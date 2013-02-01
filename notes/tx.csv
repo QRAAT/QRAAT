@@ -1,0 +1,10 @@
+use,name,freq,type,pulse_width,rise_trigger,fall_trigger,filter_alpha
+yes,N,164.5,Pulse,20,3.0,2.0,0.01
+Nope,noisy,164.5,Pulse,20,1.010,1.005,0.01
+yes,n0,164.6,Pulse,20,3.0,2.0,0.01
+yes,n1,164.7,Pulse,20,3.0,2.0,0.01
+yes,n2,164.8,Pulse,20,3.0,2.0,0.01
+yes,n3,164.9,Pulse,20,1.020,1.005,0.01
+yes,n4,164.4,Pulse,20,3.0,2.0,0.01
+yes,n5,164.3,Pulse,20,3.0,2.0,0.01
+yes,n6,164.2,Pulse,20,1.020,1.005,0.01

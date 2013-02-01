@@ -1,0 +1,398 @@
+#!/usr/bin/env python
+
+#4channel_spectrum.py
+#Visualization for the Rapid Multichannel Goniometer - UIUC-ECE
+#editted by Todd Borrowman Jan2010
+#editted by Todd Borrowman Jan2012 - updated for UHD, GnuRadio 3.5
+
+#parts of this are used under the Gnu software licence
+
+
+from gnuradio import gr, audio, eng_notation, uhd, gru
+from gnuradio.eng_option import eng_option
+from optparse import OptionParser
+from gnuradio.wxgui import stdgui2, fftsink2, form
+import wx, sys, math
+import time
+from rmg import rmg_pic_interface as pic_io
+
+# required FPGA that can do 4 rx channels.
+
+class my_graph(stdgui2.std_top_block):
+
+  def __init__(self, frame, panel, vbox, argv):
+    stdgui2.std_top_block.__init__(self, frame, panel, vbox, argv)
+
+    #Setup GUI parts
+    self.frame = frame
+    self.panel = panel
+    self.panel_1= panel_1 = wx.Panel(panel,-1)
+
+    # setup command line options
+    parser = OptionParser (option_class=eng_option)
+    parser.add_option ("-c", "--ddc-freq", type="eng_float", default=10.7e6,
+                       help="set Rx DDC frequency to FREQ", metavar="FREQ")
+    parser.add_option ("-d", "--decim", type="int", default=250,
+                       help="USRP decimation")
+    parser.add_option ("-O", "--audio_output", type="string", 
+                 default="hw:0,0", 
+	   help="pcm device name")
+    (options, args) = parser.parse_args()
+
+    if len(args) != 0:
+      parser.print_help()
+      raise SystemExit
+
+    self.nchan = 4
+    self.pic_lo = 0
+
+    # setup USRP
+    self.u = uhd.usrp_source(device_addr="fpga=usrp1_fpga_4rx.rbf",stream_args=uhd.stream_args('fc32', channels=range(self.nchan)))
+
+    #if self.u.nddcs() < nchan:
+    #   sys.stderr.write('This code requires an FPGA build with %d DDCs.  This FPGA has only %d.\n' % (
+    #      nchan, self.u.nddcs()))
+    # raise SystemExit
+                         
+    #if not self.u.set_nchannels(nchan):
+    #   sys.stderr.write('set_nchannels(%d) failed\n' % (nchan,))
+    #  raise SystemExit
+    
+    #self.subdev = (self.u.db(0,0) , self.u.db(0,1) , self.u.db(1,0) , self.u.db(1,1))
+
+    #self.u.set_mux(gru.hexint(0xf3f2f1f0))
+    self.u.set_subdev_spec("A:A A:B B:A B:B")
+    self.g_range = self.u.get_gain_range()
+    self.set_gain((self.g_range.start()+self.g_range.stop())/2)
+
+    self.usrp_center = options.ddc_freq
+    self.usrp_rate = self.u.get_clock_rate()
+    usb_rate = self.usrp_rate / options.decim
+    self.u.set_samp_rate(usb_rate)
+    #self.u.set_bandwidth(usb_rate,3)
+    print "USRP Rate", self.usrp_rate
+    print "USB Rate", self.u.get_samp_rate()
+    self.slider_range = usb_rate * 0.9375
+    self.f_lo = -self.slider_range/2
+    self.f_hi = self.slider_range/2
+    self.af_sample_rate = 8000 
+    fir_decim = long (usb_rate / self.af_sample_rate)
+    print "fir_decim ", fir_decim
+    self.frequency = 0
+
+    self.set_freq(self.usrp_center)
+
+    #self.u.tune(0, self.subdev[0], self.usrp_center)
+    #self.u.tune(1, self.subdev[1], self.usrp_center)
+    #self.u.tune(2, self.subdev[2], self.usrp_center)
+    #self.u.tune(3, self.subdev[3], self.usrp_center)
+
+    # deinterleave four channels from FPGA
+    #di = gr.deinterleave(gr.sizeof_gr_complex)
+    #self.connect(self.u, di)
+
+    # setup frequency translating filters
+    self.tune_offset = 0 
+
+    xlate_taps = gr.firdes.low_pass ( \
+      1.0, usb_rate, 3.9e3, 0.7e3, gr.firdes.WIN_HAMMING )
+
+    self.xlate1 = gr.freq_xlating_fir_filter_ccf ( \
+      fir_decim, xlate_taps, self.tune_offset, usb_rate )
+    self.xlate2 = gr.freq_xlating_fir_filter_ccf ( \
+      fir_decim, xlate_taps, self.tune_offset, usb_rate )
+    self.xlate3 = gr.freq_xlating_fir_filter_ccf ( \
+      fir_decim, xlate_taps, self.tune_offset, usb_rate )
+    self.xlate4 = gr.freq_xlating_fir_filter_ccf ( \
+      fir_decim, xlate_taps, self.tune_offset, usb_rate )
+
+    # setup individual channel control
+    self.rx1_coeff = gr.multiply_const_cc(1.0)
+    self.rx1_state = True
+    self.rx2_coeff = gr.multiply_const_cc(1.0)
+    self.rx2_state = True
+    self.rx3_coeff = gr.multiply_const_cc(1.0)
+    self.rx3_state = True
+    self.rx4_coeff = gr.multiply_const_cc(1.0)
+    self.rx4_state = True
+
+    self.sum=gr.add_cc()
+    self.connect((self.u, 0), self.xlate1, self.rx1_coeff, (self.sum,0))       # u should be udp server 
+    self.connect((self.u, 1), self.xlate2, self.rx2_coeff, (self.sum,1))
+    self.connect((self.u, 2), self.xlate3, self.rx3_coeff, (self.sum,2))
+    self.connect((self.u, 3), self.xlate4, self.rx4_coeff, (self.sum,3))
+
+    # create interleaver for file recording
+    self.interleaver = gr.interleave(gr.sizeof_gr_complex)
+    self.connect(self.xlate1,(self.interleaver,0))
+    self.connect(self.xlate2,(self.interleaver,1))
+    self.connect(self.xlate3,(self.interleaver,2))
+    self.connect(self.xlate4,(self.interleaver,3))
+    self.recording = gr.file_sink(gr.sizeof_gr_complex, "/dev/null")
+    self.recording_state = False
+    self.connect(self.interleaver, self.recording)
+
+    # create scope
+    self.scope1 = fftsink2.fft_sink_c(panel_1, fft_size=512, 
+                  sample_rate=self.af_sample_rate, fft_rate = 16, 
+                  average=True, avg_alpha=0.1, size=(512,240))
+    self.connect(self.sum, self.scope1)
+
+    # create pic_control
+    self.pic = pic_io.rmg_pic_interface()
+        
+      
+    #Setup GUI components
+    #Define new wx IDs
+
+    ID_freq_spin = wx.NewId()		# Frequency display and control
+    #define idsliders to self namespace, since these are called
+
+    ID_freq_slider = wx.NewId()	# Frequency 
+    ID_pga_slider = wx.NewId()	# Programmable Gain Amp, PGA, RF gain
+    ID_radiobox = wx.NewId()        
+    ID_pic_spin = wx.NewId()
+
+    self.freq_slider = freq_slider = wx.Slider(panel, ID_freq_slider, 0, -self.slider_range/2, self.slider_range/2)
+    self.pga_slider = pga_slider = wx.Slider(  
+      panel, ID_pga_slider, 0, self.g_range.start(), self.g_range.stop(), 
+      style=wx.SL_HORIZONTAL|wx.SL_LABELS)
+    self.pga_slider.SetValue(self.u.get_gain()) 
+
+    self.spin_ctrl_1 = spin_ctrl_1 = wx.SpinCtrl(panel, ID_freq_spin, "", min=0, max=100)
+    self.spin_ctrl_1.SetRange(self.f_lo,self.f_hi)
+    self.spin_ctrl_1.SetValue(int(self.frequency))
+
+    self.pic_spin = wx.SpinButton(panel, ID_pic_spin)
+    self.pic_spin.SetRange(2185,2480)
+
+    self.pic_spin.SetValue(self.pic.freq/100000)
+
+    self.radiobox = wx.RadioBox(panel, ID_radiobox, "PIC LO", choices = ["High", "Low"], majorDimension = 1, style = wx.RA_SPECIFY_COLS)
+
+    self.label_1 = wx.StaticText(panel,-1," PIC Frequency ")
+    self.label_2 = wx.StaticText(panel,-1," PIC Frequency \n Inc./Dec. ")
+
+    self.label_3 = label_3 = wx.StaticText(panel, -1, " Tune ")
+
+    self.label_5 = label_5 = wx.StaticText(panel, -1, " PGA ")
+
+    self.freq_slider.SetMinSize((450, 19))
+    self.pga_slider.SetMinSize((275, 35))
+
+    sizer_01 = wx.BoxSizer(wx.HORIZONTAL)
+    sizer_0 = wx.BoxSizer(wx.VERTICAL)
+    sizer_1 = wx.BoxSizer(wx.HORIZONTAL)
+    sizer_2 = wx.BoxSizer(wx.HORIZONTAL)
+    sizer_3 = wx.BoxSizer(wx.HORIZONTAL)
+    sizer_4 = wx.BoxSizer(wx.HORIZONTAL)
+    sizer_5 = wx.BoxSizer(wx.HORIZONTAL)
+    sizer_6 = wx.BoxSizer(wx.HORIZONTAL)
+
+    rx1box=wx.BoxSizer(wx.HORIZONTAL)
+    self.rx1_control = form.button_with_callback(self.panel,
+    label="RX1: ON ",
+    callback=self.toggle_rx1)
+    rx1box.Add(self.rx1_control, 0, wx.CENTER)
+
+    rx2box=wx.BoxSizer(wx.HORIZONTAL)
+    self.rx2_control = form.button_with_callback(self.panel,
+    label="RX2: ON ",
+    callback=self.toggle_rx2)
+    rx2box.Add(self.rx2_control, 0, wx.CENTER)
+
+    rx3box=wx.BoxSizer(wx.HORIZONTAL)
+    self.rx3_control = form.button_with_callback(self.panel,
+    label="RX3: ON ",
+    callback=self.toggle_rx3)
+    rx3box.Add(self.rx3_control, 0, wx.CENTER)
+
+    rx4box=wx.BoxSizer(wx.HORIZONTAL)
+    self.rx4_control = form.button_with_callback(self.panel,
+    label="RX4: ON ",
+    callback=self.toggle_rx4)
+    rx4box.Add(self.rx4_control, 0, wx.CENTER)
+
+    recbuttbox=wx.BoxSizer(wx.HORIZONTAL)
+    self.record_control = form.button_with_callback(self.panel,
+    label="Recording baseband: Off                                   ",
+    callback=self.toggle_recording)
+    recbuttbox.Add(self.record_control, 0, wx.CENTER)
+
+    sizer_3.Add(self.panel_1, 1, wx.EXPAND)
+    sizer_4.Add(self.label_3, 0, wx.ADJUST_MINSIZE)
+    sizer_4.Add(self.freq_slider, 1, wx.ADJUST_MINSIZE)
+    sizer_4.Add(self.spin_ctrl_1, 0, wx.ADJUST_MINSIZE)
+    sizer_4.Add(self.label_1, 0, wx.ALIGN_CENTER_VERTICAL | wx.ADJUST_MINSIZE)
+
+    sizer_5.Add(self.radiobox,0,wx.EXPAND)
+    sizer_5.Add(self.label_2, 0, wx.ALIGN_CENTER_VERTICAL | wx.ADJUST_MINSIZE)
+    sizer_5.Add(self.pic_spin,0,wx.EXPAND)
+    sizer_5.Add(self.label_5, 0, wx.ALIGN_CENTER_VERTICAL | wx.ADJUST_MINSIZE)
+    sizer_5.Add(self.pga_slider, 1, wx.ADJUST_MINSIZE)
+
+    sizer_6.Add(rx1box, 0, wx.ADJUST_MINSIZE)
+    sizer_6.Add(rx2box, 0, wx.ADJUST_MINSIZE)
+    sizer_6.Add(rx3box, 0, wx.ADJUST_MINSIZE)
+    sizer_6.Add(rx4box, 0, wx.ADJUST_MINSIZE)
+    vbox.Add(sizer_01,0,wx.EXPAND)
+    #vbox.Add(sizer_1, 1, wx.EXPAND, 0)
+    #vbox.Add(sizer_2, 1, wx.EXPAND, 0) 
+    vbox.Add(sizer_3, 0, wx.EXPAND) 
+    vbox.Add(sizer_4, 0, wx.EXPAND)
+    vbox.Add(sizer_5, 0, wx.EXPAND) 
+    vbox.Add(sizer_6, 0, wx.CENTER) 
+    vbox.Add(recbuttbox, 0, wx.CENTER)
+
+    wx.EVT_SLIDER(panel,ID_freq_slider,self.slide_tune)
+    wx.EVT_RADIOBOX (panel, ID_radiobox, self.radio_click )
+    wx.EVT_SLIDER(panel,ID_pga_slider,self.set_pga)
+    wx.EVT_SPINCTRL(panel,ID_freq_spin,self.spin_tune)
+    wx.EVT_SPIN_UP(panel,ID_pic_spin,self.pic_up)
+    wx.EVT_SPIN_DOWN(panel,ID_pic_spin,self.pic_down)
+    self.change_freq_label()
+
+#toggles Ch 1 on/off
+  def toggle_rx1(self):
+    if self.rx1_state == True:
+      self.rx1_state = False
+      self.rx1_coeff.set_k(0.0)
+      self.rx1_control.SetLabel("RX1: OFF")
+    else:
+      self.rx1_state = True
+      self.rx1_coeff.set_k(1.0)
+      self.rx1_control.SetLabel("RX1: ON")
+
+#toggles Ch 2 on/off
+  def toggle_rx2(self):
+    if self.rx2_state == True:
+      self.rx2_state = False
+      self.rx2_coeff.set_k(0.0)
+      self.rx2_control.SetLabel("RX2: OFF")
+    else:
+      self.rx2_state = True
+      self.rx2_coeff.set_k(1.0)
+      self.rx2_control.SetLabel("RX2: ON")
+
+#toggles Ch 3 on/off
+  def toggle_rx3(self):
+    if( self.rx3_state == True):
+      self.rx3_state = False
+      self.rx3_coeff.set_k(0.0)
+      self.rx3_control.SetLabel("RX3: OFF")
+    else:
+      self.rx3_state = True
+      self.rx3_coeff.set_k(1.0)
+      self.rx3_control.SetLabel("RX3: ON")
+
+#toggles Ch 4 on/off
+  def toggle_rx4(self):
+    if( self.rx4_state == True):
+      self.rx4_state = False
+      self.rx4_coeff.set_k(0.0)
+      self.rx4_control.SetLabel("RX4: OFF")
+    else:
+      self.rx4_state = True
+      self.rx4_coeff.set_k(1.0)
+      self.rx4_control.SetLabel("RX4: ON")
+
+#toggles Recording on/off
+  def toggle_recording(self):
+    # Pick up current localtime
+    localtime=time.localtime()
+
+    # Generate filename
+    filename="%04d%02d%02d%02d%02d%02d.tdat" % \
+      (localtime.tm_year, localtime.tm_mon, localtime.tm_mday, 
+      localtime.tm_hour, localtime.tm_min, localtime.tm_sec)
+
+    # Current recording? Flip state
+    if self.recording_state == True:
+      self.recording_state = False
+      self.record_control.SetLabel("Recording Baseband: Off                                  ")
+      self.recording.close()
+    # Not recording? 
+    else:
+      self.recording_state=True
+      self.record_control.SetLabel("Recording baseband to: "+filename)
+      # Cause gr_file_sink object to accept new filename
+      self.recording.open( "./"+filename)
+
+
+#sets gain on all receiver channels
+  def set_gain(self, gain):
+    for i in range(self.nchan):
+      self.u.set_gain(gain,i)
+
+#sets frequency of all receiver channels
+  def set_freq(self, target_freq):
+      ok = True
+      for j in range(self.nchan):
+          r = self.u.set_center_freq(target_freq,j)
+          if not r:
+              ok = False
+              print "set_freq: failed to set subdev[%d] freq to %f" % (
+                  i, target_freq)
+      return ok
+
+#toggles audio band
+  def radio_click(self, event):
+      radiobox = event.GetEventObject()
+      self.pic_lo = radiobox.GetSelection()
+      self.change_freq_label()
+      if self.pic_lo == 0:
+          self.pic.use_high_lo()
+          self.set_freq(self.usrp_center)
+      else:
+          self.pic.use_low_lo()
+          self.set_freq(-self.usrp_center)
+
+#pga slider event, change receiver gain accordingly
+  def set_pga(self,event):
+    self.set_gain(self.pga_slider.GetValue())
+
+#frequency slider event, retune receiver
+  def slide_tune(self, event):
+    self.frequency = self.freq_slider.GetValue()
+    self.xlate1.set_center_freq(-self.frequency)
+    self.xlate2.set_center_freq(-self.frequency)
+    self.xlate3.set_center_freq(-self.frequency)
+    self.xlate4.set_center_freq(-self.frequency)
+    self.spin_ctrl_1.SetValue(self.frequency)
+    self.change_freq_label() 
+
+#frequency spin box event, retune receiver
+  def spin_tune(self, event):
+    self.frequency = self.spin_ctrl_1.GetValue()
+    self.xlate1.set_center_freq(-self.frequency)
+    self.xlate2.set_center_freq(-self.frequency)
+    self.xlate3.set_center_freq(-self.frequency)
+    self.xlate4.set_center_freq(-self.frequency)
+    self.freq_slider.SetValue(int(self.frequency))
+    self.change_freq_label() 
+
+  def pic_up(self,event):
+    self.pic.inc_freq()
+    self.pic.freq = self.pic.freq + 100000
+    self.change_freq_label() 
+
+  def pic_down(self,event):
+    self.pic.dec_freq()
+    self.pic.freq = self.pic.freq - 100000
+    self.change_freq_label() 
+
+  def change_freq_label(self):
+    if not self.pic_lo:
+      freq_value = self.pic.freq - 70000000 + self.spin_ctrl_1.GetValue()
+    else:
+      freq_value = self.pic.freq + 70000000 + self.spin_ctrl_1.GetValue()
+
+    self.label_1.SetLabel("RMG Center Frequency\n{0:f} MHz".format(freq_value/1000000.0))
+
+
+def main ():
+  app = stdgui2.stdapp(my_graph, "4 Channel Sum Spectrum Analyzer", nstatus=1)
+  app.MainLoop()
+
+if __name__ == '__main__':
+    main ()

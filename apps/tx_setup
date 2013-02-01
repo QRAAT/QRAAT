@@ -1,0 +1,10 @@
+#!/usr/bin/env python
+#runs the setup script to enter transmitters
+
+from gnuradio import gr, blks2, uhd, gru
+import rmg, wx
+
+app = wx.PySimpleApp()
+frame = rmg.rmg_setup.rmg_window(None, wx.ID_ANY, "Transmitter Setup for RMG")
+
+app.MainLoop()

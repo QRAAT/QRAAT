@@ -1,0 +1,40 @@
+#!/usr/bin/env python
+#Runs the RMG
+
+from gnuradio import gr, blks2, uhd, gru
+import rmg
+from optparse import OptionParser
+
+parser = OptionParser ()
+parser.add_option ("-f", "--tx_file", type="string", 
+	                   default="tx.csv", 
+			   help="csv file with transmitter info ")
+parser.add_option ("-t", "--time", type="int",
+                           default=6,
+                           help="time in seconds to look at each frequency")
+parser.add_option ("-p", "--port", type="string",
+                           default="/dev/ttyS0",
+                           help="serial port for communication to RMG PIC")
+parser.add_option ("-n", "--no_usrp", action="store_true", dest="NO_USRP",
+                           default=False,
+                           help="use null_source instead of USRP")
+parser.add_option ("-d", "--directory", type="string",
+                           default="/ramdisk/det_files",
+                           help="directory to save .det files")
+parser.add_option ("-b", "--bands", type="int",
+                           default=32,
+                           help="number of bands to use")
+
+(options, args) = parser.parse_args()
+
+if len(args) != 0:
+    parser.print_help()
+    raise SystemExit
+
+dir_finder = rmg.rmg_run.detector_array(options.tx_file,
+                                        options.directory,
+                                        options.bands,
+                                        options.port,
+                                        options.NO_USRP)
+dir_finder.run(options.time)
+
