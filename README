@@ -1,6 +1,25 @@
-Code for the RMG project.
+This is comprised of software for the Quail Ridge Automated Animal Trackking
+(QRAAT) project. It remains under major development, but is distributed nonetheless 
+under the terms of the GNU General Public License, in the hopes that it will 
+be useful. 
 
-installation instructions:
+The RMG module (as we have been calling it) is a signal processing block that works
+in the GNU Radio framework. After building and installing, the following programs 
+are made available from the command line: 
+
+  4channel_spectrum 
+  4channel_spectrum_{serv,client}
+  tx_setup
+  run_rmg
+  read_det
+  active_rmg
+
+For usage instructions, refer to the documentation. 
+
+Installation
+------------
+A more lengthy and useful set of instructions is available in our documentation. 
+However, these simple instructions should suffice if you know what you're doing. 
 
 ./build-gnuradio
 <Will take about an hour for a full download/build/install>
@@ -10,13 +29,4 @@ vi ~/.bashrc
 
 ./install-rmg install
 <build/install Todd's code>
-
-  After installation, the following scripts are made available 
-  from the command line:
-   4channel_spectrum
-   4channel_specturm_{serv,client}
-   tx_setup
-   run_rmg
-   read_det
-
 

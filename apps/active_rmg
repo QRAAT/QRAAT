@@ -1,14 +1,25 @@
 #!/usr/bin/env python
+# active_rmg 
+# Visualization of activity data. This simple program collects output
+# from the running RMG module and displays statistical infomration
+# about the pulses. This information is used as a proxy to determine
+# the "activity levels" of targets, based on SNR. This file is part of 
+# QRAAT, an automated animal tracking system based on GNU Radio. 
 #
-# Christopher Patton ~9 Nov 2012
-# John Muir Institute for the Environment
-# UC Davis
-#
-# This simple program collects the output from the RMG module written
-# by Todd Borrowman and displays statistical information about the 
-# pulses in a window. This information is used as a proxy to determine
-# the "activity levels" of targets, based on SNR.  
-#
+# Copyright (C) 2012 Todd Borrowman, Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import wxversion
 wxversion.select("2.8")

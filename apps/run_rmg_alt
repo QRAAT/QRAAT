@@ -1,14 +1,29 @@
 #!/usr/bin/env python
-# 
-# Alternative script for running RMG module.
-# This was written to eliminate all possible complexity in the code in order
-# to identify bottleneck in the signal processing that was causing the USRP 
-# buffer to overflow ("00000 ... 00" appear in stderr). We instantiate only
-# the necessary components of the graph and fix the number of channels and 
-# detectors (nchan and nbank respectively).
+# run_rmg_alt
+# Alternative script for running RMG module. This was written to eliminate 
+# all possible complexity in the code in order to identify bottleneck in 
+# the signal processing that was causing the USRP buffer to overflow 
+# ("00000 ... 00" appear in stderr). We instantiate only the necessary 
+# components of the graph and fix the number of channels and detectors 
+# (nchan and nbank respectively).
+
+# This file is part of QRAAT, an automated animal tracking system 
+# based on GNU Radio. 
 #
-# Christoper Patton 07 Aug 2012
- 
+# Copyright (C) 2012 Todd Borrowman, Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from gnuradio import gr, blks2, uhd, gru
 from rmg import *

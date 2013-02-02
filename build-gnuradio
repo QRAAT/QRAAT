@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Build script for UHD+GnuRadio on Fedora and Ubuntu
-#
-#
+# Build script for UHD+GnuRadio on Fedora and Ubuntu. This 
+# not ours, but is provided freely for users of GNU Radio. 
 #
 # Updates: https://github.com/guruofquality/grextras/wiki
 # Updates: https://github.com/balint256/gr-baz.git

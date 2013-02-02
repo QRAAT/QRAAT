@@ -20,8 +20,6 @@
 # Boston, MA 02111-1307, USA.
 # 
 
-#editted by Todd Borrowman ECE-UIUC 01/18/08~02/2010
-
 from gnuradio import gr, gr_unittest, blks2
 import rmg
 

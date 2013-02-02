@@ -1,14 +1,22 @@
-/**
- * Implementation of peak detector block
- * input - data stream
- * output - .det files storing individual detected pulses
- * Todd Borrowman ECE-UIUC 01/30/08~02/2010
- * TAB 01/2012 added enable/disable
- *
- * TODO Chris 7/24/12
- * clarify the file outputting  (status.txt, .det's). There should be 
- * two file descriptors for the debug info (status.txt) and pulse 
- * data respectively.
+/* detectmod_detect.cc
+ * Implementation of the detectmod_detect class, the peak detector and 
+ * main component of this work. This file is part of QRAAT, an automated 
+ * animal tracking system  based on GNU Radio. 
+ * 
+ * Copyright (C) 2012 Todd Borrowman, Christopher Patton
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -274,7 +282,7 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   float noise_db = 10.0*log10(pkdet->avg/1e-5);
   strftime(time_string,40,"%H:%M:%S %d %b %Y",time_struct);
   
-  printf("pulse %s,%ld,%f,%f\n", tx_name, int_seconds, noise_db, snr);  
+  printf("pulse %s,%d,%f,%f\n", tx_name, int_seconds, noise_db, snr);  
   printf("%s\n\t%s\n\t\tNoise Floor: %.2f dB, SNR: %.2f dB\n",time_string, filename, noise_db, snr);
 
   //get data buffer and index from data_holder

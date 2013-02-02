@@ -30,6 +30,8 @@ GR_PYTHON_INSTALL(
     active_rmg
     run_rmg
     run_rmg_alt
+    process_det.py # TODO 
+    proc_det.sh    # TODO 
     DESTINATION bin
 )
 
