@@ -13,10 +13,7 @@ SUDOASKED=false
 CALL_DIR=$(pwd)
 LOG=$(pwd)/install_rmg_log.txt
 RMG_SRC=$(pwd)
-if [ ! $RMG_BUILD ]; then
-  RMG_BUILD=$(pwd)/build
-  add_rmg_build=true
-fi 
+RMG_BUILD=$(pwd)/build
 
 # 
 # verify we're not running as root
@@ -52,8 +49,6 @@ usage: rmg install/uninstall [-h,--help] [-v,--verbose]
   -b        defaults to \$RMG_BUILD if set, otherwise
             \$(pwd)/build 
 
-  This program will modify $USER's .bashrc to set the environment 
-  varaible \$RMG_BUILD = <build-directory>
 !EOF!
 }
 
@@ -264,7 +259,6 @@ do
       shift
       if [ $1 ]; then
         RMG_BUILD=$(readlink -f $1)
-        add_rmg_build=true
       else 
         echo '--build-dir <build-directory>'
         exit
@@ -292,10 +286,6 @@ done
 
 if [ $INSTALL = true ]; then
   install
-  if [ $add_rmg_build ]; then 
-    echo "export RMG_BUILD=$RMG_BUILD" >> ~/.bashrc
-    echo "$USER's .bashrc has been updated."
-  fi
 fi
 
 if [ $UNINSTALL = true ]; then
