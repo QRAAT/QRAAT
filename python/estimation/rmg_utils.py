@@ -5,14 +5,6 @@ import antenna_pattern
 import struct
 import os
 
-
-def find_site_pos(waypoint_filename, waypoint_name):
-
-    gw = gpx_handler.gpx_waypoints(waypoint_filename)
-    rmg_loc_ll = gw.get_waypoint(waypoint_name)
-    rmg_loc_utm = gpx_handler.convert_ll_to_utm(rmg_loc_ll)
-    return rmg_loc_utm
-
 class gps_data:
   def __init__(self, gpx_filename, rmg_loc_utm = None):
 
@@ -180,6 +172,7 @@ class bearing_data:
             sig = rmg.e_sig
         else:
             print "Invalid signal type <{0}>, using default <f>".format(type_str)
+            sig = rmg.f_sig
         for j in range(self.num_records):
             (self.bearing_prob[j,:], self.estimates[j]) = pat.likelihood_estimation(sig[j,:])
         

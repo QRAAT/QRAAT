@@ -186,6 +186,13 @@ class gpx_waypoints:
         return loc
             
 
+def find_site_pos(waypoint_filename, waypoint_name):
+
+    gw = gpx_waypoints(waypoint_filename)
+    rmg_loc_ll = gw.get_waypoint(waypoint_name)
+    rmg_loc_utm = convert_ll_to_utm(rmg_loc_ll)
+    return rmg_loc_utm
+
 
 if __name__ == "__main__":
 
