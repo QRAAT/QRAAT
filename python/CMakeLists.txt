@@ -38,8 +38,6 @@ GR_PYTHON_INSTALL(
     rmg_editors.py
     rmg_pic_interface.py
     rmg_validators.py
-    est_dict.py
-    det_file.py
     DESTINATION ${GR_PYTHON_DIR}/rmg
 )
 
