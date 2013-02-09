@@ -1,0 +1,191 @@
+#!/bin/bash
+# rmg
+# This script is part of the QRAAT system. It provides basic server
+# side controls for RMG comptures/receiver running remotely. 
+#
+# Copyright (C) 2013 Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Notes and taks for Marcel and Todd's info: 
+# * Lots of TODO's. None of the functions are implemented yet; this is 
+#   just the skeleton so far. 8 Feb 2013
+# 
+# * This script won't check for connectivity ... it would make it too 
+#   cumbersome. So after doing something like 'rmg up 2', you might 
+#   try ping 10.2.1.55 to verify. 
+#
+# * Consistency guarentees. 'fetch' renames all files on the ramdisk 
+#   (/home/rmg/det/ on the remote host) with a postfix '.fetch'. These 
+#   files are scp'ed to the server, then deleted from the remote host.
+#   One point of concern is if there is an open file descriptor in the 
+#   directory. We could modify the peak detector to rename the file 
+#   after it finishes it in order to guarentee mutual exclusion.
+# 
+# * If 'stop' is called, then 'fetch' is called first. However, neither
+#   'fetch' nor 'stop' are called if 'down' is called. In this case, 
+#   remaining .det's are stored in a tarball to disk. 
+#
+# * TODO modify run_rmg to create a ramdisk for the .det files directly. 
+#   Incorporate Todd's script into the Python. 
+#
+
+
+function help {
+  cat <<!EOF!
+usage: rmg task [-options] {sites}/all  
+
+  This program is part of the QRAAT system. It provides basic controls
+  for RMG computers/receivers running in the field. Perform a batch job
+  on a list of sites. If 'all' is provided, the job will be dispatched to 
+  all up sites.   
+
+  'task' is any one of the following: 
+
+    up           Power on remote computer and RMG receiver. 
+
+    down         Power off remote computer and RMG receiver. 
+
+    start        Sart RMG software defined radio. Store pulse data remotely. 
+
+    stop         Stop running RMG software defined radio. 
+
+    fetch        Download pulse data from site to server. Delete downloaded 
+                 data from remote machine. 
+    
+    updatetx --file FILE    Update transmitter file on remote computer. 
+                            Defaults to 'tx.csv' in working directory.
+
+    cyclerx      Power off the RMG receiver and power it back on.
+
+    help         Print this. 
+!EOF!
+}
+
+# get task and options
+TASK=$1 
+shift
+
+case $TASK in
+ -h|--help|help)
+   help
+   exit 0
+  ;; 
+
+  updatetx)
+    if [[ "$1" == "-f" ]] || [[ "$1" == "--file" ]] 
+    then
+      TX_FILE=$2
+      shift
+      shift
+    else     
+      TX_FILE="tx.csv"
+    fi
+  ;;
+esac 
+
+# list of sites to run routine on 
+SITES=""
+for SITE in $@ 
+do
+  if [[ $SITE =~ ^[0-9]+$ ]]
+  then
+    [[ ! $SITES =~ $SITE ]] && SITES="$SITES $SITE"
+  else
+    echo error: site \'$SITE\` not recognized.
+    exit 1
+  fi
+done
+
+# list of sites that are up
+UP_SITES=$(cat up_sites)
+
+for SITE in $SITES
+do
+  case $TASK in 
+    up)
+      if [[ $UP_SITES =~ $SITE ]]
+      then
+        echo "site$SITE already up!"
+      else
+        echo "up site$SITE"
+        UP_SITES="$UP_SITES $SITE"
+        # TODO Tell the switch to bring up the computer, then the RMG
+        # receiver. The computer will be addressable as !0.$SITE.1.55. 
+        # Let's say the switch is 10.$SITE.1.56. This will go something 
+        # like this:
+        # telnet 10.$SITE.1.56 power on 0
+        # telnet 10.$SITE.1.56 power on 1
+      fi
+    ;; 
+
+    down)
+      if [[ $UP_SITES =~ $SITE ]]
+      then
+        echo "down site$SITE"
+        UP_SITES=`echo ${UP_SITES[@]//$SITE/}`
+        # TODO Kill SIGINT run_rmg. Archive any remaining .det's on ramdisk. 
+        # Name the tarball with the date/time of creation. Halt computer. Wait a
+        # a sufficient amount of time, then power off RMG and computer. 
+        # ssh root@10.$SITE.1.55 /sbin/halt
+        # sleep(5) 
+        # telnet 10.$SITE.1.56 power off 0
+        # telnet 10.$SITE.1.56 power off 1
+      else 
+        echo "site$SITE already down!"
+      fi
+    ;;
+    
+    start) 
+      echo "start site$SITE"
+      # TODO Do 'stop' to make sure things are clean. Start run_rmg. 
+    ;;
+
+    stop) 
+      echo "stop site$SITE"
+      # TODO kill SIGINT run_rmg. Do 'fetch'. Archive any remaining .det's, 
+      # name the file with the date/time of creation. Clear ram disk.
+    ;;
+
+    fetch)
+      echo "fetch site$SITE"
+      # TODO rename all .det's in ram disk directory: mv $name.det $name.det.fetch
+      # mkdir -p $SITE
+      # scp rmg@10.$SITE.1.55:det/*.det.fetch $SITE/
+      # ssh rmg@10.$SITE.1.55 rm det/*fetch
+      # mv $SITE/$name.det.fetch $SITE/$name.det
+    ;;
+    
+    updatetx) 
+      echo "udpatetx site$SITE"
+      # TODO copy specified transmitter file. 
+      # scp $TX_FILE rmg@10.$SITE.1.55:config/tx.csv
+    ;;
+
+    cyclerx)
+      echo "cyclerx site$SITE" 
+      # TODO Cycle RMG receiver power. 
+      # telnet 10.$SITE.1.56 power off 1
+      # telnet 10.$SITE.1.56 power on 1
+    ;;
+    
+    *)
+      echo error: unrecognized task \'$TASK\'
+      exit 1
+    ;;
+
+  esac
+done
+
+echo $UP_SITES | cat > up_sites

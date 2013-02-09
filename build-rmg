@@ -28,7 +28,7 @@ fi
 function help {
   cat <<!EOF!
 
-usage: rmg install/uninstall [-h,--help] [-v,--verbose] 
+usage: build-rmg install/uninstall [-h,--help] [-v,--verbose] 
            [-l/--log] <file>
            [-s/--source-dir] <source-directory>
            [-b/--build-dir] <build-directory>
