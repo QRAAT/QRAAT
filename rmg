@@ -99,7 +99,7 @@ esac
 SITES=""
 for SITE in $@ 
 do
-  if [[ $SITE =~ ^[0-9]+$ ]]
+  if [[ $SITE =~ [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3} ]] || [[ $(grep /etc/hosts -e "$SITE") ]] 
   then
     [[ ! $SITES =~ $SITE ]] && SITES="$SITES $SITE"
   else
@@ -109,17 +109,18 @@ do
 done
 
 # list of sites that are up
-UP_SITES=$(cat up_sites)
+UP_SITES=$(cat up_sites 2> /dev/null)
 
+ct=0
 for SITE in $SITES
 do
   case $TASK in 
     up)
       if [[ $UP_SITES =~ $SITE ]]
       then
-        echo "site$SITE already up!"
+        echo "$SITE already up!"
       else
-        echo "up site$SITE"
+        echo "up $SITE"
         UP_SITES="$UP_SITES $SITE"
         # TODO Tell the switch to bring up the computer, then the RMG
         # receiver. The computer will be addressable as !0.$SITE.1.55. 
@@ -133,7 +134,7 @@ do
     down)
       if [[ $UP_SITES =~ $SITE ]]
       then
-        echo "down site$SITE"
+        echo "down $SITE"
         UP_SITES=`echo ${UP_SITES[@]//$SITE/}`
         # TODO Kill SIGINT run_rmg. Archive any remaining .det's on ramdisk. 
         # Name the tarball with the date/time of creation. Halt computer. Wait a
@@ -143,23 +144,23 @@ do
         # telnet 10.$SITE.1.56 power off 0
         # telnet 10.$SITE.1.56 power off 1
       else 
-        echo "site$SITE already down!"
+        echo "$ITE already down!"
       fi
     ;;
     
     start) 
-      echo "start site$SITE"
+      echo "start $SITE"
       # TODO Do 'stop' to make sure things are clean. Start run_rmg. 
     ;;
 
     stop) 
-      echo "stop site$SITE"
+      echo "stop $SITE"
       # TODO kill SIGINT run_rmg. Do 'fetch'. Archive any remaining .det's, 
       # name the file with the date/time of creation. Clear ram disk.
     ;;
 
     fetch)
-      echo "fetch site$SITE"
+      echo "fetch $SITE"
       # TODO rename all .det's in ram disk directory: mv $name.det $name.det.fetch
       # mkdir -p $SITE
       # scp rmg@10.$SITE.1.55:det/*.det.fetch $SITE/
@@ -168,13 +169,13 @@ do
     ;;
     
     updatetx) 
-      echo "udpatetx site$SITE"
+      echo "udpatetx $SITE"
       # TODO copy specified transmitter file. 
       # scp $TX_FILE rmg@10.$SITE.1.55:config/tx.csv
     ;;
 
     cyclerx)
-      echo "cyclerx site$SITE" 
+      echo "cyclerx $SITE" 
       # TODO Cycle RMG receiver power. 
       # telnet 10.$SITE.1.56 power off 1
       # telnet 10.$SITE.1.56 power on 1
@@ -186,6 +187,19 @@ do
     ;;
 
   esac
+  let ct=ct+1
 done
 
+
+if [ $ct -eq 0 ]
+then
+  case $TASK in
+  up) # if no sites provided by user, just list up sites
+    echo up $UP_SITES
+    ;;
+    
+  esac
+fi 
+
 echo $UP_SITES | cat > up_sites
+export UP_SITES
