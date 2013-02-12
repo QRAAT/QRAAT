@@ -1,0 +1,16 @@
+Chris's notes
+
+Access to serial port for selected users:
+cat /etc/groups | grep /dev/ttyS0 # make sure there's no group already
+groupadd serial 
+chgrp serial /dev/ttyS0 /dev/ttyUSB0
+chmod 0060 /dev/ttyS0
+ls -l /dev/ttyS0
+
+For all: 
+chmod a+rw /dev/ttyS0
+
+Ramdisk setup: 
+mkdir /tmp/ramdisk
+chmod 666 /tmp/ramdisk
+mount -t tmpfs -o size=256M tmpfs /tmp/ramdisk/
