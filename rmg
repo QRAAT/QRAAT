@@ -41,6 +41,7 @@
 #   Incorporate Todd's script into the Python. 
 #
 
+RAMDISK=256 # size (MB) of ramdisk for running rmg. 
 
 function help {
   cat <<!EOF!
@@ -72,6 +73,24 @@ usage: rmg task [-options] {sites}/all
     help         Print this. 
 !EOF!
 }
+
+# FIXME ~11 Feb 2013
+# In order to mount a ramdisk, root is required. If we do it this way
+# (send script as a command), there is no tty and the password can't 
+# be entered. Alternatively, we make this its own file and do: 
+# ssh rmg@$SITE -m start_script.sh
+# That or we can modify /etc/rc.local on RMG remote machine to 
+# create a ramdisk with open permissions (666). 
+function start {
+  echo "\
+mkdir -p /home/rmg/det; \
+[[ \! $(mount | grep -e \"det.*tmpfs\") ]] && \
+sudo mount -t tmpfs -o size=${RAMDISK}M tmpfs /home/rmg/det; \ 
+/usr/local/bin/run_rmg -d det -f tx.csv &> \
+run_rmg_$(date -d 'today' +\"%d.%m.%Y_%H.%M\").txt &
+"
+}
+
 
 # get task and options
 TASK=$1 
@@ -123,9 +142,8 @@ do
         echo "up $SITE"
         UP_SITES="$UP_SITES $SITE"
         # TODO Tell the switch to bring up the computer, then the RMG
-        # receiver. The computer will be addressable as !0.$SITE.1.55. 
-        # Let's say the switch is 10.$SITE.1.56. This will go something 
-        # like this:
+        # receiver. Let's say the switch is 10.$SITE.1.56. This will go 
+        # something like this:
         # telnet 10.$SITE.1.56 power on 0
         # telnet 10.$SITE.1.56 power on 1
       fi
@@ -139,24 +157,36 @@ do
         # TODO Kill SIGINT run_rmg. Archive any remaining .det's on ramdisk. 
         # Name the tarball with the date/time of creation. Halt computer. Wait a
         # a sufficient amount of time, then power off RMG and computer. 
-        # ssh root@10.$SITE.1.55 /sbin/halt
+        # ssh root@$SITE /sbin/halt
         # sleep(5) 
         # telnet 10.$SITE.1.56 power off 0
         # telnet 10.$SITE.1.56 power off 1
       else 
-        echo "$ITE already down!"
+        echo "$SITE already down!"
       fi
     ;;
     
     start) 
       echo "start $SITE"
-      # TODO Do 'stop' to make sure things are clean. Start run_rmg. 
+      # Start an RMG process on remote machine. Redirect all output to a 
+      # timestamped log file. 
+      if [[ $UP_SITES =~ $SITE ]]
+      then
+        ssh rmg@$SITE $(start) # FIXME, see rmg:77
+      else 
+        echo "$SITE is currently down."
+      fi 
+
     ;;
 
     stop) 
       echo "stop $SITE"
-      # TODO kill SIGINT run_rmg. Do 'fetch'. Archive any remaining .det's, 
-      # name the file with the date/time of creation. Clear ram disk.
+      if [[ $UP_SITES =~ $SITE ]]
+      then
+        ssh rmg@$SITE '/usr/bin/killall run_rmg 2> /dev/null'
+      else 
+        echo "$SITE is currently down."
+      fi 
     ;;
 
     fetch)
@@ -170,8 +200,12 @@ do
     
     updatetx) 
       echo "udpatetx $SITE"
-      # TODO copy specified transmitter file. 
-      # scp $TX_FILE rmg@10.$SITE.1.55:config/tx.csv
+      if [ -e $TX_FILE ]
+      then
+        scp $TX_FILE rmg@$SITE:/home/rmg/tx.csv 
+      else 
+        echo "error: '$TX_FILE' doesn't exist"
+      fi
     ;;
 
     cyclerx)
