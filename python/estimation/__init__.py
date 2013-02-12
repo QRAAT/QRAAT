@@ -44,6 +44,7 @@ if _RTLD_GLOBAL != 0:
 import antenna_pattern
 import det_file
 import est_dict
+import est_data
 import gpx_handler
 import rmg_plot_utils
 import rmg_utils
