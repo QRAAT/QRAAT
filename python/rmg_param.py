@@ -32,7 +32,7 @@ class band:
 
     def __init__(self, tx_data, band_num, band_cf, filter_length, directory):
         self.name = tx_data[0]
-        self.file_prefix = directory + '/' + self.name + '_'
+        self.directory = directory
         self.band_num = band_num
         self.cf = band_cf
         self.tx_type = tx_data[2]
