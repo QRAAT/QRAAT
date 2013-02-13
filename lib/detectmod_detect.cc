@@ -251,12 +251,12 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
  */
 
   //Get time
-  struct timeval *tp = (struct timeval *)malloc(sizeof(struct timeval));
-  gettimeofday(tp, NULL);
+  struct timeval tp;
+  gettimeofday(&tp, NULL);
   void *temp;
-  struct tm *time_struct = gmtime(&(tp->tv_sec));
-  int int_seconds = (int)tp->tv_sec;
-  int int_useconds = (int)tp->tv_usec;
+  struct tm *time_struct = localtime(&(tp.tv_sec));
+  int int_seconds = (int)tp.tv_sec;
+  int int_useconds = (int)tp.tv_usec;
 
   // Create diretory tree. 
   char *str = (char *)malloc(256*sizeof(char)),
@@ -273,7 +273,6 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
       switch (errno) {
         case EEXIST: break;
         default:     perror("mkdir"); 
-                     free(tp);
                      free(str);
                      free(filename); 
                      return; 
@@ -297,7 +296,6 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   if (!open_file(filename) || !d_fp) {
     free(u_sec); 
     free(time_string); 
-    free(tp);
     free(str);
     free(filename); 
     return;
@@ -328,7 +326,6 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   free(filename);
   free(str); 
   free(u_sec);
-  free(tp);
 
 }
 
