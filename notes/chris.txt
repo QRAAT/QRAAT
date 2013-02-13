@@ -7,6 +7,8 @@ chgrp serial /dev/ttyS0 /dev/ttyUSB0
 chmod 0060 /dev/ttyS0
 ls -l /dev/ttyS0
 
+usermod -a -G serial <user> 
+
 For all: 
 chmod a+rw /dev/ttyS0
 
