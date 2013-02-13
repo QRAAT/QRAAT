@@ -74,24 +74,6 @@ usage: rmg task [-options] {sites}/all
 !EOF!
 }
 
-# FIXME ~11 Feb 2013
-# In order to mount a ramdisk, root is required. If we do it this way
-# (send script as a command), there is no tty and the password can't 
-# be entered. Alternatively, we make this its own file and do: 
-# ssh rmg@$SITE -m start_script.sh
-# That or we can modify /etc/rc.local on RMG remote machine to 
-# create a ramdisk with open permissions (666). 
-function start {
-  echo "\
-mkdir -p /home/rmg/det; \
-[[ \! $(mount | grep -e \"det.*tmpfs\") ]] && \
-sudo mount -t tmpfs -o size=${RAMDISK}M tmpfs /home/rmg/det; \ 
-/usr/local/bin/run_rmg -d det -f tx.csv &> \
-run_rmg_$(date -d 'today' +\"%d.%m.%Y_%H.%M\").txt &
-"
-}
-
-
 # get task and options
 TASK=$1 
 shift
@@ -172,7 +154,8 @@ do
       # timestamped log file. 
       if [[ $UP_SITES =~ $SITE ]]
       then
-        ssh rmg@$SITE $(start) # FIXME, see rmg:77
+        ssh rmg@$SITE "/usr/local/bin/run_rmg -d /tmp/ramdisk -f tx.csv &> \
+                       run_rmg_$(date -d 'today' +"%d.%m.%Y_%H.%M").txt &"
       else 
         echo "$SITE is currently down."
       fi 

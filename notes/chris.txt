@@ -11,6 +11,10 @@ For all:
 chmod a+rw /dev/ttyS0
 
 Ramdisk setup: 
-mkdir /tmp/ramdisk
-chmod 666 /tmp/ramdisk
-mount -t tmpfs -o size=256M tmpfs /tmp/ramdisk/
+Add the following line to /etc/fstab:
+tmpfs   /tmp/ramdisk  tmpfs  nodev/nosuid,mode=1777,size=512M   0   0
+Where the entries are separated by tabs \t. 
+
+ssh keys TODO: 
+It will be nice to pass around RSA keys instead of typing dumb passwords. 
+
