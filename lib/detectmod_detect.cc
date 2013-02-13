@@ -33,6 +33,7 @@
 #include <sys/time.h>
 #include <string.h>
 #include <math.h>
+#include <errno.h>
 
 #ifndef O_BINARY
 #define	O_BINARY 0
@@ -42,7 +43,7 @@ detectmod_detect_sptr
 detectmod_make_detect (int pulse_width, 
                        int save_width, 
                        int channels, 
-                       const char *fileprefix, 
+                       const char *directory, 
                        const char *tx_name,
                        float rate, 
                        float center_freq, 
@@ -55,7 +56,7 @@ detectmod_make_detect (int pulse_width,
     new detectmod_detect (pulse_width, 
                           save_width, 
                           channels, 
-                          fileprefix, 
+                          directory, 
                           tx_name,
                           rate, 
                           center_freq, 
@@ -66,7 +67,7 @@ detectmod_make_detect (int pulse_width,
 detectmod_detect::detectmod_detect (int pulse_width, 
                                     int save_width, 
                                     int _ch, 
-                                    const char *_fileprefix, 
+                                    const char *_directory, 
                                     const char *_tx_name,
                                     float _rate, 
                                     float _c_freq, 
@@ -96,8 +97,8 @@ detectmod_detect::detectmod_detect (int pulse_width,
     save_length = save_width;
   }
 
-  fileprefix = (char *)malloc((strlen(_fileprefix) + 1) * sizeof(char));
-  strcpy(fileprefix, _fileprefix);
+  directory = (char *)malloc((strlen(_directory) + 1) * sizeof(char));
+  strcpy(directory, _directory);
 
   tx_name = (char *)malloc((strlen(_tx_name) + 1) * sizeof(char)); 
   strcpy(tx_name, _tx_name); 
@@ -120,7 +121,7 @@ detectmod_detect::detectmod_detect (int pulse_width,
 detectmod_detect::~detectmod_detect(){
 
   close();
-  free(fileprefix); 
+  free(directory); 
   free(tx_name);
   delete acc;
   delete save_holder;
@@ -168,7 +169,7 @@ detectmod_detect::work (int noutput_items,
             state = DETECT;
                     //initial estimate of the noise floor for detector
             pkdet->avg = acc_total;
-            printf("%s Seed: %e\n",fileprefix,acc_total);
+            printf("%s Seed: %e\n",directory,acc_total);
           }
         break;
       
@@ -249,8 +250,6 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
  * Writes the pulse data as a .det file
  */
 
-
-
   //Get time
   struct timeval *tp = (struct timeval *)malloc(sizeof(struct timeval));
   gettimeofday(tp, NULL);
@@ -258,24 +257,53 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   struct tm *time_struct = gmtime(&(tp->tv_sec));
   int int_seconds = (int)tp->tv_sec;
   int int_useconds = (int)tp->tv_usec;
+
+  // Create diretory tree. 
+  char *str = (char *)malloc(256*sizeof(char)),
+       *filename = (char *)malloc((strlen(directory)+256)*sizeof(char)),
+       *pch; 
+  strftime(str, 256, "%Y/%m/%d/%H/%M", time_struct);
+  strcpy(filename, directory);
+  strcat(filename, "/"); 
+  pch = strtok(str, "/");
+  while (pch != NULL) {
+    strcat(filename, pch); 
+    strcat(filename, "/");
+    if (mkdir(filename, 0777) == -1) {
+      switch (errno) {
+        case EEXIST: break;
+        default:     perror("mkdir"); 
+                     free(tp);
+                     free(str);
+                     free(filename); 
+                     return; 
+      }
+    }
+    pch = strtok(NULL, "/"); 
+  }
+
+  // Create file name.
   char *time_string = (char *)malloc(40*sizeof(char));
-  strftime(time_string,40,"%Y%m%d%H%M%S",time_struct);
+  strftime(time_string,40,"%S",time_struct);
   char *u_sec = (char *)malloc(10*sizeof(char));
   sprintf(u_sec,"%.6d",int_useconds);
   strncat(time_string,u_sec,6);
-  int len = strlen(fileprefix)+strlen(time_string)+10;
+  strcat(filename, tx_name); 
+  strcat(filename, "_"); 
+  strcat(filename, time_string); 
+  strcat(filename, ".det"); 
   
-  //filename is the given prefix and the time to the microsecond (false precision)
-  char *filename = (char *)malloc(len*sizeof(char));
-  sprintf(filename,"%s%s.det",fileprefix,time_string);
-
-  //open .det file
-  if(!open_file(filename))
+  // Open .det file. 
+  if (!open_file(filename) || !d_fp) {
+    free(u_sec); 
+    free(time_string); 
+    free(tp);
+    free(str);
+    free(filename); 
     return;
-  if (!d_fp)
-    return;
+  }
 
-  //write time as an integer
+  // Write metadata. 
   fwrite(&int_seconds,sizeof(int),1,(FILE *)d_fp);
   fwrite(&int_useconds,sizeof(int),1,(FILE *)d_fp);
   float snr = 10.0*log10(pkdet->peak_value/pkdet->avg);
@@ -285,23 +313,23 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   printf("pulse %s,%d,%f,%f\n", tx_name, int_seconds, noise_db, snr);  
   printf("%s\n\t%s\n\t\tNoise Floor: %.2f dB, SNR: %.2f dB\n",time_string, filename, noise_db, snr);
 
-  //get data buffer and index from data_holder
+  // Write pulse data. Get data buffer and index from data_holder
   gr_complex *data = data_holder->get_buffer();
   int index = data_holder->get_index();
 
-  //unwrap circular buffer and write data to file
+  // Unwrap circular buffer and write data to file
   temp = data + (index)*ch;
   fwrite(temp,sizeof(gr_complex),(save_length-index)*ch, (FILE *)d_fp);
   fwrite(data,sizeof(gr_complex),(index)*ch, (FILE *)d_fp);
 
-  //close file and free string variables
+  // Close file and free string variables.
   close();
   free(time_string);
   free(filename);
+  free(str); 
   free(u_sec);
   free(tp);
 
-  return;
 }
 
 bool
@@ -472,13 +500,13 @@ void detectmod_detect::enable()
 
 void detectmod_detect::enable(int pulse_width, 
                               int save_width, 
-                              const char *_fileprefix, 
+                              const char *_directory, 
                               const char *_tx_name,
                               float center_freq, 
                               char use_psd)
 {
   free(tx_name); 
-  free(fileprefix);
+  free(directory);
   delete acc;
   delete save_holder;
   delete peak_holder;
@@ -504,8 +532,8 @@ void detectmod_detect::enable(int pulse_width,
 
   psd = use_psd;
   
-  fileprefix = (char *)malloc((strlen(_fileprefix) + 1) * sizeof(char));
-  strcpy(fileprefix, _fileprefix);
+  directory = (char *)malloc((strlen(_directory) + 1) * sizeof(char));
+  strcpy(directory, _directory);
 
   tx_name = (char *)malloc((strlen(_tx_name) + 1) * sizeof(char)); 
   strcpy(tx_name, _tx_name); 

@@ -119,7 +119,7 @@ class software_backend(gr.hier_block2):
                 self.det[j.band_num].alpha_factor(j.alpha)
                 self.det[j.band_num].enable(j.filter_length, 
                                             j.filter_length*3, 
-                                            str(j.file_prefix), 
+                                            str(j.directory), 
                                             str(j.name), 
                                             j.cf, 
                                             USE_PSD)

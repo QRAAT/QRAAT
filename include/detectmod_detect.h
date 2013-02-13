@@ -41,7 +41,7 @@ RMG_API detectmod_detect_sptr detectmod_make_detect (
     int pulse_width, 
     int save_width, 
     int channels, 
-    const char *fileprefix, 
+    const char *f, 
     const char *tx_name,
     float, float, char);
 
@@ -53,7 +53,7 @@ private:
      int pulse_width, 
      int save_width, 
      int channels,
-     const char *fileprefix,
+     const char *directory,
      const char *tx_name,
      float, float, char);
   
@@ -67,7 +67,7 @@ private:
   peak_detect *pkdet;
   float rate;
   float c_freq;
-  char *fileprefix;
+  char *directory;
   char *tx_name; 
   int fill_counter;
   module_state_t state;
@@ -104,7 +104,7 @@ public:
   void enable();
   void enable(int pulse_width, 
               int save_width, 
-              const char *fileprefix, 
+              const char *directory, 
               const char *tx_name, 
               float,char);
 
