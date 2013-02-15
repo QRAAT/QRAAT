@@ -18,32 +18,73 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Notes and taks for Marcel and Todd's info: 
-# * Lots of TODO's. None of the functions are implemented yet; this is 
-#   just the skeleton so far. 8 Feb 2013
+# Notes
 # 
-# * This script won't check for connectivity ... it would make it too 
-#   cumbersome. So after doing something like 'rmg up 2', you might 
-#   try ping 10.2.1.55 to verify. 
-#
-# * Consistency guarentees. 'fetch' renames all files on the ramdisk 
-#   (/home/rmg/det/ on the remote host) with a postfix '.fetch'. These 
-#   files are scp'ed to the server, then deleted from the remote host.
-#   One point of concern is if there is an open file descriptor in the 
-#   directory. We could modify the peak detector to rename the file 
-#   after it finishes it in order to guarentee mutual exclusion.
+# Meta data (transmitter file, log files, etc.) is stored persistently on
+# disk on the RMG remotes, typically in /home/rmg. Data (.det files, 
+# status.txt) is written in memory to ramdisk, typically /tmp/ramdisk/det.
 # 
-# * If 'stop' is called, then 'fetch' is called first. However, neither
-#   'fetch' nor 'stop' are called if 'down' is called. In this case, 
-#   remaining .det's are stored in a tarball to disk. 
+# We make heavy use of SSH. To avoid entering passwords all the time, we 
+# use an RSA encryption key with no passphrase. The public key is stored 
+# at all RMG remote sites in /home/rmg/.ssh/authorized_keys; the private 
+# key is kept at the server. This is because the remotes run the SSH 
+# daemon. 
+#     The key is assumed to be ~/.ssh/rmg_rsa. 
 #
-# * TODO modify run_rmg to create a ramdisk for the .det files directly. 
-#   Incorporate Todd's script into the Python. 
+# Tasks 
+# 
+#  'up/down'
+# 
+# Power the physical hardware on and off. The relevant components are the 
+# RMG receiver and the host computer, called the "RMG remote". The power
+# supply for these will run through a network addressible hub. Theoretically,
+# we should be able to tell this device to turn it sattached components on 
+# and off. 
+#     'up' does nothing special, but 'down' will SIGINT the run_rmg program 
+# if it's running. Next, it sends the RMG remote the halt signal, waits a 
+# sufficient amount of time (say 5 seconds), and powers the computer off. 
+#     A list of up sites is stored in $(pwd)/up_sites. 
+#
+#  'start/stop'
+# 
+# Run and kill the pulse detector module (run_rmg). Output is logged in a 
+# file in the meta data directory.
+#
+#  'fetch' 
+#
+# Download pulse data (.det files) from RMG remote to RMG server. Upon 
+# success, erase the transfered data from the RMG remote. The pulse detector 
+# in the RMG module emits .det files into a directory structure like 
+# YYYY/MM/DD/HH/mm/ssuuuuuu.det. We want to be able to copy these files from 
+# RMG remotes to the server, but exclude the directory that is being mutated. 
+#       One solution would be to implement a hot-directory locking 
+# mechanism on the RMG remote side. Since we don't want to burden the site 
+# computers with this extra work, we decided to take advantage of the fact 
+# that the real clock time must be synchronized across all nodes of the 
+# network. We fetch all directories that are older than one minute because 
+# the pulse detector will never mutate these directories again. Notes and 
+# taks for Marcel and Todd's info: 
+#
+#  'updatetx' 
+#
+# Update transmitter information on specified sites. This task includes an
+# option to specify a file. 
+#
+#  'cyclerx'
+#
+# Cycle the power on the RMG module.  
+#
+# TODOs 
+# 
+# - Run task on 'all' sites. 
+# - 'cyclerx', 'up', 'down'.
 #
 
-RAMDISK=256 # size (MB) of ramdisk for running rmg. 
+HOST_METADATA_DIR="/home/rmg"      # Transmitter configuration file
+HOST_DATA_DIR="/tmp/ramdisk/det"   # Where .det files are stored
+KEY="$HOME/.ssh/rmg_rsa"           # location of RSA encryption key
 
-function help {
+function help() {
   cat <<!EOF!
 usage: rmg task [-options] {sites}/all  
 
@@ -54,7 +95,8 @@ usage: rmg task [-options] {sites}/all
 
   'task' is any one of the following: 
 
-    up           Power on remote computer and RMG receiver. 
+    up           Power on remote computer and RMG receiver. If no arguments
+                 provided, print sites currently up. 
 
     down         Power off remote computer and RMG receiver. 
 
@@ -74,7 +116,38 @@ usage: rmg task [-options] {sites}/all
 !EOF!
 }
 
-# get task and options
+function fetch() {
+# Input a list of directories on remote host. Output directories containing 
+# .det's to be copied, excluding those younger than one minute. 
+  python -c "import os, re, time, sys
+prog = re.compile(\".*([0-9]{4})\/([0-9]{2})\/([0-9]{2})\/([0-9]{2})\/([0-9]{2}).*\") 
+
+now = time.localtime(time.time() - 120) # Exclude last two minutes, actually. This 
+                                        # is to account for possible synchronization 
+                                        # issues-up to one minute of clock slippage. 
+                                        
+t = [now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min]
+
+for line in sys.stdin.readlines():
+  m = prog.match(line)
+  if m: 
+    
+    # Fetch if directory is sufficiently old. 
+    ts = map(lambda n: int(n), m.group(1,2,3,4,5))
+    fetch = True
+    for i in range(5):
+      if ts[i] < t[i]: break
+      elif ts[i] > t[i]: 
+        fetch = False
+        break 
+
+    # Emit whole directory
+    if fetch:
+      print line.strip()"
+}
+
+
+## Get task and options ##
 TASK=$1 
 shift
 
@@ -96,7 +169,8 @@ case $TASK in
   ;;
 esac 
 
-# list of sites to run routine on 
+
+## List of sites to run routine on ##
 SITES=""
 for SITE in $@ 
 do
@@ -109,10 +183,13 @@ do
   fi
 done
 
-# list of sites that are up
+
+## List of sites that are currently up ##
 UP_SITES=$(cat up_sites 2> /dev/null)
 
-ct=0
+
+## Run tasks at each site ##
+count=0
 for SITE in $SITES
 do
   case $TASK in 
@@ -123,11 +200,7 @@ do
       else
         echo "up $SITE"
         UP_SITES="$UP_SITES $SITE"
-        # TODO Tell the switch to bring up the computer, then the RMG
-        # receiver. Let's say the switch is 10.$SITE.1.56. This will go 
-        # something like this:
-        # telnet 10.$SITE.1.56 power on 0
-        # telnet 10.$SITE.1.56 power on 1
+        # TODO power up RMG receiver and computer
       fi
     ;; 
 
@@ -136,13 +209,10 @@ do
       then
         echo "down $SITE"
         UP_SITES=`echo ${UP_SITES[@]//$SITE/}`
-        # TODO Kill SIGINT run_rmg. Archive any remaining .det's on ramdisk. 
-        # Name the tarball with the date/time of creation. Halt computer. Wait a
-        # a sufficient amount of time, then power off RMG and computer. 
-        # ssh root@$SITE /sbin/halt
-        # sleep(5) 
-        # telnet 10.$SITE.1.56 power off 0
-        # telnet 10.$SITE.1.56 power off 1
+        ssh -i $KEY rmg@$SITE "/usr/bin/killall run_rmg 2> /dev/null \
+                               /sbin/halt"
+        sleep 5 
+        # TODO power down RMG receiver and computer
       else 
         echo "$SITE already down!"
       fi
@@ -154,19 +224,18 @@ do
       # timestamped log file. 
       if [[ $UP_SITES =~ $SITE ]]
       then
-        ssh rmg@$SITE "/usr/local/bin/run_rmg -d /tmp/ramdisk -f tx.csv &> \
-                       run_rmg_$(date -d 'today' +"%d.%m.%Y_%H.%M").txt &"
+        ssh -i $KEY rmg@$SITE "/usr/local/bin/run_rmg -d $HOST_DATA_DIR -f $HOST_METADATA_DIR/tx.csv &> \
+                               $HOST_METADATA_DIR/run_rmg_$(date -d 'today' +"%d.%m.%Y_%H.%M").txt &"
       else 
         echo "$SITE is currently down."
       fi 
-
     ;;
 
     stop) 
       echo "stop $SITE"
       if [[ $UP_SITES =~ $SITE ]]
       then
-        ssh rmg@$SITE '/usr/bin/killall run_rmg 2> /dev/null'
+        ssh -i $KEY rmg@$SITE '/usr/bin/killall run_rmg 2> /dev/null'
       else 
         echo "$SITE is currently down."
       fi 
@@ -174,18 +243,23 @@ do
 
     fetch)
       echo "fetch $SITE"
-      # TODO rename all .det's in ram disk directory: mv $name.det $name.det.fetch
-      # mkdir -p $SITE
-      # scp rmg@10.$SITE.1.55:det/*.det.fetch $SITE/
-      # ssh rmg@10.$SITE.1.55 rm det/*fetch
-      # mv $SITE/$name.det.fetch $SITE/$name.det
+      COPY=$(ssh -i $KEY rmg@$SITE "cd $HOST_DATA_DIR && find -type d" | fetch) # directories to copy
+      mkdir -p $SITE 
+      ct=0
+      for DIR in $COPY; do
+        echo "copying $DIR"
+        scp -r rmg@$SITE:$HOST_DATA_DIR/$DIR $SITE         # copy data to RMG server
+        ssh -i $KEY rmg@$SITE "rm -r $HOST_DATA_DIR/$DIR"  # delete from RMG remote
+        let ct=ct+1
+      done
+      if [ $ct -eq 0 ]; then echo "Nothing to fetch."; fi
     ;;
     
     updatetx) 
       echo "udpatetx $SITE"
       if [ -e $TX_FILE ]
       then
-        scp $TX_FILE rmg@$SITE:/home/rmg/tx.csv 
+        scp $TX_FILE rmg@$SITE:$HOST_METADATA_DIR/tx.csv 
       else 
         echo "error: '$TX_FILE' doesn't exist"
       fi
@@ -194,8 +268,6 @@ do
     cyclerx)
       echo "cyclerx $SITE" 
       # TODO Cycle RMG receiver power. 
-      # telnet 10.$SITE.1.56 power off 1
-      # telnet 10.$SITE.1.56 power on 1
     ;;
     
     *)
@@ -204,11 +276,11 @@ do
     ;;
 
   esac
-  let ct=ct+1
+  let count=countt+1
 done
 
 
-if [ $ct -eq 0 ]
+if [ $count -eq 0 ]
 then
   case $TASK in
   up) # if no sites provided by user, just list up sites
