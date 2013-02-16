@@ -62,8 +62,7 @@
 # computers with this extra work, we decided to take advantage of the fact 
 # that the real clock time must be synchronized across all nodes of the 
 # network. We fetch all directories that are older than one minute because 
-# the pulse detector will never mutate these directories again. Notes and 
-# taks for Marcel and Todd's info: 
+# the pulse detector will never mutate these directories again. 
 #
 #  'updatetx' 
 #
@@ -276,7 +275,7 @@ do
     ;;
 
   esac
-  let count=countt+1
+  let count=count+1
 done
 
 
