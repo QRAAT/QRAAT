@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # run_rmg
-# Adhoc method for running the RMG module. Outputs pulse data as .det files. 
+# De facto method for running the RMG module. Outputs pulse data as .det files. 
 # (See documentaiton for file format and details.) This file is part of QRAAT, 
 # an automated animal tracking system based on GNU Radio. 
 #
