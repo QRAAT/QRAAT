@@ -1,9 +1,9 @@
-# est_dict.py
-# Dictionaryt structure for holding processed .det files. Output
-# formats: .csv and .est. (deprecated? TODO) This file is part of QRAAT, 
+# est_data.py
+# Structure for holding processed .det files. Output
+# formats: .csv and .est. This file is part of QRAAT, 
 # an automated animal tracking system based on GNU Radio. 
 #
-# Copyright (C) 2012 Todd Borrowman
+# Copyright (C) 2013 Todd Borrowman
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import det_file
-import os,time
+import os,time,errno
 import numpy as np
 import struct
 
@@ -102,7 +102,11 @@ class data_arrays():
 
     def filter_non_filled(self):
         tag_filter = ((self.tag_number == -1) == False)
-        self.filter_by_bool(tag_filter)
+        return self.filter_by_bool(tag_filter)
+
+    def filter_by_bw10(self, threshold = 1000):
+        tag_filter = self.f_bw10 < threshold
+        return self.filter_by_bool(tag_filter)
 
 
 #est file class
@@ -123,13 +127,21 @@ class est_data():
 
         if not dirname[-1] == '/':
             dirname += '/'
+        try:
+            os.makedirs(dirname)
+        except OSError as exc:
+            if exc.errno == errno.EEXIST and os.path.isdir(dirname):
+                pass
+            else: raise
         for tag_index, tag_name in enumerate(self.tag_names):
             filtered_data = self.data.filter_by_tag_number(tag_index)
-            min_time = np.min(filtered_data.epoch_time)
-            min_time_str = time.strftime("%Y%m%d%H%M%S",time.gmtime(min_time))
-            max_time = np.max(filtered_data.epoch_time)
-            max_time_str = time.strftime("%Y%m%d%H%M%S",time.gmtime(max_time))
-            est_filename = tag_name + '-' + min_time_str + '-' + max_time_str + '.est'
+            #min_time = np.min(filtered_data.epoch_time)
+            #min_time_str = time.strftime("%Y%m%d%H%M%S",time.gmtime(min_time))
+            #max_time = np.max(filtered_data.epoch_time)
+            #max_time_str = time.strftime("%Y%m%d%H%M%S",time.gmtime(max_time))
+            #est_filename = tag_name + '-' + min_time_str + '-' + max_time_str + '.est'
+            est_filename = tag_name + '.est'
+            stat_filename = tag_name + '.stat'
 
             with open(dirname + est_filename,'w') as estfile:
                 estfile.write(struct.pack('i',filtered_data.num_records))
@@ -160,30 +172,42 @@ class est_data():
                         estfile.write(struct.pack('f',sig.real))
                         estfile.write(struct.pack('f',sig.imag))
 
+            with open(dirname + stat_filename, 'w') as stat_file:
+                stat_file.write('Name: {0}\n'.format(tag_name))
+                stat_file.write('Number of files: {0}\n'.format(filtered_data.num_records))
+                good_data = filtered_data.filter_by_bw10()
+                stat_file.write('Number of good pulses: {0}\n'.format(good_data.num_records))
+                if good_data.num_records > 0:
+                    max_time = np.max(good_data.epoch_time)
+                    max_time_str = time.strftime("%Y-%m-%d %H:%M:%S",time.gmtime(max_time))
+                    stat_file.write('Last time seen: {0}\n'.format(max_time_str))
+                    stat_file.write('Avg. Frequency: {0}\n'.format(np.mean(good_data.freq)))
+                    stat_file.write('Avg. Signal Level: {0} dB\n'.format(10*np.log10(np.mean(good_data.f_pwr))))
+                    stat_file.write('Std. Dev. Signal Level: {0}\n'.format(np.std(good_data.f_pwr)))
+
     #writes .csv file for each tag in dictionary
     def write_csv(self, dirname = './'):
-#
-        import datetime
+
         if not dirname[-1] == '/':
             dirname += '/'
-        for tag_name in self.tags():
-            tag_item = self[tag_name]
-            min_time = np.min(tag_item.epoch_time)
+        for tag_index, tag_name in enumerate(self.tag_names):
+            filtered_data = self.data.filter_by_tag_number(tag_index)
+            min_time = np.min(filtered_data.epoch_time)
             min_time_str = time.strftime("%Y%m%d%H%M%S",time.gmtime(min_time))
-            max_time = np.max(tag_item.epoch_time)
+            max_time = np.max(filtered_data.epoch_time)
             max_time_str = time.strftime("%Y%m%d%H%M%S",time.gmtime(max_time))
             csv_filename = tag_name + '-' + min_time_str + '-' + max_time_str + '.csv'
             with open(dirname + csv_filename,'w') as csvfile:
                 label_str = "Date/Time (UTC), Tag Frequency (Hz), Band Center Frequency (Hz), Signal Power, Noise Power, SNR (dB)\n"
                 csvfile.write(label_str)
-                for index in range(tag_item.num):
-                    line_str = str(datetime.datetime.utcfromtimestamp(tag_item.epoch_time[index]))
-                    line_str += ', {0:.0f}'.format(tag_item.freq[index])
-                    line_str += ', {0:.0f}'.format(tag_item.center_freq[index])
-                    e = tag_item.e_pwr[index]
+                for index in range(filtered_data.num_records):
+                    line_str = time.strftime("%Y-%m-%d %H:%M:%S",time.gmtime(filtered_data.epoch_time[index]))
+                    line_str += ', {0:.0f}'.format(filtered_data.freq[index])
+                    line_str += ', {0:.0f}'.format(filtered_data.center_freq[index])
+                    e = filtered_data.e_pwr[index]
                     line_str += ', {0:e}'.format(e)
-                    sig = tag_item.e_sig[index][:,np.newaxis]
-                    n = np.dot(sig.conj().transpose(),np.dot(tag_item.n_cov[index],sig))[0,0].real
+                    sig = filtered_data.e_sig[index,:]
+                    n = np.trace(filtered_data.n_cov[index,:,:]).real
                     line_str += ', {0:e}'.format(n)
                     line_str += ', {0:.3f}\n'.format(10*np.log10(e/n))
                     csvfile.write(line_str)
@@ -255,26 +279,28 @@ class est_data():
     def read_dir(self,dirname):
 
         dir_list = os.listdir(dirname)
-        dir_list.sort()
-        if not dirname[-1] == '/':
-            dirname += '/'
-        new_data = data_arrays(self.num_channels, len(dir_list))
-        count = 0
-        for fstr in dir_list:
-            if fstr[-4:] == '.det':
-                det = det_file.det_file(dirname + fstr)
-                if not det.null_file:
-                    tag_name = det.tag_name
-                    try:
-                        tag_index  = self.tag_names.index(tag_name)
-                    except ValueError:
-                        self.tag_names.append(tag_name)
-                        tag_index = self.num_tags
-                        self.num_tags += 1
-                    new_data.add_det(det, tag_index, count)
-                    count += 1
-        new_data.filter_non_filled()
-        self.data.append(new_data)
+        print "{0} files found at {1}".format(len(dir_list), dirname)
+        if len(dir_list) > 0:
+            dir_list.sort()
+            if not dirname[-1] == '/':
+                dirname += '/'
+            new_data = data_arrays(self.num_channels, len(dir_list))
+            count = 0
+            for fstr in dir_list:
+                if fstr[-4:] == '.det':
+                    det = det_file.det_file(dirname + fstr)
+                    if not det.null_file:
+                        tag_name = det.tag_name
+                        try:
+                            tag_index  = self.tag_names.index(tag_name)
+                        except ValueError:
+                            self.tag_names.append(tag_name)
+                            tag_index = self.num_tags
+                            self.num_tags += 1
+                        new_data.add_det(det, tag_index, count)
+                        count += 1
+            
+            self.data.append(new_data.filter_non_filled())
 
     #adds given det_file object
     def add_det(self, det):
