@@ -247,7 +247,7 @@ do
       ct=0
       for DIR in $COPY; do
         echo "copying $DIR"
-        scp -r rmg@$SITE:$HOST_DATA_DIR/$DIR $SITE         # copy data to RMG server
+        scp -i $KEY -r rmg@$SITE:$HOST_DATA_DIR/$DIR $SITE         # copy data to RMG server
         ssh -i $KEY rmg@$SITE "rm -r $HOST_DATA_DIR/$DIR"  # delete from RMG remote
         let ct=ct+1
       done
@@ -258,7 +258,7 @@ do
       echo "udpatetx $SITE"
       if [ -e $TX_FILE ]
       then
-        scp $TX_FILE rmg@$SITE:$HOST_METADATA_DIR/tx.csv 
+        scp -i $KEY $TX_FILE rmg@$SITE:$HOST_METADATA_DIR/tx.csv 
       else 
         echo "error: '$TX_FILE' doesn't exist"
       fi
