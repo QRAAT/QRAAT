@@ -1,10 +1,25 @@
-import est_data
-import os
+#!/usr/bin/env python
+#est_processing
+#Processes the det files on the server into est files
+#
+# Copyright (C) 2013 Todd Borrowman, Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-server_dir = '/rmg_server'
-sitelist = server_dir + '/rmg_site_list'
-det_dir = server_dir + '/det_files/'
-est_dir = server_dir + '/est_files/'
+from rmg.estimation import est_data
+import os
+import csv
 
 def process_det_files(det_dirname, est_dirname):
     print "Processing " + det_dirname
@@ -44,8 +59,15 @@ def write_latest_dir(dirname, latest):
             f.write(j)
 
 def read_rmg_list(filename):
-#TODO
-    return ['rmg_site_test']
+    with open(filename, 'r') as f:
+        rmg_sites = csv.reader(f, delimiter = ",", quotechar='"') 
+        cols  = rmg_sites.next() # first row is header
+        index = dict( [(cols[i], i) for i in range(len(cols))] ) 
+        rmg_site_list = []
+        for line in rmg_sites:
+            if line[index['use']] in ['Y', 'y', 'yes', 'Yes', 'YES']: 
+                rmg_site_list.append(line[index['name']])
+    return rmg_site_list
 
 def search_for_dirs(rmg_site_dir_str, latest, depth, found_dir):
 
@@ -68,6 +90,10 @@ def search_for_dirs(rmg_site_dir_str, latest, depth, found_dir):
 
 if __name__=="__main__":
 
+    server_dir = '/rmg_server'
+    sitelist = server_dir + '/rmg_site_list'
+    det_dir = server_dir + '/det_files/'
+    est_dir = server_dir + '/est_files/'
     rmg_list = read_rmg_list(sitelist)
     for rmg_site in rmg_list:
         det_rmg_dir = det_dir + rmg_site + '/'

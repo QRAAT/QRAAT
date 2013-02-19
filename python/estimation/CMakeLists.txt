@@ -32,7 +32,6 @@ GR_PYTHON_INSTALL(
     FILES
     __init__.py
     det_file.py
-    est_dict.py
     est_data.py
     DESTINATION ${GR_PYTHON_DIR}/rmg/estimation
 )
