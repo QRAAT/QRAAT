@@ -17,20 +17,21 @@
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
 
-
+########################################################################
+# Include python install macros
+########################################################################
 include(GrPython)
+if(NOT PYTHONINTERP_FOUND)
+    return()
+endif()
 
+########################################################################
+# Install python sources
+########################################################################
 GR_PYTHON_INSTALL(
-    PROGRAMS
-    4channel_spectrum
-    4channel_spectrum_server
-    4channel_spectrum_client
-    read_det
-    tx_setup
-    active_rmg
-    run_rmg
-    run_rmg_alt
-    est_processing
-    DESTINATION bin
+    FILES
+    __init__.py
+    det_file.py
+    est_data.py
+    DESTINATION ${GR_PYTHON_DIR}/rmg/estimation
 )
-

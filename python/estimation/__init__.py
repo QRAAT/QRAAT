@@ -19,7 +19,7 @@
 # The presence of this file turns this directory into a Python package
 
 '''
-This is the GNU Radio HOWTO module. Place your Python package
+This is the rmg estimation module. Place your Python package
 description here (python/__init__.py).
 '''
 
@@ -40,14 +40,10 @@ if _RTLD_GLOBAL != 0:
     sys.setdlopenflags(_dlopenflags|_RTLD_GLOBAL)
 # ----------------------------------------------------------------
 
-
-# import swig generated symbols into the rmg namespace
-from rmg_swig import *
-
 # import any pure python here
-import rmg_run
-import rmg_setup
-import estimation
+import det_file
+import est_data
+
 
 # ----------------------------------------------------------------
 # Tail of workaround

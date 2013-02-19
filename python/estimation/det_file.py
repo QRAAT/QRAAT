@@ -1,5 +1,5 @@
 # det_file.py
-# Python encapsulation for .det files (deprecated? TODO) This file is 
+# Python encapsulation for .det files. This file is 
 # part of QRAAT, an automated animal tracking system based on GNU Radio. 
 #
 # Copyright (C) 2012 Todd Borrowman
@@ -18,7 +18,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
-from rmg import pulse_data
 import struct
 import os
 import time
