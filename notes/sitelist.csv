@@ -1,0 +1,4 @@
+# This is a CSV formatted file. Comments are ok.
+name="site1", comp_ip="site1", power_ip="192.168.0.100", comp_outlet="1", rx_outlet="2", powertype="webpowerswitch", status="up"
+name="fake", comp_ip="10.2.1.55", power_ip="shit", comp_outlet="1", rx_outlet="2", powertype="another_brand", status="down"
+
