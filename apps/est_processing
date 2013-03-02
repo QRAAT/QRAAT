@@ -89,11 +89,15 @@ def search_for_dirs(rmg_site_dir_str, latest, depth, found_dir):
     return latest, found_dir
 
 if __name__=="__main__":
-
-    server_dir = '/rmg_server/'
-    sitelist = server_dir + 'rmg_site_list'
-    det_dir = server_dir + 'det_files/'
-    est_dir = server_dir + 'est_files/'
+    
+    #server_dir = '/rmg_server/'
+    #sitelist = server_dir + 'rmg_site_list'
+    #det_dir = server_dir + 'det_files/'
+    #est_dir = server_dir + 'est_files/'
+    sitelist = os.getenv('RMG_SERVER_SITELIST')
+    det_dir = os.getenv('RMG_SERVER_DET_DIR') + '/'
+    est_dir = os.getenv('RMG_SERVER_EST_DIR') + '/'
+    print sitelist
     rmg_list = read_rmg_list(sitelist)
     for rmg_site in rmg_list:
         det_rmg_dir = det_dir + rmg_site + '/'
