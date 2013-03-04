@@ -95,6 +95,8 @@ if __name__=="__main__":
     #det_dir = server_dir + 'det_files/'
     #est_dir = server_dir + 'est_files/'
     sitelist = os.getenv('RMG_SERVER_SITELIST')
+    if sitelist is None:
+        raise ValueError("Missing RMG system variables.  Please run rmg_vars.sh within this shell.")
     det_dir = os.getenv('RMG_SERVER_DET_DIR') + '/'
     est_dir = os.getenv('RMG_SERVER_EST_DIR') + '/'
     print sitelist
