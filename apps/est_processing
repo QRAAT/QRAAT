@@ -90,10 +90,6 @@ def search_for_dirs(rmg_site_dir_str, latest, depth, found_dir):
 
 if __name__=="__main__":
     
-    #server_dir = '/rmg_server/'
-    #sitelist = server_dir + 'rmg_site_list'
-    #det_dir = server_dir + 'det_files/'
-    #est_dir = server_dir + 'est_files/'
     sitelist = os.getenv('RMG_SERVER_SITELIST')
     if sitelist is None:
         raise ValueError("Missing RMG system variables.  Please run rmg_vars.sh within this shell.")
