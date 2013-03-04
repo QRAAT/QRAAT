@@ -99,7 +99,11 @@ if __name__=="__main__":
     rmg_list = read_rmg_list(sitelist)
     for rmg_site in rmg_list:
         det_rmg_dir = det_dir + rmg_site + '/'
+        if not os.path.exists(det_rmg_dir):
+            os.makedirs(det_rmg_dir)
         est_rmg_dir = est_dir + rmg_site + '/'
+        if not os.path.exists(est_rmg_dir):
+            os.makedirs(est_rmg_dir)
         latest, found_dir = search_for_dirs(det_rmg_dir, find_latest_dir(est_rmg_dir), 0, [])
         for det_dir_process in found_dir[1:]:
             process_det_files(det_rmg_dir + det_dir_process, est_rmg_dir + det_dir_process)
