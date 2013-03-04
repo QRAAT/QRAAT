@@ -36,8 +36,9 @@ class det_file():
                 with open(filename,'r+b') as f:
                     #read header info
                     self.filename = filename
-                    tag_index = filename.rfind('/')
-                    self.tag_name = filename[tag_index+1:][:-24]
+                    tagname_index = filename.rfind('/')
+                    tagname_last_index = filename.rfind('_')
+                    self.tag_name = filename[tag_index+1:tagname_last_index]
                     self.num_ch = struct.unpack('i',f.read(4))[0]
                     self.data_length = struct.unpack('i',f.read(4))[0]
                     self.acc_length = struct.unpack('i',f.read(4))[0]
