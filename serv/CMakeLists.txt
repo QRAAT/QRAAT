@@ -1,7 +1,8 @@
 INSTALL(PROGRAMS  
   rmg
   rmg_env
-  sitelist
+  rmg_sitelist.py
+  rmg_fetch.py
   DESTINATION bin)
 
 

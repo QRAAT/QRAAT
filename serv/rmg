@@ -85,16 +85,12 @@
 # network. For example, for the one Marcel and I worked on, 
 # curl --user admin:1234 "http://192.168.0.100/outlet?1=OFF" 
 # is sufficient. 
+# - Try to read/write sitelist.csv just once. 
 # - Run task on 'all' sites. 
 #
+#
 
-rmg_env  # setup RMG environment variables
-
-HOST_METADATA_DIR=$RMG_SITE_METADATA_DIR      # Transmitter configuration file
-HOST_DATA_DIR=$RMG_SITE_DET_DIR   # Where .det files are stored
-KEY=$RMG_SERVER_SSH_KEYFILE           # location of RSA encryption key
-SERVER_DET_DIR=$RMG_SERVER_DET_DIR #location to put det files on server
-SITELIST_FILE=$RMG_SERVER_SITELIST #list of remote sites
+. rmg_env  # setup RMG environment variables
 
 function help() {
   cat <<!EOF!
@@ -128,70 +124,26 @@ usage: rmg task [-options] {sites}/all
 !EOF!
 }
 
-function fetch() {
-# Input a list of directories on remote host. Output directories containing 
-# .det's to be copied, excluding those younger than one minute. 
-  python -c 'import os, re, time, sys
-class Tree: 
+## Configuration and status of sites ##
+touch $RMG_SERVER_SITELIST 2> /dev/null
+if [ $? -ne 0 ]; 
+then
+  echo "error: site configuration information not available (no sitelist.csv)."
+  exit 1
+fi 
 
-  def __init__(self, parent=None, hot=False):
-    self.hot = hot
-    self.parent = parent
-    self.children = {}
-  
-  def insert(self, branch, hot): 
-  # insert a branch
-    if not self.hot and hot:  # if hot once, hot forever
-      self.hot = hot
-    if branch == []:
-      return
-    else:
-      try:  
-        self.children[branch[0]].insert(branch[1:], hot)
-      except KeyError: 
-        self.children[branch[0]] = Tree(self)
-        self.children[branch[0]].insert(branch[1:], hot)        
+function update_sitelist () {
+  SITE=$1
+  ENTRY=$2
+  VALUE=$3
+  rmg_sitelist.py $SITE $ENTRY $VALUE < $RMG_SERVER_SITELIST > tmp.csv
+  mv tmp.csv $RMG_SERVER_SITELIST
+}
 
-  def copiable(self, directory=None): 
-  # emit non-hot, i.e. copiable,  directories.
-    if self.parent == None: # root directory
-      (name, child) = (self.children.keys()[0], self.children.values()[0])
-      child.copiable(directory + "/" + name)
-    elif self.hot == False: # no children hot, this whole directory can be copied
-      print directory
-    else:                   # directory has a hot child, recurse
-      for (name, child) in self.children.iteritems():
-        child.copiable(directory + "/" + name)
-
-
-prog = re.compile("([0-9]{4})(\/([0-9]{2})){4}") 
-
-now = time.localtime(time.time() - (120)) # Exclude last two minutes, actually. This 
-                                          # is to account for possible synchronization 
-                                          # issues-up to one minute of clock slippage. 
-                                        
-t = [now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min]
-
-tree = Tree()
-
-for line in sys.stdin.readlines():
-  if prog.search(line): 
-    
-    # Fetch if directory is sufficiently old. 
-    d = line.strip().split("/")
-    ts = map(lambda n: int(n), d[1:])
-    fetch = True
-    for i in range(len(ts)):
-      if ts[i] < t[i]: break
-      elif ts[i] > t[i]: 
-        fetch = False
-        break 
-
-    tree.insert(d[1:], hot=not fetch)
-
-try: 
-  tree.copiable(d[0])
-except: pass'
+function get_sitelist() {
+  SITE=$1
+  ENTRY=$2
+  rmg_sitelist.py $SITE $ENTRY < $RMG_SERVER_SITELIST
 }
 
 
@@ -217,7 +169,6 @@ case $TASK in
   ;;
 esac 
 
-
 ## List of sites to run routine on ##
 SITES=""
 for SITE in $@ 
@@ -232,33 +183,33 @@ do
 done
 
 
-## List of sites that are currently up ##
-UP_SITES=$(cat up_sites 2> /dev/null)
-
-
 ## Run tasks at each site ##
 count=0
 for SITE in $SITES
 do
+  STATUS=$(get_sitelist $SITE "status")
+  if [ $? -ne 0 ]; then 
+    echo error: site \'$SITE\' not recognized. 
+    exit 1
+  fi 
   case $TASK in 
     up)
-      if [[ $UP_SITES =~ $SITE ]]
+      if [[ $STATUS == "up" ]] || [[ $STATUS == "active" ]]
       then
         echo "$SITE already up!"
       else
         echo "up $SITE"
-        UP_SITES="$UP_SITES $SITE"
+        update_sitelist $SITE "status" "up"
         # TODO power up RMG receiver and computer
       fi
     ;; 
 
     down)
-      if [[ $UP_SITES =~ $SITE ]]
+      if [[ $STATUS == "up" ]] || [[ $STATUS == "active" ]]
       then
         echo "down $SITE"
-        UP_SITES=`echo ${UP_SITES[@]//$SITE/}`
-        ssh -i $KEY rmg@$SITE "/usr/bin/killall run_rmg 2> /dev/null \
-                               /sbin/halt"
+        update_sitelist $SITE "status" "down"
+        ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$SITE "/usr/bin/killall run_rmg 2> /dev/null && /sbin/halt"
         sleep 5 
         # TODO power down RMG receiver and computer
       else 
@@ -270,10 +221,13 @@ do
       echo "start $SITE"
       # Start an RMG process on remote machine. Redirect all output to a 
       # timestamped log file. 
-      if [[ $UP_SITES =~ $SITE ]]
+      if [[ $STATUS == "up" ]]
       then
-        ssh -i $KEY rmg@$SITE "/usr/local/bin/run_rmg -d $HOST_DATA_DIR -f $HOST_METADATA_DIR/tx.csv &> \
-                               $HOST_METADATA_DIR/run_rmg_$(date -d 'today' +'%Y.%m.%d_%H.%M').txt &"
+        ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$SITE \
+            "/usr/local/bin/run_rmg -d $RMG_SITE_DET_DIR -f $RMG_SITE_METADATA_DIR/tx.csv &> \
+             $RMG_SITE_METADATA_DIR/run_rmg_$(date -d 'today' +'%Y.%m.%d_%H.%M').txt &"
+      elif [[ $STATUS == "active" ]]; then
+        echo "$SITE already running"
       else 
         echo "$SITE is currently down."
       fi 
@@ -281,24 +235,26 @@ do
 
     stop) 
       echo "stop $SITE"
-      if [[ $UP_SITES =~ $SITE ]]
+      if [[ $STATUS == "active" ]]
       then
-        ssh -i $KEY rmg@$SITE '/usr/bin/killall run_rmg 2> /dev/null'
+        ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$SITE '/usr/bin/killall run_rmg 2> /dev/null'
       else 
-        echo "$SITE is currently down."
+        echo "$SITE isn't running."
       fi 
     ;;
 
     fetch)
       echo "fetch $SITE"
-      DIRECTORIES_TO_COPY=$(ssh -i $KEY rmg@$SITE "cd $HOST_DATA_DIR && find -type d" | fetch) # directories to copy
-      mkdir -p $SERVER_DET_DIR/$SITE 
+      DIRECTORIES_TO_COPY=$(ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$SITE \ 
+                    "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch.py) # directories to copy
+      mkdir -p $RMG_SERVER_DET_DIR/$SITE 
       ct=0
       for DIR in $DIRECTORIES_TO_COPY; do
         echo "copying $DIR"
-        mkdir -p $SERVER_DET_DIR/$SITE/$DIR
-        rsync -ave "ssh -i $KEY" rmg@$SITE:$HOST_DATA_DIR/$DIR/* $SERVER_DET_DIR/$SITE/$DIR # download to RMG server
-        ssh -i $KEY rmg@$SITE "rm -r $HOST_DATA_DIR/$DIR"                   # delete from RMG remote
+        mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
+        rsync -ave "ssh -i $RMG_SERVER_SSH_KEYFILE" rmg@$SITE:$RMG_SITE_DET_DIR/$DIR/* \ 
+          $RMG_SERVER_DET_DIR/$SITE/$DIR                                        # download to RMG server
+        ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$SITE "rm -r $RMG_SITE_DET_DIR/$DIR" # delete from RMG remote
         let ct=ct+1
       done
       if [ $ct -eq 0 ]; then echo "Nothing to fetch."; fi
@@ -308,7 +264,7 @@ do
       echo "udpatetx $SITE"
       if [ -e $TX_FILE ]
       then
-        scp -i $KEY $TX_FILE rmg@$SITE:$HOST_METADATA_DIR/tx.csv 
+        scp -i $RMG_SERVER_SSH_KEYFILE $TX_FILE rmg@$SITE:$RMG_SITE_METADATA_DIR/tx.csv 
       else 
         echo "error: '$TX_FILE' doesn't exist"
       fi
@@ -329,15 +285,4 @@ do
 done
 
 
-if [ $count -eq 0 ]
-then
-  case $TASK in
-  up) # if no sites provided by user, just list up sites
-    echo up $UP_SITES
-    ;;
-    
-  esac
-fi 
 
-echo $UP_SITES | cat > up_sites
-export UP_SITES
