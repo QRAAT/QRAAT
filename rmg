@@ -75,8 +75,18 @@
 #
 # TODOs 
 # 
-# - Run task on 'all' sites. 
 # - 'cyclerx', 'up', 'down'.
+# We now have one network addressible power supply. We will have a file that
+# stores all configuration data for all sites, as well as status bits. For 
+# each site, we'll have a record like (name, comp_ip, power_ip, comp_outlet
+# int, rx_outlet int, powertype, status {"down", "up", "active"}). When this 
+# script starts, it will read the file. When it finishes, it will write it 
+# again. An external script will do Power (powertype, power_ip, action {"ON", 
+# "OFF", "CYCLE"}). Each powertype has its own means of interacting with the 
+# network. For example, for the one Marcel and I worked on, 
+# curl --user admin:1234 "http://192.168.0.100/outlet?1=OFF" 
+# is sufficient. 
+# - Run task on 'all' sites. 
 #
 . rmg_vars.sh
 
