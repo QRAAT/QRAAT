@@ -88,7 +88,7 @@
 # - Run task on 'all' sites. 
 #
 
-. rmg_vars.sh #export RMG system variables
+rmg_env  # setup RMG environment variables
 
 HOST_METADATA_DIR=$RMG_SITE_METADATA_DIR      # Transmitter configuration file
 HOST_DATA_DIR=$RMG_SITE_DET_DIR   # Where .det files are stored
