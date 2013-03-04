@@ -27,9 +27,8 @@
 # We make heavy use of SSH. To avoid entering passwords all the time, we 
 # use an RSA encryption key with no passphrase. The public key is stored 
 # at all RMG remote sites in /home/rmg/.ssh/authorized_keys; the private 
-# key is kept at the server. This is because the remotes run the SSH 
-# daemon. 
-#     The key is assumed to be ~/.ssh/rmg_rsa. 
+# key is kept at the server, typically /home/rmg/.ssh/rmg_rsa. This is 
+#because the remotes run the SSH daemon. 
 #
 # Tasks 
 # 
