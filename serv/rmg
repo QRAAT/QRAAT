@@ -75,7 +75,6 @@
 # TODOs 
 # 
 # - 'cyclerx', 'up', 'down'.
-# - Try to read/write sitelist.csv just once. 
 # - Run task on 'all' sites. 
 #
 #
@@ -118,12 +117,12 @@ usage: rmg task [-options] {sites}/all
 
 
 ## Configuration and status of sites ##
-touch $RMG_SERVER_SITELIST 2> /dev/null
 if [ $? -ne 0 ]; 
 then
-  echo "error: site configuration information not available (no sitelist.csv)."
+  echo "error: site configuration information not available (no sitelist.csv)." 1>&2
   exit 1
 fi 
+
 
 function update_sitelist () {
   SITE=$1

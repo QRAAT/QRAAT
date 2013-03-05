@@ -23,7 +23,7 @@
 import sys
 
 if len(sys.argv) < 3 or len(sys.argv) > 4:
-  print >> sys.stderr, "usage: sitelist.py <site> <parameter> [<value>]" 
+  print >> sys.stderr, "usage: sitelist <site> <parameter> [<value>]" 
   sys.exit(1)
 
 sys.argv.append(None)
@@ -31,6 +31,7 @@ sys.argv.append(None)
 (row, col, value) = sys.argv[1:4]
 
 headers = sys.stdin.readline().strip().split(',')
+print headers
 header = { headers[i] : i for i in range(len(headers)) }
 
 if value: 
