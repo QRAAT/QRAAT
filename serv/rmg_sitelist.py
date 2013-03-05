@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# sitelist
+# sitelist.py
 # Input a CSV formatted site list on STDIN, return an entry or 
 # modify the file and output to STDOUT. This script is part of the 
 # QRAAT system. 
@@ -22,8 +22,8 @@
 
 import sys
 
-if len(sys.argv) < 4 or len(sys.argv) > 5:
-  print >> sys.stderr, "usage: sitelist.py <site> <parameter> [<value>]" 
+if len(sys.argv) < 3 or len(sys.argv) > 4:
+  print >> sys.stderr, "usage: sitelist <site> <parameter> [<value>]" 
   sys.exit(1)
 
 sys.argv.append(None)
@@ -31,13 +31,18 @@ sys.argv.append(None)
 (row, col, value) = sys.argv[1:4]
 
 headers = sys.stdin.readline().strip().split(',')
+print headers
 header = { headers[i] : i for i in range(len(headers)) }
+
+if value: 
+  print ','.join(headers)
 
 for line in sys.stdin.readlines(): 
   line = line.strip().split(',')
   try: 
     if value == None and line[header["name"]] == row: # Just get value
       print line[header[col]]
+      sys.exit(0)
     elif value: 
       if line[header["name"]] == row:
         line[header[col]] = value
@@ -45,3 +50,7 @@ for line in sys.stdin.readlines():
   except IndexError: 
     pass
 
+if value == None: # If we got here, site doesn't appear in site list
+  sys.exit(1)
+else:
+  sys.exit(0)
