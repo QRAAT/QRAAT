@@ -88,7 +88,7 @@
 # - Run task on 'all' sites. 
 #
 
-. rmg_env  # setup RMG environment variables
+source rmg_env  # setup RMG environment variables
 
 HOST_METADATA_DIR=$RMG_SITE_METADATA_DIR      # Transmitter configuration file
 HOST_DATA_DIR=$RMG_SITE_DET_DIR   # Where .det files are stored
@@ -123,6 +123,8 @@ usage: rmg task [-options] {sites}/all
                             Defaults to 'tx.csv' in working directory.
 
     cyclerx      Power off the RMG receiver and power it back on.
+
+    estimate     Process det files into est files from given site.
 
     help         Print this. 
 !EOF!
@@ -319,6 +321,11 @@ do
       # TODO Cycle RMG receiver power. 
     ;;
     
+    estimate)
+      echo "estimate $SITE"
+      est_processing $RMG_SERVER_DET_DIR/$SITE/ $RMG_SERVER_EST_DIR/$SITE/
+    ;;
+
     *)
       echo error: unrecognized task \'$TASK\'
       exit 1
