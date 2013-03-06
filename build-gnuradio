@@ -2,10 +2,10 @@
 #
 # Build script for UHD+GnuRadio on Fedora and Ubuntu. This 
 # not ours, but is provided freely for users of GNU Radio. 
+# Written by Marcus Leech.
 #
 # Updates: https://github.com/guruofquality/grextras/wiki
 # Updates: https://github.com/balint256/gr-baz.git
-#
 #
 function help {
 	cat <<!EOF!
@@ -151,7 +151,7 @@ CWD=`pwd`
 SUDOASKED=n
 SYSTYPE=unknown
 good_to_go=no
-for files in /etc/fedora-release /etc/lsb-release /etc/debian_version /etc/redhat-release
+for files in /etc/fedora-release /etc/linuxmint/info /etc/lsb-release /etc/debian_version /etc/redhat-release
 do
 	if [ -f $file ]
 	then
@@ -160,7 +160,7 @@ do
 done
 if [ $good_to_go = no ]
 then
-	echo Supported systems are: Fedora, Ubuntu, Redhat, Debian
+	echo Supported systems: Fedora, Ubuntu, Redhat, Debian, Mint, OpenSuse
 	echo You appear to be running none of the above, exiting
 	exit
 fi
@@ -361,6 +361,40 @@ function prereqs {
 			exit
 			;;
 		esac
+
+	#
+	# It's a Mint system
+	#
+	elif [ -f /etc/linuxmint/info ]
+	then
+		SYSTYPE=Mint
+		sudo apt-get -y purge 'gnuradio-*' >>$LOGDEV 2>&1
+		sudo apt-get -y purge 'libgruel-*' >>$LOGDEV 2>&1
+		sudo apt-get -y purge 'libgruel*' >>$LOGDEV 2>&1
+		sudo apt-get -y purge 'libgruel0*' >>$LOGDEV 2>&1
+		sudo apt-get -y purge 'libgnuradio*' >>$LOGDEV 2>&1
+		sudo apt-get -y purge 'python-gnuradio*' >>$LOGDEV 2>&1
+		case `grep RELEASE /etc/linuxmint/info` in
+		*11*|*12*|*13*|*14*)
+			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
+			automake autoconf libtool python-dev libfftw3-dev
+			libcppunit-dev libboost-all-dev libusb-dev libusb-1.0-0-dev fort77
+			libsdl1.2-dev python-wxgtk2.8 git-core guile-1.8-dev
+			libqt4-dev python-numpy ccache python-opengl libgsl0-dev
+			python-cheetah python-lxml doxygen qt4-dev-tools libusb-1.0-0-dev
+			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools python-qwt5-qt4
+			cmake git-core wget libxi-dev python-docutils gtk2-engines-pixbuf r-base-dev python-tk
+			liborc-0.4-0 liborc-0.4-dev libasound2-dev python-gtk2"
+			;;
+			
+		*)
+			my_echo Your Mint release must be at least Linux Mint 11 to proceed
+			exit
+			;;
+		esac
+		for pkg in $PKGLIST; do checkpkg $pkg; done
+		sudo apt-get -y --ignore-missing install $PKGLIST >>$LOGDEV 2>&1
+
 	#
 	# It's a Ubuntu system
 	#
@@ -374,7 +408,7 @@ function prereqs {
 		sudo apt-get -y purge 'libgnuradio*' >>$LOGDEV 2>&1
 		sudo apt-get -y purge 'python-gnuradio*' >>$LOGDEV 2>&1
 		case `grep DISTRIB_RELEASE /etc/lsb-release` in
-		*11.*|*12.*|*13*)
+		*11.*|*12.10*|*13*)
 			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
 			automake autoconf libtool python-dev libfftw3-dev
 			libcppunit-dev libboost-all-dev libusb-dev libusb-1.0-0-dev fort77
@@ -383,7 +417,19 @@ function prereqs {
 			python-cheetah python-lxml doxygen qt4-dev-tools libusb-1.0-0-dev
 			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools python-qwt5-qt4
 			cmake git-core wget libxi-dev python-docutils gtk2-engines-pixbuf r-base-dev python-tk
-			liborc-0.4-0 libasound2-dev python-gtk2"
+			liborc-0.4-0 liborc-0.4-dev libasound2-dev python-gtk2"
+			;;
+		
+		*12.04*)
+			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
+			automake autoconf libtool python-dev libfftw3-dev
+			libcppunit-dev libboost1.48-all-dev libusb-dev libusb-1.0-0-dev fort77
+			libsdl1.2-dev python-wxgtk2.8 git-core guile-1.8-dev
+			libqt4-dev python-numpy ccache python-opengl libgsl0-dev
+			python-cheetah python-lxml doxygen qt4-dev-tools libusb-1.0-0-dev
+			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools python-qwt5-qt4
+			cmake git-core wget libxi-dev python-docutils gtk2-engines-pixbuf r-base-dev python-tk
+			liborc-0.4-0 liborc-0.4-dev libasound2-dev python-gtk2"
 			;;
 			
 		*10.04*|*10.10*)
@@ -447,7 +493,7 @@ function prereqs {
 			python-cheetah python-lxml doxygen qt4-dev-tools libusb-1.0-0-dev
 			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools python-qwt5-qt4
 			cmake git-core wget libxi-dev python-docutils gtk2-engines-pixbuf r-base-dev python-tk
-			liborc-0.4-0 libasound2-dev python-gtk2 libportaudio2 portaudio19-dev"
+			liborc-0.4-0 liborc-0.4-dev libasound2-dev python-gtk2 libportaudio2 portaudio19-dev"
 			;;
 		*)
 			my_echo Only Debian release 6 is supported
@@ -470,10 +516,10 @@ function prereqs {
 		git gsl-devel libjack-devel libqt4-devel libqwtplot3d-devel \
 		libSDL-devel libusb-1_0-devel orc portaudio portaudio-devel \
 		python-cheetah python-devel python-lxml python-wxGTK python-wxWidgets-devel \
-		qwt-devel wxWidgets-devel xmlto texlive-latex >>$LOGDEV 2>&1
+		qwt-devel wxWidgets-devel boost-devel xmlto texlive-latex >>$LOGDEV 2>&1
 		
 	else
-		my_echo This script supports only Ubuntu,Fedora and Debian systems
+		my_echo This script supports only Ubuntu,Mint,Fedora, Debian and OpenSuse systems
 		my_echo Your Fedora system must be at least Fedora 12
 		my_echo Your Ubuntu system must be at least Ubuntu 9.04
 		my_echo Your Debian system must be release 6
@@ -739,9 +785,27 @@ function rtl_build {
 
 function firmware {
 	sudocheck
+	FOUND_DOWNLOADER=False
+	
 	if [ -f /usr/local/share/uhd/utils/uhd_images_downloader.py ]
 	then
-		sudo /usr/local/share/uhd/utils/uhd_images_downloader.py 
+		FOUND_DOWNLOADER=True
+		DOWNLOADER=/usr/local/share/uhd/utils/uhd_images_downloader.py
+	fi
+	if [ -f /usr/local/lib/uhd/utils/uhd_images_downloader.py ]
+	then
+		FOUND_DOWNLOADER=True
+		DOWNLOADER=/usr/local/lib/uhd/utils/uhd_images_downloader.py
+	fi
+	if [ -f /usr/local/lib64/uhd/utils/uhd_images_downloader.py ]
+	then
+		FOUND_DOWNLOADER=True
+		DOWNLOADER=/usr/local/lib64/uhd/utils/uhd_images_downloader.py
+	fi
+	
+	if [ $FOUND_DOWNLOADER = True ]
+	then
+		sudo $DOWNLOADER
 	else
 		#
 		# Firmware/FPGA images...
@@ -1223,3 +1287,4 @@ do
 	$arg
 done
 my_echo All Done
+
