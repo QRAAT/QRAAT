@@ -79,7 +79,7 @@
 #
 #
 
-. rmg_env  # setup RMG environment variables
+source rmg_env  # setup RMG environment variables
 
 function help() {
   cat <<!EOF!
@@ -110,6 +110,8 @@ usage: rmg task [-options] {sites}/all
                             Defaults to 'tx.csv' in working directory.
 
     cyclerx      Power off the RMG receiver and power it back on.
+
+    estimate     Process det files into est files from given site.
 
     help         Print this. 
 !EOF!
@@ -166,7 +168,7 @@ case $TASK in
     fi
   ;;
 
-  status|up|down|start|stop|fetch|cyclerx)
+  status|up|down|start|stop|fetch|cyclerx|estimate)
   ;; 
     
   *)
@@ -296,6 +298,11 @@ do
       fi
     ;;
     
+    estimate)
+      echo "estimate $SITE"
+      est_processing $RMG_SERVER_DET_DIR/$SITE/ $RMG_SERVER_EST_DIR/$SITE/
+    ;;
+
   esac
   let count=count+1
 done

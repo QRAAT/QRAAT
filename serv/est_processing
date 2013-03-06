@@ -19,7 +19,6 @@
 
 from rmg.estimation import est_data
 import os
-import csv
 
 def process_det_files(det_dirname, est_dirname):
     print "Processing " + det_dirname
@@ -58,17 +57,6 @@ def write_latest_dir(dirname, latest):
         for j in latest:
             f.write(j)
 
-def read_rmg_list(filename):
-    with open(filename, 'r') as f:
-        rmg_sites = csv.reader(f, delimiter = ",", quotechar='"') 
-        cols  = rmg_sites.next() # first row is header
-        index = dict( [(cols[i], i) for i in range(len(cols))] ) 
-        rmg_site_list = []
-        for line in rmg_sites:
-            if line[index['use']] in ['Y', 'y', 'yes', 'Yes', 'YES']: 
-                rmg_site_list.append(line[index['name']])
-    return rmg_site_list
-
 def search_for_dirs(rmg_site_dir_str, latest, depth, found_dir):
 
     dir_str = ''
@@ -89,19 +77,22 @@ def search_for_dirs(rmg_site_dir_str, latest, depth, found_dir):
     return latest, found_dir
 
 if __name__=="__main__":
-    
-    sitelist = os.getenv('RMG_SERVER_SITELIST')
-    if sitelist is None:
-        raise ValueError("Missing RMG system variables.  Please run rmg_vars.sh within this shell.")
-    det_dir = os.getenv('RMG_SERVER_DET_DIR') + '/'
-    est_dir = os.getenv('RMG_SERVER_EST_DIR') + '/'
-    print sitelist
-    rmg_list = read_rmg_list(sitelist)
-    for rmg_site in rmg_list:
-        det_rmg_dir = det_dir + rmg_site + '/'
-        est_rmg_dir = est_dir + rmg_site + '/'
+    import sys
+    if len(sys.argv) == 3:
+        det_rmg_dir = sys.argv[1]
+        if not os.path.exists(det_rmg_dir):
+            raise ValueError('{0} .det file directory does not exist'.format(det_rmg_dir))
+        if not det_rmg_dir[-1]=='/':
+            det_rmg_dir += '/'
+        est_rmg_dir = sys.argv[2]
+        if not os.path.exists(est_rmg_dir):
+            os.makedirs(est_rmg_dir)
+        if not est_rmg_dir[-1]=='/':
+            est_rmg_dir += '/'
         latest, found_dir = search_for_dirs(det_rmg_dir, find_latest_dir(est_rmg_dir), 0, [])
+        print "{0} new directories found to be processed".format(len(found_dir)-1)
         for det_dir_process in found_dir[1:]:
             process_det_files(det_rmg_dir + det_dir_process, est_rmg_dir + det_dir_process)
         write_latest_dir(est_rmg_dir, latest)
-        
+    else:
+        raise ValueError('Missing arguments! Use is \'est_processing site_det_directory site_est_directory\'')
