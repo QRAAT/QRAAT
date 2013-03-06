@@ -20,3 +20,5 @@ Where the entries are separated by tabs \t.
 ssh keys TODO: 
 It will be nice to pass around RSA keys instead of typing dumb passwords. 
 
+Scripting the netbooter:
+curl --user admin:admin http://192.168.1.100/cmd.cgi?rly={0,1}
