@@ -12,13 +12,34 @@ usermod -a -G serial <user>
 For all: 
 chmod a+rw /dev/ttyS0
 
+
+
 Ramdisk setup: 
 Add the following line to /etc/fstab:
 tmpfs   /tmp/ramdisk  tmpfs  nodev/nosuid,mode=1777,size=512M   0   0
 Where the entries are separated by tabs \t. 
 
-ssh keys TODO: 
-It will be nice to pass around RSA keys instead of typing dumb passwords. 
+
 
 Scripting the netbooter:
 curl --user admin:admin http://192.168.1.100/cmd.cgi?rly={0,1}
+
+
+
+Setting up RMG remotes to pull code from RMG server. 
+To start, qraat-zero is connected to the internet with a DHCP address. 
+I git-cloned from github, installed GR/UHD, and set up a static IP
+(10.99.1.55). On the RMG server (10.253.1.55), I created an account
+called rmg and cloned a bare repo from github on it, then setup sshd:
+
+rmg@10.253.1.55$ git clone --bare github.com/QRAAT/QRAAT.git
+rmg@10.253.1.55$ sudo apt-get install openssh-server
+
+On qraat-zero, I edited ~/QRAAT/.git/config to pull from this bare repo:
+
+-url = http://github.com/QRAAT/QRAAT.git
++url = rmg@10.253.1.55:QRAAT.git
+
+You have to enter the password, but it's good to go now. 
+
+
