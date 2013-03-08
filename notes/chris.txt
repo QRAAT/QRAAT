@@ -43,3 +43,9 @@ On qraat-zero, I edited ~/QRAAT/.git/config to pull from this bare repo:
 You have to enter the password, but it's good to go now. 
 
 
+
+On my work computer, I found it useful to set up a virtual interface to be 
+in the subnet with RMG remotes. 
+$ sudo ifconfig eth0:1 10.253.1.55 netmask 255.0.0.0 up
+
+
