@@ -31,7 +31,6 @@ sys.argv.append(None)
 (row, col, value) = sys.argv[1:4]
 
 headers = sys.stdin.readline().strip().split(',')
-print headers
 header = { headers[i] : i for i in range(len(headers)) }
 
 if value: 
