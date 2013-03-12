@@ -49,6 +49,7 @@ class my_graph(stdgui2.std_top_block):
     parser.add_option ("-O", "--audio_output", type="string", 
                  default="hw:0,0", 
 	   help="pcm device name")
+    parser.add_option ("-p", "--serial_port", type="string", default="/dev/ttyS0", help="serial port connected to RMG")
     (options, args) = parser.parse_args()
 
     if len(args) != 0:
@@ -151,7 +152,8 @@ class my_graph(stdgui2.std_top_block):
     self.connect(self.sum, self.scope1)
 
     # create pic_control
-    self.pic = pic_io.rmg_pic_interface()
+    self.pic = pic_io.rmg_pic_interface(options.serial_port)
+
         
       
     #Setup GUI components
