@@ -41,12 +41,45 @@ function webpowerswitch {
 
 }
 
+function netbooter {
+  # This is the nicer one that Marcel modified to supply 12 V DC. It has 
+  # just two outlets. Here we script it with telnet. It seems a little 
+  # cludgy, but the alternative, using curl, means we can only toggle the 
+  # power switch. This might be OK, but it would also be nice to know its 
+  # off when we've sent the command. 
+  
+  case $OP in
+
+    ON)
+      (sleep 1; echo -ne "pset $OUTLET 1\r\nlogout\r\n") | telnet $IP &> /dev/null
+    ;; 
+
+    OFF)
+      (sleep 1; echo -ne "pset $OUTLET 0\r\nlogout\r\n") | telnet $IP &> /dev/null
+    ;;
+
+    CYCLE) 
+      (sleep 1; echo -ne "rb $OUTLET\r\nlogout\r\n") | telnet $IP &> /dev/null
+    ;;
+    
+    *) 
+      echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
+      exit 1
+
+  esac
+ 
+}
+
 
 ## execute power script ## 
 case $TYPE in
   
   webpowerswitch) 
     webpowerswitch
+  ;;
+
+  netbooter)
+    netbooter
   ;;
 
   # more to come!
