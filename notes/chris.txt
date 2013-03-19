@@ -41,8 +41,8 @@ rmg@10.253.1.55$ cd QRAAT.git && git remote update
 
 
 
+TODO see serv/rmg_powerswitch::pingbrother().  
 
-Make it so 'sudo {halt,reboot,poweroff}' works without typing password, type
-sudo visudo
+
 
 

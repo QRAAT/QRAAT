@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# fetch.py
+# rmg_fetch
 # Input a directory tree, e.g., find det -type d, and output the 
 # directories that we want to fetch from the RMG remote computer. 
 # This excludes the "hot" directory, consolidates the directories 

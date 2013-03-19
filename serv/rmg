@@ -74,7 +74,6 @@
 #
 # TODOs 
 # 
-# - 'cyclerx', 'up', 'down'.
 # - Run task on 'all' sites. 
 #
 #
@@ -130,14 +129,14 @@ function update_sitelist () {
   SITE=$1
   ENTRY=$2
   VALUE=$3
-  rmg_sitelist.py $SITE $ENTRY $VALUE < $RMG_SERVER_SITELIST > tmp.csv
+  rmg_sitelist $SITE $ENTRY $VALUE < $RMG_SERVER_SITELIST > tmp.csv
   mv tmp.csv $RMG_SERVER_SITELIST
 }
 
 function get_sitelist() {
   SITE=$1
   ENTRY=$2
-  rmg_sitelist.py $SITE $ENTRY < $RMG_SERVER_SITELIST
+  rmg_sitelist $SITE $ENTRY < $RMG_SERVER_SITELIST
 }
 
 
@@ -191,7 +190,7 @@ do
   STATUS=$(get_sitelist $SITE status)
   ADDR=$(get_sitelist $SITE comp_ip)
   if [ $? -ne 0 ]; then 
-    echo error: site \'$SITE\' not recognized. 
+    echo "error: site '$SITE' not recognized." 1>&2
     exit 1
   fi 
 
@@ -201,38 +200,38 @@ do
     ;;
 
     up)
-      if [[ $STATUS == "up" ]] || [[ $STATUS == "active" ]]
-      then
-        echo "$SITE already up!"
+      echo -n "up $SITE "
+      TYPE=$(get_sitelist $SITE powertype) 
+      IP=$(get_sitelist $SITE power_ip)
+      C_OUTLET=$(get_sitelist $SITE comp_outlet)
+      R_OUTLET=$(get_sitelist $SITE rx_outlet)
+      rmg_powerswitch $TYPE $IP $C_OUTLET ON && \
+      rmg_powerswitch $TYPE $IP $R_OUTLET ON
+      if [ $? -ne 0 ]; then
+        echo "error: couldn't reach $ADDR." 1>&2
+        exit 1
       else
-        echo "up $SITE"
-        TYPE=$(get_sitelist $SITE powertype) 
-        IP=$(get_sitelist $SITE power_ip)
-        C_OUTLET=$(get_sitelist $SITE comp_outlet)
-        R_OUTLET=$(get_sitelist $SITE rx_outlet)
-        rmg_powerswitch.sh $TYPE $IP $C_OUTLET ON
-        rmg_powerswitch.sh $TYPE $IP $R_OUTLET ON
-        # TODO if success, change status
+        echo 
         update_sitelist $SITE status up
       fi
     ;; 
 
     down)
-      if [[ $STATUS == "up" ]] || [[ $STATUS == "active" ]]
-      then
-        echo "down $SITE"
-        ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR "/usr/bin/killall run_rmg 2> /dev/null; sudo /sbin/poweroff"
-        sleep 5 # wait an appropriate time
-        TYPE=$(get_sitelist $SITE powertype) 
-        IP=$(get_sitelist $SITE power_ip)
-        C_OUTLET=$(get_sitelist $SITE comp_outlet)
-        R_OUTLET=$(get_sitelist $SITE rx_outlet)
-        rmg_powerswitch.sh $TYPE $IP $C_OUTLET OFF
-        rmg_powerswitch.sh $TYPE $IP $R_OUTLET OFF
-        # TODO If success, change status
-        update_sitelist $SITE status down
+      echo -n "down $SITE "
+      ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR "/usr/bin/killall run_rmg 2> /dev/null; sudo /sbin/poweroff"
+      sleep 5 # wait an appropriate time
+      TYPE=$(get_sitelist $SITE powertype) 
+      IP=$(get_sitelist $SITE power_ip)
+      C_OUTLET=$(get_sitelist $SITE comp_outlet)
+      R_OUTLET=$(get_sitelist $SITE rx_outlet)
+      rmg_powerswitch $TYPE $IP $C_OUTLET OFF && \
+      rmg_powerswitch $TYPE $IP $R_OUTLET OFF
+      if [ $? -ne 0 ]; then
+        echo "error: couldn't reach $ADDR." 1>&2
+        exit 1
       else 
-        echo "$SITE already down!"
+        echo         
+        update_sitelist $SITE status down
       fi
     ;;
     
@@ -261,6 +260,7 @@ do
       if [[ $STATUS == "active" ]]
       then
         ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR '/usr/bin/killall run_rmg 2> /dev/null'
+
         # TODO if success, change status
         update_sitelist $SITE status up
       else 
@@ -273,7 +273,7 @@ do
       then
         echo "fetch $SITE"
         DIRECTORIES_TO_COPY=$(ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR "cd $RMG_SITE_DET_DIR \
-          && find -type d" | rmg_fetch.py) # directories to copy
+          && find -type d" | rmg_fetch) # directories to copy
         mkdir -p $RMG_SERVER_DET_DIR/$SITE 
         ct=0
         for DIR in $DIRECTORIES_TO_COPY; do
@@ -298,7 +298,7 @@ do
         then
           scp -i $RMG_SERVER_SSH_KEYFILE $TX_FILE rmg@$ADDR:$RMG_SITE_METADATA_DIR/tx.csv 
         else 
-          echo "error: '$TX_FILE' doesn't exist"
+          echo "error: '$TX_FILE' doesn't exist" 1>&2
         fi
       else 
         echo "$STIE is currently down."
@@ -312,7 +312,7 @@ do
         TYPE=$(get_sitelist $SITE powertype) 
         IP=$(get_sitelist $SITE power_ip)
         R_OUTLET=$(get_sitelist $SITE rx_outlet)
-        rmg_powerswitch.sh $TYPE $IP $R_OUTLET CYCLE
+        rmg_powerswitch $TYPE $IP $R_OUTLET CYCLE
       else 
         echo "$SITE is currently down."
       fi

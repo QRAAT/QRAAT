@@ -2,9 +2,9 @@ INSTALL(PROGRAMS
   est_processing
   rmg
   rmg_env
-  rmg_sitelist.py
-  rmg_fetch.py
-  rmg_powerswitch.sh
+  rmg_sitelist
+  rmg_fetch
+  rmg_powerswitch
   DESTINATION bin)
 
 

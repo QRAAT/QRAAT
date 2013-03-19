@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# sitelist.py
+# rmg_sitelist
 # Input a CSV formatted site list on STDIN, return an entry or 
 # modify the file and output to STDOUT. This script is part of the 
 # QRAAT system. 

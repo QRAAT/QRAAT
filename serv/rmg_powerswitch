@@ -1,0 +1,139 @@
+#!/bin/bash
+# 
+# Chris ~4 Mar 2013
+# rmg_powerswitch
+# Site-specific power management stuff.
+# 
+
+TYPE=$1
+IP=$2
+OUTLET=$3
+OP=$4
+
+if [ ! $OP ]
+then
+  echo "usage: powerswitch <power_type> <IP_addr> <outlet> {ON, OFF, CYCLE}" 1>&2
+  exit 1
+fi 
+
+function pingbrother {
+# This is net booter we ordered from New Zealand. This is the best choice
+# because it provides 12 V DC, is essentially a dummy router, does power 
+# monitoring, etc. TODO: (1) what sort of network configuration must be used 
+# with the PingBrother guy? (2) write a powerdown daemon to run on the 
+# RMG remotes. It listens for packets from the PingBrother box that tells it
+# that it's about to lose power. It sends a message to the server and halts
+# the operating system.
+
+  case $OP in
+
+    ON) 
+      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=1" > /dev/null
+    ;; 
+
+    OFF)
+      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=0" > /dev/null
+    ;;
+
+    CYCLE) 
+      echo "powerswitch: wait about 6 seconds for power to cycle." 1>&2
+      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=0" > /dev/null && \
+      sleep 5 && \
+      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=1" > /dev/null
+   ;;
+
+   *) 
+     echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
+     exit 1
+  esac
+  echo $? 
+}
+
+function webpowerswitch {
+  # This is the big, clunky network addressible power supply that Marcel 
+  # modified. It now supplies 12 V DC to 10 outlets. It's not easily 
+  # scripted via telnet, so here we use curl. 
+  case $OP in
+
+    ON|OFF) 
+    ;; 
+
+    CYCLE) 
+      OP="CCL"
+      echo "powerswitch: wait about 15 seconds for power to cycle." 1>&2
+
+    ;;
+
+    *) 
+      echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
+      exit 1
+    
+  esac
+  
+  curl --user admin:1234 "http://$IP/outlet?$OUTLET=$OP" > /dev/null
+  echo $? 
+
+}
+
+function netbooter {
+  # This is the nicer one. It has  just two outlets. Here we script it with 
+  # telnet. It seems a little cludgy, but the alternative, using curl, means 
+  # we can only toggle the  power switch. This might be OK, but it would also 
+  # be nice to know its off when we've sent the command. Telnet session ends
+  # with a goodbye message. 
+  
+  case $OP in
+
+    ON)
+      (sleep 1; echo -ne "pset $OUTLET 1\r\nlogout\r\n"; sleep 1) \
+        | telnet $IP 2> /dev/null \
+        | grep -e 'Goodbye!' &> /dev/null
+      echo $? 
+    ;; 
+
+    OFF)
+      (sleep 1; echo -ne "pset $OUTLET 0\r\nlogout\r\n"; sleep 1) \
+        | telnet $IP 2> /dev/null \
+        | grep -e 'Goodbye!' &> /dev/null
+      echo $? 
+    ;;
+
+    CYCLE) 
+      echo "powerswitch: wait about 6 seconds for power to cycle." 1>&2
+      (sleep 1; echo -ne "rb $OUTLET\r\nlogout\r\n"; sleep 5) \
+        | telnet $IP 2> /dev/null \
+        | grep -e 'Goodbye!' &> /dev/null
+      echo $?
+    ;;
+    
+    *) 
+      echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
+      exit 1
+
+  esac
+ 
+}
+
+
+
+## execute power script ## 
+case $TYPE in
+  
+  pingbrother)
+    exit $(pingbrother)
+  ;;
+  
+  webpowerswitch) 
+    exit $(webpowerswitch)
+  ;;
+
+  netbooter)
+    exit $(netbooter)
+  ;;
+
+  *)
+    echo "error (powerswitch): '$TYPE' is not a valid power type." 1>&2
+    exit 1
+  ;;
+
+esac
