@@ -1,22 +1,14 @@
-/* detectmod_detect.cc
- * Implementation of the detectmod_detect class, the peak detector and 
- * main component of this work. This file is part of QRAAT, an automated 
- * animal tracking system  based on GNU Radio. 
- * 
- * Copyright (C) 2012 Todd Borrowman, Christopher Patton
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+/**
+ * Implementation of peak detector block
+ * input - data stream
+ * output - .det files storing individual detected pulses
+ * Todd Borrowman ECE-UIUC 01/30/08~02/2010
+ * TAB 01/2012 added enable/disable
+ *
+ * TODO Chris 7/24/12
+ * clarify the file outputting  (status.txt, .det's). There should be 
+ * two file descriptors for the debug info (status.txt) and pulse 
+ * data respectively.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -33,56 +25,31 @@
 #include <sys/time.h>
 #include <string.h>
 #include <math.h>
-#include <errno.h>
 
 #ifndef O_BINARY
 #define	O_BINARY 0
 #endif 
 
 detectmod_detect_sptr 
-detectmod_make_detect (int pulse_width, 
-                       int save_width, 
-                       int channels, 
-                       const char *directory, 
-                       const char *tx_name,
-                       float rate, 
-                       float center_freq, 
-                       char use_psd)
+detectmod_make_detect (int pulse_width, int save_width, int channels, char *filename, float rate, float center_freq, char use_psd)
 /**
  * Public constructor used by Gnu Radio 
  */
 {
-  return detectmod_detect_sptr (
-    new detectmod_detect (pulse_width, 
-                          save_width, 
-                          channels, 
-                          directory, 
-                          tx_name,
-                          rate, 
-                          center_freq, 
-                          use_psd));
+  return detectmod_detect_sptr (new detectmod_detect (pulse_width, save_width, channels, filename, rate, center_freq, use_psd));
 }
 
-
-detectmod_detect::detectmod_detect (int pulse_width, 
-                                    int save_width, 
-                                    int _ch, 
-                                    const char *_directory, 
-                                    const char *_tx_name,
-                                    float _rate, 
-                                    float _c_freq, 
-                                    char  _psd)
+detectmod_detect::detectmod_detect (int pulse_width, int save_width, int channels,char *filename, float r, float center_freq, char use_psd)
   : gr_sync_block ("detectmod_detect",
-    gr_make_io_signature (_ch, _ch, sizeof (gr_complex)),
-    gr_make_io_signature (0,0,0))
+	      gr_make_io_signature (channels, channels, sizeof (gr_complex)),
+	      gr_make_io_signature (0,0,0))
 /**
  * Private constructor used internally 
  */
 {
-  rate   = _rate;
-  c_freq = _c_freq;
-  ch     = _ch;
-
+  rate = r;
+  c_freq = center_freq;
+  ch = channels;
   acc_length = pulse_width;//size of the accumulator
   
   
@@ -96,34 +63,31 @@ detectmod_detect::detectmod_detect (int pulse_width,
   else{
     save_length = save_width;
   }
-
-  directory = (char *)malloc((strlen(_directory) + 1) * sizeof(char));
-  strcpy(directory, _directory);
-
-  tx_name = (char *)malloc((strlen(_tx_name) + 1) * sizeof(char)); 
-  strcpy(tx_name, _tx_name); 
+  int l = strlen(filename)+1;
+  fileprefix = (char *)malloc(l*sizeof(char));
+  strcpy(fileprefix,filename);
 
   state = FILL_ACCUMULATOR;
   fill_counter = -7;
   fill_length = ((int)(0.5*acc_length));
   d_fp = 0;
-  
-  acc = new accumulator(acc_length);
+  acc = new accumulator *[ch-1];
+  for(int j=0;j<ch-1;j++){
+    acc[j] = new accumulator(acc_length);
+  }
   save_holder = new circ_buffer(ch, save_length);
   peak_holder = new circ_buffer(ch, save_length);
   pkdet = new peak_detect(1.1,1.05,.05);
 
-  psd = _psd;
+  psd = use_psd;
   enable_detect = 0;
-
 }
 
 detectmod_detect::~detectmod_detect(){
 
   close();
-  free(directory); 
-  free(tx_name);
-  delete acc;
+  free(fileprefix);
+  delete[] acc;
   delete save_holder;
   delete peak_holder;
   delete pkdet;
@@ -136,7 +100,9 @@ detectmod_detect::work (int noutput_items,
 {
   
   gr_complex *current_sample; 
-  float r,i,sample_pwr,acc_total;
+  //float r,i,sample_pwr,acc_total;
+  float acc_total;
+  gr_complex acc_value;
   detect_state_t det_state = BELOW_THRESHOLD;
   int sh_index;
 
@@ -147,17 +113,20 @@ detectmod_detect::work (int noutput_items,
     for (int j=0;j<noutput_items;j++){
       
           //Calculate total power received
-      sample_pwr=0.0;
+      //sample_pwr=0.0;
+      acc_total = 0.0;
       current_sample = save_holder->get_sample();
-      for (int m=0;m<ch;m++){
+      current_sample[0] = ((gr_complex *) input_items[0])[j];
+      for (int m=1;m<ch;m++){
         current_sample[m] = ((gr_complex *) input_items[m])[j];
-        r = current_sample[m].real();
-        i = current_sample[m].imag();
-        sample_pwr += (r*r) + (i*i);
-        
+        //r = current_sample[m].real();
+        //i = current_sample[m].imag();
+        //sample_pwr += (r*r) + (i*i);
+        acc_value = acc[m-1]->add(current_sample[m]*conj(current_sample[0]));
+        acc_total += real(acc_value*conj(acc_value));
       }
       save_holder->inc_index();
-      acc_total = acc->add(sample_pwr);
+      //acc_total = acc->add(sample_pwr);
 
       switch(state){
         
@@ -169,7 +138,7 @@ detectmod_detect::work (int noutput_items,
             state = DETECT;
                     //initial estimate of the noise floor for detector
             pkdet->avg = acc_total;
-            printf("%s Seed: %e\n",directory,acc_total);
+            printf("%s Seed: %e\n",fileprefix,acc_total);
           }
         break;
       
@@ -250,83 +219,58 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
  * Writes the pulse data as a .det file
  */
 
+
+
   //Get time
-  struct timeval tp;
-  gettimeofday(&tp, NULL);
+  struct timeval *tp = (struct timeval *)malloc(sizeof(struct timeval));
+  gettimeofday(tp, NULL);
   void *temp;
-  struct tm *time_struct = localtime(&(tp.tv_sec));
-  int int_seconds = (int)tp.tv_sec;
-  int int_useconds = (int)tp.tv_usec;
-
-  // Create diretory tree. 
-  char *str = (char *)malloc(256*sizeof(char)),
-       *filename = (char *)malloc((strlen(directory)+256)*sizeof(char)),
-       *pch; 
-  strftime(str, 256, "%Y/%m/%d/%H/%M", time_struct);
-  strcpy(filename, directory);
-  strcat(filename, "/"); 
-  pch = strtok(str, "/");
-  while (pch != NULL) {
-    strcat(filename, pch); 
-    strcat(filename, "/");
-    if (mkdir(filename, 0777) == -1) {
-      switch (errno) {
-        case EEXIST: break;
-        default:     perror("mkdir"); 
-                     free(str);
-                     free(filename); 
-                     return; 
-      }
-    }
-    pch = strtok(NULL, "/"); 
-  }
-
-  // Create file name.
+  struct tm *time_struct = gmtime(&(tp->tv_sec));
   char *time_string = (char *)malloc(40*sizeof(char));
-  strftime(time_string,40,"%S",time_struct);
+  strftime(time_string,40,"%Y%m%d%H%M%S",time_struct);
   char *u_sec = (char *)malloc(10*sizeof(char));
-  sprintf(u_sec,"%.6d",int_useconds);
+  sprintf(u_sec,"%.6d",(unsigned int)tp->tv_usec);
   strncat(time_string,u_sec,6);
-  strcat(filename, tx_name); 
-  strcat(filename, "_"); 
-  strcat(filename, time_string); 
-  strcat(filename, ".det"); 
+  int len = strlen(fileprefix)+strlen(time_string)+10;
   
-  // Open .det file. 
-  if (!open_file(filename) || !d_fp) {
-    free(u_sec); 
-    free(time_string); 
-    free(str);
-    free(filename); 
-    return;
-  }
+  //filename is the given prefix and the time to the microsecond (false precision)
+  char *filename = (char *)malloc(len*sizeof(char));
+  sprintf(filename,"%s%s.det",fileprefix,time_string);
 
-  // Write metadata. 
-  fwrite(&int_seconds,sizeof(int),1,(FILE *)d_fp);
-  fwrite(&int_useconds,sizeof(int),1,(FILE *)d_fp);
+  //open .det file
+  if(!open_file(filename))
+    return;
+  if (!d_fp)
+    return;
+
+  //write time as a timeval
+  fwrite(tp,sizeof(struct timeval),1,(FILE *)d_fp);
   float snr = 10.0*log10(pkdet->peak_value/pkdet->avg);
   float noise_db = 10.0*log10(pkdet->avg/1e-5);
   strftime(time_string,40,"%H:%M:%S %d %b %Y",time_struct);
-  
-  printf("pulse %s,%d,%f,%f\n", tx_name, int_seconds, noise_db, snr);  
   printf("%s\n\t%s\n\t\tNoise Floor: %.2f dB, SNR: %.2f dB\n",time_string, filename, noise_db, snr);
 
-  // Write pulse data. Get data buffer and index from data_holder
+  //get data buffer and index from data_holder
   gr_complex *data = data_holder->get_buffer();
   int index = data_holder->get_index();
 
-  // Unwrap circular buffer and write data to file
-  temp = data + (index)*ch;
-  fwrite(temp,sizeof(gr_complex),(save_length-index)*ch, (FILE *)d_fp);
-  fwrite(data,sizeof(gr_complex),(index)*ch, (FILE *)d_fp);
+  //unwrap circular buffer and write data to file
+  if (index != 0){
+    temp = data + (index)*ch;
+    fwrite(temp,sizeof(gr_complex),(save_length-index)*ch, (FILE *)d_fp);
+    fwrite(data,sizeof(gr_complex),(index)*ch, (FILE *)d_fp);
+  }
+  else
+    fwrite(data,sizeof(gr_complex),index*ch, (FILE *)d_fp);
 
-  // Close file and free string variables.
+  //close file and free string variables
   close();
   free(time_string);
   free(filename);
-  free(str); 
   free(u_sec);
+  free(tp);
 
+  return;
 }
 
 bool
@@ -495,16 +439,10 @@ void detectmod_detect::enable()
   return;
 }
 
-void detectmod_detect::enable(int pulse_width, 
-                              int save_width, 
-                              const char *_directory, 
-                              const char *_tx_name,
-                              float center_freq, 
-                              char use_psd)
+void detectmod_detect::enable(int pulse_width, int save_width,char *filename, float center_freq, char use_psd)
 {
-  free(tx_name); 
-  free(directory);
-  delete acc;
+  free(fileprefix);
+  //delete[] acc;
   delete save_holder;
   delete peak_holder;
 
@@ -522,24 +460,27 @@ void detectmod_detect::enable(int pulse_width,
   else{
     save_length = save_width;
   }
+  int l = strlen(filename)+1;
 
   state = FILL_ACCUMULATOR;
   fill_counter = -7;
   fill_length = ((int)(0.5*acc_length));
 
   psd = use_psd;
-  
-  directory = (char *)malloc((strlen(_directory) + 1) * sizeof(char));
-  strcpy(directory, _directory);
 
-  tx_name = (char *)malloc((strlen(_tx_name) + 1) * sizeof(char)); 
-  strcpy(tx_name, _tx_name); 
-
-  acc = new accumulator(acc_length);
+  fileprefix = (char *)malloc(l*sizeof(char));
+  strcpy(fileprefix,filename);
+  //acc = new accumulator(acc_length);
+  //acc = new accumulator *[ch-1];
+  for(int j=0;j<ch-1;j++){
+    delete acc[j];
+    acc[j] = new accumulator(acc_length);
+  }
   save_holder = new circ_buffer(ch, save_length);
   peak_holder = new circ_buffer(ch, save_length);
 
   enable_detect = 1;
+  return;
 }
 
 void detectmod_detect::enable_cont(char *filename)
