@@ -158,6 +158,7 @@ function install {
     exit $?
   fi
   echo -n '.'
+  sudo ldconfig
 
   echo ' done.'
   echo 
