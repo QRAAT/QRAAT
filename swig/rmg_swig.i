@@ -23,9 +23,6 @@
 
 %include "gnuradio.i" // the common stuff
 
-//load generated python docstrings
-%include "rmg_swig_doc.i"
-
 %{
 #include "detectmod_detect.h"
 #include "pulse_data.h"

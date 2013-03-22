@@ -56,10 +56,10 @@ function(GR_SWIG_MAKE_DOCS output_file)
         make_directory(${OUTPUT_DIRECTORY})
 
         #generate the Doxyfile used by doxygen
-        configure_file(
-            ${CMAKE_SOURCE_DIR}/docs/doxygen/Doxyfile.swig_doc.in
-            ${OUTPUT_DIRECTORY}/Doxyfile
-        @ONLY)
+        #configure_file(
+        #    ${CMAKE_SOURCE_DIR}/docs/doxygen/Doxyfile.swig_doc.in
+        #    ${OUTPUT_DIRECTORY}/Doxyfile
+        #@ONLY)
 
         #Create a dummy custom command that depends on other targets
         include(GrMiscUtils)

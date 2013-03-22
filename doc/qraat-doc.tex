@@ -1,0 +1,127 @@
+\documentclass[letter]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{tikz}
+\usepackage{ulem}
+
+\usepackage{hyperref}
+\usepackage{parskip}
+
+\hypersetup{
+    colorlinks,%
+    citecolor=black,%
+    filecolor=black,%
+    linkcolor=black,%
+    urlcolor=black
+}
+
+\def\dashuline{\bgroup 
+  \ifdim\ULdepth=\maxdimen  % Set depth based on font, if not set already
+	  \settodepth\ULdepth{(j}\advance\ULdepth.4pt\fi
+  \markoverwith{\kern.15em
+	\vtop{\kern\ULdepth \hrule width .3em}%
+	\kern.15em}\ULon}
+
+\newcounter{foot}
+\setcounter{foot}{1}
+
+\setlength\parindent{2em}
+
+\author{}
+\date{\today}
+\title{QRAAT}
+	
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This could eventually be our doc for QRAAT. For now, this just outlines configuration 
+stuff for the prototype system. Build this doc with pdflatex (sudo apt-get install pdflatex). 
+\end{abstract}
+
+\tableofcontents
+
+\section{System specifications}
+QRAAT ahs two main components: the remote field computers, which implement the initial 
+signal detection, and the server, which collects data from the field computers for 
+higher order processing. Here we outline the structure of these two components. 
+
+\subsection{RMG Remote}
+Each field computer is configured to run the software defined radio. These systems have 
+32-bit dual core processors, 2 GB of ram, and 8 GB solid-state persistent memory. They 
+run stock Ubuntu Server 12.04. Along with the SDR implemented in GNU Radio, each is 
+configured to run an ssh server, minicom, ntpdate, and the various other necessities. 
+
+The initial signal processing software outputs outputs files corresponding to pulses 
+with the extension \texttt{.det}. These are stored on a temporary file system in memory, 
+located at \texttt{/tmp/ramdisk/det\_files}. The pulse data files are stored in a directory 
+structure according to the the minute in which they were recorded, for example: 
+$$ \texttt{/tmp/ramdisk/det\_files/2013/03/22/15/20/03439743.det} $$
+The file name gives the second it was created with millisecond precision, i.e. 
+\texttt{SSUUUUUU.det}. This is the last step on the field computers; these files are 
+then collected by the server. 
+
+Each site has a user called \textit{rmg} whose password---you guessed it---is \textit{rmg}. 
+
+The QRAAT software is located in \texttt{/home/rmg/QRAAT}. We've set it up as a git 
+repository that pulls from the RMG Server. To update the software, ssh to the site, 
+switch to this directory, and type '\texttt{git pull}'. You will be prompted for 
+the server's password.  
+
+Lastly, the transmitter file is \texttt{/home/rmg/tx.csv}. 
+
+
+\subsection{RMG Server}
+Along with managing the field computers and collecting data, the server is responsible for
+callibration and triangulation. The \texttt{rmg} script allows us to power the computer and 
+RMG module on and off, cycle the RMG module power, start and stop the software defined radio, 
+update the field computer's transmitter file, and collect \texttt{.det}s. The server has a 
+file called \texttt{sitelist.csv} that stores various parameters and the status of the RMG remotes:
+\begin{enumerate}
+  \item \textit{Name} - of the site, 
+  \item \textit{CompIP} - hostname or IP address of the remote computer, 
+  \item \textit{PowerIP} - hostname or IP address of the network addressible power source,
+  \item \textit{CompOutlet} - outlet number of the computer, 
+  \item \textit{RxOutlet} - outlet number of the RMG receiver module, 
+  \item \textit{PowerType} - power source type, e.g. Netbooter, PingBrother, or WebPowerSwitch, and finally
+  \item \textit{Status} - is the site up, down, or active (SDR is running). 
+\end{enumerate}
+
+\texttt{rmg} uses RSA encryption for ssh instead of prompting the user for a password each time. This is 
+important since some of \texttt{rmg}'s routines, such as \texttt{rmg fetch}, make many ssh calls. The 
+RMG remotes store the public part of the key and the server the private part. 
+
+We keep a copy of the software repository on the server from which the remote ocmputers pull; the server 
+copy pulls directly from github. 
+
+\section{Configuration}
+Here are the configuration steps that need to be taken as of this writing (22 March). 
+
+\subsection{West campus prototype}
+We won't have networking for this implementation. As they are the ethernet interfaces of the RMG 
+remotes are configured with a static IP address 10.\texttt{<site\_no>}.1.55 and netmask 255.0.0.0. 
+To connect to it, the simplest thing to do is create an interface 
+in network manager. \textit{Network Manager} $\rightarrow$ \textit{Edit Connections...}, in the 
+\textit{Wired} tab, choose \textit{Add}. In \textit{IPv4 Settings}, choose \textit{Method = Manual}. 
+Add an address like 10.253.1.55 with netmask 255.0.0.0. You should be good to go.  
+
+\subsection{Quail Ridge}
+There are two configuration steps for each field computer. First, the ethernet interface needs 
+to be configured to use the Qurinet router as its gateway. In \texttt{/etc/network/interfaces}, 
+you'll find an interface that is commented out. Uncomment this and comment out the old one. 
+\begin{verbatim}
+# Default interface in Quirinet
+auto eth0 
+iface eth0 inet static
+  address 10.20.1.55
+  netmask 255.255.0.0
+  gateway 10.20.1.1
+\end{verbatim}
+
+The second part is to make sure the git repository is pointed to the right place. In 
+\texttt{/home/rmg/QRAAT/.git/config}, you'll find a line that reads
+$$ \texttt{url = christopher@10.253.1.55:work/QRAAT \# change me!} $$ 
+Change this to the correct worker and directory and you're set!
+
+
+
+\end{document}
