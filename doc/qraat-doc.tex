@@ -48,12 +48,14 @@ signal detection, and the server, which collects data from the field computers f
 higher order processing. Here we outline the structure of these two components. 
 
 \subsection{RMG Remote}
-Each field computer is configured to run the software defined radio. These systems have 
-32-bit dual core processors, 2 GB of ram, and 8 GB solid-state persistent memory. They 
+Each field computer is configured to run the software defined radio. We are using 
+fanless, low-power machines manufactured by fit-PC.\footnote{For details, visit
+\href{http://www.fit-pc.com}{\tt fit-pc.com}.} The fit-PC3 has a dual-core, 32-bit AMD
+processor, 2 GBs of ram, and 8 GBs solid-state persistent memory. They 
 run stock Ubuntu Server 12.04. Along with the SDR implemented in GNU Radio, each is 
-configured to run an ssh server, minicom, ntpdate, and the various other necessities. 
+configured to run an ssh server, ntpdate, and other necessities. 
 
-The initial signal processing software outputs outputs files corresponding to pulses 
+The initial signal processing software outputs files corresponding to pulses 
 with the extension \texttt{.det}. These are stored on a temporary file system in memory, 
 located at \texttt{/tmp/ramdisk/det\_files}. The pulse data files are stored in a directory 
 structure according to the the minute in which they were recorded, for example: 
@@ -145,7 +147,7 @@ $ QRAAT/build-rmg -v install
 
 Before testing your build, we need to setup communication with the RMG recevier's PIC interface. First we 
 add a rule to udev\footnote{\texttt{udev} is a common domain on GNU/linux systems used to handle 
-new devices when they're plugged in. For instance, when you installed the GNU Radio, rules were installed 
+new devices when they're plugged in. For instance, when you installed GNU Radio, rules were installed 
 for the USRP---a hardware component of the RMG receiver---and the UHD driver.} to set permissions for 
 \texttt{/dev/ttyUSB0}, the serial interface for the RMG receiver. Create a new file: 
 \begin{verbatim}
@@ -179,7 +181,7 @@ configure GRUB to timeout in this situation. Add the following to \texttt{/etc/d
 Then type \texttt{sudo update-grub}. 
 
 Up until now, we've been using the field computer with a monitor, keyboard, and ethernet connection
-to the internet. The last thing we have to do is configure the network interface so that we can 
+to the internet. The next thing we have to do is configure the network interface so that we can 
 access it over ssh without a head. In \texttt{/etc/network/interfaces}, comment out the default 
 ethernet interface and add a static IP address: 
 \begin{verbatim}
@@ -191,7 +193,7 @@ ethernet interface and add a static IP address:
     netmask 255.0.0.0
 \end{verbatim}
 To connect to the computer directly through an ethernet cable, just setup a static IP address on 
-the host system in the same subnet. See the section on networking for details.
+the host system in the same subnet. See the section on networking for details. 
 
 The next thing to do is change the system's hostname. This needs to be changed in two places:
 \texttt{/etc/hostname} and \texttt{/etc/hosts}. 
@@ -201,12 +203,16 @@ shutdown and reboot the computer without typing in a sudo password. Type
 \begin{verbatim}
 $ sudo visudo
 \end{verbatim}
-
-[TODO]
+and add the following lines to the end of the sudoers file: 
+\begin{verbatim}
+  rmg ALL=NOPASSWD: /sbin/halt
+  rmg ALL=NOPASSWD: /sbin/reboot
+  rmg ALL=NOPASSWD: /sbin/poweroff
+\end{verbatim}
 
 \subsubsection{Creating an image}
 The preceeding configuration is time-consuming, though not difficult. For configuring many sites, 
-it's best to create an image from a fully configured system and copying this to other sites. The 
+it's best to create an image from a fully configured system and copy this to other sites. The 
 simplest way to do this is with a Ubuntu live-USB. Plug a monitor, keyboard, and mouse into the 
 FitPC and boot a live copy of Ubuntu on a thumbdrive. Grab a terminal and make sure the harddrive
 is unmounted. ("\texttt{mount | grep "sda"}. Verify that \texttt{/dev/sda} is indeed the 
@@ -238,9 +244,9 @@ in network manager. \textit{Network Manager} $\rightarrow$ \textit{Edit Connecti
 Add an address like 10.253.1.55 with netmask 255.0.0.0. You should be good to go.  
 
 \subsubsection{Quail Ridge}
-There are two configuration steps for each field computer. First, the ethernet interface needs 
-to be configured to use the Qurinet router as its gateway. In \texttt{/etc/network/interfaces}, 
-you'll find an interface that is commented out. Uncomment this and comment out the old one. 
+The ethernet interface needs to be configured to use the Qurinet router as its gateway. 
+In \texttt{/etc/network/interfaces}, you'll find an interface that is commented out. 
+Uncomment this and comment out the old one. 
 \begin{verbatim}
   # Default interface in Quirinet
   auto eth0 
@@ -256,7 +262,5 @@ The second part is to make sure the git repository is pointed to the right place
   url = christopher@10.253.1.55:work/QRAAT # change me!
 \end{verbatim}
 Change this to the correct user and directory and you're set!
-
-
 
 \end{document}
