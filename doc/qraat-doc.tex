@@ -1,5 +1,6 @@
 \documentclass[letter]{article}
 \usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
 \usepackage{tikz}
 \usepackage{ulem}
 
@@ -57,7 +58,7 @@ configured to run an ssh server, ntpdate, and other necessities.
 
 The initial signal processing software outputs files corresponding to pulses 
 with the extension \texttt{.det}. These are stored on a temporary file system in memory, 
-located at \texttt{/tmp/ramdisk/det\_files}. The pulse data files are stored in a directory 
+located at /tmp/ramdisk/det\_files. The pulse data files are stored in a directory 
 structure according to the the minute in which they were recorded, for example: 
 \begin{verbatim}
   /tmp/ramdisk/det_files/2013/03/22/15/20/03439743.det
@@ -68,12 +69,12 @@ then collected by the server.
 
 Each site has a user called \textit{rmg} whose password---you guessed it---is \textit{rmg}. 
 
-The QRAAT software is located in \texttt{/home/rmg/QRAAT}. We've set it up as a git 
+The QRAAT software is located in /home/rmg/QRAAT. We've set it up as a git 
 repository that pulls from the RMG Server. To update the software, ssh to the site, 
 switch to this directory, and type '\texttt{git pull}'. You will be prompted for 
 the server's password.  
 
-The transmitter file is \texttt{/home/rmg/tx.csv}. 
+The transmitter file is /home/rmg/tx.csv. 
 
 \subsection{RMG Server}
 Along with managing the field computers and collecting data, the server is responsible for
@@ -174,7 +175,7 @@ tmpfs   /tmp/ramdisk  tmpfs  nodev,nosuid,mode=1777,size=1024M   0   0
 
 If linux shutsdown uncleanly, e.g. the site loses power, the GRUB bootloader will wait for user 
 input before rebooting the operating system. This is bad for headless systems, so we need to 
-configure GRUB to timeout in this situation. Add the following to \texttt{/etc/default/grub}: 
+configure GRUB to timeout in this situation. Add the following to /etc/default/grub: 
 \begin{verbatim}
   GRUB_RECORDFAIL_TIMEOUT=2
 \end{verbatim}
@@ -182,7 +183,7 @@ Then type \texttt{sudo update-grub}.
 
 Up until now, we've been using the field computer with a monitor, keyboard, and ethernet connection
 to the internet. The next thing we have to do is configure the network interface so that we can 
-access it over ssh without a head. In \texttt{/etc/network/interfaces}, comment out the default 
+access it over ssh without a head. In /etc/network/interfaces, comment out the default 
 ethernet interface and add a static IP address: 
 \begin{verbatim}
   # auto eth0
@@ -196,7 +197,7 @@ To connect to the computer directly through an ethernet cable, just setup a stat
 the host system in the same subnet. See the section on networking for details. 
 
 The next thing to do is change the system's hostname. This needs to be changed in two places:
-\texttt{/etc/hostname} and \texttt{/etc/hosts}. 
+/etc/hostname and /etc/hosts. 
 
 Lastly, since we will be managing the power of this system remotely, we want to be able to 
 shutdown and reboot the computer without typing in a sudo password. Type 
@@ -215,7 +216,7 @@ The preceeding configuration is time-consuming, though not difficult. For config
 it's best to create an image from a fully configured system and copy this to other sites. The 
 simplest way to do this is with a Ubuntu live-USB. Plug a monitor, keyboard, and mouse into the 
 FitPC and boot a live copy of Ubuntu on a thumbdrive. Grab a terminal and make sure the harddrive
-is unmounted. ("\texttt{mount | grep "sda"}. Verify that \texttt{/dev/sda} is indeed the 
+is unmounted. ("\texttt{mount | grep "sda"}. Verify that /dev/sda is indeed the 
 harddrive.) Plug in an external harddrive or thumbdrive that can 
 fit the 8 GB file we're about to create. Change the directory to the external drive and run: 
 \begin{verbatim}
@@ -243,9 +244,18 @@ in network manager. \textit{Network Manager} $\rightarrow$ \textit{Edit Connecti
 \textit{Wired} tab, choose \textit{Add}. In \textit{IPv4 Settings}, choose \textit{Method = Manual}. 
 Add an address like 10.253.1.55 with netmask 255.0.0.0. You should be good to go.  
 
+In lue of networking, we're collecting the data on external harddrives at all three sites. We 
+can use udev to setup automounting, Create a new udev rule file, like /etc/udev/rules.d/
+90-hd-backup.rules and add the following lines:
+\begin{verbatim}
+ACTION=="add", SUBSYSTEMS=="scsi", KERNEL=="sd[a-h]1", RUN+="/bin/mount /dev/%k /media/backup"
+ACTION=="remove", SUBSYSTEMS=="scsi", KERNEL=="sd[b-h]1",RUN+="/bin/umount /dev/%k"
+\end{verbatim}
+
+
 \subsubsection{Quail Ridge}
 The ethernet interface needs to be configured to use the Qurinet router as its gateway. 
-In \texttt{/etc/network/interfaces}, you'll find an interface that is commented out. 
+In /etc/network/interfaces, you'll find an interface that is commented out. 
 Uncomment this and comment out the old one. 
 \begin{verbatim}
   # Default interface in Quirinet
@@ -257,7 +267,7 @@ Uncomment this and comment out the old one.
 \end{verbatim}
 
 The second part is to make sure the git repository is pointed to the right place. In 
-\texttt{/home/rmg/QRAAT/.git/config}, you'll find a line that reads
+/home/rmg/QRAAT/.git/config, you'll find a line that reads
 \begin{verbatim}
   url = christopher@10.253.1.55:work/QRAAT # change me!
 \end{verbatim}
