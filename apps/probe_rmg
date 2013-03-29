@@ -19,10 +19,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import sys
+null = open('/dev/null', 'w')
+stdout = sys.stdout
+stderr = sys.stderr
+sys.stderr = sys.stdout = null 
+
 from gnuradio import gr, blks2, uhd, gru
 from optparse import OptionParser
-import rmg
-import traceback
+import rmg, traceback
 
 parser = OptionParser ()
 parser.add_option ("-f", "--tx_file", type="string", 
@@ -64,6 +69,8 @@ except:
 
 finally: 
   if not error: 
-    print "ready" 
+    print >> stdout, "ready"
   else: 
-    print error
+    print >> stdout, "error"
+    print >> stderr, error
+
