@@ -260,32 +260,9 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   int int_useconds = (int)tp.tv_usec;
 
   // Create diretory tree. 
-/*
-  char *str = (char *)malloc(256*sizeof(char)),
-       *filename = (char *)malloc((strlen(directory)+256)*sizeof(char)),
-       *pch; 
-  strftime(str, 256, "%Y/%m/%d/%H/%M", time_struct);
-  strcpy(filename, directory);
-  strcat(filename, "/"); 
-  pch = strtok(str, "/");
-  while (pch != NULL) {
-    strcat(filename, pch); 
-    strcat(filename, "/");
-    if (mkdir(filename, 0777) == -1) {
-      switch (errno) {
-        case EEXIST: break;
-        default:     perror("mkdir"); 
-                     free(str);
-                     free(filename); 
-                     return; 
-      }
-    }
-    pch = strtok(NULL, "/"); 
-  }
-*/
   char *filename = (char *)malloc(256*sizeof(char));
-  char *directory_time_string = (char *)malloc(20*sizeof(char));
-  strftime(directory_time_string, 256, "/%Y/%m/%d/%H/%M", time_struct);
+  char *directory_time_string = (char *)malloc(24*sizeof(char));
+  strftime(directory_time_string, 24, "/%Y/%m/%d/%H/%M/", time_struct);
   strcpy(filename, directory);
   strcat(filename,directory_time_string);
   boost::filesystem::create_directories(filename);
