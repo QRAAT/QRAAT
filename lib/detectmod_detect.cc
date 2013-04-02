@@ -34,6 +34,7 @@
 #include <string.h>
 #include <math.h>
 #include <errno.h>
+#include "boost/filesystem.hpp"
 
 #ifndef O_BINARY
 #define	O_BINARY 0
@@ -259,27 +260,12 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   int int_useconds = (int)tp.tv_usec;
 
   // Create diretory tree. 
-  char *str = (char *)malloc(256*sizeof(char)),
-       *filename = (char *)malloc((strlen(directory)+256)*sizeof(char)),
-       *pch; 
-  strftime(str, 256, "%Y/%m/%d/%H/%M", time_struct);
+  char *filename = (char *)malloc(256*sizeof(char));
+  char *directory_time_string = (char *)malloc(24*sizeof(char));
+  strftime(directory_time_string, 24, "/%Y/%m/%d/%H/%M/", time_struct);
   strcpy(filename, directory);
-  strcat(filename, "/"); 
-  pch = strtok(str, "/");
-  while (pch != NULL) {
-    strcat(filename, pch); 
-    strcat(filename, "/");
-    if (mkdir(filename, 0777) == -1) {
-      switch (errno) {
-        case EEXIST: break;
-        default:     perror("mkdir"); 
-                     free(str);
-                     free(filename); 
-                     return; 
-      }
-    }
-    pch = strtok(NULL, "/"); 
-  }
+  strcat(filename,directory_time_string);
+  boost::filesystem::create_directories(filename);
 
   // Create file name.
   char *time_string = (char *)malloc(40*sizeof(char));
@@ -296,8 +282,9 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   if (!open_file(filename) || !d_fp) {
     free(u_sec); 
     free(time_string); 
-    free(str);
-    free(filename); 
+    //free(str);
+    free(filename);
+    free(directory_time_string);
     return;
   }
 
@@ -324,8 +311,9 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   close();
   free(time_string);
   free(filename);
-  free(str); 
+  //free(str); 
   free(u_sec);
+  free(directory_time_string);
 
 }
 

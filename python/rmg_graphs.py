@@ -125,7 +125,7 @@ class software_backend(gr.hier_block2):
                                             USE_PSD)
 
             elif (j.tx_type == rmg_param.CONT):
-                self.det[j.band_num].enable_cont(str(j.file_prefix + time.strftime('%Y%m%d%H%M%S', time.gmtime()) + '.tdat'))
+                self.det[j.band_num].enable_cont(str(j.directory + '/' + j.name + '_' + time.strftime('%Y%m%d%H%M%S', time.gmtime()) + '.tdat'))
 
 
     def disable(self):

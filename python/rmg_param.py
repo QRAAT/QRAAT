@@ -49,7 +49,7 @@ class band:
 
     def combine_tx(self, tx_data, filter_length):
         self.name = self.name + tx_data[0] + '_'
-        self.file_prefix = self.file_prefix + tx_data[0] + '_'
+#        self.file_prefix = self.file_prefix + tx_data[0] + '_'
         if (self.tx_type != CONT):
         
             if (tx_data[2] == CONT):
