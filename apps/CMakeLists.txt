@@ -30,7 +30,6 @@ GR_PYTHON_INSTALL(
     active_rmg
     run_rmg
     run_rmg_alt
-    probe_rmg
     DESTINATION bin
 )
 
