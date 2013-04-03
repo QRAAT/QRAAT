@@ -49,7 +49,7 @@ class band:
 
     def combine_tx(self, tx_data, filter_length):
         self.name = self.name + tx_data[0] + '_'
-        self.file_prefix = self.file_prefix + tx_data[0] + '_'
+#        self.file_prefix = self.file_prefix + tx_data[0] + '_'
         if (self.tx_type != CONT):
         
             if (tx_data[2] == CONT):
@@ -132,8 +132,8 @@ class backend:
         self.tunings = []
     
         #hardcoded RF parameters
-        self.pa_min = 162000000
-        self.pa_max = 167000000
+        self.pa_min = 148000000
+        self.pa_max = 178000000
         self.if1_cf = 70000000
         self.if1_bw = 500000
         self.if2_cf = 10700000
@@ -252,6 +252,7 @@ class backend:
             min_steps = int(math.ceil(min_tune/self.pv_step))
             max_temp = (int(math.floor(max_tune/self.pv_step)))
             tuning_range = range(min_steps, max_temp +1)
+
             if self.num_bands > 1:
             #check that tx isn't on filter edge
                 tr_cp = list(tuning_range)#so I can remove bad values and still iterate over the whole thing
@@ -279,16 +280,9 @@ class backend:
         #build "save_keys", the smallest amount of tunings to reach all transmitters
         save_keys = []
         f_index = 0
-        found_freqs = set()
         while num_freqs > f_index:
             save_keys.append(max_steps[f_index])
-            found_freqs.update(inv[max_steps[f_index]])
-            f_index = len(found_freqs)
-            
-        #print tunings
-        #print save_keys
-        #for j in save_keys:
-            #print inv[j]
+            f_index = s_freqs.index(max(inv[max_steps[f_index]]))+1
 
         #builds optimized tuning parameters
         for j in save_keys:#for each tuning required

@@ -40,7 +40,6 @@ foreach(incdir ${GRUEL_INCLUDE_DIRS})
 endforeach(incdir)
 
 set(GR_SWIG_LIBRARIES gnuradio-rmg)
-set(GR_SWIG_DOC_FILE ${CMAKE_CURRENT_BINARY_DIR}/rmg_swig_doc.i)
 set(GR_SWIG_DOC_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 GR_SWIG_MAKE(rmg_swig rmg_swig.i)
 SWIG_LINK_LIBRARIES(rmg_swig gnuradio-rmg)
@@ -57,7 +56,6 @@ GR_SWIG_INSTALL(TARGETS rmg_swig DESTINATION ${GR_PYTHON_DIR}/rmg)
 install(
     FILES
     rmg_swig.i
-    ${CMAKE_CURRENT_BINARY_DIR}/rmg_swig_doc.i
     DESTINATION ${GR_INCLUDE_DIR}/rmg/swig
 )
     #pulse_data.i

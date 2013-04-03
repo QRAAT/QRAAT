@@ -191,7 +191,7 @@ class Frame(wx.Frame):
 
     def HandleInterrupt(self, signum, frame): 
       # interrupt input reading
-      raise 0
+      raise KeyboardInterrupt
                 
     def OnRefresh(self, event):
   

@@ -25,6 +25,11 @@
 #include <sys/time.h>
 #include <string.h>
 #include <math.h>
+<<<<<<< HEAD
+=======
+#include <errno.h>
+#include "boost/filesystem.hpp"
+>>>>>>> master
 
 #ifndef O_BINARY
 #define	O_BINARY 0
@@ -225,7 +230,20 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   struct timeval *tp = (struct timeval *)malloc(sizeof(struct timeval));
   gettimeofday(tp, NULL);
   void *temp;
-  struct tm *time_struct = gmtime(&(tp->tv_sec));
+  struct tm *time_struct = localtime(&(tp.tv_sec));
+  int int_seconds = (int)tp.tv_sec;
+  int int_useconds = (int)tp.tv_usec;
+
+  // Create diretory tree. 
+  char *filename = (char *)malloc(256*sizeof(char));
+  char *directory_time_string = (char *)malloc(24*sizeof(char));
+  strftime(directory_time_string, 24, "/%Y/%m/%d/%H/%M/", time_struct);
+  strcpy(filename, directory);
+  strcat(filename,directory_time_string);
+  boost::filesystem::create_directories(filename);
+
+  // Create file name.
+
   char *time_string = (char *)malloc(40*sizeof(char));
   strftime(time_string,40,"%Y%m%d%H%M%S",time_struct);
   char *u_sec = (char *)malloc(10*sizeof(char));
@@ -233,14 +251,14 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   strncat(time_string,u_sec,6);
   int len = strlen(fileprefix)+strlen(time_string)+10;
   
-  //filename is the given prefix and the time to the microsecond (false precision)
-  char *filename = (char *)malloc(len*sizeof(char));
-  sprintf(filename,"%s%s.det",fileprefix,time_string);
-
-  //open .det file
-  if(!open_file(filename))
-    return;
-  if (!d_fp)
+  // Open .det file. 
+  if (!open_file(filename) || !d_fp) {
+    free(u_sec); 
+    free(time_string); 
+    free(tp);
+    //free(str);
+    free(filename);
+    free(directory_time_string);
     return;
 
   //write time as a timeval
@@ -267,8 +285,10 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   close();
   free(time_string);
   free(filename);
-  free(u_sec);
   free(tp);
+  //free(str); 
+  free(u_sec);
+  free(directory_time_string);
 
   return;
 }
