@@ -4,6 +4,17 @@
 # modify the file and output to STDOUT. This script is part of the 
 # QRAAT system. 
 #
+# Example usage
+# rmg_sitelist site10 powertype <sitelist.csv      ... Emit a a cell, 
+#       e.g., the type of power supply at site 10. 
+# rmg_sitelist site10 status down <sitelist.csv >tmp && mv tmp sitelist.csv 
+#       ... Update a cell in the file, write to a temporary file, and 
+#       rename the updated to the original. 
+# rmg_sitelist -r site10 <sitelist.csv >site10.csv ... Output a site-
+#       specific CSV file.
+# rmg_sitelist -c status <sitelist.csv             ... Emit a list of 
+#       of parameter values for all sites, e.g. statuses. 
+#
 # Copyright (C) 2013 Christopher Patton
 # 
 # This program is free software: you can redistribute it and/or modify
@@ -73,7 +84,7 @@ header = { headers[i] : i for i in range(len(headers)) }
 
     ## Parse line by line ##
 
-if value:
+if value or (row and not col): 
   print ','.join(headers)
 
 for line in sys.stdin.readlines(): 
@@ -94,7 +105,7 @@ for line in sys.stdin.readlines():
     elif row and not col: # Row
       i = header["name"]
       if line[i] == row: 
-        print ','.join(line[:i] + line[i+1:])
+        print ','.join(line)
         sys.exit(0)
     
     else: # Cell
