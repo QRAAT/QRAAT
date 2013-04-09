@@ -230,7 +230,7 @@ class est_data():
                         self.tag_names.append(tag_name)
                         tag_index = self.num_tags
                         self.num_tags += 1
-                    tag_number[j] = tag_index
+                    temp_data.tag_number[j] = tag_index
 
                     (time_sec, time_usec) = struct.unpack('ii', estfile.read(8))
                     temp_data.epoch_time[j] = time_sec + time_usec/1000000.0
