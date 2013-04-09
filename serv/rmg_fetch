@@ -57,10 +57,10 @@ class Tree:
 
 prog = re.compile("([0-9]{4})(\/([0-9]{2})){4}") 
 
-now = time.localtime(time.time() - (120)) # Exclude last two minutes, actually. This 
-                                          # is to account for possible synchronization 
-                                          # issues-up to one minute of clock slippage. 
-                                        
+now = time.gmtime(time.time() - (120)) # Exclude last two minutes, actually. This 
+                                       # is to account for possible synchronization 
+                                       # issues-up to one minute of clock slippage. 
+             
 t = [now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min]
 
 tree = Tree()

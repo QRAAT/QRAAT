@@ -255,7 +255,7 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   struct timeval tp;
   gettimeofday(&tp, NULL);
   void *temp;
-  struct tm *time_struct = localtime(&(tp.tv_sec));
+  struct tm *time_struct = gmtime(&(tp.tv_sec));
   int int_seconds = (int)tp.tv_sec;
   int int_useconds = (int)tp.tv_usec;
 

@@ -4,6 +4,17 @@
 # modify the file and output to STDOUT. This script is part of the 
 # QRAAT system. 
 #
+# Example usage
+# rmg_sitelist site10 powertype <sitelist.csv      ... Emit a a cell, 
+#       e.g., the type of power supply at site 10. 
+# rmg_sitelist site10 status down <sitelist.csv >tmp && mv tmp sitelist.csv 
+#       ... Update a cell in the file, write to a temporary file, and 
+#       rename the updated to the original. 
+# rmg_sitelist -r site10 <sitelist.csv >site10.csv ... Output a site-
+#       specific CSV file.
+# rmg_sitelist -c status <sitelist.csv             ... Emit a list of 
+#       of parameter values for all sites, e.g. statuses. 
+#
 # Copyright (C) 2013 Christopher Patton
 # 
 # This program is free software: you can redistribute it and/or modify
@@ -22,34 +33,103 @@
 
 import sys
 
-if len(sys.argv) < 3 or len(sys.argv) > 4:
-  print >> sys.stderr, "usage: sitelist <site> <parameter> [<value>]" 
+usage = """\
+usage: rmg_sitelist <site> <parameter> [<value>] 
+               -c,--column <parameter> [<value>] 
+               -r,--row <site> 
+ < path/to/original.csv [> path/to/new.csv]
+
+  If a value is specified, then a .csv file is emitted to 
+  standard output; otherwise the requested parameter's value
+  is emitted.""" 
+
+    ## Parse command line parameters ##
+
+if len(sys.argv) == 2 and sys.argv[1] in ['-h', '--help']:
+  print >> sys.stderr, usage
+  sys.exit(0)
+
+elif len(sys.argv) < 3 or len(sys.argv) > 4:
+  print >> sys.stderr, "error (sitelist): wrong number of arguments arguments." 
+  print >> sys.stderr, usage
   sys.exit(1)
 
-sys.argv.append(None)
+elif sys.argv[1][0] == '-':
 
-(row, col, value) = sys.argv[1:4]
+  if sys.argv[1] in ['-c', '--column']: 
+    # Operate on column. Either emit column values or set them all to 'value'. 
+    sys.argv.append(None)
+    (row, col, value) = (None, sys.argv[2], sys.argv[3]) 
+
+  elif sys.argv[1] in ['-r', '--row']: 
+    # Operate on row. Emit first row whose name matches 'row'. Can't mutate. 
+    (row, col, value) = (sys.argv[2], None, None)
+
+  else:
+    print >> sys.stderr, "error (sitelist): unknown option '%s'." % sys.argv[1][1:]
+    print >> sys.stderr, usage
+    sys.exit(1)
+
+else: 
+  # Operate on cell. Either emit first match or set to 'value'.
+  sys.argv.append(None)
+  (row, col, value) = sys.argv[1:4]
+
+
+    ## Read header ##
 
 headers = sys.stdin.readline().strip().split(',')
 header = { headers[i] : i for i in range(len(headers)) }
 
-if value: 
+
+    ## Parse line by line ##
+
+if value or (row and not col): 
   print ','.join(headers)
 
 for line in sys.stdin.readlines(): 
   line = line.strip().split(',')
   try: 
-    if value == None and line[header["name"]] == row: # Just get value
-      print line[header[col]]
-      sys.exit(0)
-    elif value: 
-      if line[header["name"]] == row:
+
+    if not row and col: # Column
+      if not value:
+        if len(line[header[col]]) == 0: 
+          print "(nil)"
+        else:
+          print line[header[col]]
+        
+      elif value: 
         line[header[col]] = value
-      print ','.join(line)
+        print ','.join(line)
+
+    elif row and not col: # Row
+      i = header["name"]
+      if line[i] == row: 
+        print ','.join(line)
+        sys.exit(0)
+    
+    else: # Cell
+      if not value and line[header["name"]] == row: # Just get value
+        if len(line[header[col]]) == 0: 
+          print "(nil)"
+        else:
+          print line[header[col]]
+        sys.exit(0)
+      elif value: 
+        if line[header["name"]] == row:
+          line[header[col]] = value
+        print ','.join(line)
+
   except IndexError: 
     pass
 
-if value == None: # If we got here, site doesn't appear in site list
+  except KeyError: 
+    print >> sys.stderr, "error (rowlist): no such parameter '%s'." % col
+    sys.exit(1)
+
+
+if row and not value:
+  print >> sys.stderr, "error (rowlist): '%s' doesn't appear in sitelist." % row
   sys.exit(1)
 else:
   sys.exit(0)
