@@ -12,7 +12,7 @@ OP=$4
 
 if [ ! $OP ]
 then
-  echo "usage: powerswitch <power_type> <IP_addr> <outlet> {ON, OFF, CYCLE}" 1>&2
+  echo "usage: powerswitch <power_type> <IP_addr> <outlet> {ON, OFF, CYCLE, QUERY}" 1>&2
   exit 1
 fi 
 
@@ -42,6 +42,10 @@ function pingbrother {
       curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=1" > /dev/null
    ;;
 
+   QUERY)
+     echo "error (powerswitch): QUERY not implemented for PingBrother!" 1>&2
+   ;; 
+
    *) 
      echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
      exit 1
@@ -63,6 +67,10 @@ function webpowerswitch {
       echo "powerswitch: wait about 15 seconds for power to cycle." 1>&2
 
     ;;
+   
+    QUERY)
+      echo "error (powerswitch): QUERY not implemented for WebPowerswitch!" 1>&2
+    ;; 
 
     *) 
       echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
@@ -106,6 +114,10 @@ function netbooter {
       echo $?
     ;;
     
+    QUERY)
+      echo "error (powerswitch): QUERY not implemented for netBooter!" 1>&2
+    ;; 
+
     *) 
       echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
       exit 1
