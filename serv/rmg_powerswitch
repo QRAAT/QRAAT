@@ -101,6 +101,17 @@ function webpowerswitch {
 
     ;;
    
+<<<<<<< HEAD
+=======
+    QUERY)
+      echo "error (powerswitch): QUERY not implemented for WebPowerswitch!" 1>&2
+    ;; 
+
+    *) 
+      echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
+      exit 1
+    
+>>>>>>> parsing relay status from pingbrother
   esac
   
   curl --user admin:1234 "http://$IP/outlet?$OUTLET=$OP" > /dev/null
