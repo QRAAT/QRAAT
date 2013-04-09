@@ -17,13 +17,9 @@ then
 fi 
 
 function pingbrother {
-# This is net booter we ordered from New Zealand. This is the best choice
-# because it provides 12 V DC, is essentially a dummy router, does power 
-# monitoring, etc. TODO: (1) what sort of network configuration must be used 
-# with the PingBrother guy? (2) write a powerdown daemon to run on the 
-# RMG remotes. It listens for packets from the PingBrother box that tells it
-# that it's about to lose power. It sends a message to the server and halts
-# the operating system.
+  # This is net booter we ordered from New Zealand. This is the best choice
+  # because it provides 12 V DC, is essentially a dummy router, does power 
+  # monitoring, etc. 
 
   case $OP in
 
@@ -42,15 +38,52 @@ function pingbrother {
       curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=1" > /dev/null
    ;;
 
-   QUERY)
-     echo "error (powerswitch): QUERY not implemented for PingBrother!" 1>&2
-   ;; 
-
-   *) 
-     echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
-     exit 1
   esac
   echo $? 
+}
+
+function pb_query {
+  # Get status of PingBrother relays. Unfortunately we have to parse HTML.
+  # Luckily this is relatively simple with Python! 
+
+  curl -u admin:admin "http://$IP/protect/PBmanual.htm" | \
+  python -c "
+from HTMLParser import HTMLParser
+import sys
+
+class PBRelayStatus(HTMLParser): 
+
+  relay = None
+  state = None
+  relays = {}
+
+  def handle_starttag(self, tag, attrs): 
+    if tag == 'select': 
+      for (attr, value) in attrs:
+        if attr == 'name':
+          self.relay = value[5:] # 'Relay'
+
+    elif tag == 'option' and self.relay:
+      for (attr, value) in attrs: 
+        if attr == 'value': 
+          self.state = value
+        elif attr == 'selected': 
+          self.relays[self.relay] = self.state
+
+  def handle_endtag(self, tag):
+    if tag == 'select': 
+      self.relay = None
+
+    elif tag == 'option' and self.relay:
+      self.state = None
+
+  def handle_data(self, data):
+    pass
+
+parser = PBRelayStatus()
+parser.feed(sys.stdin.read())
+print parser.relays['$OUTLET']
+"
 }
 
 function webpowerswitch {
@@ -68,14 +101,6 @@ function webpowerswitch {
 
     ;;
    
-    QUERY)
-      echo "error (powerswitch): QUERY not implemented for WebPowerswitch!" 1>&2
-    ;; 
-
-    *) 
-      echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
-      exit 1
-    
   esac
   
   curl --user admin:1234 "http://$IP/outlet?$OUTLET=$OP" > /dev/null
@@ -114,38 +139,57 @@ function netbooter {
       echo $?
     ;;
     
-    QUERY)
-      echo "error (powerswitch): QUERY not implemented for netBooter!" 1>&2
-    ;; 
-
-    *) 
-      echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
-      exit 1
-
   esac
  
 }
 
 
+    ## Execute power script ## 
 
-## execute power script ## 
-case $TYPE in
+case $OP in 
   
-  pingbrother)
-    exit $(pingbrother)
+  QUERY) 
+    
+    case $TYPE in 
+      
+      pingbrother)
+        pb_query
+      ;;
+
+      *)
+        echo "error (powerswitch): QUERY not implemented for $TYPE!" 1>&2
+        exit 1
+
+    esac
+
   ;;
   
-  webpowerswitch) 
-    exit $(webpowerswitch)
-  ;;
+  ON|OFF|CYCLE)
 
-  netbooter)
-    exit $(netbooter)
-  ;;
+    case $TYPE in
+      
+      pingbrother)
+        exit $(pingbrother)
+      ;;
+      
+      webpowerswitch) 
+        exit $(webpowerswitch)
+      ;;
 
+      netbooter)
+        exit $(netbooter)
+      ;;
+
+      *)
+        echo "error (powerswitch): '$TYPE' is not a valid power type." 1>&2
+        exit 1
+
+    esac
+
+  ;;
+      
   *)
-    echo "error (powerswitch): '$TYPE' is not a valid power type." 1>&2
+    echo "error (powerswitch): '$OP' is not a valid operation." 1>&2
     exit 1
-  ;;
 
 esac
