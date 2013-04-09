@@ -124,12 +124,12 @@ for line in sys.stdin.readlines():
     pass
 
   except KeyError: 
-    print >> sys.stderr, "error (rowlist): no such parameter '%s'." % col
+    print >> sys.stderr, "error (sitelist): no such parameter '%s'." % col
     sys.exit(1)
 
 
 if row and not value:
-  print >> sys.stderr, "error (rowlist): '%s' doesn't appear in sitelist." % row
+  print >> sys.stderr, "error (sitelist): '%s' doesn't appear in sitelist." % row
   sys.exit(1)
 else:
   sys.exit(0)
