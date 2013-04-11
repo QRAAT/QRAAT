@@ -189,7 +189,7 @@ count=0
 for SITE in $SITES
 do
 
-  STATUS=$(get_sitelist $SITE status)
+  STATUS=$(get_sitelist $SITE state)
   ADDR=$(get_sitelist $SITE comp_ip)
   if [ $? -ne 0 ]; then 
     echo "error: site '$SITE' not recognized." 1>&2
@@ -222,7 +222,7 @@ do
         exit 1
       else
         echo 
-        update_sitelist $SITE status up
+        update_sitelist $SITE state up
       fi
     ;; 
 
@@ -241,7 +241,7 @@ do
         exit 1
       else 
         echo         
-        update_sitelist $SITE status down
+        update_sitelist $SITE state down
       fi
     ;;
     
@@ -263,7 +263,7 @@ do
 
         if [ $(ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR "pgrep run_rmg") ]
           then 
-            update_sitelist $SITE status active
+            update_sitelist $SITE state active
           else
             echo "error: RMG couldn't start." 1>&2
             echo "----------------------------------------" 1>&2
@@ -283,7 +283,7 @@ do
       echo "stop $SITE"
       ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR '/usr/bin/killall run_rmg 2> /dev/null'
       # TODO if success, change status
-      update_sitelist $SITE status up
+      update_sitelist $SITE state up
     ;;
 
     fetch)
