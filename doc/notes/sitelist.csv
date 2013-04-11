@@ -1,4 +1,6 @@
-name,comp_ip,power_ip,comp_outlet,rx_outlet,powertype,status
-site1,site1,192.168.0.100,1,2,webpowerswitch,active
-fake,10.2.1.55,shit,1,2,another_brand,down
-dumb,1.2.3.4,shit,2,3,,down
+name,comp_ip,power_ip,comp_outlet,rx_outlet,powertype,state
+site0,10.0.0.55,10.0.0.56,1,2,pingbrother,down
+site1,localhost,,,,,up
+site2,10.2.1.55,10.0.0.56,1,2,netbooter,down
+site13,10.13.1.55,10.0.0.56,1,2,netbooter,down
+site10,10.10.1.55,10.0.0.56,1,2,netbooter,down
