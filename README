@@ -28,12 +28,12 @@ command line:
 For usage instructions, refer to the documentation. 
 
  rmg
-This program provides basic controls for managing nodes in a small QRAAT deployment.  
-RMG Remote is defined as the field computer which runs the software defined radio 
-portion of QRAAT. Typically there are many RMG remotes running simultaneously. 
-RMG Server is the central computer where all raw data is collected and processed. 
-This program makes heavy use of SSH and for that reason makes use of an RSA key
-with no passphrase. Set up instructions below. 
+This program provides basic controls for managing nodes in a small QRAAT 
+deployment. RMG Remote is defined as the field computer which runs the software 
+defined radio portion of QRAAT. Typically there are many RMG remotes running 
+simultaneously. RMG Server is the central computer where all raw data is 
+collected and processed. This program makes heavy use of SSH and for that 
+reason makes use of an RSA key with no passphrase. Set up instructions below. 
 
 
 Installation
