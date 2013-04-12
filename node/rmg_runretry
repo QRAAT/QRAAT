@@ -16,8 +16,10 @@ if [ ! $RX_OUTLET ]
 fi
 
 source rmg_env  # setup RMG environment variables
+
 STATUS_LOG=$RMG_SITE_METADATA_DIR/status.log
 RETRY_CT=0
+
 if [ ! $RETRY_MAX ]
 then
   echo "error: retry max not set." 1>&2
