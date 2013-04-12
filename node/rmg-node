@@ -98,9 +98,8 @@ fi
 
 if [ ! $RETRY_CT ] || [ ! $RETRY_MAX ]
 then
-  echo "warning: setting retry count to zero." 1>&2
-  RETRY_CT=0
-  RETRY_MAX=10
+  echo "warning: setting retry count to 3." 1>&2
+  export RETRY_MAX=3
 fi 
 
 
@@ -110,7 +109,7 @@ IP=$(rmg_sitelist --column power_ip <$SITE)
 RX_OUTLET=$(rmg_sitelist --column rx_outlet <$SITE)
 
 RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY)
-SDR_PID=$(pgrep run_rmg)
+SDR_PID=$(pgrep rmg_runretry)
 
 PREV_STATUS=$(rmg_sitelist --column site_status <$STATUS_LOG | tail -1)
 PREV_TIME=$(rmg_sitelist --column timestamp <$STATUS_LOG | tail -1)
@@ -125,7 +124,8 @@ function up() {
       if [ $RX_STATE -ne 0 ]                   # RMG receiver off
         then rmg_powerswitch $TYPE $IP $RX_OUTLET OFF; fi 
       if [ $SDR_PID ]                          # Pulse detector stopped
-        then kill -s INT $SDR_PID; fi
+        then kill -SIGTERM $SDR_PID `pgrep run_rmg`; fi 
+
       echo up
   fi
 }
@@ -138,39 +138,21 @@ function down() {
       if [ $RX_STATE -ne 0 ]                   # RMG receiver off
         then rmg_powerswitch $TYPE $IP $RX_OUTLET OFF; fi 
       if [ $SDR_PID ]                          # Pulse detector stopped
-        then kill -s INT $SDR_PID; fi
+        then kill -SIGTERM $SDR_PID `pgrep run_rmg`; fi 
       echo down\($(($DELAY * 60))\)
   fi
 }
 
 function active() {
-  if [ $RETRY_CT -gt $RETRY_MAX ]
-    then 
-      if [ $RX_STATE -ne 0 ]                   # RMG receiver off
-       then rmg_powerswitch $TYPE $IP $RX_OUTLET OFF; fi 
-      if [ $SDR_PID ]                          # Pulse detector stopped
-        then kill -s INT $SDR_PID; fi
-      echo err_fatal
    
-  elif [ $RX_STATE -eq 1 ] && [ $SDR_PID ]
+  if [ $RX_STATE -eq 1 ] && [ $SDR_PID ]
     then
-      let RETRY_CT=0
-      echo active
-  
+      echo "running" 1>&2
   else 
-      if [ $RX_STATE -ne 1 ]                   # RMG receiver on
-       then rmg_powerswitch $TYPE $IP $RX_OUTLET ON; fi 
-      if [ ! $SDR_PID ]                        # Pulse detector running
-        then 
-          run_rmg -d $RMG_SITE_DET_DIR \
-                  -f $RMG_SITE_METADATA_DIR/tx.csv \
-                  -p /dev/ttyUSB0 \
-                  1> $RMG_SITE_METADATA_DIR/run_rmg$(date -d 'today' +'%Y.%m.%d_%H.%M').txt \
-                  2> $RMG_SITE_METADATA_DIR/run_rmg_error.txt &
-      fi
-      let RETRY_CT=RETRY_CT+1
-      echo err_retry\($RETRY_CT\)
+    nohup rmg_runretry $TYPE $IP $RX_OUTLET &> /dev/null < /dev/null & 
   fi
+
+  echo active
 }
 
 
