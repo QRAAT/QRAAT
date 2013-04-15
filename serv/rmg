@@ -69,8 +69,6 @@
 #
 #
 
-source rmg_env  # setup RMG environment variables
-
 function help() {
   cat <<!EOF!
 usage: rmg task [-options] {sites}/all  
@@ -107,9 +105,12 @@ usage: rmg task [-options] {sites}/all
 !EOF!
 }
 
+source rmg_env  # setup RMG environment variables
+
+SITELIST=$RMG_SERVER_METADATA_DIR/sitelist.csv
 
 ## Configuration and status of sites ##
-if [ $? -ne 0 ]; 
+if [ ! -e $SITELIST ]; 
 then
   echo "error: site configuration information not available (no sitelist.csv)." 1>&2
   exit 1
@@ -120,14 +121,14 @@ function update_sitelist () {
   SITE=$1
   ENTRY=$2
   VALUE=$3
-  rmg_csv $SITE $ENTRY $VALUE < $RMG_SERVER_SITELIST > tmp.csv
-  mv tmp.csv $RMG_SERVER_SITELIST
+  rmg_csv $SITE $ENTRY $VALUE < $SITELIST > tmp.csv
+  mv tmp.csv $SITELIST
 }
 
 function get_sitelist() {
   SITE=$1
   ENTRY=$2
-  rmg_csv $SITE $ENTRY < $RMG_SERVER_SITELIST
+  rmg_csv $SITE $ENTRY < $SITELIST
 }
 
 
@@ -168,12 +169,6 @@ case $TASK in
 
 esac 
 
-function status () {
-
-
-
-}
-
 
 ## Site list ##
 SITES=$@
@@ -184,9 +179,8 @@ count=0
 for SITE in $SITES
 do
 
-  GOAL=$(get_sitelist $SITE state)
-
-  ADDR=$(get_sitelist $SITE comp_ip)
+  read GOAL ADDR <<< $(rmg_csv --row $SITE state comp_ip <$SITELIST)
+  
   if [ $? -ne 0 ]; then 
     echo "error: site '$SITE' not recognized." 1>&2
     exit 1
@@ -204,7 +198,7 @@ do
       rm site.csv
     ;;
 
-    up)    # * -> down
+    up)    # * -> up
       echo "up $SITE"
     ;; 
 
@@ -249,9 +243,7 @@ do
  
     cyclerx)
       echo "cyclerx $SITE" 
-      TYPE=$(get_sitelist $SITE powertype) 
-      IP=$(get_sitelist $SITE power_ip)
-      R_OUTLET=$(get_sitelist $SITE rx_outlet)
+      read TYPE IP R_OUTLET <<< $(rmg_csv --row $SITE powertype power_ip rx_outlet <$SITELIST)
       rmg_powerswitch $TYPE $IP $R_OUTLET CYCLE
     ;;
     

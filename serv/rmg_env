@@ -31,7 +31,7 @@ export RMG_SITE_DET_DIR="/tmp/ramdisk/det_files"
 export RMG_SERVER_SSH_KEYFILE="$HOME/.ssh/rmg_rsa"
 export RMG_SERVER_DET_DIR="$HOME/det_files"
 export RMG_SERVER_EST_DIR="$HOME/est_files"
-export RMG_SERVER_SITELIST="$HOME/sitelist.csv"
+export RMG_SERVER_METADATA_DIR="$HOME"
 
 
 
