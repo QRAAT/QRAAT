@@ -32,9 +32,9 @@ function pingbrother {
     ;;
 
     CYCLE) 
-      echo "powerswitch: wait about 6 seconds for power to cycle." 1>&2
+      echo "powerswitch: wait about 3 seconds for power to cycle." 1>&2
       curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=0" &> /dev/null && \
-      sleep 5 && \
+      sleep 2 && \
       curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=1" &> /dev/null
    ;;
 

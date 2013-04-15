@@ -210,7 +210,7 @@ case $STATUS in
       then
         echo "$TIME,shutdown" | cat >> $STATUS_LOG
         echo "time to shutdown!" 
-        #sudo poweroff FIXME
+        sudo poweroff 
 
     ## reset timer or set a new one ##
     elif [ $DELAY_SPECIFIED ] || [ ! $D ]
