@@ -5,14 +5,14 @@
 # QRAAT system. 
 #
 # Example usage
-# rmg_csv site10 powertype <sitelist.csv      ... Emit a a cell, 
+# rmg_csv site10 powertype <csv.csv      ... Emit a a cell, 
 #       e.g., the type of power supply at site 10. 
-# rmg_csv site10 status down <sitelist.csv >tmp && mv tmp sitelist.csv 
+# rmg_csv site10 status down <csv.csv >tmp && mv tmp csv.csv 
 #       ... Update a cell in the file, write to a temporary file, and 
 #       rename the updated to the original. 
-# rmg_csv -r site10 <sitelist.csv >site10.csv ... Output a site-
+# rmg_csv -r site10 <csv.csv >site10.csv ... Output a site-
 #       specific CSV file.
-# rmg_csv -c status <sitelist.csv             ... Emit a list of 
+# rmg_csv -c status <csv.csv             ... Emit a list of 
 #       of parameter values for all sites, e.g. statuses. 
 #
 # Copyright (C) 2013 Christopher Patton
@@ -36,7 +36,7 @@ import sys
 usage = """\
 usage: rmg_csv <site> <parameter> [<value>] 
           -c,--column <parameter> [<value>] 
-          -r,--row <site> 
+          -r,--row <site> [{parameter list}]
  < path/to/original.csv [> path/to/new.csv]
 
   If a value is specified, then a .csv file is emitted to 
@@ -49,8 +49,8 @@ if len(sys.argv) == 2 and sys.argv[1] in ['-h', '--help']:
   print >> sys.stderr, usage
   sys.exit(0)
 
-elif len(sys.argv) < 3 or len(sys.argv) > 4:
-  print >> sys.stderr, "error (sitelist): wrong number of arguments arguments." 
+elif len(sys.argv) < 3:
+  print >> sys.stderr, "error (csv): too few arguments arguments." 
   print >> sys.stderr, usage
   sys.exit(1)
 
@@ -64,9 +64,12 @@ elif sys.argv[1][0] == '-':
   elif sys.argv[1] in ['-r', '--row']: 
     # Operate on row. Emit first row whose name matches 'row'. Can't mutate. 
     (row, col, value) = (sys.argv[2], None, None)
+    if len(sys.argv) > 3: 
+      param_list = sys.argv[3:]
+    else: param_list = None
 
   else:
-    print >> sys.stderr, "error (sitelist): unknown option '%s'." % sys.argv[1][1:]
+    print >> sys.stderr, "error (csv): unknown option '%s'." % sys.argv[1][1:]
     print >> sys.stderr, usage
     sys.exit(1)
 
@@ -84,7 +87,7 @@ header = { headers[i] : i for i in range(len(headers)) }
 
     ## Parse line by line ##
 
-if value or (row and not col): 
+if value or (row and not col) and not param_list: 
   print ','.join(headers)
 
 for line in sys.stdin.readlines(): 
@@ -105,7 +108,10 @@ for line in sys.stdin.readlines():
     elif row and not col: # Row
       i = header["name"]
       if line[i] == row: 
-        print ','.join(line)
+        if param_list: 
+          for col in param_list:
+            print line[header[col]]
+        else: print ','.join(line)
         sys.exit(0)
     
     else: # Cell
@@ -124,12 +130,12 @@ for line in sys.stdin.readlines():
     pass
 
   except KeyError: 
-    print >> sys.stderr, "error (sitelist): no such parameter '%s'." % col
+    print >> sys.stderr, "error (csv): no such parameter '%s'." % col
     sys.exit(1)
 
 
 if row and not value:
-  print >> sys.stderr, "error (sitelist): '%s' doesn't appear in sitelist." % row
+  print >> sys.stderr, "error (csv): '%s' doesn't appear in csv." % row
   sys.exit(1)
 else:
   sys.exit(0)
