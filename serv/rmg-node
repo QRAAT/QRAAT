@@ -192,7 +192,8 @@ esac
 TIME=`date -u +%s`
 # Timestamp is in seconds after epoch. This makes it easier to 
 # calculate the time-elapse. To print the timestamp pretty, do:
-# date --date @`rmg_csv -c timestamp <status.log | tail -1` 
+# date --date @`rmg_csv -c timestamp <status.log | tail -1`
+# Also, GMT is used ('-u'). 
 case $STATUS in
   
   down\(*\))

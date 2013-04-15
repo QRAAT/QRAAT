@@ -82,14 +82,17 @@ usage: rmg task [-options] {sites}/all
 
     status       Show status of a site. 
 
-    up           Power on remote computer and RMG receiver. If no arguments
-                 provided, print sites currently up. 
+    update       Update a site's configuration information and goal state. 
 
-    down         Power off remote computer and RMG receiver. 
+    up           Power on remote computer.
 
-    start        Sart RMG software defined radio. Store pulse data remotely. 
+    down         Power off remote computer. 
 
-    stop         Stop running RMG software defined radio. 
+    start        Power on the RMG receiver and start software defined radio. 
+                 Store pulse data remotely. 
+
+    stop         Power off the RMG receiver and stop the software defined 
+                 radio. 
 
     fetch        Download pulse data from site to server. Delete downloaded 
                  data from remote machine. 
@@ -131,6 +134,7 @@ function get_sitelist() {
   rmg_csv $SITE $ENTRY < $SITELIST
 }
 
+
 function status() {
   SITE=$1
 
@@ -165,6 +169,17 @@ function status() {
     echo err_pwr
     echo unknown
   fi
+}
+
+function update() {
+  SITE=$1
+  ADDR=$2
+  
+  rmg_csv --row $SITE <$RMG_SERVER_METADATA_DIR/sitelist.csv >site.csv
+  scp -i $RMG_SERVER_SSH_KEYFILE site.csv rmg@$ADDR:$RMG_SITE_METADATA_DIR/site.csv
+  ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR "rmg-node check" 
+  rm site.csv
+
 }
 
 
@@ -215,6 +230,7 @@ count=0
 for SITE in $SITES
 do
 
+  read network_status site_status <<< `status $SITE`
   read GOAL ADDR <<< $(rmg_csv --row $SITE state comp_ip <$SITELIST)
   
   if [ $? -ne 0 ]; then 
@@ -225,16 +241,23 @@ do
   case $TASK in 
     status)
       echo "status $SITE"
-      read network_status site_status <<< `status $SITE`
       echo "  network: $network_status"
       echo "  site:    $site_status"
+      if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
+        then site_goal=`ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR \
+              "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv"`
+             [[ "$site_goal" != "$GOAL" ]] && \
+              echo "warning: state goal mismatch (serv=$GOAL, node=$site_goal). Suggest update." 1>&2
+      fi
     ;;
 
     update)
       echo "update $SITE"
-      rmg_csv --row $SITE <sitelist.csv >site.csv
-      scp -i $RMG_SERVER_SSH_KEYFILE site.csv rmg@$ADDR:$RMG_SITE_METADATA_DIR/site.csv
-      rm site.csv
+      if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
+        then update $SITE $ADDR
+      else 
+        echo "error: couldn't update ($network_status, $site_status)" 1>&2
+      fi
     ;;
 
     up)    # * -> up
@@ -242,7 +265,7 @@ do
     ;; 
 
     down)  # * -> down
-      echo "down $SITE "
+      echo "down $SITE"
     ;;
     
     start) # * -> active 
@@ -284,6 +307,9 @@ do
       echo "cyclerx $SITE" 
       read TYPE IP R_OUTLET <<< $(rmg_csv --row $SITE powertype power_ip rx_outlet <$SITELIST)
       rmg_powerswitch $TYPE $IP $R_OUTLET CYCLE
+      if [ $? -ne 0 ]
+        then echo "error (powerswitch): couldn't connect with host" 1>&2
+      fi
     ;;
     
     estimate)
