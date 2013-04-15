@@ -1,18 +1,18 @@
 #!/usr/bin/python
-# rmg_sitelist
+# rmg_csv
 # Input a CSV formatted site list on STDIN, return an entry or 
 # modify the file and output to STDOUT. This script is part of the 
 # QRAAT system. 
 #
 # Example usage
-# rmg_sitelist site10 powertype <sitelist.csv      ... Emit a a cell, 
+# rmg_csv site10 powertype <sitelist.csv      ... Emit a a cell, 
 #       e.g., the type of power supply at site 10. 
-# rmg_sitelist site10 status down <sitelist.csv >tmp && mv tmp sitelist.csv 
+# rmg_csv site10 status down <sitelist.csv >tmp && mv tmp sitelist.csv 
 #       ... Update a cell in the file, write to a temporary file, and 
 #       rename the updated to the original. 
-# rmg_sitelist -r site10 <sitelist.csv >site10.csv ... Output a site-
+# rmg_csv -r site10 <sitelist.csv >site10.csv ... Output a site-
 #       specific CSV file.
-# rmg_sitelist -c status <sitelist.csv             ... Emit a list of 
+# rmg_csv -c status <sitelist.csv             ... Emit a list of 
 #       of parameter values for all sites, e.g. statuses. 
 #
 # Copyright (C) 2013 Christopher Patton
@@ -34,9 +34,9 @@
 import sys
 
 usage = """\
-usage: rmg_sitelist <site> <parameter> [<value>] 
-               -c,--column <parameter> [<value>] 
-               -r,--row <site> 
+usage: rmg_csv <site> <parameter> [<value>] 
+          -c,--column <parameter> [<value>] 
+          -r,--row <site> 
  < path/to/original.csv [> path/to/new.csv]
 
   If a value is specified, then a .csv file is emitted to 

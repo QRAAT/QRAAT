@@ -4,7 +4,7 @@ INSTALL(PROGRAMS
   rmg-node
   rmg_env
   rmg_runretry
-  rmg_sitelist
+  rmg_csv
   rmg_fetch
   rmg_powerswitch
   DESTINATION bin)

@@ -105,7 +105,7 @@ case $GOAL in
   ;;
 
   check) 
-    GOAL=$(rmg_sitelist --column state <$SITE)
+    GOAL=$(rmg_csv --column state <$SITE)
     DELAY=5
   ;;
   
@@ -117,15 +117,15 @@ case $GOAL in
 esac 
 
 ## Collect status information ##
-TYPE=$(rmg_sitelist --column powertype <$SITE)
-IP=$(rmg_sitelist --column power_ip <$SITE)
-RX_OUTLET=$(rmg_sitelist --column rx_outlet <$SITE)
+TYPE=$(rmg_csv --column powertype <$SITE)
+IP=$(rmg_csv --column power_ip <$SITE)
+RX_OUTLET=$(rmg_csv --column rx_outlet <$SITE)
 
 RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY)
 SDR_PID=$(pgrep rmg_runretry)
 
-PREV_STATUS=$(rmg_sitelist --column site_status <$STATUS_LOG | tail -1)
-PREV_TIME=$(rmg_sitelist --column timestamp <$STATUS_LOG | tail -1)
+PREV_STATUS=$(rmg_csv --column site_status <$STATUS_LOG | tail -1)
+PREV_TIME=$(rmg_csv --column timestamp <$STATUS_LOG | tail -1)
 
 
 ## Transition functions ##
@@ -192,7 +192,7 @@ esac
 TIME=`date -u +%s`
 # Timestamp is in seconds after epoch. This makes it easier to 
 # calculate the time-elapse. To print the timestamp pretty, do:
-# date --date @`rmg_sitelist -c timestamp <status.log | tail -1` 
+# date --date @`rmg_csv -c timestamp <status.log | tail -1` 
 case $STATUS in
   
   down\(*\))

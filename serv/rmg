@@ -120,14 +120,14 @@ function update_sitelist () {
   SITE=$1
   ENTRY=$2
   VALUE=$3
-  rmg_sitelist $SITE $ENTRY $VALUE < $RMG_SERVER_SITELIST > tmp.csv
+  rmg_csv $SITE $ENTRY $VALUE < $RMG_SERVER_SITELIST > tmp.csv
   mv tmp.csv $RMG_SERVER_SITELIST
 }
 
 function get_sitelist() {
   SITE=$1
   ENTRY=$2
-  rmg_sitelist $SITE $ENTRY < $RMG_SERVER_SITELIST
+  rmg_csv $SITE $ENTRY < $RMG_SERVER_SITELIST
 }
 
 
@@ -169,8 +169,9 @@ case $TASK in
 esac 
 
 function status () {
-  # TODO 
-  # Return a tuple (net_status,site_status)
+
+
+
 }
 
 
@@ -198,7 +199,7 @@ do
 
     update)
       echo "update $SITE"
-      rmg_sitelist --row $SITE <sitelist.csv >site.csv
+      rmg_csv --row $SITE <sitelist.csv >site.csv
       scp -i $RMG_SERVER_SSH_KEYFILE site.csv rmg@$ADDR:$RMG_SITE_METADATA_DIR/site.csv
       rm site.csv
     ;;
