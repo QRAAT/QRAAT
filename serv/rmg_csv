@@ -5,15 +5,17 @@
 # QRAAT system. 
 #
 # Example usage
-# rmg_csv site10 powertype <csv.csv      ... Emit a a cell, 
+# rmg_csv site10 powertype <sitelist.csv      ... Emit a a cell, 
 #       e.g., the type of power supply at site 10. 
-# rmg_csv site10 status down <csv.csv >tmp && mv tmp csv.csv 
+# rmg_csv site10 status down <sitelist.csv >tmp && mv tmp csv.csv 
 #       ... Update a cell in the file, write to a temporary file, and 
 #       rename the updated to the original. 
-# rmg_csv -r site10 <csv.csv >site10.csv ... Output a site-
+# rmg_csv -r site10 <sitelist.csv >site10.csv ... Output a site-
 #       specific CSV file.
-# rmg_csv -c status <csv.csv             ... Emit a list of 
+# rmg_csv -c status <sitelist.csv             ... Emit a list of 
 #       of parameter values for all sites, e.g. statuses. 
+# rmg_csv --row site10 power_ip comp_ip <sitelist.csv ... Emit columns
+#       per row.
 #
 # Copyright (C) 2013 Christopher Patton
 # 
@@ -37,6 +39,7 @@ usage = """\
 usage: rmg_csv <site> <parameter> [<value>] 
           -c,--column <parameter> [<value>] 
           -r,--row <site> [{parameter list}]
+          -l,--last-row   [{parameter list}]
  < path/to/original.csv [> path/to/new.csv]
 
   If a value is specified, then a .csv file is emitted to 
@@ -45,9 +48,16 @@ usage: rmg_csv <site> <parameter> [<value>]
 
     ## Parse command line parameters ##
 
-if len(sys.argv) == 2 and sys.argv[1] in ['-h', '--help']:
+if len(sys.argv) < 2 or len(sys.argv) == 2 and sys.argv[1] in ['-h', '--help']:
   print >> sys.stderr, usage
   sys.exit(0)
+
+elif sys.argv[1] in ['-l', '--last-row']:
+  # Operate on last row. Can't mutate.
+  (row, col, value) = (None, None, None)
+  if len(sys.argv) > 2: 
+    param_list = sys.argv[2:]
+  else: param_list = None
 
 elif len(sys.argv) < 3:
   print >> sys.stderr, "error (csv): too few arguments arguments." 
@@ -84,15 +94,28 @@ else:
 headers = sys.stdin.readline().strip().split(',')
 header = { headers[i] : i for i in range(len(headers)) }
 
+try:
+
+    ## Operate on last row only ##
+
+  if (not row and not col): 
+    line = sys.stdin.readlines()[-1].strip().split(',')
+    if param_list: 
+      for col in param_list:
+         print line[header[col]]
+    else:
+      print ','.join(headers)
+      print ','.join(line)
+      
+    sys.exit(0)
 
     ## Parse line by line ##
 
-if value or (row and not col) and not param_list: 
-  print ','.join(headers)
+  if value or (row and not col) and not param_list: 
+    print ','.join(headers)
 
-for line in sys.stdin.readlines(): 
-  line = line.strip().split(',')
-  try: 
+  for line in sys.stdin.readlines(): 
+    line = line.strip().split(',')
 
     if not row and col: # Column
       if not value:
@@ -126,12 +149,12 @@ for line in sys.stdin.readlines():
           line[header[col]] = value
         print ','.join(line)
 
-  except IndexError: 
-    pass
+except IndexError: 
+  pass
 
-  except KeyError: 
-    print >> sys.stderr, "error (csv): no such parameter '%s'." % col
-    sys.exit(1)
+except KeyError: 
+  print >> sys.stderr, "error (csv): no such parameter '%s'." % col
+  sys.exit(1)
 
 
 if row and not value:
