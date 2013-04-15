@@ -147,8 +147,9 @@ function status() {
       if [ $? -eq 0 ]; then
         
         echo ok
-        ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$comp_ip "tail -1 $RMG_SITE_METADATA_DIR/status.log"
-        
+        read site_status timestamp <<< `ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$comp_ip \
+          "rmg_csv --last-row site_status timestamp <$RMG_SITE_METADATA_DIR/status.log"`
+        echo $site_status, `date --date @$timestamp`
         
       else 
         echo err_comp
@@ -224,7 +225,9 @@ do
   case $TASK in 
     status)
       echo "status $SITE"
-      status $SITE
+      read network_status site_status <<< `status $SITE`
+      echo "  network: $network_status"
+      echo "  site:    $site_status"
     ;;
 
     update)
