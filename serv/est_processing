@@ -26,6 +26,7 @@ def process_det_files(det_dirname, est_dirname):
     est.read_dir(det_dirname)
     if est.num_tags > 0:
         est.write_est(est_dirname)
+        est.write_csv(est_dirname)
 
 def find_latest_dir(est_rmg_site_dir):
     try:

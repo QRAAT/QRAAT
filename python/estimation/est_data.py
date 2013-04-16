@@ -185,32 +185,53 @@ class est_data():
                     stat_file.write('Avg. Signal Level: {0} dB\n'.format(10*np.log10(np.mean(good_data.f_pwr))))
                     stat_file.write('Std. Dev. Signal Level: {0}\n'.format(np.std(good_data.f_pwr)))
 
-    #writes .csv file for each tag in dictionary
+    #writes .csv file for each tag
     def write_csv(self, dirname = './'):
 
         if not dirname[-1] == '/':
             dirname += '/'
         for tag_index, tag_name in enumerate(self.tag_names):
             filtered_data = self.data.filter_by_tag_number(tag_index)
-            min_time = np.min(filtered_data.epoch_time)
-            min_time_str = time.strftime("%Y%m%d%H%M%S",time.gmtime(min_time))
-            max_time = np.max(filtered_data.epoch_time)
-            max_time_str = time.strftime("%Y%m%d%H%M%S",time.gmtime(max_time))
-            csv_filename = tag_name + '-' + min_time_str + '-' + max_time_str + '.csv'
+            csv_filename = tag_name + '.csv'
             with open(dirname + csv_filename,'w') as csvfile:
-                label_str = "Date/Time (UTC), Tag Frequency (Hz), Band Center Frequency (Hz), Signal Power, Noise Power, SNR (dB)\n"
+                label_str = "Date/Time (UTC), Unix Timestamp (s), Tag Frequency (Hz), Band Center Frequency (Hz), Fourier Decomposition Signal Power, "
+                for ch_iter in range(self.num_channels):
+                    label_str += "Fourier Decomposition Signal on Channel {0:d} - real part, Fourier Decomposition Signal on Channel {0:d} - imaginary part, ".format(ch_iter + 1)
+                label_str += "3dB Bandwidth, 10dB Bandwidth, Eigenvalue Decomposition Signal Power, "
+                for ch_iter in range(self.num_channels):
+                    label_str += "Eigenvalue Decomposition Signal on Channel {0:d} - real part, Eigenvalue Decomposition Signal on Channel {0:d} - imaginary part, ".format(ch_iter + 1)
+                label_str += "Eigenvalue Confidence, Total Noise Power, "
+                for ch_iter1 in range(self.num_channels):
+                    for ch_iter2 in range(self.num_channels):
+                        label_str += "Noise Covariance {0:d}{1:d} - real part, Noise Covariance {0:d}{1:d} - imaginary part, ".format(ch_iter1 + 1, ch_iter2 + 1)
+                label_str += "Fourier Decomposition SNR (dB), Eigenvalue Decomposition SNR (dB)\n"
                 csvfile.write(label_str)
                 for index in range(filtered_data.num_records):
                     line_str = time.strftime("%Y-%m-%d %H:%M:%S",time.gmtime(filtered_data.epoch_time[index]))
+                    line_str += ', {0:.6f}'.format(filtered_data.epoch_time[index])
                     line_str += ', {0:.0f}'.format(filtered_data.freq[index])
                     line_str += ', {0:.0f}'.format(filtered_data.center_freq[index])
+                    f = filtered_data.f_pwr[index]
+                    line_str += ', {0:e}'.format(f)
+                    for ch_iter in range(self.num_channels):
+                        line_str += ', {0:e}, {1:e}'.format(filtered_data.f_sig[index,ch_iter].real,filtered_data.f_sig[index,ch_iter].imag)
+                    line_str += ', {0:.0f}'.format(filtered_data.f_bw3[index])
+                    line_str += ', {0:.0f}'.format(filtered_data.f_bw10[index])
                     e = filtered_data.e_pwr[index]
                     line_str += ', {0:e}'.format(e)
-                    sig = filtered_data.e_sig[index,:]
+                    for ch_iter in range(self.num_channels):
+                        line_str += ', {0:e}, {1:e}'.format(filtered_data.e_sig[index,ch_iter].real,filtered_data.e_sig[index,ch_iter].imag)
+                    line_str += ', {0:0.5f}'.format(filtered_data.confidence[index])
                     n = np.trace(filtered_data.n_cov[index,:,:]).real
                     line_str += ', {0:e}'.format(n)
+                    for ch_iter1 in range(self.num_channels):
+                        for ch_iter2 in range(self.num_channels):
+                            line_str += ', {0:e}, {1:e}'.format(filtered_data.n_cov[index,ch_iter1,ch_iter2].real, filtered_data.n_cov[index,ch_iter1,ch_iter2].imag)
+                    line_str += ', {0:.3f}'.format(10*np.log10(f/n))
                     line_str += ', {0:.3f}\n'.format(10*np.log10(e/n))
                     csvfile.write(line_str)
+
+
 
     #reads data from a est file
     def read_est(self, est_filename):
