@@ -137,7 +137,7 @@ function up() {
       echo up
   else
       if [ $RX_STATE -ne 0 ]                   # RMG receiver off
-        then rmg_powerswitch $TYPE $IP $RX_OUTLET OFF; fi 
+        then rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert; fi 
       if [ $SDR_PID ]                          # Pulse detector stopped
         then kill -SIGTERM $SDR_PID `pgrep run_rmg`; fi 
 
@@ -151,7 +151,7 @@ function down() {
       echo down\($(($DELAY * 60))\)
   else 
       if [ $RX_STATE -ne 0 ]                   # RMG receiver off
-        then rmg_powerswitch $TYPE $IP $RX_OUTLET OFF; fi 
+        then rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert; fi 
       if [ $SDR_PID ]                          # Pulse detector stopped
         then kill -SIGTERM $SDR_PID `pgrep run_rmg`; fi 
       echo down\($(($DELAY * 60))\)
