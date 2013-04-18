@@ -9,12 +9,52 @@ TYPE=$1
 IP=$2
 OUTLET=$3
 OP=$4
+invert=$5
+
+function die() {
+  echo "usage: powerswitch <power_type> <IP_addr> <outlet> {ON, OFF, CYCLE, QUERY} [--invert={true,false}]" 1>&2
+  exit 1
+}
 
 if [ ! $OP ]
 then
-  echo "usage: powerswitch <power_type> <IP_addr> <outlet> {ON, OFF, CYCLE, QUERY}" 1>&2
-  exit 1
+  die
 fi 
+
+# Invert switch. 
+# A device can be plugged into the Pingbrother relay either on normally open (NO) or 
+# normally closed (NC). The field computer will be attached to normally closed and the 
+# RMG receiver to normally opened. For this reason, it's necessary to invert the signal
+# for the receiver. This can be specified on the command line.  
+
+ON=1
+OFF=0
+
+[ $invert ] && case $invert in
+  
+  --invert=*)
+    read dummy inversion <<< $(echo $invert | tr "=" "\n")
+    case $inversion in 
+      true) 
+        ON=0
+        OFF=1
+      ;;
+
+      false)
+      ;;
+
+      *) 
+        die
+      ;;
+    esac
+  ;;
+  
+  *)
+    die
+  ;;
+
+esac
+
 
 function pingbrother {
   # This is net booter we ordered from New Zealand. This is the best choice
@@ -24,18 +64,18 @@ function pingbrother {
   case $OP in
 
     ON) 
-      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=1" &> /dev/null
+      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$ON" &> /dev/null
     ;; 
 
     OFF)
-      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=0" &> /dev/null
+      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$OFF" &> /dev/null
     ;;
 
     CYCLE) 
       echo "powerswitch: wait about 3 seconds for power to cycle." 1>&2
-      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=0" &> /dev/null && \
+      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$OFF" &> /dev/null && \
       sleep 2 && \
-      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=1" &> /dev/null
+      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$ON" &> /dev/null
    ;;
 
   esac
@@ -153,7 +193,14 @@ case $OP in
     case $TYPE in 
       
       pingbrother)
-        pb_query
+        q=`pb_query`
+        if [ $q -eq 0 ] && [ $ON -eq 0 ]
+          then echo 1
+        elif [ $q -eq 1 ] && [ $ON -eq 0 ]
+          then echo 0
+        else
+          echo $q
+        fi
       ;;
 
       *)

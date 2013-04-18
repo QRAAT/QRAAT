@@ -118,10 +118,12 @@ esac
 
 ## Collect status information ##
 TYPE=$(rmg_csv --column powertype <$SITE)
+[[ "$TYPE" == "pingbrother" ]] && invert="--invert=true" 
+
 IP=$(rmg_csv --column power_ip <$SITE)
 RX_OUTLET=$(rmg_csv --column rx_outlet <$SITE)
 
-RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY)
+RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
 SDR_PID=$(pgrep rmg_runretry)
 
 PREV_STATUS=$(rmg_csv --column site_status <$STATUS_LOG | tail -1)
