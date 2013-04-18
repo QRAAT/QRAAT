@@ -126,33 +126,42 @@ function status() {
   read comp_ip power_ip comp_outlet powertype <<< \
    $(rmg_csv --row $SITE comp_ip power_ip comp_outlet powertype <$SITELIST)
 
-  ping $power_ip -c 1 -w 2 &> /dev/null
+  ping $comp_ip -c 1 -w 2 &> /dev/null
   if [ $? -eq 0 ]; then
-    
-    power_status=$(rmg_powerswitch $powertype $power_ip $comp_outlet QUERY)
-    if [ $power_status -eq 1 ]; then
-
-      ping $comp_ip -c 1 -w 2 &> /dev/null
-      if [ $? -eq 0 ]; then
-        
-        echo ok
-        read site_status timestamp <<< `ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$comp_ip \
-          "rmg_csv --last-row site_status timestamp <$RMG_SITE_METADATA_DIR/status.log"`
-        echo $site_status, `date --date @$timestamp`
-        
-      else 
-        echo err_comp
-        echo unknown
-      fi      
-
-    else 
-      echo ok
-      echo down
-    fi    
-
+    echo ok
+    read site_status timestamp <<< `ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$comp_ip \
+      "rmg_csv --last-row site_status timestamp <$RMG_SITE_METADATA_DIR/status.log"`
+    echo $site_status, `date --date @$timestamp`
+  
   else
-    echo err_pwr
-    echo unknown
+    ping $power_ip -c 1 -w 2 &> /dev/null
+    if [ $? -eq 0 ]; then
+      
+      power_status=$(rmg_powerswitch $powertype $power_ip $comp_outlet QUERY)
+      if [ $power_status -eq 1 ]; then
+
+        ping $comp_ip -c 1 -w 2 &> /dev/null
+        if [ $? -eq 0 ]; then
+          
+          echo ok
+          read site_status timestamp <<< `ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$comp_ip \
+            "rmg_csv --last-row site_status timestamp <$RMG_SITE_METADATA_DIR/status.log"`
+          echo $site_status, `date --date @$timestamp`
+          
+        else 
+          echo err_comp
+          echo unknown
+        fi      
+
+      else 
+        echo ok
+        echo down
+      fi    
+
+    else
+      echo err_pwr
+      echo unknown
+    fi
   fi
 }
 
