@@ -1,4 +1,0 @@
-use,name,freq,type,pulse_width,rise_trigger,fall_trigger,filter_alpha
-no,N,164.5,Pulse,20,3.0,2.0,0.01
-Nope,noisy,164.5,Pulse,20,1.010,1.005,0.01
-yes,test_tx,165.99,Pulse,25,3.00,1.15,.001
