@@ -108,6 +108,45 @@ usage: rmg task [-options] {sites}/all
 !EOF!
 }
 
+## Get task and options ##
+TASK=$1 
+shift
+
+if [ ! $TASK ]
+then
+  help
+  exit 0
+fi
+
+case $TASK in
+ -h|--help|help)
+   help
+   exit 0
+  ;; 
+
+  updatetx)
+    if [[ "$1" == "-f" ]] || [[ "$1" == "--file" ]] 
+    then
+      TX_FILE=$2
+      shift
+      shift
+    else     
+      TX_FILE="tx.csv"
+    fi
+  ;;
+
+  status|update|up|down|start|stop|fetch|cyclerx|estimate)
+  ;; 
+    
+  *)
+    echo error: unrecognized task \'$TASK\'
+    exit 1
+  ;;
+
+esac 
+
+  ## Set up environment ##
+
 source rmg_env  # setup RMG environment variables
 
 SITELIST=$RMG_SERVER_METADATA_DIR/sitelist.csv
@@ -184,43 +223,6 @@ function update_sitelist () {
   mv tmp.csv $SITELIST
 }
 
-
-## Get task and options ##
-TASK=$1 
-shift
-
-if [ ! $TASK ]
-then
-  help
-  exit 0
-fi
-
-case $TASK in
- -h|--help|help)
-   help
-   exit 0
-  ;; 
-
-  updatetx)
-    if [[ "$1" == "-f" ]] || [[ "$1" == "--file" ]] 
-    then
-      TX_FILE=$2
-      shift
-      shift
-    else     
-      TX_FILE="tx.csv"
-    fi
-  ;;
-
-  status|update|up|down|start|stop|fetch|cyclerx|estimate)
-  ;; 
-    
-  *)
-    echo error: unrecognized task \'$TASK\'
-    exit 1
-  ;;
-
-esac 
 
 
 ## Site list ##
