@@ -53,6 +53,10 @@ usage: rmg-node state/check/help [-options]
 !EOF!
 }
 
+## Site configuration ##
+source rmg_env                # setup RMG environment variables
+SITE=$RMG_SITE_METADATA_DIR/site.csv
+STATUS_LOG=$RMG_SITE_METADATA_DIR/status.log
 
 ## Get goal state and options ##
 GOAL=$1 
@@ -95,10 +99,6 @@ case $GOAL in
 
 esac 
 
-## Site configuration ##
-source rmg_env                # setup RMG environment variables
-SITE=$RMG_SITE_METADATA_DIR/site.csv
-STATUS_LOG=$RMG_SITE_METADATA_DIR/status.log
 
 if [ ! -e $SITE ]
 then

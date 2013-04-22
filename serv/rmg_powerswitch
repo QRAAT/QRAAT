@@ -61,11 +61,11 @@ function nil {
   case $OP in 
 
     ON|OFF)
-      echo "warning (powerswitch): powerswitching not available." 1>&2
+      echo "warning (powerswitch): power switching not available." 1>&2
     ;; 
 
     CYCLE) 
-      echo "warning (powerswitch): powerswitching not available. Waiting 2 minutes instead." 1>&2
+      echo "warning (powerswitch): power switching not available. Waiting 2 minutes instead." 1>&2
       sleep 120
     ;;
   esac 

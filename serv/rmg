@@ -269,36 +269,40 @@ do
       fi
     ;;
 
-    up)    # * -> up
+    on)
+      if [[ "$network_status" == "ok" ]] && [[ "$site_status" == "down"]]  
+        then read TYPE IP C_OUTLET <<< $(rmg_csv --row $SITE powertype power_ip comp_outlet <$SITELIST)
+             rmg_powerswitch $TYPE $IP $C_OUTLET ON
+      else
+        echo "error: first switch the computer's power off." 1>&2
+      fi
+    ;;
+
+    off)
+      if [[ "$network_status" == "err_comp" ]]
+        then read TYPE IP C_OUTLET <<< $(rmg_csv --row $SITE powertype power_ip comp_outlet <$SITELIST)
+             rmg_powerswitch $TYPE $IP $C_OUTLET OFF
+        else 
+          echo "error: first shutdown the computer."
+        fi
+    ;;
+    
+    up|down)  
       echo "up $SITE"
-      #update_sitelist $SITE state up
-      #if [[ "$network_status" == "err_comp" ]] || \
-      #   ( [[ "$network_status" == "ok" ]] && [[ "$site_status" == "down" ]] )
-      #  then
-      #    read TYPE IP C_OUTLET <<< $(rmg_csv --row $SITE powertype power_ip comp_outlet <$SITELIST)
-      #    rmg_powerswitch $TYPE $IP $C_OUTLET CYCLE     
       if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
-        then update $SITE $ADDR
+        then 
+          update_sitelist $SITE state $TASK
+          update $SITE $ADDR
       else 
         echo "error: couldn't update ($network_status, $site_status)" 1>&2
       fi
     ;; 
 
-    down)  # * -> down
-      echo "down $SITE"
-      update_sitelist $SITE state down
-      if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
-        then update $SITE $ADDR
-      else 
-        echo "error: couldn't update ($network_status, $site_status)" 1>&2
-      fi
-    ;;
-    
     start) # * -> active 
       echo "start $SITE"
-      update_sitelist $SITE state active
       if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
-        then update $SITE $ADDR
+        then update_sitelist $SITE state active
+             update $SITE $ADDR
       else 
         echo "error: couldn't update ($network_status, $site_status)" 1>&2
       fi
@@ -306,9 +310,9 @@ do
 
     stop)  # active -> up
       echo "stop $SITE"
-      update_sitelist $SITE state up
       if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
-        then update $SITE $ADDR
+        then update_sitelist $SITE state up
+             update $SITE $ADDR
       else 
         echo "error: couldn't update ($network_status, $site_status)" 1>&2
       fi
