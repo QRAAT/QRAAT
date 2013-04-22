@@ -139,7 +139,7 @@ case $TASK in
     fi
   ;;
 
-  status|update|up|down|start|stop|fetch|cyclerx|estimate)
+  status|update|on|off|up|down|start|stop|fetch|cyclerx|estimate)
   ;; 
     
   *)
@@ -270,7 +270,7 @@ do
     ;;
 
     on)
-      if [[ "$network_status" == "ok" ]] && [[ "$site_status" == "down"]]  
+      if [[ "$network_status" == "ok" ]] && [[ "$site_status" == "down" ]]  
         then read TYPE IP C_OUTLET <<< $(rmg_csv --row $SITE powertype power_ip comp_outlet <$SITELIST)
              rmg_powerswitch $TYPE $IP $C_OUTLET ON
       else
