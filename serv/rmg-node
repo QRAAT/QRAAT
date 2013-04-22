@@ -53,27 +53,6 @@ usage: rmg-node state/check/help [-options]
 !EOF!
 }
 
-## Site configuration ##
-source rmg_env                # setup RMG environment variables
-SITE=$RMG_SITE_METADATA_DIR/site.csv
-STATUS_LOG=$RMG_SITE_METADATA_DIR/status.log
-
-if [ ! -e $SITE ]
-then
-  echo "error: site configuration information not available (no site.csv)." 1>&2
-  exit 1
-fi 
-
-if [ ! -e $STATUS_LOG ]
-then
-  echo "timestamp,site_status" | cat >> $STATUS_LOG
-fi
-
-if [ ! $RETRY_MAX ]
-then
-  echo "warning: setting max retry count to 10." 1>&2
-  export RETRY_MAX=10
-fi 
 
 ## Get goal state and options ##
 GOAL=$1 
@@ -116,6 +95,29 @@ case $GOAL in
 
 esac 
 
+## Site configuration ##
+source rmg_env                # setup RMG environment variables
+SITE=$RMG_SITE_METADATA_DIR/site.csv
+STATUS_LOG=$RMG_SITE_METADATA_DIR/status.log
+
+if [ ! -e $SITE ]
+then
+  echo "error: site configuration information not available (no site.csv)." 1>&2
+  exit 1
+fi 
+
+if [ ! -e $STATUS_LOG ]
+then
+  echo "timestamp,site_status" | cat >> $STATUS_LOG
+fi
+
+if [ ! $RETRY_MAX ]
+then
+  echo "warning: setting max retry count to 10." 1>&2
+  export RETRY_MAX=10
+fi 
+
+
 ## Collect status information ##
 TYPE=$(rmg_csv --column powertype <$SITE)
 [[ "$TYPE" == "pingbrother" ]] && invert="--invert=true" 
@@ -124,6 +126,9 @@ IP=$(rmg_csv --column power_ip <$SITE)
 RX_OUTLET=$(rmg_csv --column rx_outlet <$SITE)
 
 RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
+if [ $? -ne 0 ]
+  then exit 1; fi 
+
 SDR_PID=$(pgrep rmg_runretry)
 
 PREV_STATUS=$(rmg_csv --column site_status <$STATUS_LOG | tail -1)

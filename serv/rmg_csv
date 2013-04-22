@@ -5,7 +5,7 @@
 # QRAAT system. 
 #
 # Example usage
-# rmg_csv site10 powertype <sitelist.csv      ... Emit a a cell, 
+# rmg_csv site10 powertype <sitelist.csv      ... Emit a cell, 
 #       e.g., the type of power supply at site 10. 
 # rmg_csv site10 status down <sitelist.csv >tmp && mv tmp csv.csv 
 #       ... Update a cell in the file, write to a temporary file, and 
@@ -121,7 +121,7 @@ try:
     if not row and col: # Column
       if not value:
         if len(line[header[col]]) == 0: 
-          print "(nil)"
+          print "nil"
         else:
           print line[header[col]]
         
@@ -141,7 +141,7 @@ try:
     else: # Cell
       if not value and line[header["name"]] == row: # Just get value
         if len(line[header[col]]) == 0: 
-          print "(nil)"
+          print "nil"
         else:
           print line[header[col]]
         sys.exit(0)

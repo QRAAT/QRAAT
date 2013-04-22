@@ -80,19 +80,23 @@ usage: rmg task [-options] {sites}/all
 
   'task' is any one of the following:
 
+    on/off       Switch the field computer's power.
+
     status       Show status of a site. 
 
     update       Update a site's configuration information and goal state. 
 
-    up           Power on remote computer.
+    up           RMG receiver is unpowered and the detector is stopped. 
+                 (Transition to up state.) 
 
-    down         Power off remote computer. 
+    down         Instruct field computer to shut down in 5 minutes. 
+                 (Transition to down state.) 
 
     start        Power on the RMG receiver and start software defined radio. 
-                 Store pulse data remotely. 
+                 Store pulse data remotely. (Transition to active state.)
 
     stop         Power off the RMG receiver and stop the software defined 
-                 radio. 
+                 radio. (Trnasition to up staqte.)
 
     fetch        Download pulse data from site to server. Delete downloaded 
                  data from remote machine. 
@@ -267,13 +271,13 @@ do
 
     up)    # * -> up
       echo "up $SITE"
-      update_sitelist $SITE state up
-      if [[ "$network_status" == "err_comp" ]] || \
-         ( [[ "$network_status" == "ok" ]] && [[ "$site_status" == "down" ]] )
-        then
-          read TYPE IP C_OUTLET <<< $(rmg_csv --row $SITE powertype power_ip comp_outlet <$SITELIST)
-          rmg_powerswitch $TYPE $IP $C_OUTLET CYCLE     
-      elif [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
+      #update_sitelist $SITE state up
+      #if [[ "$network_status" == "err_comp" ]] || \
+      #   ( [[ "$network_status" == "ok" ]] && [[ "$site_status" == "down" ]] )
+      #  then
+      #    read TYPE IP C_OUTLET <<< $(rmg_csv --row $SITE powertype power_ip comp_outlet <$SITELIST)
+      #    rmg_powerswitch $TYPE $IP $C_OUTLET CYCLE     
+      if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
         then update $SITE $ADDR
       else 
         echo "error: couldn't update ($network_status, $site_status)" 1>&2
