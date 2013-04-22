@@ -55,6 +55,23 @@ OFF=0
 
 esac
 
+function null {
+  # No power switching. 
+
+  case $OP in 
+
+    ON|OFF)
+      echo "warning (powerswitch): powerswitching not available." 1>&2
+    ;; 
+
+    CYCLE) 
+      echo "warning (powerswitch): powerswitching not available. Waiting 2 minutes instead." 1>&2
+      sleep 120
+    ;;
+  esac 
+}
+
+
 
 function pingbrother {
   # This is net booter we ordered from New Zealand. This is the best choice
@@ -214,7 +231,11 @@ case $OP in
   ON|OFF|CYCLE)
 
     case $TYPE in
-      
+     
+      null) 
+        exit $(null)
+      ;;
+
       pingbrother)
         exit $(pingbrother)
       ;;
