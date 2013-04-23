@@ -171,9 +171,11 @@ function status() {
 
   ping $comp_ip -c 1 -w 2 &> /dev/null
   if [ $? -eq 0 ]; then
+    read site_status timestamp goal <<< `ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$comp_ip \
+      "rmg_csv --last-row site_status timestamp <$RMG_SITE_METADATA_DIR/status.log; \
+       rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv"`
+    echo $goal
     echo ok
-    read site_status timestamp <<< `ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$comp_ip \
-      "rmg_csv --last-row site_status timestamp <$RMG_SITE_METADATA_DIR/status.log"`
     echo $site_status, `date --date @$timestamp`
   
   else
@@ -185,23 +187,28 @@ function status() {
 
         ping $comp_ip -c 1 -w 2 &> /dev/null
         if [ $? -eq 0 ]; then
-          
+          read site_status timestamp goal <<< `ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$comp_ip \
+            "rmg_csv --last-row site_status timestamp <$RMG_SITE_METADATA_DIR/status.log; \
+             rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv"`
+          echo $goal
           echo ok
-          read site_status timestamp <<< `ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$comp_ip \
-            "rmg_csv --last-row site_status timestamp <$RMG_SITE_METADATA_DIR/status.log"`
           echo $site_status, `date --date @$timestamp`
           
+          
         else 
+          echo 
           echo err_comp
           echo unknown
         fi      
 
       else 
+        echo
         echo ok
         echo down
       fi    
 
     else
+      echo 
       echo err_pwr
       echo unknown
     fi
@@ -238,7 +245,7 @@ count=0
 for SITE in $SITES
 do
 
-  read network_status site_status <<< `status $SITE`
+  read site_goal network_status site_status <<< `status $SITE`
   read GOAL ADDR <<< $(rmg_csv --row $SITE state comp_ip <$SITELIST)
   
   if [ $? -ne 0 ]; then 
@@ -253,8 +260,6 @@ do
       echo "  site:    $site_status"
       if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
         then 
-          site_goal=`ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR \
-           "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv"`
           [[ "$site_goal" != "$GOAL" ]] && \
            echo "warning: goal state mismatch (serv=$GOAL, node=$site_goal). Suggest update." 1>&2
       fi
