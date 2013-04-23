@@ -112,7 +112,8 @@ usage: rmg task [-options] {sites}/all
 !EOF!
 }
 
-## Get task and options ##
+  ## Get task and options ##
+
 TASK=$1 
 shift
 
@@ -155,7 +156,6 @@ source rmg_env  # setup RMG environment variables
 
 SITELIST=$RMG_SERVER_METADATA_DIR/sitelist.csv
 
-## Configuration and status of sites ##
 if [ ! -e $SITELIST ]; 
 then
   echo "error: site configuration information not available (no sitelist.csv)." 1>&2
@@ -163,7 +163,12 @@ then
 fi 
 
 
+  ## Routines ##
+
 function status() {
+# Probe the the status of a site, return a 3-tuple
+# (site_goal_state, net_status, site_status).
+
   SITE=$1
 
   read comp_ip power_ip comp_outlet powertype <<< \
@@ -216,37 +221,25 @@ function status() {
 }
 
 function update() {
+# Update a site's state remotely. Copy a new site.csv file 
+# and run rmg-node check. 
   SITE=$1
   ADDR=$2
-  
-  rmg_csv --row $SITE <$RMG_SERVER_METADATA_DIR/sitelist.csv >site.csv
-  scp -i $RMG_SERVER_SSH_KEYFILE site.csv rmg@$ADDR:$RMG_SITE_METADATA_DIR/site.csv
-  ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR "rmg-node check" 
-  rm site.csv
+  rmg_csv --row $SITE <$RMG_SERVER_METADATA_DIR/sitelist.csv | \
+  ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR "cat > site.csv; rmg-node check"  
 
 }
 
-function update_sitelist () {
-  SITE=$1
-  ENTRY=$2
-  VALUE=$3
-  rmg_csv $SITE $ENTRY $VALUE < $SITELIST > tmp.csv
-  mv tmp.csv $SITELIST
-}
+  ## Run task at each site ##
 
-
-
-## Site list ##
 SITES=$@
 
-
-## Run tasks at each site ##
 count=0
 for SITE in $SITES
 do
 
   read site_goal network_status site_status <<< `status $SITE`
-  read GOAL ADDR <<< $(rmg_csv --row $SITE state comp_ip <$SITELIST)
+  read serv_goal ADDR <<< $(rmg_csv --row $SITE state comp_ip <$SITELIST)
   
   if [ $? -ne 0 ]; then 
     echo "error: site '$SITE' not recognized." 1>&2
@@ -260,8 +253,8 @@ do
       echo "  site:    $site_status"
       if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
         then 
-          [[ "$site_goal" != "$GOAL" ]] && \
-           echo "warning: goal state mismatch (serv=$GOAL, node=$site_goal). Suggest update." 1>&2
+          [[ "$site_goal" != "$serv_goal" ]] && \
+           echo "warning: goal state mismatch (serv=$serv_goal, node=$site_goal). Suggest update." 1>&2
       fi
     ;;
 
@@ -292,11 +285,11 @@ do
         fi
     ;;
     
-    up|down)  
-      echo "up $SITE"
+    up|down) # * -> {up, down} 
+      echo "$TASK $SITE"
       if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
         then 
-          update_sitelist $SITE state $TASK
+          rmg_csv $SITE state $TASK < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
           update $SITE $ADDR
       else 
         echo "error: couldn't update ($network_status, $site_status)" 1>&2
@@ -306,7 +299,7 @@ do
     start) # * -> active 
       echo "start $SITE"
       if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
-        then update_sitelist $SITE state active
+        then rmg_csv $SITE state active < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
              update $SITE $ADDR
       else 
         echo "error: couldn't update ($network_status, $site_status)" 1>&2
@@ -316,7 +309,7 @@ do
     stop)  # active -> up
       echo "stop $SITE"
       if [[ "$network_status" == "ok" ]] && [[ "$site_status" != "down" ]]
-        then update_sitelist $SITE state up
+        then rmg_csv $SITE state up < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
              update $SITE $ADDR
       else 
         echo "error: couldn't update ($network_status, $site_status)" 1>&2
