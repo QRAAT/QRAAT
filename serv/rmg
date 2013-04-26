@@ -201,19 +201,19 @@ function status() {
           
           
         else 
-          echo 
+          echo unknown
           echo err_comp
           echo unknown
         fi      
 
       else 
-        echo
+        echo unknown
         echo ok
         echo down
       fi    
 
     else
-      echo 
+      echo unknown
       echo err_pwr
       echo unknown
     fi
