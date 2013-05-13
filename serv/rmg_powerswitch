@@ -198,7 +198,7 @@ function netbooter {
     
   esac
  
-k}
+}
 
 
     ## Execute power script ## 
