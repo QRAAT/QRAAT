@@ -11,7 +11,7 @@ RX_OUTLET=$3
 
 if [ ! $RX_OUTLET ]
   then
-    echo "usage: runretry <type> <pwr_ip> <rx_outlet>" 1>&2
+    echo "usage: rmg_runretry <pwr_type> <pwr_ip> <rx_outlet>" 1>&2
     exit 1
 fi
 

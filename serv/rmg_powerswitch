@@ -12,7 +12,7 @@ OP=$4
 invert=$5
 
 function die() {
-  echo "usage: powerswitch <power_type> <IP_addr> <outlet> {ON, OFF, CYCLE, QUERY} [--invert={true,false}]" 1>&2
+  echo "usage: rmg_powerswitch <pwr_type> <pwr_ip> <outlet> {ON, OFF, CYCLE, QUERY} [--invert={true,false}]" 1>&2
   exit 1
 }
 
@@ -198,7 +198,7 @@ function netbooter {
     
   esac
  
-}
+k}
 
 
     ## Execute power script ## 

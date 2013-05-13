@@ -326,8 +326,10 @@ do
         echo "copying $DIR"
         mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
         rsync -ave "ssh -i $RMG_SERVER_SSH_KEYFILE" rmg@$ADDR:$RMG_SITE_DET_DIR/$DIR/* \
-          $RMG_SERVER_DET_DIR/$SITE/$DIR                                        # download to RMG server
-        ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR "rm -r $RMG_SITE_DET_DIR/$DIR" # delete from RMG remote
+          $RMG_SERVER_DET_DIR/$SITE/$DIR                                          # download to RMG server
+        if [ $? -eq 0 ]; then
+          ssh -i $RMG_SERVER_SSH_KEYFILE rmg@$ADDR "rm -r $RMG_SITE_DET_DIR/$DIR" # delete from RMG remote
+        fi
         let ct=ct+1
       done
       if [ $ct -eq 0 ]; then echo "Nothing to fetch."; fi
