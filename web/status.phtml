@@ -1,0 +1,36 @@
+<html>
+<head>
+<title>QRAAT Status</title>
+<style type="text/css">
+table.status {
+	font-family: verdana,arial,sans-serif;
+	font-size:11px;
+	color:#333333;
+	border-width: 1px;
+	border-color: #666666;
+	border-collapse: collapse;
+}
+table.status th {
+	border-width: 1px;
+	padding: 8px;
+	border-style: solid;
+	border-color: #666666;
+	background-color: #dedede;
+}
+table.status td {
+	border-width: 1px;
+	padding: 8px;
+	border-style: solid;
+	border-color: #666666;
+	background-color: #ffffff;
+}
+</style>
+</head>
+<body>
+<h1>System Status</h1>
+<?php
+	include("qr_status.php") ;
+	qr_status() ;
+?>
+</body>
+</html>
