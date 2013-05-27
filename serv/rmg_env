@@ -18,21 +18,43 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#RMG_SERVER_DIR="/rmg_server"
-#export RMG_SITE_METADATA_DIR="/home/rmg"
-#export RMG_SITE_DET_DIR="/tmp/ramdisk/det_files"
-#export RMG_SERVER_SSH_KEYFILE="/home/rmg/.ssh/rmg_rsa"
-#export RMG_SERVER_DET_DIR="$RMG_SERVER_DIR/det_files"
-#export RMG_SERVER_EST_DIR="$RMG_SERVER_DIR/est_files"
-#export RMG_SERVER_SITELIST="$RMG_SERVER_DIR/rmg_sitelist.csv"
 
+# Location of metadata on a remote machine. Files included in this
+# directory are: site.csv, tx.csv, and status.log. Any debug information
+# is also stored here. We currently log the standard output and standard
+# error of the last run of the pulse detector. This value is used by the
+# server and must be the same at each site.
 export RMG_SITE_METADATA_DIR="/home/rmg"
+
+# Location of det data files on a remote machine. This is typically a
+# subdirectory of a temporary filesystem created with /etc/fstab.
+# This value is used by the sever and must be the same at each site.
 export RMG_SITE_DET_DIR="/tmp/ramdisk/det_files"
+
+# The directory on the server where the server RMG files are stored.
+# This convenience variable is local to this script.
+RMG_SERVER_DIR="/rmg_server"
+
+# Location of metadata on the server. Files included in this directory
+# are sitelist.csv and transmitter spec files.
+export RMG_SERVER_METADATA_DIR="$RMG_SERVER_DIR"
+
+# The location of the site configuration file sitelist.csv
+# This file is used by server scripts to configure remote sites.
+export RMG_SERVER_SITELIST="$RMG_SERVER_METADATA_DIR/sitelist.csv"
+
+# The location of the ssh private key used to login to remote sites.
+export RMG_SERVER_SSH_KEYFILE="$RMG_SERVER_DIR/ssh/rmg_rsa"
+
+# The location on the server for det files from remote sites.
+export RMG_SERVER_DET_DIR="$RMG_SERVER_DIR/det_files"
+
+# The location on the server for estimator output files.
+export RMG_SERVER_EST_DIR="$RMG_SERVER_DIR/est_files"
+
+# The maximum number of attempts to start the pulse detector before a
+# fatal error state is reached. This value is needed by the site.
 export RETRY_MAX=3
-export RMG_SERVER_SSH_KEYFILE="$HOME/.ssh/rmg_rsa"
-export RMG_SERVER_DET_DIR="$HOME/det_files"
-export RMG_SERVER_EST_DIR="$HOME/est_files"
-export RMG_SERVER_METADATA_DIR="$HOME"
 
-
+#END
 
