@@ -52,6 +52,7 @@ usage: rmg-node state/check/help [-options]
   'help' prints this help. 
 !EOF!
 }
+PATH="/usr/local/bin:$PATH"
 
 ## Site configuration ##
 source rmg_env                # setup RMG environment variables
@@ -126,8 +127,8 @@ IP=$(rmg_csv --column power_ip <$SITE)
 RX_OUTLET=$(rmg_csv --column rx_outlet <$SITE)
 
 RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
-if [ $? -ne 0 ]
-  then exit 1; fi 
+if [ $? -ne "0" ]
+  then echo "error: foreground pipeline exited $?"; exit 1; fi 
 
 SDR_PID=$(pgrep rmg_runretry)
 
