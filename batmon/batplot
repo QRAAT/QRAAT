@@ -1,0 +1,113 @@
+#!/usr/bin/perl
+use strict ;
+use warnings ;
+use POSIX qw(strftime);
+
+my $RMG_SERVER_SITELIST = 'RMG_SERVER_SITELIST' ;
+
+sub main()
+{
+	my $sitelist = $ENV{$RMG_SERVER_SITELIST} ;
+	if( (not defined $sitelist) or ($sitelist eq "") )
+	{
+		print "ERROR: environment variable $RMG_SERVER_SITELIST not set\n" ;
+		return 1 ;
+	}
+	print "Reading sitelist from '$sitelist'\n" ;
+	my @data = readcsv($sitelist) ;
+	shift @data ;	# discard header line
+	if( scalar @data < 1 )
+	{
+		print "ERROR: cannot read sitelist\n" ;
+		return 1 ;
+	}
+	for my $ref_row ( @data )
+	{
+		my $name = $ref_row->[0] ;
+		if( (not defined $name) or ($name eq "") ) { next ; }
+		print "Writing gnuplot file for '$name'\n" ;
+		writegp($name,"battery voltage at $name") ;
+		print "Creating plot file for '$name'\n" ;
+		makeplot($name) ;
+	}	
+	
+	return 0 ;
+}
+
+sub readcsv($)
+{
+	my ( $filename ) = @_ ;
+	my $fd ;
+	if( not defined open($fd,"<".$filename) )
+	{
+		print "ERROR: cannot open file '$filename'" ;
+		return undef ;
+	}
+	my @data = () ;
+	my $line ;
+	while( $line = <$fd> )
+	{
+		chomp($line) ;
+		my @argv = split(',',$line) ;
+		push @data, [ @argv ] ;	# create an array of references to an array 
+	}
+	close($fd) ;
+	return @data ;
+}
+
+my @GnuplotCommands =
+(
+	"set term png size 600,300",
+	"set datafile separator \",\"",
+	"set xdata time",
+	"set timefmt \"%Y-%m-%d %H:%M:%S\"",
+	#set format x "%H:%M\n%m/%d"",
+	"set format x \"%l %p\\n%m/%d\"",
+	"set grid",
+	"set style data lines",
+	"set lmargin 9",
+	"set xtics out nomirror",
+	""
+) ;
+
+sub writegp($$)
+{
+	my ( $name, $title ) = @_ ;
+	my $gpfilename = "$name.gp" ;
+	my $csvfilename = "$name.csv" ;
+	my $pngfilename = "$name.png" ;
+	my $gp ;
+	if( not defined open($gp,">".$gpfilename) )
+	{
+		print "ERROR: cannot write to file '$gpfilename'\n" ;
+		return 1 ;
+	}
+	my $interval = 86400 ;	# 1 day
+	my $timenow = time() ;
+	my $dtstart = strftime "%Y-%m-%d %H:%M:%S", localtime($timenow-$interval);
+	my $dtstop = strftime "%Y-%m-%d %H:%M:%S", localtime($timenow);
+	for my $line ( @GnuplotCommands )
+	{
+		print $gp "$line\n" ;
+	}
+	print $gp "set output \"$pngfilename\"\n" ;
+	print $gp "set title \"$title\"\n" ;
+	print $gp "set yrange [10:15]\n" ;
+	print $gp "set xrange [\"$dtstart\":\"$dtstop\"]\n" ;
+	print $gp "plot \"$csvfilename\" using 1:5 with lines linewidth 0.5 linecolor rgb \"red\" notitle\n" ;
+	close($gp) ;
+	return 0 ;
+}
+
+sub makeplot($)
+{
+	my ( $name ) = @_ ;
+	my $gpfilename = "$name.gp" ;
+	my $logfilename = "$name.log" ;
+	my $command = "/usr/bin/gnuplot $gpfilename &>$logfilename" ;
+	`$command` ;
+	return 0 ;
+}
+
+exit main() ;
+#END

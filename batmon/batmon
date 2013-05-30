@@ -1,0 +1,94 @@
+#!/usr/bin/perl
+use strict ;
+use warnings ;
+use POSIX qw(strftime);
+
+my $RMG_SERVER_SITELIST = 'RMG_SERVER_SITELIST' ;
+
+sub main()
+{
+	my $sitelist = $ENV{$RMG_SERVER_SITELIST} ;
+	if( (not defined $sitelist) or ($sitelist eq "") )
+	{
+		print "ERROR: environment variable $RMG_SERVER_SITELIST not set\n" ;
+		return 1 ;
+	}
+	print "Reading sitelist from '$sitelist'\n" ;
+	my @data = readcsv($sitelist) ;
+	shift @data ;	# discard header line
+	if( scalar @data < 1 )
+	{
+		print "ERROR: cannot read sitelist\n" ;
+		return 1 ;
+	}
+	for my $ref_row ( @data )
+	{
+		my $name = $ref_row->[0] ;
+		my $ip = $ref_row->[2] ;
+		if( (not defined $name) or ($name eq "") ) { next ; }
+		if( (not defined $ip) or ($ip eq "") ) { next ; }
+		my $pingbrother = "curl --connect-timeout 10 -s -u admin:admin http://$ip" ;
+		my $result = `$pingbrother` ;
+		#my $result = `cat pbindex` ;
+		# <tr><td><b>Input Voltage:</b></td><td></td><td>13.69V</td></tr>
+                my ( $intemp ) = ( $result =~ /.*Internal Temp.*>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
+                my ( $extemp ) = ( $result =~ /.*External Temp.*>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
+                my ( $voltage ) = ( $result =~ /.*Input Voltage.*>(\d{1,2}\.\d{1,2})V<.*/ ) ;
+		if( not defined $intemp )
+		{
+			$intemp = "" ;
+		}
+		if( not defined $extemp )
+		{
+			$extemp = "" ;
+		}
+		if( not defined $voltage )
+		{
+			$voltage = "" ;
+		}
+		print "Site $name at $ip: intemp=$intemp extemp=$extemp voltage=$voltage\n" ;
+		writecsv($name,$intemp,$extemp,$voltage) ;
+	}	
+	
+	return 0 ;
+}
+
+sub readcsv($)
+{
+	my ( $filename ) = @_ ;
+	my $fd ;
+	if( not defined open($fd,"<".$filename) )
+	{
+		print "ERROR: cannot open file '$filename'" ;
+		return undef ;
+	}
+	my @data = () ;
+	my $line ;
+	while( $line = <$fd> )
+	{
+		chomp($line) ;
+		my @argv = split(',',$line) ;
+		push @data, [ @argv ] ;	# create an array of references to an array 
+	}
+	close($fd) ;
+	return @data ;
+}
+
+sub writecsv($$$$)
+{
+	my ( $name, $intemp, $extemp, $voltage ) = @_ ;
+	my $filename = "$name.csv" ;
+	my $fd ;
+	if( not defined open($fd,">>".$filename) )
+	{
+		print "ERROR: cannot write to file '$filename'\n" ;
+		return 1 ;
+	}
+	my $dt = strftime "%Y-%m-%d %H:%M:%S,%z", localtime();
+	print $fd "$dt,$intemp,$extemp,$voltage\n" ;
+	close($fd) ;
+	return 0 ;
+}
+
+exit main() ;
+#END
