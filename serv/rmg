@@ -151,7 +151,7 @@ case $TASK in
 esac 
 
   ## Set up environment ##
-
+PATH="/usr/local/bin:$PATH"
 source rmg_env  # setup RMG environment variables
 
 SITELIST=$RMG_SERVER_METADATA_DIR/sitelist.csv
