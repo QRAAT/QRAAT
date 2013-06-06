@@ -88,6 +88,16 @@ case $GOAL in
     fi
   ;;
 
+  restart)
+    if [ `rmg_csv --column state <$SITE` = 'active' ]
+    then
+      GOAL='restart'
+    else
+      echo 'error: Site goal is not set to active'
+      exit 1
+    fi
+  ;;
+
   check) 
     GOAL=$(rmg_csv --column state <$SITE)
     DELAY=5
@@ -143,9 +153,15 @@ function up() {
       echo up
   else
       if [ $RX_STATE -ne 0 ]                   # RMG receiver off
-        then rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert; fi 
+        then 
+          rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
+          RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
+      fi 
       if [ $SDR_PID ]                          # Pulse detector stopped
-        then kill -SIGTERM $SDR_PID `pgrep run_rmg`; fi 
+        then 
+          kill -SIGTERM $SDR_PID `pgrep run_rmg`
+          unset SDR_PID
+      fi 
 
       echo up
   fi
@@ -157,9 +173,15 @@ function down() {
       echo down\($(($DELAY * 60))\)
   else 
       if [ $RX_STATE -ne 0 ]                   # RMG receiver off
-        then rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert; fi 
+        then
+          rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
+          RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
+      fi 
       if [ $SDR_PID ]                          # Pulse detector stopped
-        then kill -SIGTERM $SDR_PID `pgrep run_rmg`; fi 
+        then
+          kill -SIGTERM $SDR_PID `pgrep run_rmg`
+          unset SDR_PID
+      fi 
       echo down\($(($DELAY * 60))\)
   fi
 }
@@ -171,6 +193,7 @@ function active() {
       echo "running" 1>&2
   else
       nohup rmg_runretry $TYPE $IP $RX_OUTLET &> /dev/null < /dev/null & 
+      SDR_PID=$!
   fi
 
   echo active
@@ -194,7 +217,14 @@ case $GOAL in
 
   do_nothing)
     STATUS='do_nothing'
-  
+  ;;
+
+  restart)
+    up
+    active
+    STATUS='restarted'
+  ;; 
+
 esac 
 
 
@@ -230,9 +260,10 @@ case $STATUS in
     fi
   ;;
 
-  active|up|shutdown|err_*|do_nothing)
+  *)
 
     # All other transitions are handled the same way. 
+    # active|up|shutdown|err_*|do_nothing|restarted
 
     if [[ "$STATUS" != "$PREV_STATUS" ]]
       then echo "$TIME,$STATUS" | cat >> $STATUS_LOG
