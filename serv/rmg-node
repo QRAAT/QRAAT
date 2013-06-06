@@ -138,7 +138,7 @@ RX_OUTLET=$(rmg_csv --column rx_outlet <$SITE)
 
 RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
 if [ $? -ne "0" ]
-  then echo "error: foreground pipeline exited $?"; exit 1; fi 
+  then echo "error: foreground pipeline exited unsuccessful"; exit 1; fi 
 
 SDR_PID=$(pgrep rmg_runretry)
 
@@ -150,39 +150,38 @@ PREV_TIME=$(rmg_csv --column timestamp <$STATUS_LOG | tail -1)
 function up() {
   if [ $RX_STATE -eq 0 ] && [ ! $SDR_PID ]
     then
-      echo up
+      echo "Site is up; no change"
   else
-      if [ $RX_STATE -ne 0 ]                   # RMG receiver off
-        then 
-          rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
-          RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
-      fi 
       if [ $SDR_PID ]                          # Pulse detector stopped
         then 
           kill -SIGTERM $SDR_PID `pgrep run_rmg`
           unset SDR_PID
       fi 
-
-      echo up
+      if [ $RX_STATE -ne 0 ]                   # RMG receiver off
+        then 
+          rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
+          RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
+      fi
+      echo "Site stopped; is now up"
   fi
 }
 
 function down() {
   if [ $RX_STATE -eq 0 ] && [ ! $SDR_PID ] 
     then 
-      echo down\($(($DELAY * 60))\)
+      echo "Site set to go down in $(($DELAY * 60)) seconds"
   else 
+      if [ $SDR_PID ]                          # Pulse detector stopped
+        then
+          kill -SIGTERM $SDR_PID `pgrep run_rmg`
+          unset SDR_PID
+      fi
       if [ $RX_STATE -ne 0 ]                   # RMG receiver off
         then
           rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
           RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
       fi 
-      if [ $SDR_PID ]                          # Pulse detector stopped
-        then
-          kill -SIGTERM $SDR_PID `pgrep run_rmg`
-          unset SDR_PID
-      fi 
-      echo down\($(($DELAY * 60))\)
+      echo "Site stopped; set to go down in $(($DELAY * 60)) seconds"
   fi
 }
 
@@ -190,13 +189,12 @@ function active() {
    
   if [ $RX_STATE -eq 1 ] && [ $SDR_PID ]
     then 
-      echo "running" 1>&2
-  else
+      echo "Site already running"
+    else
       nohup rmg_runretry $TYPE $IP $RX_OUTLET &> /dev/null < /dev/null & 
       SDR_PID=$!
+      echo "Site started"
   fi
-
-  echo active
 }
 
 
@@ -222,7 +220,7 @@ case $GOAL in
   restart)
     up
     active
-    STATUS='restarted'
+    STATUS='Site restarted'
   ;; 
 
 esac 
@@ -237,7 +235,7 @@ TIME=`date -u +%s`
 # Also, GMT is used ('-u'). 
 case $STATUS in
   
-  down\(*\))
+  *down*)
 
     # If no delay is specied and the previous status was down, we 
     # need to check if the delay specified by the last status has 
@@ -265,10 +263,7 @@ case $STATUS in
     # All other transitions are handled the same way. 
     # active|up|shutdown|err_*|do_nothing|restarted
 
-    if [[ "$STATUS" != "$PREV_STATUS" ]]
-      then echo "$TIME,$STATUS" | cat >> $STATUS_LOG
-    fi
+    echo "$TIME,$STATUS" | cat >> $STATUS_LOG
   ;;
 
 esac
-
