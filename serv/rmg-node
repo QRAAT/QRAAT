@@ -74,7 +74,7 @@ case $GOAL in
    exit 0
   ;; 
   
-  up|active)
+  up|active|do_nothing)
   ;; 
 
   down)
@@ -191,6 +191,9 @@ case $GOAL in
   down)
     STATUS=`down`
   ;;
+
+  do_nothing)
+    STATUS='do_nothing'
   
 esac 
 
@@ -227,7 +230,7 @@ case $STATUS in
     fi
   ;;
 
-  active|up|shutdown|err_*)
+  active|up|shutdown|err_*|do_nothing)
 
     # All other transitions are handled the same way. 
 
