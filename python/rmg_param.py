@@ -209,30 +209,29 @@ class backend:
         
 
     def __backend_calc(self):
-    
+        #Calculates the smallest set of tunings to record all transmitters
+        #this is a "set covering optimization problem", NP-hard
+
         data = self.data
 
         #make list of transmitter frequencies
         num_freqs = len(data)
-        freqs = []
-        freq_tune = []
+        list_of_tx_freqs = []#list of frequencys
+        dict_of_tunings_per_freq = dict()#dictionary of sets of tunings for a given frequency
+        set_of_needed_tunings = set()#list of tunings to get all the transmitters
         data_index = []
         for j in range(num_freqs):
             if data[j][0]:
                 curr_freq = int(data[j][2]*1000000)
-                freqs.append(curr_freq)
+                list_of_tx_freqs.append(curr_freq)
                 data_index.append(j)
 
-        #make sorted list of frequencies
-        s_freqs = sorted(freqs)
-        max_steps = []
-
         #Calculate all tunings which will receive at least one transmitter
-        for j in s_freqs:
+        for freq in list_of_tx_freqs:
             if not self.high_lo:
-                #high_lo = False
-                max_tune = j - self.if_min - self.pv_offset
-                min_tune = j - self.if_max - self.pv_offset
+                #Using Low LO, high_lo = False 
+                max_tune = freq - self.if_min - self.pv_offset
+                min_tune = freq - self.if_max - self.pv_offset
         
                 if max_tune > self.pv_max:
                     max_tune = self.pv_max
@@ -241,52 +240,67 @@ class backend:
 
 
             else:
-                #high_lo = True
-                max_tune = j + self.if_max - self.pv_offset
-                min_tune = j + self.if_min - self.pv_offset
+                #Using High LO, high_lo = True
+                max_tune = freq + self.if_max - self.pv_offset
+                min_tune = freq + self.if_min - self.pv_offset
                 if max_tune > self.pv_max:
                     max_tune = self.pv_max
                 if min_tune < self.pv_min:
                     min_tune = self.pv_min
 
             min_steps = int(math.ceil(min_tune/self.pv_step))
-            max_temp = (int(math.floor(max_tune/self.pv_step)))
-            tuning_range = range(min_steps, max_temp +1)
+            max_steps = (int(math.floor(max_tune/self.pv_step)))
+            tuning_range = range(min_steps, max_steps +1)
 
             if self.num_bands > 1:
             #check that tx isn't on filter edge
                 tr_cp = list(tuning_range)#so I can remove bad values and still iterate over the whole thing
                 for t in tr_cp:
-                    base_freq = ((t*self.pv_step - j) % self.bw)
+                    base_freq = ((t*self.pv_step - freq) % self.bw)
                     if (base_freq > self.bw*7/16) and (base_freq < self.bw*9/16):
                         tuning_range.remove(t)
-            freq_tune.append(set(tuning_range))
-            max_steps.append(max(tuning_range))
+            dict_of_tunings_per_freq[freq] = set(tuning_range)
+            if len(tuning_range) == 1:#only one tuning will work for this transmitter
+                set_of_needed_tunings.add(tuning_range[0])
+            elif len(tuning_range) == 0:
+                raise ValueError("No viable tuning found for {0} Hz".format(freq))
                 
-        #build "inv" which maps the list of transmitters to tuning frequency
-        num_freqs = len(s_freqs)
-        super_set = set()
-        for j in range(num_freqs):
-            super_set.update(freq_tune[j])
-        inv = dict()
-        cp_ss = super_set.copy()
-        for j in range(len(super_set)):
-            temp_tune = cp_ss.pop()
-            inv[temp_tune] = set()
-            for k in range(num_freqs):
-                if temp_tune in freq_tune[k]:
-                    inv[temp_tune].add(s_freqs[k])
+        #build "set_of_all_tunings"
+        set_of_all_tunings = set()
+        for freq,tunings in dict_of_tunings_per_freq.iteritems():
+            set_of_all_tunings.update(tunings)
 
-        #build "save_keys", the smallest amount of tunings to reach all transmitters
-        save_keys = []
-        f_index = 0
-        while num_freqs > f_index:
-            save_keys.append(max_steps[f_index])
-            f_index = s_freqs.index(max(inv[max_steps[f_index]]))+1
+        #build "dict_of_freqs_per_tuning" which maps the list of transmitters to tuning frequency
+        dict_of_freqs_per_tuning = dict()
+        for temp_tune in set_of_all_tunings:
+            dict_of_freqs_per_tuning[temp_tune] = set()
+            for freq in list_of_tx_freqs:
+                if temp_tune in dict_of_tunings_per_freq[freq]:
+                    dict_of_freqs_per_tuning[temp_tune].add(freq)
+
+        #generate set of frequencies not covered by "needed tunings"
+        set_of_missing_freqs = set(list_of_tx_freqs)
+        for tuning in set_of_needed_tunings:
+            set_of_missing_freqs.difference_update(dict_of_freqs_per_tuning[tuning])
+
+        #Use "greedy" algorithm to add tunings to "needed tunings"
+        while len(set_of_missing_freqs) > 0:
+            set_of_available_tunings = set()
+            for freq in set_of_missing_freqs:
+                set_of_available_tunings.update(dict_of_tunings_per_freq[freq])
+            max_value = 0
+            max_key = None
+            for tuning in set_of_available_tunings:
+                l = len(dict_of_freqs_per_tuning[tuning])
+                if l > max_value:
+                    max_value = l
+                    max_key = tuning
+            set_of_needed_tunings.add(max_key)
+            set_of_missing_freqs.difference_update(dict_of_freqs_per_tuning[max_key])
 
         #builds optimized tuning parameters
-        for j in save_keys:#for each tuning required
-            lo1 = j*self.pv_step
+        for tuning in set_of_needed_tunings:#for each tuning required
+            lo1 = tuning*self.pv_step
             #calculate tuning center frequency
             if self.high_lo:
                 center_freq = lo1 + self.pv_offset - (self.lo2 - self.if2_cf)
@@ -297,15 +311,12 @@ class backend:
             self.add_tuning(center_freq, lo1)
             print "{0:.1f} MHz - RMG Center Frequency".format(center_freq/1000000.0)
 
-            for k in range(len(inv[j])):#for each transmitter tunable
-                tx_freq = inv[j].pop()
-                tx_index = freqs.index(tx_freq)
+            for tx_freq in dict_of_freqs_per_tuning[tuning]:#for each transmitter tunable
+                tx_index = list_of_tx_freqs.index(tx_freq)
 
                 #get transmitter data
                 tx_data = data[data_index[tx_index]][1:]
                 print "\t{0} {1:.3f} MHz".format(tx_data[0],tx_data[1])
                 tx_data[2] = transmitter_types[tx_data[2]]
                 self.add_tx(tx_data)
-              
-
 
