@@ -210,7 +210,7 @@ case $OP in
     case $TYPE in 
 
       nil) 
-        echo 1 # Just assume device is powered. 
+        echo -1 #No result 
       ;;
       
       pingbrother)

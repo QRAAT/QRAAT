@@ -148,16 +148,16 @@ PREV_TIME=$(rmg_csv --column timestamp <$STATUS_LOG | tail -1)
 
 ## Transition functions ##
 function up() {
-  if [ $RX_STATE -eq 0 ] && [ ! $SDR_PID ]
+  if [ $RX_STATE -ne 1 ] && [ ! $SDR_PID ]
     then
-      echo "Site is up; no change"
+      echo "Site is already up"
   else
       if [ $SDR_PID ]                          # Pulse detector stopped
         then 
           kill -SIGTERM $SDR_PID `pgrep run_rmg`
           unset SDR_PID
       fi 
-      if [ $RX_STATE -ne 0 ]                   # RMG receiver off
+      if [ $RX_STATE -eq 1 ]                   # RMG receiver off
         then 
           rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
           RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
@@ -167,7 +167,7 @@ function up() {
 }
 
 function down() {
-  if [ $RX_STATE -eq 0 ] && [ ! $SDR_PID ] 
+  if [ $RX_STATE -ne 1 ] && [ ! $SDR_PID ] 
     then 
       echo "Site set to go down in $(($DELAY * 60)) seconds"
   else 
@@ -176,7 +176,7 @@ function down() {
           kill -SIGTERM $SDR_PID `pgrep run_rmg`
           unset SDR_PID
       fi
-      if [ $RX_STATE -ne 0 ]                   # RMG receiver off
+      if [ $RX_STATE -eq 1 ]                   # RMG receiver off
         then
           rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
           RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
@@ -187,7 +187,7 @@ function down() {
 
 function active() {
    
-  if [ $RX_STATE -eq 1 ] && [ $SDR_PID ]
+  if [ $RX_STATE -ne 0 ] && [ $SDR_PID ]
     then 
       echo "Site already running"
     else
