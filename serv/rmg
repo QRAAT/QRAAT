@@ -195,29 +195,34 @@ function status() {
   fi
 
     #Ping router
-  ping $power_ip -c 1 -w 2 &> /dev/null
-  if [ $? -eq 0 ]
+  if [[ "$powertype" != "nil" ]]
     then
-      ping_router="success"
-      power_status=$(rmg_powerswitch $powertype $power_ip $comp_outlet QUERY)
-      if [[ $ping_computer == "failure" ]]  && [ $power_status -eq 1 ]
+      ping $power_ip -c 1 -w 2 &> /dev/null
+      if [ $? -eq 0 ]
         then
-            #Try pinging computer again
-          ping $comp_ip -c 1 -w 2 &> /dev/null
-          if [ $? -eq 0 ]
+          ping_router="success"
+          power_status=$(rmg_powerswitch $powertype $power_ip $comp_outlet QUERY)
+          if [[ $ping_computer == "failure" ]]  && [ $power_status -eq 1 ]
             then
-              ping_computer="success"
-              read goal timestamp site_status <<< `ssh $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+                #Try pinging computer again
+              ping $comp_ip -c 1 -w 2 &> /dev/null
+              if [ $? -eq 0 ]
+                then
+                  ping_computer="success"
+                  read goal timestamp site_status <<< `ssh $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+              fi
+            else
+              if [ $power_status -eq 0 ]
+                then
+                  site_status="off"
+              fi
           fi
         else
-          if [ $power_status -eq 0 ]
-            then
-              site_status="off"
-          fi
+          ping_router="failure"
+          power_status=-1
       fi
     else
-      ping_router="failure"
-      power_status=-1
+      ping_router="no powerswitch"
   fi
 
   echo $goal
@@ -306,7 +311,7 @@ do
     
     up|down|do_nothing) # * -> {up, down, do_nothing} 
       echo "$TASK $SITE"
-      if [[ "$network_status" == "success" ]]
+      if [[ "$ping_computer" == "success" ]]
         then 
           rmg_csv $SITE state $TASK < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
           update $SITE $ADDR
