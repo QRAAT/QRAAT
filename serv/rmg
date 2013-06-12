@@ -245,7 +245,10 @@ function update() {
   ## Run task at each site ##
 
 SITES=$@
-
+if [[ "$SITES" = "all" ]]
+  then
+    SITES=`rmg_csv -c name < $RMG_SERVER_METADATA_DIR/sitelist.csv`
+fi
 count=0
 for SITE in $SITES
 do
