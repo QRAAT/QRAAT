@@ -33,7 +33,7 @@ export RMG_SITE_DET_DIR="/tmp/ramdisk/det_files"
 
 # The directory on the server where the server RMG files are stored.
 # This convenience variable is local to this script.
-RMG_SERVER_DIR="/rmg_server"
+export RMG_SERVER_DIR="/rmg_server"
 
 # Location of metadata on the server. Files included in this directory
 # are sitelist.csv and transmitter spec files.
@@ -48,11 +48,6 @@ export RMG_SERVER_DET_DIR="$RMG_SERVER_DIR/det_files"
 
 # The location on the server for estimator output files.
 export RMG_SERVER_EST_DIR="$RMG_SERVER_DIR/est_files"
-
-# The location of the ssh private key used to login to remote sites.
-# The file must have permission 600 and owned by the login user.
-# To create this file, copy it from $RMG_SERVER_METADATA_DIR/ssh/rmg_rsa
-export RMG_SERVER_SSH_KEYFILE="$HOME/.ssh/rmg_rsa"
 
 # The maximum number of attempts to start the pulse detector before a
 # fatal error state is reached. This value is needed by the site.
