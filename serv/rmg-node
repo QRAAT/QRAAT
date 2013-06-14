@@ -163,7 +163,6 @@ function up() {
           RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
       fi
       echo "Site stopped; is now up"
-      set STATE_CHANGE
   fi
 }
 
@@ -183,7 +182,6 @@ function down() {
           RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
       fi 
       echo "Site stopped; set to go down in $(($DELAY * 60)) seconds"
-      set STATE_CHANGE
   fi
 }
 
@@ -196,7 +194,6 @@ function active() {
       nohup rmg_runretry $TYPE $IP $RX_OUTLET &> /dev/null < /dev/null & 
       SDR_PID=$!
       echo "Site started"
-      set STATE_CHANGE
   fi
 }
 
@@ -261,12 +258,20 @@ case $STATUS in
     fi
   ;;
 
+  do_nothing)
+
+    if [[ "$PREV_STATUS" != "do_nothing" ]]
+      then
+        echo "$TIME,$STATUS" | cat >> $STATUS_LOG
+    fi
+  ;;
+
   *)
 
     # All other transitions are handled the same way. 
     # active|up|shutdown|err_*|do_nothing|restarted
     echo $STATUS
-    if [ $STATE_CHANGE ]
+    if [[ "$STATUS" != *"already"* ]]
       then
         echo "$TIME,$STATUS" | cat >> $STATUS_LOG
     fi
