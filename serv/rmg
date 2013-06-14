@@ -219,10 +219,10 @@ function status() {
           fi
         else
           ping_router="failure"
-          power_status=-1
       fi
     else
-      ping_router="no powerswitch"
+      ping_router="no_powerswitch"
+      power_status=-1
   fi
 
   echo $goal
@@ -283,8 +283,9 @@ do
 
     on)
       echo "on $SITE"
+      echo "/$site_status/"
       if [[ "$ping_router" == "success" ]]
-        then if [[ "$site_status" == "off" ]]  
+        then if [[ "$site_status" == "off"* ]]  
           then
             read TYPE IP C_OUTLET <<< $(rmg_csv --row $SITE powertype power_ip comp_outlet <$SITELIST)
             rmg_powerswitch $TYPE $IP $C_OUTLET ON
