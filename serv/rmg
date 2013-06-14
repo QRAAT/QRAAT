@@ -290,6 +290,7 @@ do
             rmg_powerswitch $TYPE $IP $C_OUTLET ON
           else
             echo "error: first switch the computer's power off." 1>&2
+          fi
         else
           echo "error: Router ping test wasn't sucessful" 1>&2
       fi
@@ -298,18 +299,22 @@ do
     off)
       echo "off $SITE"
       if [[ "$ping_router" == "success" ]]
-        then if [[ "$ping_computer" == "failure" ]]
-          then if [[ $serv_goal == "down" ]]
+        then
+          if [[ "$ping_computer" == "failure" ]]
+          then
+            if [[ $serv_goal == "down" ]]
             then 
               read TYPE IP C_OUTLET <<< $(rmg_csv --row $SITE powertype power_ip comp_outlet <$SITELIST)
               rmg_powerswitch $TYPE $IP $C_OUTLET OFF
             else
               echo "error: Goal in sitelist.csv is not down; cannot poweroff automatically" 1>&2
+            fi
           else
             echo "error: Computer is responding to ping; please shutdown computer" 1>&2
+          fi
         else 
           echo "error: Router ping test wasn't sucessful" 1>&2
-        fi
+      fi
     ;;
     
     up|down|do_nothing) # * -> {up, down, do_nothing} 
@@ -379,6 +384,7 @@ do
           scp $SITE:$RMG_SITE_METADATA_DIR/tx.csv 
         else
           echo "error: Computer ping test wasn't successful" 1>&2
+        fi
       else 
         echo "error: '$TX_FILE' doesn't exist" 1>&2
       fi
