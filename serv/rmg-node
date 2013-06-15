@@ -119,7 +119,7 @@ fi
 
 if [ ! -e $STATUS_LOG ]
 then
-  echo "timestamp,site_status" | cat >> $STATUS_LOG
+  echo "timestamp,site_status" >> $STATUS_LOG
 fi
 
 if [ ! $RETRY_MAX ]
@@ -150,8 +150,13 @@ PREV_TIME=$(rmg_csv --column timestamp <$STATUS_LOG | tail -1)
 function up() {
   if [ $RX_STATE -ne 1 ] && [ ! $SDR_PID ]
     then
-      echo "Site is already up"
-  else
+      if [[ $PREV_STATUS == *"down"* ]] || [[ $PREV_STATUS == "do_nothing" ]]
+        then
+          STATUS="Site is now up"
+        else
+          STATUS="Site is already up"
+      fi
+    else
       if [ $SDR_PID ]                          # Pulse detector stopped
         then 
           kill -SIGTERM $SDR_PID `pgrep run_rmg`
@@ -162,14 +167,14 @@ function up() {
           rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
           RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
       fi
-      echo "Site stopped; is now up"
+      STATUS="Site stopped; is now up"
   fi
 }
 
 function down() {
   if [ $RX_STATE -ne 1 ] && [ ! $SDR_PID ] 
     then 
-      echo "Site set to go down in $(($DELAY * 60)) seconds"
+      STATUS="Site set to go down in $(($DELAY * 60)) seconds"
   else 
       if [ $SDR_PID ]                          # Pulse detector stopped
         then
@@ -181,7 +186,7 @@ function down() {
           rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
           RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
       fi 
-      echo "Site stopped; set to go down in $(($DELAY * 60)) seconds"
+      STATUS="Site stopped; set to go down in $(($DELAY * 60)) seconds"
   fi
 }
 
@@ -189,41 +194,38 @@ function active() {
    
   if [ $RX_STATE -ne 0 ] && [ $SDR_PID ]
     then 
-      echo "Site already running"
+      if [[ $PREV_STATUS == "do_nothing" ]]
+        then
+          STATUS="Site is running"
+        else
+          STATUS="Site already running"
+      fi
     else
       nohup rmg_runretry $TYPE $IP $RX_OUTLET &> /dev/null < /dev/null & 
       SDR_PID=$!
-      echo "Site started"
+      STATUS="Site started"
   fi
+}
+
+function do_nothing() {
+
+  STATUS='do_nothing'
+
+}
+
+function restart() {
+
+  up
+  active
+  STATUS='Site restarted'
+
 }
 
 
 ## Execute state transition ##
-case $GOAL in
+$GOAL
 
-  active)
-    STATUS=`active`
-  ;; 
-
-  up)
-    STATUS=`up`
-  ;; 
-
-  down)
-    STATUS=`down`
-  ;;
-
-  do_nothing)
-    STATUS='do_nothing'
-  ;;
-
-  restart)
-    up
-    active
-    STATUS='Site restarted'
-  ;; 
-
-esac 
+#echo $STATUS
 
 
 ## Log new state, shutdown if time has elapsed ## 
@@ -247,14 +249,15 @@ case $STATUS in
     D=$(echo $PREV_STATUS | grep down | grep -o -e "[0-9]*")
     if [ ! $DELAY_SPECIFIED ] && [ $D ] && [ $PREV_TIME ] && [ $(($TIME - $PREV_TIME)) -gt $D ]
       then
-        echo "$TIME,shutdown" | cat >> $STATUS_LOG
+        echo "$TIME,shutdown" >> $STATUS_LOG
         echo "time to shutdown!" 
         sudo poweroff 
 
     ## reset timer or set a new one ##
     elif [ $DELAY_SPECIFIED ] || [ ! $D ]
       then
-        echo "$TIME,$STATUS" | cat >> $STATUS_LOG
+        echo "$TIME,$STATUS" >> $STATUS_LOG
+        echo $STATUS
     fi
   ;;
 
@@ -262,7 +265,8 @@ case $STATUS in
 
     if [[ "$PREV_STATUS" != "do_nothing" ]]
       then
-        echo "$TIME,$STATUS" | cat >> $STATUS_LOG
+        echo "$TIME,$STATUS" >> $STATUS_LOG
+        echo "Site set to do nothing"
     fi
   ;;
 
@@ -273,7 +277,7 @@ case $STATUS in
     echo $STATUS
     if [[ "$STATUS" != *"already"* ]]
       then
-        echo "$TIME,$STATUS" | cat >> $STATUS_LOG
+        echo "$TIME,$STATUS" >> $STATUS_LOG
     fi
   ;;
 

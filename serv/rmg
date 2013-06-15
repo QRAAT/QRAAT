@@ -180,8 +180,8 @@ function status() {
   SITE=$1
 
     #Ping computer
-  read comp_ip power_ip comp_outlet powertype <<< \
-   $(rmg_csv --row $SITE comp_ip power_ip comp_outlet powertype <$SITELIST)
+  read comp_ip power_ip comp_outlet powertype serv_state <<< \
+   $(rmg_csv --row $SITE comp_ip power_ip comp_outlet powertype state <$SITELIST)
   ping $comp_ip -c 1 -w 2 &> /dev/null
   if [ $? -eq 0 ]
     then
@@ -210,6 +210,11 @@ function status() {
                 then
                   ping_computer="success"
                   read goal timestamp site_status <<< `ssh $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+                else
+                  if [[ $serv_state == "down" ]]
+                    then
+                      site_status="down"
+                  fi
               fi
             else
               if [ $power_status -eq 0 ]
@@ -283,7 +288,6 @@ do
 
     on)
       echo "on $SITE"
-      echo "/$site_status/"
       if [[ "$ping_router" == "success" ]]
         then if [[ "$site_status" == "off"* ]]  
           then
