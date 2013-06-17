@@ -173,7 +173,7 @@ fi
 
   ## Routines ##
 
-function status() {
+function get_status() {
 # Probe the the status of a site
 
   SITE=$1
@@ -250,8 +250,8 @@ fi
 count=0
 for SITE in $SITES
 do
-  status $SITE
-  read serv_goal ADDR <<< $(rmg_csv --row $SITE state comp_ip <$SITELIST)
+  get_status $SITE
+  read serv_goal <<< $(rmg_csv --row $SITE state <$SITELIST)
   if [ $? -ne 0 ]; then 
     echo "error: site '$SITE' not recognized." 1>&2
     exit 1
@@ -273,7 +273,7 @@ do
     update)
       echo "update $SITE"
       if [[ "$ping_computer" == "success" ]]
-        then update $SITE $ADDR
+        then update $SITE
       else 
         echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
       fi
@@ -318,7 +318,7 @@ do
       if [[ "$ping_computer" == "success" ]]
         then 
           rmg_csv $SITE state $TASK < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
-          update $SITE $ADDR
+          update $SITE
         else 
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
       fi
@@ -334,7 +334,7 @@ do
               TASK=up
           fi
           rmg_csv $SITE state $TASK < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
-          update $SITE $ADDR
+          update $SITE
           TASK=down
         else
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
@@ -346,7 +346,7 @@ do
       if [[ "$ping_computer" == "success" ]]
         then 
           rmg_csv $SITE state active < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
-          update $SITE $ADDR
+          update $SITE
         else 
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
       fi
@@ -357,7 +357,7 @@ do
       if [[ "$ping_computer" == "success" ]]
         then
           rmg_csv $SITE state up < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
-          update $SITE $ADDR
+          update $SITE
         else 
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
       fi
