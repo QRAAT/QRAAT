@@ -90,10 +90,11 @@ if __name__=="__main__":
             os.makedirs(est_rmg_dir)
         if not est_rmg_dir[-1]=='/':
             est_rmg_dir += '/'
-        latest, found_dir = search_for_dirs(det_rmg_dir, find_latest_dir(est_rmg_dir), 0, [])
-        print "{0} new directories found to be processed".format(len(found_dir)-1)
-        for det_dir_process in found_dir[1:]:
-            process_det_files(det_rmg_dir + det_dir_process, est_rmg_dir + det_dir_process)
-        write_latest_dir(est_rmg_dir, latest)
+        #latest, found_dir = search_for_dirs(det_rmg_dir, find_latest_dir(est_rmg_dir), 0, [])
+        #print "{0} new directories found to be processed".format(len(found_dir)-1)
+        #for det_dir_process in found_dir[1:]:
+        #    process_det_files(det_rmg_dir + det_dir_process, est_rmg_dir + det_dir_process)
+        #write_latest_dir(est_rmg_dir, latest)
+        process_det_files(det_rmg_dir, est_rmg_dir)
     else:
         raise ValueError('Missing arguments! Use is \'est_processing site_det_directory site_est_directory\'')
