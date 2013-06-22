@@ -419,7 +419,7 @@ do
     
     estimate)
       echo "estimate $SITE"
-      det_directories_to_process=$(find -type d $RMG_SERVER_DET_DIR/$SITE/)
+      det_directories_to_process=$(find $RMG_SERVER_DET_DIR/$SITE/ -type d)
       for det_dir in $det_directories_to_process
         do
           subdirectory=${det_dir#$"$RMG_SERVER_DET_DIR/$SITE/"}
