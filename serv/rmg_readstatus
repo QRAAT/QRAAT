@@ -7,6 +7,7 @@
 #
 # This script reads various status related data from the server and remote sites and writes them to the qraat database.
 # Reads telemetry values from pingbrother power switch for each of the sites in sitelist.csv
+# Reads site status using the script rmg status
 # Counts det files (coming soon)
 # Counts est files (coming soon)
 #
@@ -37,7 +38,7 @@ my $TableNameSitelist = "sitelist" ;		# The name of the db table
 
 sub usage()
 {
-	print "$0: path_to_sitelist authfile\n" ;
+	print "$0: path_to_sitelist authfile [debug]\n" ;
 	print "Reads pingbrother telemetry from all sites in sitelist\n" ;
 	print "Writes data to database account defined in authfile\n" ;
 }
@@ -93,77 +94,113 @@ sub main()
 		if( (not defined $sitename) or ($sitename eq "") ) { next ; }
 		if( (not defined $ip) or ($ip eq "") ) { next ; }
 		if( (not defined $ps) or ($ps eq "") ) { next ; }
-		if( $ps ne "pingbrother" ) { next ; }	# Ignore sites that do not have a pingbrother power switch
-		my $command = "curl --connect-timeout 10 -s -u admin:admin http://$ip" ;
-		#my $result = `cat pbtest` ;	# test
-		my $result = `$command` ;
-		$result =~ s/\r//g ;
-		$result =~ s/\n//g ;
-		#<tr><td><b>Input Voltage:</b></td><td></td><td>13.69V</td></tr>
-                my ( $intemp ) = ( $result =~ /.*Internal Temp.+?>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
-		#<tr><td><b>Internal Temp:</b></td><td></td><td>39.8°C</td></tr>
-                my ( $extemp ) = ( $result =~ /.*External Temp.+?>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
-		#<tr><td><b>External Temp:</b></td><td></td><td>35.7°C</td></tr>
-                my ( $voltage ) = ( $result =~ /.*Input Voltage.+?>(\d{1,2}\.\d{1,2})V<.*/ ) ;
-		#<td><b>&nbsp;&nbsp;&nbsp;&nbsp;Channel 1:</b></td>
-		#<td>ON,&nbsp;&nbsp;&nbsp;&nbsp;Current:0.0A, Power:0.0W</td>
-                my ( $current1 ) = ( $result =~ /.*Channel 1.+?Current:(\d{1,2}\.\d{1,2})A.*/ ) ;
-                my ( $power1 ) = ( $result =~ /.*Channel 1.+?Power:(\d{1,2}\.\d{0,2})W.*/ ) ;
-                my ( $current2 ) = ( $result =~ /.*Channel 2.+?Current:(\d{1,2}\.\d{0,2})A.*/ ) ;
-                my ( $power2 ) = ( $result =~ /.*Channel 2.+?Power:(\d{1,2}\.\d{0,2})W.*/ ) ;
-		if( not defined $intemp )
+		my ( $ping_power, $ping_computer, $site_status ) = get_rmg_status($sitename) ;
+		my ( $intemp, $extemp, $voltage ) = ( "","","" ) ;
+		if( $ps eq "pingbrother" )
 		{
-			$intemp = "" ;
+			( $intemp, $extemp, $voltage ) = get_pingbrother_status($sitename,$ip) ;
 		}
-		if( not defined $extemp )
-		{
-			$extemp = "" ;
-		}
-		if( not defined $voltage )
-		{
-			$voltage = "" ;
-		}
-		if( not defined $current1 )
-		{
-			$current1 = "" ;
-		}
-		if( $current1 eq "" )
-		{
-			$current1 = "0" ;
-		}
-		if( not defined $power1 )
-		{
-			$power1 = "" ;
-		}
-		if( $power1 eq "" )
-		{
-			$power1 = "0" ;
-		}
-		if( not defined $current2 )
-		{
-			$current2 = "" ;
-		}
-		if( $current2 eq "" )
-		{
-			$current2 = "0" ;
-		}
-		if( not defined $power2 )
-		{
-			$power2 = "" ;
-		}
-		if( $power2 eq "" )
-		{
-			$power2 = "0" ;
-		}
-		my $current = $current1 + $current2 ;
-		my $power = $power1 + $power2 ;
-		print "Site $sitename at $ip: intemp=$intemp extemp=$extemp voltage=$voltage current1=$current1 power1=$power1 current2=$current2 power2=$power2 current=$current power=$power\n" ;
-		writetable($dbh,$TableNameTelemetry,$sitename,[$intemp,$extemp,$voltage]) ;
+		writetable($dbh,$TableNameTelemetry,$sitename,[$intemp,$extemp,$voltage,$ping_power,$ping_computer,$site_status]) ;
 	}	
 	#
 	# Close database
 	closedatabase($dbh) ;
 	return 0 ;
+}
+
+sub get_pingbrother_status($$)
+{
+	my ( $sitename, $ip ) = @_ ;
+	my $command = "curl --connect-timeout 10 -s -u admin:admin http://$ip" ;
+	#my $result = `cat pbtest` ;	# test
+	my $result = `$command` ;
+	$result =~ s/\r//g ;
+	$result =~ s/\n//g ;
+	#<tr><td><b>Input Voltage:</b></td><td></td><td>13.69V</td></tr>
+	my ( $intemp ) = ( $result =~ /.*Internal Temp.+?>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
+	#<tr><td><b>Internal Temp:</b></td><td></td><td>39.8°C</td></tr>
+	my ( $extemp ) = ( $result =~ /.*External Temp.+?>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
+	#<tr><td><b>External Temp:</b></td><td></td><td>35.7°C</td></tr>
+	my ( $voltage ) = ( $result =~ /.*Input Voltage.+?>(\d{1,2}\.\d{1,2})V<.*/ ) ;
+	#<td><b>&nbsp;&nbsp;&nbsp;&nbsp;Channel 1:</b></td>
+	#<td>ON,&nbsp;&nbsp;&nbsp;&nbsp;Current:0.0A, Power:0.0W</td>
+	my ( $current1 ) = ( $result =~ /.*Channel 1.+?Current:(\d{1,2}\.\d{1,2})A.*/ ) ;
+	my ( $power1 ) = ( $result =~ /.*Channel 1.+?Power:(\d{1,2}\.\d{0,2})W.*/ ) ;
+	my ( $current2 ) = ( $result =~ /.*Channel 2.+?Current:(\d{1,2}\.\d{0,2})A.*/ ) ;
+	my ( $power2 ) = ( $result =~ /.*Channel 2.+?Power:(\d{1,2}\.\d{0,2})W.*/ ) ;
+	if( not defined $intemp ) { $intemp = "" ; }
+	if( not defined $extemp ) { $extemp = "" ; }
+	if( not defined $voltage ) { $voltage = "" ; }
+	if( not defined $current1 ) { $current1 = "" ; }
+	if( $current1 eq "" ) { $current1 = "0" ; }
+	if( not defined $power1 ) { $power1 = "" ; }
+	if( $power1 eq "" ) { $power1 = "0" ; }
+	if( not defined $current2 ) { $current2 = "" ; }
+	if( $current2 eq "" ) { $current2 = "0" ; }
+	if( not defined $power2 ) { $power2 = "" ; }
+	if( $power2 eq "" ) { $power2 = "0" ; }
+	my $current = $current1 + $current2 ;
+	my $power = $power1 + $power2 ;
+	if( $Debug ) { print "debug: get_pingbrother_status: $sitename at $ip: intemp=$intemp extemp=$extemp voltage=$voltage current1=$current1 power1=$power1 current2=$current2 power2=$power2 current=$current power=$power\n" ; }
+	#return ( $intemp, $extemp, $voltage, $current1, $power1, $current2, $power2, $current, $power ) ;
+	return ( $intemp, $extemp, $voltage ) ;
+}
+
+sub get_rmg_status($)
+{
+	my ( $sitename ) = @_ ;
+	my $ping_power = "" ;
+	my $ping_computer = "" ;
+	my $site_status = "" ;
+	if( (defined $sitename) and ($sitename ne "") )
+	{
+		my $command = "rmg status $sitename" ;
+		if( $Debug ) { print "debug: get_rmg_status: command=$command\n" ; }
+		my $result = `$command` ;
+		if( $Debug ) { print "debug: get_rmg_status: result=$result\n" ; }
+		my @lines = split /\r|\n/,$result ;
+		if( $lines[0] =~ m/^error/ )
+		{
+			print "Error: bad response from rmg status command: $result\n" ;
+		}
+		else
+		{
+			my $line = shift @lines ;	# drop the line with "status siteX"
+			$line = shift @lines ;	# grab the line with "Powerswitch Router Ping Test:"
+			my ( $status1 ) = ($line =~ m/.+?:\s*?(\w+)/) ;
+			$line = shift @lines ;	# grab the line with "Computer Ping Test:"
+			my ( $status2 ) = ($line =~ m/.+?:\s*?(\w+)/) ;
+			$line = shift @lines ;	# grab the line with "Site Status:"
+			my ( $status3 ) = ($line =~ m/.*?:\s*([^,]*),/) ;
+			if( defined $status1 )
+			{
+				if( $status1 eq "failure" ) { $ping_power = 0 ; }	# 0 means failure
+				if( $status1 eq "success" ) { $ping_power = 1 ; }	# 1 means success
+				if( $Debug ) { print "debug: get_rmg_status: status1=$status1 ping_power=$ping_power\n" ; }
+			}
+			if( defined $status2 )
+			{
+				if( $status2 eq "failure" ) { $ping_computer = 0 ; }	# 0 means failure
+				if( $status2 eq "success" ) { $ping_computer = 1 ; }	# 1 means success
+				if( $Debug ) { print "debug: get_rmg_status: status2=$status2 ping_computer=$ping_computer\n" ; }
+			}
+			if( defined $status3 )
+			{
+				if( $status3 eq "unknown" ) { $site_status = 0 ; }			# 0 means unknown`
+				if( $status3 eq "off" ) { $site_status = 1 ; }				# 1 means off
+				else { $site_status = 2 ; }						# 2 means not off
+				if( $status3 eq "down" ) { $site_status = 3 ; }				# 3 means down
+				if( $status3 eq "Site stopped; is now up" ) { $site_status = 4 ; }	# 4 means stopped but up (???)
+				#
+				if( $Debug ) { print "debug: get_rmg_status: status3=$status3 site_status=$site_status\n" ; }
+			}
+		}
+	}
+	else
+	{
+		print "Error: missing sitename in get_rmg_status\n" ;
+	}
+	return ( $ping_power, $ping_computer, $site_status ) ;
 }
 
 sub readcsv($)

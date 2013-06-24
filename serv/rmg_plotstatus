@@ -81,6 +81,13 @@ my @Products =
 			{ column=>4,label=>'ext',color=>'magenta' }
 		]
 	}, 
+	# Site status: ping_power, ping_computer, site_status
+	{
+		file=> "status",
+		title=> "status",
+		yrange=> [0,5],
+		lines=> [ {column=>8,color=>'black'} ]
+	}, 
 ) ;
 
 sub main()
@@ -189,6 +196,7 @@ sub writecsv($$)
 			print $fd ",$tz" ;
 			for my $column ( @row )
 			{
+				if( not defined $column ) { $column = "" ; }
 				print $fd ",$column" ;
 			}
 			print $fd "\n" ;
