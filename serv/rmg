@@ -419,7 +419,13 @@ do
     
     estimate)
       echo "estimate $SITE"
-      est_processing $RMG_SERVER_DET_DIR/$SITE/ $RMG_SERVER_EST_DIR/$SITE/
+      det_directories_to_process=$(find -type d $RMG_SERVER_DET_DIR/$SITE/)
+      for det_dir in $det_directories_to_process
+        do
+          subdirectory=${det_dir#$"$RMG_SERVER_DET_DIR/$SITE/"}
+          est_processing $det_dir $RMG_SERVER_EST_DIR/$SITE/$subdirectory
+          mv $det_dir $RMG_SERVER_DET_ARCHIVE/$SITE/$subdirectory
+      done
     ;;
 
   esac

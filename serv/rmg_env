@@ -24,34 +24,47 @@
 # is also stored here. We currently log the standard output and standard
 # error of the last run of the pulse detector. This value is used by the
 # server and must be the same at each site.
-export RMG_SITE_METADATA_DIR="/home/rmg"
+RMG_SITE_METADATA_DIR="/home/rmg"
 
 # Location of det data files on a remote machine. This is typically a
 # subdirectory of a temporary filesystem created with /etc/fstab.
 # This value is used by the sever and must be the same at each site.
-export RMG_SITE_DET_DIR="/tmp/ramdisk/det_files"
+RMG_SITE_DET_DIR="/tmp/ramdisk/det_files"
 
 # The directory on the server where the server RMG files are stored.
 # This convenience variable is local to this script.
-export RMG_SERVER_DIR="/rmg_server"
+RMG_SERVER_DIR="/rmg_server"
 
 # Location of metadata on the server. Files included in this directory
 # are sitelist.csv and transmitter spec files.
-export RMG_SERVER_METADATA_DIR="$RMG_SERVER_DIR"
+RMG_SERVER_METADATA_DIR="$RMG_SERVER_DIR"
 
 # The location of the site configuration file sitelist.csv
 # This file is used by server scripts to configure remote sites.
-export RMG_SERVER_SITELIST="$RMG_SERVER_METADATA_DIR/sitelist.csv"
+RMG_SERVER_SITELIST="$RMG_SERVER_METADATA_DIR/sitelist.csv"
 
 # The location on the server for det files from remote sites.
-export RMG_SERVER_DET_DIR="$RMG_SERVER_DIR/det_files"
+RMG_SERVER_DET_DIR="$RMG_SERVER_DIR/det_files"
+
+# The location on the server for processed det files
+RMG_SERVER_DET_ARCHIVE="$RMG_SERVER_DIR/archive/det_files"
 
 # The location on the server for estimator output files.
-export RMG_SERVER_EST_DIR="$RMG_SERVER_DIR/est_files"
+RMG_SERVER_EST_DIR="$RMG_SERVER_DIR/est_files"
+
+# The location on the server for est files that have been uploaded to the database.
+RMG_SERVER_EST_ARCHIVE="$RMG_SERVER_DIR/archive/est_files"
 
 # The maximum number of attempts to start the pulse detector before a
 # fatal error state is reached. This value is needed by the site.
-export RETRY_MAX=3
+RETRY_MAX=3
+
+# Set the path used by gnuplot to find fonts used for the status plots
+GDFONTPATH=/usr/share/fonts/truetype/ttf-dejavu
+
+# Set the name of the default font that gnuplot should use for the status plots
+GNUPLOT_DEFAULT_GDFONT=DejaVuSans
+
 
 #END
 
