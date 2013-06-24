@@ -9,8 +9,6 @@
 # Reads telemetry values from pingbrother power switch for each of the sites in sitelist.csv
 # Counts det files (coming soon)
 # Counts est files (coming soon)
-# Call this script from cron:
-*/10 * * * * rmg_env; rmg_readstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile &>/var/log/rmg/rmg_readstatus.log
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

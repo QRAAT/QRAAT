@@ -9,6 +9,7 @@ INSTALL(PROGRAMS
   rmg_powerswitch
   rmg_readstatus
   rmg_plotstatus
+  rmg_status
   DESTINATION bin)
 
 

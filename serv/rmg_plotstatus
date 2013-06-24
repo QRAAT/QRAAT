@@ -7,8 +7,6 @@
 #
 # This script creates plot images for the site telemetry using the data in the qraat database,
 # using the gnuplot program.
-# Call this script from cron:
-*/10 * * * * rmg_env; rmg_plotstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile &>/var/log/rmg/rmg_plotstatus.log
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
