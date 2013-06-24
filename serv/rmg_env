@@ -1,7 +1,10 @@
 #!/bin/bash
 # rmg_env
+#
 # This script is part of the QRAAT system. It provides system variables
 # for running QRAAT.
+#
+# NB: Each variable must be defined using the export command.
 #
 # Copyright (C) 2013 Todd Borrowman
 # 
