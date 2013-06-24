@@ -114,8 +114,6 @@ usage: rmg task [-options] {sites}/all
 
     cyclerx      Power off the RMG receiver and power it back on.
 
-    estimate     Process det files into est files from given site.
-
     help         Print this. 
 !EOF!
 }
@@ -153,7 +151,7 @@ case $TASK in
     fi
   ;;
 
-  status|update|on|off|up|down|start|stop|fetch|cyclerx|estimate|do_nothing)
+  status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing)
   ;; 
     
   *)
@@ -417,17 +415,6 @@ do
       fi
     ;;
     
-    estimate)
-      echo "estimate $SITE"
-      det_directories_to_process=$(find $RMG_SERVER_DET_DIR/$SITE/ -type d)
-      for det_dir in $det_directories_to_process
-        do
-          subdirectory=${det_dir#$"$RMG_SERVER_DET_DIR/$SITE/"}
-          est_processing $det_dir $RMG_SERVER_EST_DIR/$SITE/$subdirectory
-          mv $det_dir $RMG_SERVER_DET_ARCHIVE/$SITE/$subdirectory
-      done
-    ;;
-
   esac
   let count=count+1
 done
