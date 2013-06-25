@@ -26,4 +26,5 @@
 #
 source rmg_env
 rmg_readstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile &>/var/log/rmg/rmg_readstatus.log
+rmg_timecheck $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile &>/var/log/rmg/rmg_timecheck.log
 rmg_plotstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile &>/var/log/rmg/rmg_plotstatus.log

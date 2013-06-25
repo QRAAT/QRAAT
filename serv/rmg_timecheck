@@ -1,15 +1,13 @@
 #!/usr/bin/perl
-#rmg_readstatus
+#rmg_timecheck
 #
 # This script is part of the QRAAT system.
 #
 # Copyright (C) 2013 Marcel Losekoot#
 #
-# This script reads various status related data from the server and remote sites and writes them to the qraat database.
-# Reads telemetry values from pingbrother power switch for each of the sites in sitelist.csv
-# Reads site status using the script rmg status
-# Counts det files (coming soon)
-# Counts est files (coming soon)
+# This script checks the system clock on the server and each of the remote sites
+# It uses ntpq to determine the time offset for each computer
+# It writes the time offsets to the timecheck table in the qraat database
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,13 +31,13 @@ use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
 
 my $Debug = 0 ;
 
-my $TableNameTelemetry = "telemetry" ;		# The name of the db table
+my $TableNameTimeCheck = "timecheck" ;		# The name of the db table
 my $TableNameSitelist = "sitelist" ;		# The name of the db table
 
 sub usage()
 {
 	print "$0: path_to_sitelist authfile [debug]\n" ;
-	print "Reads pingbrother telemetry from all sites in sitelist\n" ;
+	print "Reads time offset values from all sites in sitelist\n" ;
 	print "Writes data to database account defined in authfile\n" ;
 }
 
@@ -90,120 +88,52 @@ sub main()
 	{
 		my $sitename = $ref_row->[0] ;
 		my $ip = $ref_row->[2] ;
-		my $ps = $ref_row->[5] ;
+		#my $ps = $ref_row->[5] ;
 		if( (not defined $sitename) or ($sitename eq "") ) { next ; }
 		if( (not defined $ip) or ($ip eq "") ) { next ; }
-		if( (not defined $ps) or ($ps eq "") ) { next ; }
-		my ( $ping_power, $ping_computer, $site_status ) = get_rmg_status($sitename) ;
-		my ( $intemp, $extemp, $voltage ) = ( "","","" ) ;
-		if( $ps eq "pingbrother" )
-		{
-			( $intemp, $extemp, $voltage ) = get_pingbrother_status($sitename,$ip) ;
-		}
-		writetable($dbh,$TableNameTelemetry,$sitename,[$intemp,$extemp,$voltage,$ping_power,$ping_computer,$site_status]) ;
+		#if( (not defined $ps) or ($ps eq "") ) { next ; }
+		my $time_offset = get_time_offset($sitename,$ip) ;
+		writetable($dbh,$TableNameTimeCheck,$sitename,[$time_offset]) ;
 	}	
+	#
+	# Do timecheck on RMG server
+	my $time_offset = get_time_offset("") ;
+	writetable($dbh,$TableNameTimeCheck,"server",[$time_offset]) ;
 	#
 	# Close database
 	closedatabase($dbh) ;
 	return 0 ;
 }
 
-sub get_pingbrother_status($$)
+sub get_time_offset($$)
 {
 	my ( $sitename, $ip ) = @_ ;
-	my $command = "curl --connect-timeout 10 -s -u admin:admin http://$ip" ;
-	#my $result = `cat pbtest` ;	# test
+	my $time_offset = "" ;
+	my $command = "" ;
+	if( defined $sitename and $sitename ne "" )		# sitename is "" for localhost
+	{
+		$command = "ssh $sitename " ;
+	}
+	$command .= "ntpq -p" ;
+	if( $Debug ) { print "debug: get_time_offset: command=$command\n" ; }
 	my $result = `$command` ;
-	$result =~ s/\r//g ;
-	$result =~ s/\n//g ;
-	#<tr><td><b>Input Voltage:</b></td><td></td><td>13.69V</td></tr>
-	my ( $intemp ) = ( $result =~ /.*Internal Temp.+?>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
-	#<tr><td><b>Internal Temp:</b></td><td></td><td>39.8°C</td></tr>
-	my ( $extemp ) = ( $result =~ /.*External Temp.+?>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
-	#<tr><td><b>External Temp:</b></td><td></td><td>35.7°C</td></tr>
-	my ( $voltage ) = ( $result =~ /.*Input Voltage.+?>(\d{1,2}\.\d{1,2})V<.*/ ) ;
-	#<td><b>&nbsp;&nbsp;&nbsp;&nbsp;Channel 1:</b></td>
-	#<td>ON,&nbsp;&nbsp;&nbsp;&nbsp;Current:0.0A, Power:0.0W</td>
-	my ( $current1 ) = ( $result =~ /.*Channel 1.+?Current:(\d{1,2}\.\d{1,2})A.*/ ) ;
-	my ( $power1 ) = ( $result =~ /.*Channel 1.+?Power:(\d{1,2}\.\d{0,2})W.*/ ) ;
-	my ( $current2 ) = ( $result =~ /.*Channel 2.+?Current:(\d{1,2}\.\d{0,2})A.*/ ) ;
-	my ( $power2 ) = ( $result =~ /.*Channel 2.+?Power:(\d{1,2}\.\d{0,2})W.*/ ) ;
-	if( not defined $intemp ) { $intemp = "" ; }
-	if( not defined $extemp ) { $extemp = "" ; }
-	if( not defined $voltage ) { $voltage = "" ; }
-	if( not defined $current1 ) { $current1 = "" ; }
-	if( $current1 eq "" ) { $current1 = "0" ; }
-	if( not defined $power1 ) { $power1 = "" ; }
-	if( $power1 eq "" ) { $power1 = "0" ; }
-	if( not defined $current2 ) { $current2 = "" ; }
-	if( $current2 eq "" ) { $current2 = "0" ; }
-	if( not defined $power2 ) { $power2 = "" ; }
-	if( $power2 eq "" ) { $power2 = "0" ; }
-	my $current = $current1 + $current2 ;
-	my $power = $power1 + $power2 ;
-	if( $Debug ) { print "debug: get_pingbrother_status: $sitename at $ip: intemp=$intemp extemp=$extemp voltage=$voltage current1=$current1 power1=$power1 current2=$current2 power2=$power2 current=$current power=$power\n" ; }
-	#return ( $intemp, $extemp, $voltage, $current1, $power1, $current2, $power2, $current, $power ) ;
-	return ( $intemp, $extemp, $voltage ) ;
-}
-
-sub get_rmg_status($)
-{
-	my ( $sitename ) = @_ ;
-	my $ping_power = "" ;
-	my $ping_computer = "" ;
-	my $site_status = "" ;
-	if( (defined $sitename) and ($sitename ne "") )
+	if( $Debug ) { print "debug: get_time_offset: result=$result\n" ; }
+	my @lines = split '\n|\r',$result ;
+	for my $line ( @lines )
 	{
-		my $command = "rmg status $sitename" ;
-		if( $Debug ) { print "debug: get_rmg_status: command=$command\n" ; }
-		my $result = `$command` ;
-		if( $Debug ) { print "debug: get_rmg_status: result=$result\n" ; }
-		my @lines = split /\r|\n/,$result ;
-		if( $lines[0] =~ m/^error/ )
+		# *nist1.symmetric .ACTS.           1 u  117 1024  177   27.485   10.374  71.796
+		if( $line =~ m/^\*/ )
 		{
-			print "Error: bad response from rmg status command: $result\n" ;
-		}
-		else
-		{
-			my $line = shift @lines ;	# drop the line with "status siteX"
-			$line = shift @lines ;	# grab the line with "Powerswitch Router Ping Test:"
-			my ( $status1 ) = ($line =~ m/.+?:\s*?(\w+)/) ;
-			$line = shift @lines ;	# grab the line with "Computer Ping Test:"
-			my ( $status2 ) = ($line =~ m/.+?:\s*?(\w+)/) ;
-			$line = shift @lines ;	# grab the line with "Site Status:"
-			my ( $status3 ) = ($line =~ m/.*?:\s*([^,]*),/) ;
-			if( defined $status1 )
+			my @args = split /\s+/,$line ;
+			my $argc = scalar @args ;
+			if( $argc > 9)
 			{
-				if( $status1 eq "failure" ) { $ping_power = 0 ; }	# 0 means failure
-				if( $status1 eq "success" ) { $ping_power = 1 ; }	# 1 means success
-				if( $Debug ) { print "debug: get_rmg_status: status1=$status1 ping_power=$ping_power\n" ; }
-			}
-			if( defined $status2 )
-			{
-				if( $status2 eq "failure" ) { $ping_computer = 0 ; }	# 0 means failure
-				if( $status2 eq "success" ) { $ping_computer = 1 ; }	# 1 means success
-				if( $Debug ) { print "debug: get_rmg_status: status2=$status2 ping_computer=$ping_computer\n" ; }
-			}
-			if( defined $status3 )
-			{
-				if( $status3 eq "unknown" ) { $site_status = 0 ; }			# 0 means unknown
-				if( $status3 eq "off" ) { $site_status = 1 ; }				# 1 means off
-				else { $site_status = 2 ; }						# 2 means not off
-				if( $status3 eq "down" ) { $site_status = 3 ; }				# 3 means down (off)
-				if( $status3 eq "Site stopped; is now up" ) { $site_status = 4 ; }	# 4 means on not running
-				if( $status3 eq "Site is now up" ) { $site_status = 4 ; }		# 4 means on not running
-				if( $status3 eq "Site started" ) { $site_status = 5 ; }			# 5 means running RMG
-				if( $status3 eq "Site restarted" ) { $site_status = 5 ; }		# 5 means running RMG ?
-				#
-				if( $Debug ) { print "debug: get_rmg_status: status3=$status3 site_status=$site_status\n" ; }
+				$time_offset = $args[8] ;
+				if( $Debug ) {  print "debug: get_time_offset: offset=$time_offset\n" ; }
 			}
 		}
 	}
-	else
-	{
-		print "Error: missing sitename in get_rmg_status\n" ;
-	}
-	return ( $ping_power, $ping_computer, $site_status ) ;
+	return $time_offset ;
 }
 
 sub readcsv($)
@@ -227,29 +157,6 @@ sub readcsv($)
 	return @data ;
 }
 
-# NO LONGER USED
-sub writecsv($@)
-{
-	#my ( $name, $intemp, $extemp, $voltage, $current1, $power1, $current2, $power2 ) = @_ ;
-	my ( $name, @values ) = @_ ;
-	my $filename = "$name.csv" ;
-	my $fd ;
-	if( not defined open($fd,">>".$filename) )
-	{
-		print "ERROR: cannot write to file '$filename'\n" ;
-		return 1 ;
-	}
-	my $dt = strftime "%Y-%m-%d %H:%M:%S,%z", localtime();
-	#print $fd "$dt,$intemp,$extemp,$voltage,$current1,$power1,$current2,$power2\n" ;
-	print $fd "$dt" ;
-	for my $value ( @values )
-	{
-		print $fd ",$value" ;
-	}
-	print $fd "\n" ;
-	close($fd) ;
-	return 0 ;
-}
 
 sub opendatabase($)	# connects to the database and returns the database handle
 {
@@ -323,7 +230,7 @@ sub writetable($$$$)
 	{
 		if( not defined $value or $value eq "" )
 		{
-			$query .= ",NULL" ;		# no quotes around the NULL
+			$query .= ",NULL" ;
 		}
 		else
 		{

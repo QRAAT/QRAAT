@@ -51,6 +51,7 @@ my @Products =
 (
 	# Internal temperature of pingbrother
 	{
+		table=> "telemetry",
 		file=> "intemp",
 		title=> "internal temperature (C)",
 		yrange=> [0,60],
@@ -58,6 +59,7 @@ my @Products =
 	}, 
 	# External temperature of pingbrother thermocouple
 	{
+		table=> "telemetry",
 		file=> "extemp",
 		title=> "external temperature (C)",
 		yrange=> [0,60],
@@ -65,6 +67,7 @@ my @Products =
 	}, 
 	# Battery voltage measured at the pingbrother DC input
 	{
+		table=> "telemetry",
 		file=> "battery",
 		title=> "battery voltage (V)",
 		yrange=> [9,15],
@@ -72,6 +75,7 @@ my @Products =
 	}, 
 	# Compound plot of both internal and external temperatures
 	{
+		table=> "telemetry",
 		file=> "temps",
 		title=> "temperatures (C)",
 		yrange=> [0,60],
@@ -83,10 +87,19 @@ my @Products =
 	}, 
 	# Run Level: a status value that reflects both site power and RMG status, ranging from 0 to 5
 	{
+		table=> "telemetry",
 		file=> "status",
 		title=> "status",
 		yrange=> [0,6],
 		lines=> [ {column=>8,color=>'black'} ]
+	}, 
+	# Time Offset: the number of milliseconds that the site clock differs from its time reference host
+	{
+		table=> "timecheck",
+		file=> "offset",
+		title=> "time offset (ms)",
+		yrange=> [-1000,1000],
+		lines=> [ {column=>3,color=>'black'} ]
 	}, 
 ) ;
 
@@ -123,10 +136,11 @@ sub main()
 	{
 		my $site = $ref_row->[0] ;
 		if( (not defined $site) or ($site eq "") ) { next ; }
-		my $result = writecsv($site,$dbh) ;
-		if( $result ) { next ; }
 		for my $product ( @Products )
 		{
+			my $table = $product->{table} ;
+			my $result = writecsv($site,$dbh,$table) ;
+			if( $result ) { next ; }
 			make($site,$dbh,$product) ;
 		}
 	}	
@@ -150,7 +164,7 @@ sub make($$$)
 
 sub writecsv($$)
 {
-	my ( $sitename, $dbh ) = @_ ;
+	my ( $sitename, $dbh, $tablename ) = @_ ;
 	if( not defined $dbh ) { return 1 ; }
 	# Get the site number from the sitename table
 	my $query = "select id from $TableNameSitelist where name='${sitename}' ;" ;
@@ -165,19 +179,19 @@ sub writecsv($$)
 	my $timenow = time() ;
 	my $dtstart = strftime "%Y-%m-%d %H:%M:%S", localtime($timenow-$Interval);
 	my $dtstop = strftime "%Y-%m-%d %H:%M:%S", localtime($timenow);
-	$query = "select count(id) from $TableNameTelemetry where siteid = $site and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	$query = "select count(id) from $tablename where siteid = $site and datetime between \"$dtstart\" and \"$dtstop\";" ;
 	if( $Debug ) { print "debug: writecsv: query=$query\n" ; }
 	my $count = dblookup($dbh,$query) ;
 	if( $Debug ) { print "debug: writecsv: query result has $count rows\n" ; }
 	if( $count < 2 ) { return 1 ; }
-	my $filename = "$TmpPath/$sitename.csv" ;
+	my $filename = "$TmpPath/${sitename}_${tablename}.csv" ;
 	my $fd ;
 	if( not defined open($fd,">".$filename) )
 	{
 		print "ERROR: cannot write to csv file '$filename'\n" ;
 		return 1 ;
 	}
-	$query = "select * from $TableNameTelemetry where siteid = $site and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	$query = "select * from $tablename where siteid = $site and datetime between \"$dtstart\" and \"$dtstop\";" ;
 	my @data = dbdata($dbh,$query) ;
 	$count = scalar @data ;
 	if( $Debug ) { print "debug: writecsv: query result has $count rows\n" ; }
@@ -247,8 +261,9 @@ sub writegp($$)
 	my $filename = "${site}_$refhash->{file}" ;
 	my $refyrange = $refhash->{yrange} ;	# a reference to an array of 2 vales for y axis range
 	my $reflines = $refhash->{lines} ;	# a reference to an array of line definition hashes
+	my $tablename = $refhash->{table} ;
 	my $title = "$site $refhash->{title}" ;
-	my $csvfilename = "$TmpPath/$site.csv" ;
+	my $csvfilename = "$TmpPath/${site}_${tablename}.csv" ;
 	my $gpfilename = "$TmpPath/$filename.gp" ;
 	my $pngfilename = "$TmpPath/$filename.png" ;
 	my $gp ;
@@ -280,7 +295,8 @@ sub writegp($$)
 		my $color = $refline->{color} ;
 		if( not defined $color ) { $color = "" ; }
 		if( $color eq "" ) { $color = "red" ; }
-		print $gp "${command} using 1:$column with points pointtype 7 pointsize 0.5 linecolor rgb \"$color\" title \"$label\"" ;
+		my $column_expression = "($column==NULL?1/0:$column)" ;
+		print $gp "${command} using 1:$column_expression with points pointtype 7 pointsize 0.5 linecolor rgb \"$color\" title \"$label\"" ;
 		$command = ", \"\"" ;	# for multiple lines per plot, omit plot and use ', ""'
 	}
 	print $gp "\n\n" ;
