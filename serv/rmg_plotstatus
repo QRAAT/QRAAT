@@ -98,8 +98,8 @@ my @Products =
 		table=> "timecheck",
 		file=> "offset",
 		title=> "time offset (ms)",
-		yrange=> [-1000,1000],
-		lines=> [ {column=>3,color=>'black'} ]
+		yrange=> [-100,100],
+		lines=> [ {column=>3,color=>'blue'} ]
 	}, 
 ) ;
 
@@ -245,6 +245,7 @@ my @GnuplotCommands =
 (
 	"set terminal png size 600,300 truecolor nocrop enhanced",
 	"set datafile separator \",\"",
+	"set datafile missing \"NULL\"",
 	"set xdata time",
 	"set timefmt \"%Y-%m-%d %H:%M:%S\"",
 	#set format x "%H:%M\n%m/%d"",
@@ -295,8 +296,7 @@ sub writegp($$)
 		my $color = $refline->{color} ;
 		if( not defined $color ) { $color = "" ; }
 		if( $color eq "" ) { $color = "red" ; }
-		my $column_expression = "($column==NULL?1/0:$column)" ;
-		print $gp "${command} using 1:$column_expression with points pointtype 7 pointsize 0.5 linecolor rgb \"$color\" title \"$label\"" ;
+		print $gp "${command} using 1:$column with points pointtype 7 pointsize 0.5 linecolor rgb \"$color\" title \"$label\"" ;
 		$command = ", \"\"" ;	# for multiple lines per plot, omit plot and use ', ""'
 	}
 	print $gp "\n\n" ;
