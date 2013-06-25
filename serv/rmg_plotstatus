@@ -81,11 +81,11 @@ my @Products =
 			{ column=>4,label=>'ext',color=>'magenta' }
 		]
 	}, 
-	# Site status: ping_power, ping_computer, site_status
+	# Run Level: a status value that reflects both site power and RMG status, ranging from 0 to 5
 	{
 		file=> "status",
 		title=> "status",
-		yrange=> [0,5],
+		yrange=> [0,6],
 		lines=> [ {column=>8,color=>'black'} ]
 	}, 
 ) ;

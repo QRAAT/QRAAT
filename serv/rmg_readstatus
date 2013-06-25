@@ -186,11 +186,14 @@ sub get_rmg_status($)
 			}
 			if( defined $status3 )
 			{
-				if( $status3 eq "unknown" ) { $site_status = 0 ; }			# 0 means unknown`
+				if( $status3 eq "unknown" ) { $site_status = 0 ; }			# 0 means unknown
 				if( $status3 eq "off" ) { $site_status = 1 ; }				# 1 means off
 				else { $site_status = 2 ; }						# 2 means not off
-				if( $status3 eq "down" ) { $site_status = 3 ; }				# 3 means down
-				if( $status3 eq "Site stopped; is now up" ) { $site_status = 4 ; }	# 4 means stopped but up (???)
+				if( $status3 eq "down" ) { $site_status = 3 ; }				# 3 means down (off)
+				if( $status3 eq "Site stopped; is now up" ) { $site_status = 4 ; }	# 4 means on not running
+				if( $status3 eq "Site is now up" ) { $site_status = 4 ; }		# 4 means on not running
+				if( $status3 eq "Site started" ) { $site_status = 5 ; }			# 5 means running RMG
+				if( $status3 eq "Site restarted" ) { $site_status = 5 ; }		# 5 means running RMG ?
 				#
 				if( $Debug ) { print "debug: get_rmg_status: status3=$status3 site_status=$site_status\n" ; }
 			}
