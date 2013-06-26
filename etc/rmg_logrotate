@@ -1,0 +1,9 @@
+/var/log/rmg/*.log
+{
+	weekly
+	rotate 12
+	compress
+	delaycompress
+	notifempty
+	nomail
+}
