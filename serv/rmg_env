@@ -52,6 +52,9 @@ export RMG_SERVER_DET_DIR="$RMG_SERVER_DIR/det_files"
 # The location on the server for processed det files
 export RMG_SERVER_DET_ARCHIVE="$RMG_SERVER_DIR/archive/det_files"
 
+# The location on the server for processed det files
+export RMG_SERVER_DET_ARCHIVE="$RMG_SERVER_DIR/archive/det_files"
+
 # The location on the server for estimator output files.
 export RMG_SERVER_EST_DIR="$RMG_SERVER_DIR/est_files"
 
@@ -68,6 +71,14 @@ export GDFONTPATH=/usr/share/fonts/truetype/ttf-dejavu
 # Set the name of the default font that gnuplot should use for the status plots
 export GNUPLOT_DEFAULT_GDFONT=DejaVuSans
 
+# Serial Port to communicate to the RMG receiver with
+export RMG_SERIAL_PORT=/dev/ttyUSB0
+
+# Time interval (in seconds) to look at frequency tunings
+export RMG_TUNE_IIME=10
+
+# Log directory for remotes
+export RMG_SITE_LOG_DIR="$RMG_SITE_METADATA_DIR/log/"
 
 #END
 
