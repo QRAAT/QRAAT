@@ -1,0 +1,400 @@
+#!/usr/bin/perl
+#rmg_readstatus
+#
+# This script is part of the QRAAT system.
+#
+# Copyright (C) 2013 Marcel Losekoot#
+#
+# This script reads various status related data from the server and remote sites and writes them to the qraat database.
+# Reads telemetry values from pingbrother power switch for each of the sites in sitelist.csv
+# Reads site status using the script rmg status
+# Counts det files (coming soon)
+# Counts est files (coming soon)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict ;
+use warnings ;
+use POSIX qw(strftime);
+use DBI ;
+use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
+
+my $Debug = 0 ;
+
+my $TableNameTelemetry = "telemetry" ;		# The name of the db table
+my $TableNameSitelist = "sitelist" ;		# The name of the db table
+
+sub usage()
+{
+	print "$0: path_to_sitelist authfile [debug]\n" ;
+	print "Reads pingbrother telemetry from all sites in sitelist\n" ;
+	print "Writes data to database account defined in authfile\n" ;
+}
+
+sub main()
+{
+	my $argc = scalar @ARGV ;
+	if( $argc < 2 )
+	{
+		usage() ;
+		return 1 ;
+	}
+	if( ($argc > 2) && ($ARGV[2] eq "debug") )
+	{
+		$Debug = 1 ;
+	}
+	my $sitelist = $ARGV[0] ;
+	if( (not defined $sitelist) or ($sitelist eq "") )
+	{
+		print "ERROR: missing parameter for sitelist\n" ;
+		return 1 ;
+	}
+	print "Reading sitelist from '$sitelist'\n" ;
+	my @data = readcsv($sitelist) ;
+	shift @data ;	# discard header line
+	if( scalar @data < 1 )
+	{
+		print "ERROR: cannot read sitelist\n" ;
+		return 1 ;
+	}
+	#
+	# Open database
+	my $authfile = $ARGV[1] ;
+	if( (not defined $authfile) or ($authfile eq "") )
+	{
+		print "ERROR: missing parameter for authfile\n" ;
+		return 1 ;
+	}
+	my $dbh = opendatabase($authfile) ;
+	if( not defined $dbh )
+	{
+		#print "ERROR: cannot open database defined in authfile '$authfile'\n" ;
+		# opendatabase() already explains the error
+		return 1 ;
+	}
+	#
+	# Read the data
+	for my $ref_row ( @data )
+	{
+		my $sitename = $ref_row->[0] ;
+		my $ip = $ref_row->[2] ;
+		my $ps = $ref_row->[5] ;
+		if( (not defined $sitename) or ($sitename eq "") ) { next ; }
+		if( (not defined $ip) or ($ip eq "") ) { next ; }
+		if( (not defined $ps) or ($ps eq "") ) { next ; }
+		my ( $ping_power, $ping_computer, $site_status ) = get_rmg_status($sitename) ;
+		my ( $intemp, $extemp, $voltage ) = ( "","","" ) ;
+		if( $ps eq "pingbrother" )
+		{
+			( $intemp, $extemp, $voltage ) = get_pingbrother_status($sitename,$ip) ;
+		}
+		writetable($dbh,$TableNameTelemetry,$sitename,[$intemp,$extemp,$voltage,$ping_power,$ping_computer,$site_status]) ;
+	}	
+	#
+	# Close database
+	closedatabase($dbh) ;
+	return 0 ;
+}
+
+sub get_pingbrother_status($$)
+{
+	my ( $sitename, $ip ) = @_ ;
+	my $command = "curl --connect-timeout 10 -s -u admin:admin http://$ip" ;
+	#my $result = `cat pbtest` ;	# test
+	my $result = `$command` ;
+	$result =~ s/\r//g ;
+	$result =~ s/\n//g ;
+	#<tr><td><b>Input Voltage:</b></td><td></td><td>13.69V</td></tr>
+	my ( $intemp ) = ( $result =~ /.*Internal Temp.+?>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
+	#<tr><td><b>Internal Temp:</b></td><td></td><td>39.8°C</td></tr>
+	my ( $extemp ) = ( $result =~ /.*External Temp.+?>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
+	#<tr><td><b>External Temp:</b></td><td></td><td>35.7°C</td></tr>
+	my ( $voltage ) = ( $result =~ /.*Input Voltage.+?>(\d{1,2}\.\d{1,2})V<.*/ ) ;
+	#<td><b>&nbsp;&nbsp;&nbsp;&nbsp;Channel 1:</b></td>
+	#<td>ON,&nbsp;&nbsp;&nbsp;&nbsp;Current:0.0A, Power:0.0W</td>
+	my ( $current1 ) = ( $result =~ /.*Channel 1.+?Current:(\d{1,2}\.\d{1,2})A.*/ ) ;
+	my ( $power1 ) = ( $result =~ /.*Channel 1.+?Power:(\d{1,2}\.\d{0,2})W.*/ ) ;
+	my ( $current2 ) = ( $result =~ /.*Channel 2.+?Current:(\d{1,2}\.\d{0,2})A.*/ ) ;
+	my ( $power2 ) = ( $result =~ /.*Channel 2.+?Power:(\d{1,2}\.\d{0,2})W.*/ ) ;
+	if( not defined $intemp ) { $intemp = "" ; }
+	if( not defined $extemp ) { $extemp = "" ; }
+	if( not defined $voltage ) { $voltage = "" ; }
+	if( not defined $current1 ) { $current1 = "" ; }
+	if( $current1 eq "" ) { $current1 = "0" ; }
+	if( not defined $power1 ) { $power1 = "" ; }
+	if( $power1 eq "" ) { $power1 = "0" ; }
+	if( not defined $current2 ) { $current2 = "" ; }
+	if( $current2 eq "" ) { $current2 = "0" ; }
+	if( not defined $power2 ) { $power2 = "" ; }
+	if( $power2 eq "" ) { $power2 = "0" ; }
+	my $current = $current1 + $current2 ;
+	my $power = $power1 + $power2 ;
+	if( $Debug ) { print "debug: get_pingbrother_status: $sitename at $ip: intemp=$intemp extemp=$extemp voltage=$voltage current1=$current1 power1=$power1 current2=$current2 power2=$power2 current=$current power=$power\n" ; }
+	#return ( $intemp, $extemp, $voltage, $current1, $power1, $current2, $power2, $current, $power ) ;
+	return ( $intemp, $extemp, $voltage ) ;
+}
+
+sub get_rmg_status($)
+{
+	my ( $sitename ) = @_ ;
+	my $ping_power = "" ;
+	my $ping_computer = "" ;
+	my $site_status = "" ;
+	if( (defined $sitename) and ($sitename ne "") )
+	{
+		my $command = "rmg status $sitename" ;
+		if( $Debug ) { print "debug: get_rmg_status: command=$command\n" ; }
+		my $result = `$command` ;
+		if( $Debug ) { print "debug: get_rmg_status: result=$result\n" ; }
+		my @lines = split /\r|\n/,$result ;
+		if( $lines[0] =~ m/^error/ )
+		{
+			print "Error: bad response from rmg status command: $result\n" ;
+		}
+		else
+		{
+			my $line = shift @lines ;	# drop the line with "status siteX"
+			$line = shift @lines ;	# grab the line with "Powerswitch Router Ping Test:"
+			my ( $status1 ) = ($line =~ m/.+?:\s*?(\w+)/) ;
+			$line = shift @lines ;	# grab the line with "Computer Ping Test:"
+			my ( $status2 ) = ($line =~ m/.+?:\s*?(\w+)/) ;
+			$line = shift @lines ;	# grab the line with "Site Status:"
+			my ( $status3 ) = ($line =~ m/.*?:\s*([^,]*),/) ;
+			if( defined $status1 )
+			{
+				if( $status1 eq "failure" ) { $ping_power = 0 ; }	# 0 means failure
+				if( $status1 eq "success" ) { $ping_power = 1 ; }	# 1 means success
+				if( $Debug ) { print "debug: get_rmg_status: status1=$status1 ping_power=$ping_power\n" ; }
+			}
+			if( defined $status2 )
+			{
+				if( $status2 eq "failure" ) { $ping_computer = 0 ; }	# 0 means failure
+				if( $status2 eq "success" ) { $ping_computer = 1 ; }	# 1 means success
+				if( $Debug ) { print "debug: get_rmg_status: status2=$status2 ping_computer=$ping_computer\n" ; }
+			}
+			if( defined $status3 )
+			{
+				if( $status3 eq "unknown" ) { $site_status = 0 ; }			# 0 means unknown
+				if( $status3 eq "off" ) { $site_status = 1 ; }				# 1 means off
+				else { $site_status = 2 ; }						# 2 means not off
+				if( $status3 eq "down" ) { $site_status = 3 ; }				# 3 means down (off)
+				if( $status3 eq "Site stopped; is now up" ) { $site_status = 4 ; }	# 4 means on not running
+				if( $status3 eq "Site is now up" ) { $site_status = 4 ; }		# 4 means on not running
+				if( $status3 eq "Site started" ) { $site_status = 5 ; }			# 5 means running RMG
+				if( $status3 eq "Site restarted" ) { $site_status = 5 ; }		# 5 means running RMG ?
+				#
+				if( $Debug ) { print "debug: get_rmg_status: status3=$status3 site_status=$site_status\n" ; }
+			}
+		}
+	}
+	else
+	{
+		print "Error: missing sitename in get_rmg_status\n" ;
+	}
+	return ( $ping_power, $ping_computer, $site_status ) ;
+}
+
+sub readcsv($)
+{
+	my ( $filename ) = @_ ;
+	my $fd ;
+	if( not defined open($fd,"<".$filename) )
+	{
+		print "ERROR: cannot open file '$filename'" ;
+		return undef ;
+	}
+	my @data = () ;
+	my $line ;
+	while( $line = <$fd> )
+	{
+		chomp($line) ;
+		my @argv = split(',',$line) ;
+		push @data, [ @argv ] ;	# create an array of references to an array 
+	}
+	close($fd) ;
+	return @data ;
+}
+
+# NO LONGER USED
+sub writecsv($@)
+{
+	#my ( $name, $intemp, $extemp, $voltage, $current1, $power1, $current2, $power2 ) = @_ ;
+	my ( $name, @values ) = @_ ;
+	my $filename = "$name.csv" ;
+	my $fd ;
+	if( not defined open($fd,">>".$filename) )
+	{
+		print "ERROR: cannot write to file '$filename'\n" ;
+		return 1 ;
+	}
+	my $dt = strftime "%Y-%m-%d %H:%M:%S,%z", localtime();
+	#print $fd "$dt,$intemp,$extemp,$voltage,$current1,$power1,$current2,$power2\n" ;
+	print $fd "$dt" ;
+	for my $value ( @values )
+	{
+		print $fd ",$value" ;
+	}
+	print $fd "\n" ;
+	close($fd) ;
+	return 0 ;
+}
+
+sub opendatabase($)	# connects to the database and returns the database handle
+{
+	my ( $authfile ) = @_ ;
+	my $fd ;
+	if( not defined open($fd,"<".$authfile) )
+	{
+		print "ERROR: cannot open authfile '$authfile'\n" ;
+		return undef ;
+	}
+	my $host = <$fd> ;
+	chomp($host) ;
+	my $user = <$fd> ;
+	chomp($user) ;
+	my $pass = <$fd> ;
+	chomp($pass) ;
+	my $database = <$fd> ;
+	chomp($database) ;
+	if( not defined $user or $user eq "" )
+	{
+		print "ERROR: cannot read user from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $pass or $pass eq "")
+	{
+		print "ERROR: cannot read pass from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $host or $host eq "" )
+	{
+		print "ERROR: cannot read host from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $database or $database eq "" )
+	{
+		print "ERROR: cannot read database from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	close($fd) ;
+	my $port = 3306 ;
+	my $timeout = 10 ;
+	#my $dsn = "dbi:mysql:$database" ;
+	my $dsn = "DBI:Wire10:database=$database;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
+	my $dbh = DBI->connect($dsn,$user,$pass) ;
+	if( not $dbh )
+	{
+		print "ERROR: cannot connect to database host: $DBI::errstr\n" ;
+		return undef ;
+	}
+	return $dbh ;
+}
+
+sub writetable($$$$)
+{
+	my ( $dbh, $tablename, $sitename, $refdata ) = @_ ;
+	# Get the site number from the sitename table
+	my $query = "select id from $TableNameSitelist where name='${sitename}' ;" ;
+	if( $Debug ) { print "debug: writetable: query=$query\n" ; }
+	my $result = dblookup($dbh,$query) ;
+	if( not defined $result or ($result eq "") )
+	{
+		if( $Debug ) { print "debug: writetable: cannot find site code for site '$sitename'\n" ; }
+		return 1 ;
+	}
+	my $site = $result ;
+	if( $Debug ) { print "debug: writetable: site code for site '$sitename' is $site\n" ; }
+	$query = "insert into $tablename values(DEFAULT" ;	# first column is ID, automatically allocated
+	$query .= ",'${site}'" ;				# next is the site ID value, from the above query
+	$query .= strftime ",'%Y-%m-%d %H:%M:%S','%z'", localtime();	# next the datetime and timezone
+	for my $value ( @$refdata )
+	{
+		if( not defined $value or $value eq "" )
+		{
+			$query .= ",NULL" ;		# no quotes around the NULL
+		}
+		else
+		{
+			$query .= ",'${value}'" ;
+		}
+	}
+	$query .= ") ;" ;
+	if( $Debug ) { print "debug: updatetable: query=$query\n" ; }
+	if( dbexecute($dbh,$query) )
+	{
+		print "ERROR: cannot add entry to table '$tablename'\n" ;
+		return 1 ;
+	}
+	return 0 ;
+}
+
+sub dblookup($$)
+{
+	#
+	# Executes the given query to return one value, or undef
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	my $matches = $sth->rows() ;
+	if( not $matches )
+	{
+		return undef ;
+	}
+	my $ref_row = $sth->fetchrow_arrayref ;
+	if( not defined($ref_row) )
+	{
+		return undef ;
+	}
+	return $ref_row->[0] ;
+}
+
+sub dbexecute($$)		# executes a given query, returns 0 for OK, 1 for error
+{
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	return 0 ;
+}
+
+sub closedatabase($)
+{
+	my ( $dbh ) = @_ ;
+	if( not $dbh->disconnect() )
+	{
+		print "ERROR: cannot close database: $DBI::errstr\n" ;
+	}
+}
+
+exit main() ;
+
+#END

@@ -1,7 +1,10 @@
 #!/bin/bash
 # rmg_env
+#
 # This script is part of the QRAAT system. It provides system variables
 # for running QRAAT.
+#
+# NB: Each variable must be defined using the export command.
 #
 # Copyright (C) 2013 Todd Borrowman
 # 
@@ -49,15 +52,28 @@ RMG_SERVER_DET_DIR="$RMG_SERVER_DIR/det_files"
 # The location on the server for processed det files
 RMG_SERVER_DET_ARCHIVE="$RMG_SERVER_DIR/archive/det_files"
 
+# The location on the server for processed det files
+export RMG_SERVER_DET_ARCHIVE="$RMG_SERVER_DIR/archive/det_files"
+
 # The location on the server for estimator output files.
 RMG_SERVER_EST_DIR="$RMG_SERVER_DIR/est_files"
 
 # The location on the server for est files that have been uploaded to the database.
 RMG_SERVER_EST_ARCHIVE="$RMG_SERVER_DIR/archive/est_files"
 
+# The location on the server for est files that have been uploaded to the database.
+export RMG_SERVER_EST_ARCHIVE="$RMG_SERVER_DIR/archive/est_files"
+
 # The maximum number of attempts to start the pulse detector before a
 # fatal error state is reached. This value is needed by the site.
 RETRY_MAX=3
+
+# Set the path used by gnuplot to find fonts used for the status plots
+export GDFONTPATH=/usr/share/fonts/truetype/ttf-dejavu
+
+# Set the name of the default font that gnuplot should use for the status plots
+export GNUPLOT_DEFAULT_GDFONT=DejaVuSans
+
 
 #END
 

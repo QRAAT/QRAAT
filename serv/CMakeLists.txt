@@ -7,6 +7,10 @@ INSTALL(PROGRAMS
   rmg_csv
   rmg_fetch
   rmg_powerswitch
+  rmg_readstatus
+  rmg_plotstatus
+  rmg_status
+  rmg_timecheck
   DESTINATION bin)
 
 
