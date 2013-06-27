@@ -75,10 +75,10 @@ export GNUPLOT_DEFAULT_GDFONT=DejaVuSans
 export RMG_SERIAL_PORT=/dev/ttyUSB0
 
 # Time interval (in seconds) to look at frequency tunings
-export RMG_TUNE_IIME=10
+export RMG_TUNE_TIME=10
 
 # Log directory for remotes
-export RMG_SITE_LOG_DIR="$RMG_SITE_METADATA_DIR/log/"
+export RMG_SITE_LOG_DIR="$RMG_SITE_METADATA_DIR/log"
 
 #END
 
