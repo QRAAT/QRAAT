@@ -1,0 +1,491 @@
+#!/usr/bin/perl
+#rmg_plotstatus
+#
+# This script is part of the QRAAT system.
+#
+# Copyright (C) 2013 Marcel Losekoot
+#
+# This script creates plot images for the site telemetry using the data in the qraat database,
+# using the gnuplot program.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict ;
+use warnings ;
+use POSIX qw(strftime);
+use DBI ;
+use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
+
+my $Debug = 0 ;
+
+my $TableNameTelemetry = "telemetry" ;		# Name of the database table that holds telemetry
+my $TableNameSitelist = "sitelist" ;		# Name of the database table that holds site list
+my $Interval = 2*86400 ;			# The plot interval, 2*1 day
+my $TmpPath = "/tmp" ;				# The path of a scratch directory
+my $WebPath = "/var/www/images" ;		# The path of the web images directory
+
+sub usage()
+{
+	print "$0: sitelist authfile [debug]\n" ;
+	print "Reads telemetry data for each site listed in the sitelist file, from the database defined in authfile\n" ;
+	print "Writes plot image files\n" ;
+}
+
+# An array of hashes to hold definitions for each product
+# Each hash has a few scalar elements for common plot features and one array element called lines that defines each line of the plot
+# The lines array holds hashes, each one defines the column, label and color for one plot line
+
+my @Products =
+(
+	# Internal temperature of pingbrother
+	{
+		table=> "telemetry",
+		file=> "intemp",
+		title=> "internal temperature (C)",
+		yrange=> [0,60],
+		lines=> [ {column=>3,color=>'orange'} ]	# the value of key 'lines' is an array of hashes, in this case there's only one
+	}, 
+	# External temperature of pingbrother thermocouple
+	{
+		table=> "telemetry",
+		file=> "extemp",
+		title=> "external temperature (C)",
+		yrange=> [0,60],
+		lines=> [ {column=>4,color=>'magenta'} ]
+	}, 
+	# Battery voltage measured at the pingbrother DC input
+	{
+		table=> "telemetry",
+		file=> "battery",
+		title=> "battery voltage (V)",
+		yrange=> [9,15],
+		lines=> [ {column=>5,color=>'red'} ]
+	}, 
+	# Compound plot of both internal and external temperatures
+	{
+		table=> "telemetry",
+		file=> "temps",
+		title=> "temperatures (C)",
+		yrange=> [0,60],
+		lines=>
+		[
+			{ column=>3,label=>'int',color=>'orange' },
+			{ column=>4,label=>'ext',color=>'magenta' }
+		]
+	}, 
+	# Run Level: a status value that reflects both site power and RMG status, ranging from 0 to 5
+	{
+		table=> "telemetry",
+		file=> "status",
+		title=> "status",
+		yrange=> [0,6],
+		lines=> [ {column=>8,color=>'black'} ]
+	}, 
+	# Time Offset: the number of milliseconds that the site clock differs from its time reference host
+	{
+		table=> "timecheck",
+		file=> "offset",
+		title=> "time offset (ms)",
+		yrange=> [-100,100],
+		lines=> [ {column=>3,color=>'blue'} ]
+	}, 
+) ;
+
+sub main()
+{
+	my $argc = scalar @ARGV ;
+	if( $argc < 2 )
+	{
+		usage() ;
+		return 1 ;
+	}
+	if( ($argc > 2) && ($ARGV[2] eq "debug") )
+	{
+		$Debug = 1 ;
+	}
+	my $sitelist = $ARGV[0] ;
+	print "Reading sitelist from '$sitelist'\n" ;
+	my @data = readcsv($sitelist) ;
+	shift @data ;	# discard header line
+	if( scalar @data < 1 )
+	{
+		print "ERROR: cannot read sitelist\n" ;
+		return 1 ;
+	}
+	my $authfile = $ARGV[1] ;
+	my $dbh = opendatabase($authfile) ;
+	if( not defined $dbh )
+	{
+		#print "ERROR: cannot open database defined in authfile '$authfile'\n" ;
+		# opendatabase() already explains the error
+		return 1 ;
+	}
+	for my $ref_row ( @data )
+	{
+		my $site = $ref_row->[0] ;
+		if( (not defined $site) or ($site eq "") ) { next ; }
+		for my $product ( @Products )
+		{
+			my $table = $product->{table} ;
+			my $result = writecsv($site,$dbh,$table) ;
+			if( $result ) { next ; }
+			make($site,$dbh,$product) ;
+		}
+	}	
+	closedatabase($dbh) ;
+	return 0 ;
+}
+
+sub make($$$)
+{
+	my ( $site,$dbh,$refhash ) = @_ ;
+	my $file = $refhash->{file} ;
+	my $title = $refhash->{title} ;
+	print "Creating plot for $site $title\n" ;
+	my $err = writegp($site,$refhash) ;
+	if( $err ) { print "Error writing gp file: $err\n" ; }
+	$err = makeplot($site,$file) ;
+	if( $err ) { print "Error making make: $err\n" ; }
+	$err = moveplot($site,$file) ;	# move the plot from the TmpPath to the WebPath
+	if( $err ) { print "Error moving plot: $err\n" ; }
+}
+
+sub writecsv($$)
+{
+	my ( $sitename, $dbh, $tablename ) = @_ ;
+	if( not defined $dbh ) { return 1 ; }
+	# Get the site number from the sitename table
+	my $query = "select id from $TableNameSitelist where name='${sitename}' ;" ;
+	if( $Debug ) { print "debug: writecsv: query=$query\n" ; }
+	my $result = dblookup($dbh,$query) ;
+	if( not defined $result or ($result eq "") )
+	{
+		if( $Debug ) { print "debug: writecsv: cannot find site code for site '$sitename'\n" ; }
+		return 1 ;
+	}
+	my $site = $result ;
+	my $timenow = time() ;
+	my $dtstart = strftime "%Y-%m-%d %H:%M:%S", localtime($timenow-$Interval);
+	my $dtstop = strftime "%Y-%m-%d %H:%M:%S", localtime($timenow);
+	$query = "select count(id) from $tablename where siteid = $site and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	if( $Debug ) { print "debug: writecsv: query=$query\n" ; }
+	my $count = dblookup($dbh,$query) ;
+	if( $Debug ) { print "debug: writecsv: query result has $count rows\n" ; }
+	if( $count < 2 ) { return 1 ; }
+	my $filename = "$TmpPath/${sitename}_${tablename}.csv" ;
+	my $fd ;
+	if( not defined open($fd,">".$filename) )
+	{
+		print "ERROR: cannot write to csv file '$filename'\n" ;
+		return 1 ;
+	}
+	$query = "select * from $tablename where siteid = $site and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	my @data = dbdata($dbh,$query) ;
+	$count = scalar @data ;
+	if( $Debug ) { print "debug: writecsv: query result has $count rows\n" ; }
+	if( $count > 0 )
+	{
+		for my $refrow ( @data )
+		{
+			if( not defined $refrow ) { last ; }
+			my @row = @$refrow ;
+			shift @row ;	# drop the ID column
+			shift @row ;	# drop the siteid column
+			my $dt = shift @row ;
+			if( not defined $dt ) { next ; }
+			print $fd "$dt" ;
+			my $tz = shift @row ;
+			print $fd ",$tz" ;
+			for my $column ( @row )
+			{
+				if( not defined $column ) { $column = "" ; }
+				print $fd ",$column" ;
+			}
+			print $fd "\n" ;
+		}
+	}
+	close($fd) ;
+	return 0 ;
+}
+
+sub readcsv($)
+{
+	my ( $filename ) = @_ ;
+	my $fd ;
+	if( not defined open($fd,"<".$filename) )
+	{
+		print "ERROR: cannot open file '$filename'" ;
+		return undef ;
+	}
+	my @data = () ;
+	my $line ;
+	while( $line = <$fd> )
+	{
+		chomp($line) ;
+		my @argv = split(',',$line) ;
+		push @data, [ @argv ] ;	# create an array of references to an array 
+	}
+	close($fd) ;
+	return @data ;
+}
+
+my @GnuplotCommands =
+(
+	"set terminal png size 600,300 truecolor nocrop enhanced",
+	"set datafile separator \",\"",
+	"set datafile missing \"NULL\"",
+	"set xdata time",
+	"set timefmt \"%Y-%m-%d %H:%M:%S\"",
+	#set format x "%H:%M\n%m/%d"",
+	"set format x \"%l %p\\n%m/%d\"",
+	"set grid",
+	"set lmargin 9",
+	"set xtics out nomirror",
+	"#"
+) ;
+
+sub writegp($$)
+{
+	my ( $site, $refhash ) = @_ ;			# a reference to a hash containing all other parameters
+	my $filename = "${site}_$refhash->{file}" ;
+	my $refyrange = $refhash->{yrange} ;	# a reference to an array of 2 vales for y axis range
+	my $reflines = $refhash->{lines} ;	# a reference to an array of line definition hashes
+	my $tablename = $refhash->{table} ;
+	my $title = "$site $refhash->{title}" ;
+	my $csvfilename = "$TmpPath/${site}_${tablename}.csv" ;
+	my $gpfilename = "$TmpPath/$filename.gp" ;
+	my $pngfilename = "$TmpPath/$filename.png" ;
+	my $gp ;
+	if( not defined open($gp,">".$gpfilename) )
+	{
+		print "ERROR: cannot write to file '$gpfilename'\n" ;
+		return 1 ;
+	}
+	my $timenow = time() ;
+	my $dtstart = strftime "%Y-%m-%d %H:%M:%S", localtime($timenow-$Interval);
+	my $dtstop = strftime "%Y-%m-%d %H:%M:%S", localtime($timenow);
+	for my $line ( @GnuplotCommands )
+	{
+		print $gp "$line\n" ;
+	}
+	print $gp "set output \"$pngfilename\"\n" ;
+	print $gp "set title \"$title\"\n" ;
+	print $gp "set yrange [$refyrange->[0]:$refyrange->[1]]\n" ;
+	print $gp "set xrange [\"$dtstart\":\"$dtstop\"]\n" ;
+	# Assemble the plot command, possibly for multiple lines per plot. Always start with "plot"
+	my $command = "plot \"$csvfilename\"" ;
+	#my @lines = @$reflines ;
+	for my $refline ( @$reflines )
+	{
+		#my %line = %$refline ;
+		my $column = $refline->{column} ;
+		my $label = $refline->{label} ;
+		if( not defined $label ) { $label = "" ; }
+		my $color = $refline->{color} ;
+		if( not defined $color ) { $color = "" ; }
+		if( $color eq "" ) { $color = "red" ; }
+		print $gp "${command} using 1:$column with points pointtype 7 pointsize 0.5 linecolor rgb \"$color\" title \"$label\"" ;
+		$command = ", \"\"" ;	# for multiple lines per plot, omit plot and use ', ""'
+	}
+	print $gp "\n\n" ;
+	close($gp) ;
+	return 0 ;
+}
+
+sub makeplot($$)
+{
+	my ( $site, $filename ) = @_ ;
+	my $gpfilename = "$TmpPath/${site}_$filename.gp" ;
+	my $logfilename = "$TmpPath/${site}_$filename.log" ;
+	my $command = "/usr/bin/gnuplot $gpfilename &>$logfilename" ;
+	if( $Debug ) { print "debug: makeplot: command=$command\n" ; }
+	my $result = `$command` ;
+	if( $Debug ) { print "debug: makeplot: result=$result\n" ; }
+	return 0 ;
+}
+
+sub moveplot($$)
+{
+	my ( $site, $filename ) = @_ ;
+	my $source = "$TmpPath/${site}_$filename.png" ;
+	if( not -e $source )
+	{
+		print "Source file '$source' does not exist\n" ;
+		return 1 ;
+	}
+	if( not -f $source )
+	{
+		print "Source '$source' is not a file\n" ;
+		return 1 ;
+	}
+	if( -z $source )
+	{
+		print "Source file '$source' is empty\n" ;
+		return 1 ;
+	}
+	my $command = "/bin/cp --verbose --force --no-dereference --remove-destination $source $WebPath" ;
+	if( $Debug ) { print "debug: moveplot: command=$command\n" ; }
+	my $result = `$command` ;
+	if( $Debug ) { print "debug: moveplot: result=$result\n" ; }
+	return 0 ;
+}
+
+sub opendatabase($)	# connects to the database and returns the database handle
+{
+	my ( $authfile ) = @_ ;
+	my $fd ;
+	if( not defined open($fd,"<".$authfile) )
+	{
+		print "ERROR: cannot open authfile '$authfile'\n" ;
+		return undef ;
+	}
+	my $host = <$fd> ;
+	chomp($host) ;
+	my $user = <$fd> ;
+	chomp($user) ;
+	my $pass = <$fd> ;
+	chomp($pass) ;
+	my $database = <$fd> ;
+	chomp($database) ;
+	if( not defined $user or $user eq "" )
+	{
+		print "ERROR: cannot read user from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $pass or $pass eq "")
+	{
+		print "ERROR: cannot read pass from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $host or $host eq "" )
+	{
+		print "ERROR: cannot read host from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $database or $database eq "" )
+	{
+		print "ERROR: cannot read database from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	close($fd) ;
+	my $port = 3306 ;
+	my $timeout = 10 ;
+	#my $dsn = "dbi:mysql:$database" ;
+	my $dsn = "DBI:Wire10:database=$database;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
+	my $dbh = DBI->connect($dsn,$user,$pass) ;
+	if( not $dbh )
+	{
+		print "ERROR: cannot connect to database host: $DBI::errstr\n" ;
+		return undef ;
+	}
+	return $dbh ;
+}
+
+sub dblookup($$)
+{
+	#
+	# Executes the given query to return one value, or undef
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	my $matches = $sth->rows() ;
+	if( not $matches )
+	{
+		return undef ;
+	}
+	my $ref_row = $sth->fetchrow_arrayref ;
+	if( not defined($ref_row) )
+	{
+		return undef ;
+	}
+	return $ref_row->[0] ;
+}
+
+sub dbexecute($$)		# executes a given query, returns 0 for OK, 1 for error
+{
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	return 0 ;
+}
+
+sub dbdata($$)		# generic database read function, returns an array of data resulting from the given query
+{
+	my ( $dbh, $query ) = @_ ;
+	if( $Debug ) { print "debug: dbdata\n" ; }
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	my $matches = $sth->rows() ;
+	if( $matches == 0 )
+	{
+		if( $Debug ) { print "debug: dbdata: no matches\n" ; }
+		$sth->finish() ;
+		return 1 ;
+	}
+	my $ref_row ;
+	my @data = () ;
+	while( my $ref_row = $sth->fetchrow_arrayref() )
+	{
+		if( defined($ref_row) )
+		{
+			if( defined($ref_row->[0]) )
+			{
+				push @data, [ @$ref_row ] ;
+			}
+		}
+	}
+	$sth->finish() ;
+	return @data ;
+}
+
+sub closedatabase($)
+{
+	my ( $dbh ) = @_ ;
+	if( not $dbh->disconnect() )
+	{
+		print "ERROR: cannot close database: $DBI::errstr\n" ;
+	}
+}
+
+exit main() ;
+
+#END

@@ -1,0 +1,30 @@
+#!/bin/bash
+#rmg_status
+#
+# This script is part of the QRAAT system.
+#
+# Copyright (C) 2013 Marcel Losekoot
+#
+# This script is responsible for updating the system side status information after setting those pesky environment variables using rmg_env.
+# Call this script from cron:
+#	*/10 * * * * rmg_status
+#
+# It runs the scripts rmg_readstatus and rmg_plotstatus to read telemetry data from remote sites and generate the web plots.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+source rmg_env
+rmg_readstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile &>/var/log/rmg/rmg_readstatus.log
+rmg_timecheck $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile &>/var/log/rmg/rmg_timecheck.log
+rmg_plotstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile &>/var/log/rmg/rmg_plotstatus.log

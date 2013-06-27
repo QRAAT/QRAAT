@@ -1,0 +1,307 @@
+#!/usr/bin/perl
+#rmg_timecheck
+#
+# This script is part of the QRAAT system.
+#
+# Copyright (C) 2013 Marcel Losekoot#
+#
+# This script checks the system clock on the server and each of the remote sites
+# It uses ntpq to determine the time offset for each computer
+# It writes the time offsets to the timecheck table in the qraat database
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict ;
+use warnings ;
+use POSIX qw(strftime);
+use DBI ;
+use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
+
+my $Debug = 0 ;
+
+my $TableNameTimeCheck = "timecheck" ;		# The name of the db table
+my $TableNameSitelist = "sitelist" ;		# The name of the db table
+
+sub usage()
+{
+	print "$0: path_to_sitelist authfile [debug]\n" ;
+	print "Reads time offset values from all sites in sitelist\n" ;
+	print "Writes data to database account defined in authfile\n" ;
+}
+
+sub main()
+{
+	my $argc = scalar @ARGV ;
+	if( $argc < 2 )
+	{
+		usage() ;
+		return 1 ;
+	}
+	if( ($argc > 2) && ($ARGV[2] eq "debug") )
+	{
+		$Debug = 1 ;
+	}
+	my $sitelist = $ARGV[0] ;
+	if( (not defined $sitelist) or ($sitelist eq "") )
+	{
+		print "ERROR: missing parameter for sitelist\n" ;
+		return 1 ;
+	}
+	print "Reading sitelist from '$sitelist'\n" ;
+	my @data = readcsv($sitelist) ;
+	shift @data ;	# discard header line
+	if( scalar @data < 1 )
+	{
+		print "ERROR: cannot read sitelist\n" ;
+		return 1 ;
+	}
+	#
+	# Open database
+	my $authfile = $ARGV[1] ;
+	if( (not defined $authfile) or ($authfile eq "") )
+	{
+		print "ERROR: missing parameter for authfile\n" ;
+		return 1 ;
+	}
+	my $dbh = opendatabase($authfile) ;
+	if( not defined $dbh )
+	{
+		#print "ERROR: cannot open database defined in authfile '$authfile'\n" ;
+		# opendatabase() already explains the error
+		return 1 ;
+	}
+	#
+	# Read the data
+	for my $ref_row ( @data )
+	{
+		my $sitename = $ref_row->[0] ;
+		my $ip = $ref_row->[2] ;
+		#my $ps = $ref_row->[5] ;
+		if( (not defined $sitename) or ($sitename eq "") ) { next ; }
+		if( (not defined $ip) or ($ip eq "") ) { next ; }
+		#if( (not defined $ps) or ($ps eq "") ) { next ; }
+		my $time_offset = get_time_offset($sitename,$ip) ;
+		writetable($dbh,$TableNameTimeCheck,$sitename,[$time_offset]) ;
+	}	
+	#
+	# Do timecheck on RMG server
+	my $time_offset = get_time_offset("") ;
+	writetable($dbh,$TableNameTimeCheck,"server",[$time_offset]) ;
+	#
+	# Close database
+	closedatabase($dbh) ;
+	return 0 ;
+}
+
+sub get_time_offset($$)
+{
+	my ( $sitename, $ip ) = @_ ;
+	my $time_offset = "" ;
+	my $command = "" ;
+	if( defined $sitename and $sitename ne "" )		# sitename is "" for localhost
+	{
+		$command = "ssh $sitename " ;
+	}
+	$command .= "ntpq -p" ;
+	if( $Debug ) { print "debug: get_time_offset: command=$command\n" ; }
+	my $result = `$command` ;
+	if( $Debug ) { print "debug: get_time_offset: result=$result\n" ; }
+	my @lines = split '\n|\r',$result ;
+	for my $line ( @lines )
+	{
+		# *nist1.symmetric .ACTS.           1 u  117 1024  177   27.485   10.374  71.796
+		if( $line =~ m/^\*/ )
+		{
+			my @args = split /\s+/,$line ;
+			my $argc = scalar @args ;
+			if( $argc > 9)
+			{
+				$time_offset = $args[8] ;
+				if( $Debug ) {  print "debug: get_time_offset: offset=$time_offset\n" ; }
+			}
+		}
+	}
+	return $time_offset ;
+}
+
+sub readcsv($)
+{
+	my ( $filename ) = @_ ;
+	my $fd ;
+	if( not defined open($fd,"<".$filename) )
+	{
+		print "ERROR: cannot open file '$filename'" ;
+		return undef ;
+	}
+	my @data = () ;
+	my $line ;
+	while( $line = <$fd> )
+	{
+		chomp($line) ;
+		my @argv = split(',',$line) ;
+		push @data, [ @argv ] ;	# create an array of references to an array 
+	}
+	close($fd) ;
+	return @data ;
+}
+
+
+sub opendatabase($)	# connects to the database and returns the database handle
+{
+	my ( $authfile ) = @_ ;
+	my $fd ;
+	if( not defined open($fd,"<".$authfile) )
+	{
+		print "ERROR: cannot open authfile '$authfile'\n" ;
+		return undef ;
+	}
+	my $host = <$fd> ;
+	chomp($host) ;
+	my $user = <$fd> ;
+	chomp($user) ;
+	my $pass = <$fd> ;
+	chomp($pass) ;
+	my $database = <$fd> ;
+	chomp($database) ;
+	if( not defined $user or $user eq "" )
+	{
+		print "ERROR: cannot read user from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $pass or $pass eq "")
+	{
+		print "ERROR: cannot read pass from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $host or $host eq "" )
+	{
+		print "ERROR: cannot read host from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $database or $database eq "" )
+	{
+		print "ERROR: cannot read database from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	close($fd) ;
+	my $port = 3306 ;
+	my $timeout = 10 ;
+	#my $dsn = "dbi:mysql:$database" ;
+	my $dsn = "DBI:Wire10:database=$database;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
+	my $dbh = DBI->connect($dsn,$user,$pass) ;
+	if( not $dbh )
+	{
+		print "ERROR: cannot connect to database host: $DBI::errstr\n" ;
+		return undef ;
+	}
+	return $dbh ;
+}
+
+sub writetable($$$$)
+{
+	my ( $dbh, $tablename, $sitename, $refdata ) = @_ ;
+	# Get the site number from the sitename table
+	my $query = "select id from $TableNameSitelist where name='${sitename}' ;" ;
+	if( $Debug ) { print "debug: writetable: query=$query\n" ; }
+	my $result = dblookup($dbh,$query) ;
+	if( not defined $result or ($result eq "") )
+	{
+		if( $Debug ) { print "debug: writetable: cannot find site code for site '$sitename'\n" ; }
+		return 1 ;
+	}
+	my $site = $result ;
+	if( $Debug ) { print "debug: writetable: site code for site '$sitename' is $site\n" ; }
+	$query = "insert into $tablename values(DEFAULT" ;	# first column is ID, automatically allocated
+	$query .= ",'${site}'" ;				# next is the site ID value, from the above query
+	$query .= strftime ",'%Y-%m-%d %H:%M:%S','%z'", localtime();	# next the datetime and timezone
+	for my $value ( @$refdata )
+	{
+		if( not defined $value or $value eq "" )
+		{
+			$query .= ",NULL" ;
+		}
+		else
+		{
+			$query .= ",'${value}'" ;
+		}
+	}
+	$query .= ") ;" ;
+	if( $Debug ) { print "debug: updatetable: query=$query\n" ; }
+	if( dbexecute($dbh,$query) )
+	{
+		print "ERROR: cannot add entry to table '$tablename'\n" ;
+		return 1 ;
+	}
+	return 0 ;
+}
+
+sub dblookup($$)
+{
+	#
+	# Executes the given query to return one value, or undef
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	my $matches = $sth->rows() ;
+	if( not $matches )
+	{
+		return undef ;
+	}
+	my $ref_row = $sth->fetchrow_arrayref ;
+	if( not defined($ref_row) )
+	{
+		return undef ;
+	}
+	return $ref_row->[0] ;
+}
+
+sub dbexecute($$)		# executes a given query, returns 0 for OK, 1 for error
+{
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	return 0 ;
+}
+
+sub closedatabase($)
+{
+	my ( $dbh ) = @_ ;
+	if( not $dbh->disconnect() )
+	{
+		print "ERROR: cannot close database: $DBI::errstr\n" ;
+	}
+}
+
+exit main() ;
+
+#END
