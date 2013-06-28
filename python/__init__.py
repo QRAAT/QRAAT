@@ -23,7 +23,7 @@ This is the python RMG module.
 '''
 
 # import any pure python here
-import detection
-import estimation
+#import detection
+#import estimation
 
 
