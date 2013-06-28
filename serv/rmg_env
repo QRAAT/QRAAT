@@ -52,9 +52,6 @@ export RMG_SERVER_DET_DIR="$RMG_SERVER_DIR/det_files"
 # The location on the server for processed det files
 export RMG_SERVER_DET_ARCHIVE="$RMG_SERVER_DIR/archive/det_files"
 
-# The location on the server for processed det files
-export RMG_SERVER_DET_ARCHIVE="$RMG_SERVER_DIR/archive/det_files"
-
 # The location on the server for estimator output files.
 export RMG_SERVER_EST_DIR="$RMG_SERVER_DIR/est_files"
 

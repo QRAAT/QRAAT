@@ -19,7 +19,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from gnuradio import gr, blks2, uhd, gru
-from rmg import detect
+from rmg_swig import detect
 import rmg_param
 
 import sys, time

@@ -1,0 +1,19 @@
+#! /bin/bash
+
+source rmg_env
+
+SITES=$(ls -1 $RMG_SERVER_DET_DIR)
+
+for SITE in $SITES
+  do
+    site_dir=$RMG_SERVER_DET_DIR/$SITE/
+    leaf_dirs=$(find $site_dir -type d -links 2)
+    for leaf_dir in $leaf_dirs
+      do
+        subdirectory=${leaf_dir#$site_dir}
+        est_processing $leaf_dir $RMG_SERVER_EST_DIR/$SITE/$subdirectory
+        mkdir -p $RMG_SERVER_DET_ARCHIVE/$SITE/$subdirectory
+        mv $leaf_dir $RMG_SERVER_DET_ARCHIVE/$SITE/$subdirectory
+    done
+    find $site_dir -depth -empty -delete
+done

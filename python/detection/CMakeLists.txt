@@ -31,11 +31,25 @@ endif()
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
-    DESTINATION ${GR_PYTHON_DIR}/rmg
+    rmg_graphs.py
+    rmg_run.py
+    rmg_param.py
+    rmg_setup.py
+    rmg_editors.py
+    rmg_pic_interface.py
+    rmg_validators.py
+    DESTINATION ${GR_PYTHON_DIR}/rmg/detection
 )
+
+########################################################################
+# Handle the unit tests
+########################################################################
+include(GrTest)
+
+set(GR_TEST_TARGET_DEPS gnuradio-rmg)
+set(GR_TEST_PYTHON_DIRS ${CMAKE_BINARY_DIR}/swig)
+GR_ADD_TEST(qa_rmg ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_rmg.py)
 
 ########################################################################
 # Add subdirectories
 ########################################################################
-add_subdirectory(estimation)
-add_subdirectory(detection)
