@@ -5,11 +5,15 @@
 #
 # Copyright (C) 2013 Marcel Losekoot
 #
-# This script is responsible for updating the system side status information after setting those pesky environment variables using rmg_env.
+# This script is responsible for updating the system side status information after setting the environment variables using rmg_env.
 # Call this script from cron:
 #	*/10 * * * * rmg_status
 #
-# It runs the scripts rmg_readstatus and rmg_plotstatus to read telemetry data from remote sites and generate the web plots.
+# It runs the following scripts:
+#	rmg_readstatus, reads telemetry data from each of the sites
+#	rmg_timecheck, reads clock offset from each of the sites 
+#	rmg_detcount, counts the number of det files present at the site and at the server, for each site
+#	rmg_plotstatus, generates the web plots.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,6 +29,25 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 source rmg_env
-rmg_readstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile &>/var/log/rmg/rmg_readstatus.log
-rmg_timecheck $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile &>/var/log/rmg/rmg_timecheck.log
-rmg_plotstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile &>/var/log/rmg/rmg_plotstatus.log
+echo `date`
+echo
+echo rmg_schedule
+rmg_schedule $RMG_SERVER_SITELIST
+echo
+echo rmg_readstatus
+rmg_readstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
+echo
+echo rmg_timecheck
+rmg_timecheck $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
+echo
+echo rmg_detcount
+rmg_detcount $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
+echo
+echo rmg_estcount
+rmg_estcount $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
+echo
+echo rmg_plotstatus
+rmg_plotstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
+echo `date`
+echo
+#END

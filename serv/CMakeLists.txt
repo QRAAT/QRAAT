@@ -12,6 +12,7 @@ INSTALL(PROGRAMS
   rmg_plotstatus
   rmg_status
   rmg_timecheck
+  rmg_schedule
   DESTINATION bin)
 
 

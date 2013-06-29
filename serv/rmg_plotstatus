@@ -91,7 +91,8 @@ my @Products =
 		file=> "status",
 		title=> "status",
 		yrange=> [0,6],
-		lines=> [ {column=>8,color=>'black'} ]
+		lines=> [ {column=>8,color=>'black'} ],
+		gpextra=> "set ytics (\"unknown\" 0, \"off\" 1, \"other\" 2, \"down\" 3, \"up\" 4, \"active\" 5 )",
 	}, 
 	# Time Offset: the number of milliseconds that the site clock differs from its time reference host
 	{
@@ -100,6 +101,22 @@ my @Products =
 		title=> "time offset (ms)",
 		yrange=> [-100,100],
 		lines=> [ {column=>3,color=>'blue'} ]
+	}, 
+	# Server det file count: the number of det files at the server
+	{
+		table=> "detcount",
+		file=> "server_det_count",
+		title=> "server det count",
+		yrange=> [0,1000],
+		lines=> [ {column=>3,color=>'red'} ]
+	}, 
+	# Site det file count: the number of det files at the site
+	{
+		table=> "detcount",
+		file=> "site_det_count",
+		title=> "site det count",
+		yrange=> [0,1000],
+		lines=> [ {column=>4,color=>'red'} ]
 	}, 
 ) ;
 
@@ -261,9 +278,13 @@ sub writegp($$)
 	my ( $site, $refhash ) = @_ ;			# a reference to a hash containing all other parameters
 	my $filename = "${site}_$refhash->{file}" ;
 	my $refyrange = $refhash->{yrange} ;	# a reference to an array of 2 vales for y axis range
+	my $ymin = $refyrange->[0] ;
+	my $ymax = $refyrange->[1] ;
 	my $reflines = $refhash->{lines} ;	# a reference to an array of line definition hashes
 	my $tablename = $refhash->{table} ;
 	my $title = "$site $refhash->{title}" ;
+	my $gpextra = $refhash->{gpextra} ;
+	if( not defined $gpextra ) { $gpextra = "" ; }
 	my $csvfilename = "$TmpPath/${site}_${tablename}.csv" ;
 	my $gpfilename = "$TmpPath/$filename.gp" ;
 	my $pngfilename = "$TmpPath/$filename.png" ;
@@ -282,8 +303,9 @@ sub writegp($$)
 	}
 	print $gp "set output \"$pngfilename\"\n" ;
 	print $gp "set title \"$title\"\n" ;
-	print $gp "set yrange [$refyrange->[0]:$refyrange->[1]]\n" ;
+	print $gp "set yrange [$ymin:$ymax]\n" ;
 	print $gp "set xrange [\"$dtstart\":\"$dtstop\"]\n" ;
+	print $gp "$gpextra\n" ;
 	# Assemble the plot command, possibly for multiple lines per plot. Always start with "plot"
 	my $command = "plot \"$csvfilename\"" ;
 	#my @lines = @$reflines ;
@@ -296,7 +318,7 @@ sub writegp($$)
 		my $color = $refline->{color} ;
 		if( not defined $color ) { $color = "" ; }
 		if( $color eq "" ) { $color = "red" ; }
-		print $gp "${command} using 1:$column with points pointtype 7 pointsize 0.5 linecolor rgb \"$color\" title \"$label\"" ;
+		print $gp "${command} using 1:(\$$column>$ymax?$ymax:\$$column<$ymin?$ymin:\$$column) with points pointtype 7 pointsize 0.5 linecolor rgb \"$color\" title \"$label\"" ;
 		$command = ", \"\"" ;	# for multiple lines per plot, omit plot and use ', ""'
 	}
 	print $gp "\n\n" ;

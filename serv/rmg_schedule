@@ -1,0 +1,376 @@
+#!/usr/bin/perl
+#rmg_schedule
+#
+# This script is part of the QRAAT system.
+#
+# Copyright (C) 2013 Marcel Losekoot
+#
+# This script determines whether each site should be on or off and makes it happen.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict ;
+use warnings ;
+use POSIX qw(strftime);
+
+my $Debug = 0 ;			# Set to 1 to generate debug output
+
+sub usage()
+{
+	print "$0: path_to_sitelist [debug]\n" ;
+	print "Turns sites on and off according to the schedule defined in the sitelist file\n" ;
+}
+
+sub main()
+{
+	my $argc = scalar @ARGV ;
+	if( $argc < 1 )
+	{
+		usage() ;
+		return 1 ;
+	}
+	if( ($argc > 1) && ($ARGV[1] eq "debug") )
+	{
+		$Debug = 1 ;
+	}
+	my $sitelist = $ARGV[0] ;
+	if( (not defined $sitelist) or ($sitelist eq "") )
+	{
+		print "ERROR: missing parameter for sitelist\n" ;
+		return 1 ;
+	}
+	print "Reading sitelist from '$sitelist'\n" ;
+	my @data = readcsv($sitelist) ;
+	shift @data ;	# discard header line
+	if( scalar @data < 1 )
+	{
+		print "ERROR: cannot read sitelist\n" ;
+		return 1 ;
+	}
+	#
+	# Loop through each site in the sitelist data array
+	my $linecount = 0 ;
+	for my $ref_row ( @data )
+	{
+		$linecount++ ;
+		my $sitename = $ref_row->[0] ;
+		my $comp_ip = $ref_row->[1] ;
+		my $power_ip = $ref_row->[2] ;
+		my $schedule = $ref_row->[7] ;
+		if( (not defined $sitename) or ($sitename eq "") )
+		{
+			print "No sitename on line $linecount of sitelist\n" ;
+			next ;
+		}
+		if( (not defined $comp_ip) or ($comp_ip eq "") or ($comp_ip eq "0.0.0.0") )
+		{
+			print "No computer ip on line $linecount of sitelist\n" ;
+			next ;
+		}
+		if( $Debug ) { print "debug: site $sitename comp_ip $comp_ip power_ip $power_ip schedule $schedule\n" ; }
+		onoff($sitename,$schedule) ;
+	}	
+	#
+	return 0 ;
+}
+
+sub readcsv($)
+{
+	my ( $filename ) = @_ ;
+	my $fd ;
+	if( not defined open($fd,"<".$filename) )
+	{
+		print "ERROR: cannot open file '$filename'" ;
+		return undef ;
+	}
+	my @data = () ;
+	my $line ;
+	while( $line = <$fd> )
+	{
+		chomp($line) ;
+		my @argv = split(',',$line) ;
+		push @data, [ @argv ] ;	# create an array of references to an array 
+	}
+	close($fd) ;
+	return @data ;
+}
+
+sub get_rmg_status($)
+{
+	my ( $sitename ) = @_ ;
+	my $ping_power = "" ;
+	my $ping_computer = "" ;
+	my $site_status = "" ;
+	if( (defined $sitename) and ($sitename ne "") )
+	{
+		my $command = "rmg status $sitename" ;
+		if( $Debug ) { print "debug: get_rmg_status: command=$command\n" ; }
+		my $result = `$command` ;
+		if( $Debug ) { print "debug: get_rmg_status: result=$result\n" ; }
+		my @lines = split /\r|\n/,$result ;
+		if( $lines[0] =~ m/^error/ )
+		{
+			print "Error: bad response from rmg status command: $result\n" ;
+		}
+		else
+		{
+			my $line = shift @lines ;	# drop the line with "status siteX"
+			$line = shift @lines ;	# grab the line with "Powerswitch Router Ping Test:"
+			my ( $status1 ) = ($line =~ m/.+?:\s*?(\w+)/) ;
+			$line = shift @lines ;	# grab the line with "Computer Ping Test:"
+			my ( $status2 ) = ($line =~ m/.+?:\s*?(\w+)/) ;
+			$line = shift @lines ;	# grab the line with "Site Status:"
+			my ( $status3 ) = ($line =~ m/.*?:\s*([^,]*),/) ;
+			if( defined $status1 )
+			{
+				if( $status1 eq "failure" ) { $ping_power = 0 ; }	# 0 means failure
+				if( $status1 eq "success" ) { $ping_power = 1 ; }	# 1 means success
+				if( $Debug ) { print "debug: get_rmg_status: status1=$status1 ping_power=$ping_power\n" ; }
+			}
+			if( defined $status2 )
+			{
+				if( $status2 eq "failure" ) { $ping_computer = 0 ; }	# 0 means failure
+				if( $status2 eq "success" ) { $ping_computer = 1 ; }	# 1 means success
+				if( $Debug ) { print "debug: get_rmg_status: status2=$status2 ping_computer=$ping_computer\n" ; }
+			}
+			if( defined $status3 )
+			{
+				if( $status3 eq "unknown" ) { $site_status = 0 ; }			# 0 means unknown
+				if( $status3 eq "off" ) { $site_status = 1 ; }				# 1 means off
+				else { $site_status = 2 ; }						# 2 means not off
+				if( $status3 eq "down" ) { $site_status = 3 ; }				# 3 means down (off)
+				if( $status3 eq "Site stopped; is now up" ) { $site_status = 4 ; }	# 4 means on not running
+				if( $status3 eq "Site is now up" ) { $site_status = 4 ; }		# 4 means on not running
+				if( $status3 eq "Site started" ) { $site_status = 5 ; }			# 5 means running RMG
+				if( $status3 eq "Site restarted" ) { $site_status = 5 ; }		# 5 means running RMG ?
+				#
+				if( $Debug ) { print "debug: get_rmg_status: status3=$status3 site_status=$site_status\n" ; }
+			}
+		}
+	}
+	else
+	{
+		print "Error: missing sitename in get_rmg_status\n" ;
+	}
+	return ( $ping_power, $ping_computer, $site_status ) ;
+}
+
+sub onoff($$)
+{
+	my ( $sitename, $schedule ) = @_ ;
+	if( $Debug ) { print "debug: onoff: $sitename $schedule\n" ; }
+	if( (not defined $schedule) || ($schedule eq ""))
+	{
+		print "$sitename has no schedule\n " ;
+		return 1 ;
+	}
+	my $nowsec = time() ;
+	my $nowtime = strftime("%H:%M",localtime($nowsec)) ;
+	my @parts = split /\|/,$schedule ;
+	my $count = scalar @parts ;
+	if( $Debug ) { print "debug: onoff: $sitename schedule has $count part(s)\n" ; }
+	my $action = 0 ;	# assume the site should be off, unless the schedule says otherwise
+	for my $part ( @parts )
+	{
+		my @times = split /-/,$part ;
+		$count = scalar @times ;
+		if( $count != 2 )
+		{
+			print "error: $sitename has badly formatted schedule part: '$part'\n" ;
+			print "Format for schedule is start-stop|start-stop... where start and stop are HH:MM\n" ;
+			next ;
+		}
+		my $starttime = $times[0] ;
+		my $stoptime = $times[1] ;
+		my ( $starthour, $startmin ) = ($starttime =~ m/(\d{1,2}):(\d{2})/) ;
+		my ( $stophour, $stopmin ) = ($stoptime =~ m/(\d{1,2}):(\d{2})/) ;
+		$starthour = substr("0".$starthour,-2,2) ;
+		$startmin = substr("0".$startmin,-2,2) ;
+		$stophour = substr("0".$stophour,-2,2) ;
+		$stopmin = substr("0".$stopmin,-2,2) ;
+		$starttime = "$starthour:$startmin" ;
+		$stoptime = "$stophour:$stopmin" ;
+		if( $starttime eq $stoptime )
+		{
+			print "error: $sitename schedule may not have start time equal to stop time: $part\n" ;
+			print "To disable the on/off schedule, use 00:00-24:00\n" ;
+			next ;
+		}
+		if( $Debug ) { print "debug: onoff: start $starthour:$startmin stop $stophour:$stopmin\n" ; }
+		if( $starttime gt $stoptime ) # On over midnight, split the comparison
+		{
+			if( ($nowtime ge $starttime) || ($nowtime le $stoptime) )
+			{
+				$action = 1 ;	# On
+			}
+		}
+		else
+		{
+			if( ($nowtime ge $starttime) && ($nowtime le $stoptime) )
+			{
+				$action = 1 ;	# On
+			}
+		}
+	}
+	if( $action )
+	{
+		print "$sitename schedule is '$schedule', timenow is $nowtime, site should be on\n" ;
+	}
+	else
+	{
+		print "$sitename schedule is '$schedule', timenow is $nowtime, site should be off\n" ;
+	}
+	my $err = nudge($sitename,$action) ;
+	if( $Debug ) { print "debug: onoff: nudge $sitename $action returned $err\n" ; }
+	if( $err )
+	{
+		print "error: cannot control $sitename\n" ;
+	}
+}
+
+sub nudge($$)	# nudges the site from its current state towards action. returns 0 for OK 1 for error
+{
+	my ( $sitename, $action ) = @_ ;
+	if( $Debug ) { print "debug: nudge: $sitename action=$action\n" ; }
+	my ( $ping_power, $ping_computer, $site_status ) = get_rmg_status($sitename) ;
+	# Quick sanity check to make sure this is going to work
+	if( $Debug ) { print "debug: nudge: ping_power=$ping_power ping_computer=$ping_computer site_status=$site_status\n" ; }
+	if( (not $ping_computer) && (not $ping_power) )
+	{
+		if( $Debug ) { print "debug: nudge: abandon $sitename\n" ; }
+		return 1 ;
+	}
+	#
+	# Here's all the ways you can try to turn ON a site
+	#
+	# computer up, rmg running: do nothing
+	if( $action && $ping_computer && ($site_status == 5) )
+	{
+		if( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
+		return 0 ;
+	}
+	# computer up, rmg stopped: start the rmg
+	if( $action && $ping_computer && ($site_status == 4) )
+	{
+		if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
+		return do_rmg_start($sitename) ;
+	}
+	# computer up, other state: start the rmg
+	if( $action && $ping_computer )
+	{
+		if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
+		return do_rmg_start($sitename) ;
+	}
+	# computer off, power switch present, turn on the computer
+	if( $action && ($site_status == 1) && $ping_power )
+	{
+		if( $Debug ) { print "debug: nudge: rmg on $sitename\n" ; }
+		return do_rmg_on($sitename) ;
+	}
+	# abnormal state, power switch present: turn off the computer
+	if( $action && $ping_power )
+	{
+		if( $Debug ) { print "debug: nudge: rmg off $sitename\n" ; }
+		return do_rmg_off($sitename) ;
+	}
+	#
+	# Here's all the ways you can try to turn OFF a site
+	#
+	# computer off: do nothing
+	if( (not $action) && ($site_status == 1) )
+	{
+		if( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
+		return 0 ;
+	}
+	# computer up, rmg running: stop the rmg
+	if( (not $action) && $ping_computer && ($site_status == 5) )
+	{
+		if( $Debug ) { print "debug: nudge: rmg stop $sitename\n" ; }
+		return do_rmg_stop($sitename) ;
+	}
+	# computer up, rmg stopped, power switch present: shutdown the computer (do not shut down computers without a power switch)
+	if( (not $action) && $ping_computer && ($site_status == 4) && $ping_power )
+	{
+		if( $Debug ) { print "debug: nudge: rmg down $sitename\n" ; }
+		return do_rmg_down($sitename) ;
+	}
+	# computer down and power switch present: turn off the computer
+	if( (not $action) && ($site_status == 3) && $ping_power )
+	{
+		if( $Debug ) { print "debug: nudge: rmg off $sitename\n" ; }
+		return do_rmg_off($sitename) ;
+	}
+	# abnormal state, power switch present: turn off the computer
+	if( (not $action) && $ping_power )
+	{
+		if( $Debug ) { print "debug: nudge: rmg off $sitename\n" ; }
+		return do_rmg_off($sitename) ;
+	}
+	print "error: $sitename unexpected case: action=$action site_status=$site_status ping_computer=$ping_computer ping_power=$ping_power\n" ;
+	return 1 ;
+}
+
+sub do_rmg_start($)
+{
+	my ( $sitename ) = @_ ;
+	return do_rmg($sitename,"start") ;
+}
+
+sub do_rmg_stop($)
+{
+	my ( $sitename ) = @_ ;
+	return do_rmg($sitename,"stop") ;
+}
+
+sub do_rmg_down($)
+{
+	my ( $sitename ) = @_ ;
+	return do_rmg($sitename,"down") ;
+}
+
+sub do_rmg_on($)
+{
+	my ( $sitename ) = @_ ;
+	return do_rmg($sitename,"on") ;
+}
+
+sub do_rmg_off($)
+{
+	my ( $sitename ) = @_ ;
+	return do_rmg($sitename,"off") ;
+}
+
+sub do_rmg($$)
+{
+	my ( $sitename, $mode ) = @_ ;
+	if( not defined $mode ) { return 1 ; }
+	if( $mode eq "" ) { return 1 ; }
+	my $command = "rmg $mode $sitename" ;
+	#my $command = "echo rmg $mode $sitename" ;
+	print "Sending command: $command\n" ;
+	if( $Debug ) { print "debug: do_rmg: command=$command\n" ; }
+	my $result = `$command` ;
+	chomp($result) ;
+	if( $Debug ) { print "debug: do_rmg: result=$result\n" ; }
+	sleep(10) ;
+	my ( $ping_power, $ping_computer, $site_status ) = get_rmg_status($sitename) ;
+	if( $Debug ) { print "debug: do_rmg: ping_power $ping_power ping_computer $ping_computer site_status $site_status\n" ; }
+	return 0 ;
+}
+
+
+exit main() ;
+
+#END
