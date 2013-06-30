@@ -15,6 +15,8 @@ INSTALL(PROGRAMS
   rmg_schedule
   rmg_readest
   rmg_readestfile
+  rmg_detcount
+  rmg_estcount
   DESTINATION bin)
 
 
