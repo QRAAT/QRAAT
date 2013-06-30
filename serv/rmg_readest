@@ -88,11 +88,12 @@ do
 		echo $FILECOUNT files
 		for estfile in `head -100 $TMP_DIR/rmg_readest_filelist`
 		do
-			rmg_readestfile "$estfile" "$site" $AUTHFILE >>$LOG_DIR/rmg_readestfile.log
+			rmg_readestfile "$estfile" "$site" $AUTHFILE
 			#touch --reference=$estfile latest_$site
 			mv $estfile $RMG_SERVER_EST_ARCHIVE/"$estdir"
 		done
 	done
+	find "$site" -depth -empty -delete
 done
 echo processed $TOTALFILES files
 echo Finished `date`
