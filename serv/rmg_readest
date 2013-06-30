@@ -1,0 +1,100 @@
+#!/bin/bash
+#readest
+#
+# This script is part of the QRAAT system.
+#
+# Copyright (C) 2013 Marcel Losekoot
+#
+# This script processes the est files found in /rmg_server/est_files/.
+# It reads them into the qraat database using readest_file and then
+# moves the est file to the est archive /rmg_server/archive/est_files.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# Check command line args
+if [ $# -ne "2" ]
+then
+	echo Usage: $0 path_to_sitelist path_to_authfile
+	echo Processes all est files for all sites in sitelist
+	echo Reads each est csv file into the qraat database
+	echo using the account defined in the authfile.
+	exit 1
+else
+	if [ -n "$1" ]
+	then
+		SITELIST="$1"	# set SITELIST from command line
+	fi
+	if [ -n "$2" ]
+	then
+		AUTHFILE="$2"	# set AUTHFILE from command line
+	fi
+fi
+
+# Check for attempted reentry
+name=`basename $0`
+count=`pgrep -c $name`
+if [ "$count" -gt "1" ]
+then
+	echo $name already running, bye!
+	exit 1
+fi
+
+# Set some more variables
+source rmg_env
+TMP_DIR=/tmp
+LOG_DIR=/var/log/rmg
+if [ ! -e $SITELIST ]
+then
+	echo $SITELIST does not exist
+	exit 1
+fi
+if [ ! -e $AUTHFILE ]
+then
+	echo $AUTHFILE does not exist
+	exit 1
+fi
+echo Reading sitelist from $SITELIST
+SITES=`awk -F "," 'NR > 1 { print $1 }' $SITELIST`
+echo $SITES
+FILECOUNT=0
+TOTALFILES=0
+
+# Start the processing
+echo Starting `date`
+for site in $SITES
+do
+	echo Processing "$site"
+	#find $RMG_SERVER_EST_DIR/$site -type f -iname "*.csv" -newer latest_$site | sort >filelist_$site
+	cd $RMG_SERVER_EST_DIR
+	find "$site" -type d -links 2 | sort -r >$TMP_DIR/rmg_readest_dirlist
+	for estdir in `head -100 $TMP_DIR/rmg_readest_dirlist`
+	do
+		find "$estdir" -type f -iname "*.csv" | sort -r >$TMP_DIR/rmg_readest_filelist
+		mkdir -p $RMG_SERVER_EST_ARCHIVE/"$estdir"
+		FILECOUNT=`cat $TMP_DIR/rmg_readest_filelist | wc -l`
+		let TOTALFILES=$TOTALFILES+$FILECOUNT
+		echo $FILECOUNT files
+		for estfile in `head -100 $TMP_DIR/rmg_readest_filelist`
+		do
+			rmg_readestfile "$estfile" "$site" $AUTHFILE >>$LOG_DIR/rmg_readestfile.log
+			#touch --reference=$estfile latest_$site
+			mv $estfile $RMG_SERVER_EST_ARCHIVE/"$estdir"
+		done
+	done
+done
+echo processed $TOTALFILES files
+echo Finished `date`
+
+#END

@@ -13,6 +13,8 @@ INSTALL(PROGRAMS
   rmg_status
   rmg_timecheck
   rmg_schedule
+  rmg_readest
+  rmg_readestfile
   DESTINATION bin)
 
 
