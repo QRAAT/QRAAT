@@ -191,6 +191,7 @@ sub get_rmg_status($)
 				else { $site_status = 2 ; }						# 2 means not off
 				if( $status3 eq "down" ) { $site_status = 3 ; }				# 3 means down (off)
 				if( $status3 eq "Site stopped; is now up" ) { $site_status = 4 ; }	# 4 means on not running
+				if( $status3 eq "Site set to go down in 300 seconds" ) { $site_status = 4 ; }	# 4 means on not running
 				if( $status3 eq "Site is now up" ) { $site_status = 4 ; }		# 4 means on not running
 				if( $status3 eq "Site started" ) { $site_status = 5 ; }			# 5 means running RMG
 				if( $status3 eq "Site restarted" ) { $site_status = 5 ; }		# 5 means running RMG ?
