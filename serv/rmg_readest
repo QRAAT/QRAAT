@@ -79,7 +79,7 @@ do
 	#find $RMG_SERVER_EST_DIR/$site -type f -iname "*.csv" -newer latest_$site | sort >filelist_$site
 	cd $RMG_SERVER_EST_DIR
 	find "$site" -type d -links 2 | sort -r >$TMP_DIR/rmg_readest_dirlist
-	for estdir in `head -100 $TMP_DIR/rmg_readest_dirlist`
+	for estdir in `head -20 $TMP_DIR/rmg_readest_dirlist`
 	do
 		find "$estdir" -type f -iname "*.csv" | sort -r >$TMP_DIR/rmg_readest_filelist
 		mkdir -p $RMG_SERVER_EST_ARCHIVE/"$estdir"
