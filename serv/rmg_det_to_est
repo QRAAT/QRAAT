@@ -40,7 +40,7 @@ SITES=$(ls -1 $RMG_SERVER_DET_DIR)
 for SITE in $SITES
   do
     site_dir=$RMG_SERVER_DET_DIR/$SITE/
-    leaf_dirs=$(find $site_dir -type d -links 2)
+    leaf_dirs=$(find $site_dir -type d -links 2 | sort -r | head -20)
     for leaf_dir in $leaf_dirs
       do
         subdirectory=${leaf_dir#$site_dir}
@@ -50,3 +50,5 @@ for SITE in $SITES
     done
     find $site_dir -depth -empty -delete
 done
+echo Finished `date`
+#END
