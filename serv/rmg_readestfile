@@ -29,7 +29,7 @@ sub opendatabase($) ;
 
 sub usage()
 {
-	print "Usage: $0 filename sitename authfile\n" ;
+	print "Usage: $0 filename sitename authfile [debug]\n" ;
 	print "\tfilename is the csv file with the est data\n" ;
 	print "\tsitename is the name of the site that produced the est (det) file\n" ;
 	print "\tauthfile is the name of the file containing the mysql account credentials\n" ;
@@ -38,10 +38,17 @@ sub usage()
 sub main()
 {
 	my $argc = scalar @ARGV ;
-	if( $argc != 3 )
+	if( $argc < 3 )
 	{
 		usage() ;
 		return 1 ;
+	}
+	if( $argc == 4 )
+	{
+		if( $ARGV[3] eq "debug" )
+		{
+			$Debug = 1 ;
+		}
 	}
 	my $err = process(\@ARGV) ;
 	return $err ;

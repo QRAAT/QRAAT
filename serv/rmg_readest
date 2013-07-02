@@ -23,6 +23,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+
 # Check command line args
 if [ $# -ne "2" ]
 then
@@ -65,22 +66,29 @@ then
 	echo $AUTHFILE does not exist
 	exit 1
 fi
-echo Reading sitelist from $SITELIST
 SITES=`awk -F "," 'NR > 1 { print $1 }' $SITELIST`
-echo $SITES
 FILECOUNT=0
 TOTALFILES=0
 
 # Start the processing
+echo "============================"
 echo Starting `date`
+echo Reading sitelist from $SITELIST
+echo Sitelist $SITES
+cd $RMG_SERVER_EST_DIR
 for site in $SITES
 do
 	echo Processing "$site"
 	#find $RMG_SERVER_EST_DIR/$site -type f -iname "*.csv" -newer latest_$site | sort >filelist_$site
-	cd $RMG_SERVER_EST_DIR
+	rm -f $TMP_DIR/rmg_readest_dirlist
 	find "$site" -type d -links 2 | sort -r >$TMP_DIR/rmg_readest_dirlist
+	let DIRCOUNT=0
+	let DIRTOTAL=`cat $TMP_DIR/rmg_readest_dirlist | wc -l`
 	for estdir in `head -20 $TMP_DIR/rmg_readest_dirlist`
 	do
+		let DIRCOUNT=$DIRCOUNT+1
+		echo Processing $estdir \($DIRCOUNT\/$DIRTOTAL\)
+		rm -f $TMP_DIR/rmg_readest_filelist
 		find "$estdir" -type f -iname "*.csv" | sort -r >$TMP_DIR/rmg_readest_filelist
 		mkdir -p $RMG_SERVER_EST_ARCHIVE/"$estdir"
 		FILECOUNT=`cat $TMP_DIR/rmg_readest_filelist | wc -l`
