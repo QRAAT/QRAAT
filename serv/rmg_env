@@ -77,5 +77,8 @@ export RMG_TUNE_TIME=10
 # Log directory for remotes
 export RMG_SITE_LOG_DIR="$RMG_SITE_METADATA_DIR/log"
 
+# Log directory for server
+export RMG_SERVER_LOG_DIR="/var/log/rmg"
+
 #END
 
