@@ -76,32 +76,40 @@ echo Starting `date`
 echo Reading sitelist from $SITELIST
 echo Sitelist $SITES
 cd $RMG_SERVER_EST_DIR
-for site in $SITES
+# Loop over the entire site/dir/file set to process
+# all files in one directory in each site, N times and then quit
+for loopcount in {1..10}
 do
-	echo Processing "$site"
-	#find $RMG_SERVER_EST_DIR/$site -type f -iname "*.csv" -newer latest_$site | sort >filelist_$site
-	rm -f $TMP_DIR/rmg_readest_dirlist
-	find "$site" -type d -links 2 | sort -r >$TMP_DIR/rmg_readest_dirlist
-	let DIRCOUNT=0
-	let DIRTOTAL=`cat $TMP_DIR/rmg_readest_dirlist | wc -l`
-	for estdir in `head -20 $TMP_DIR/rmg_readest_dirlist`
+	# Loop over all sites
+	for site in $SITES
 	do
-		let DIRCOUNT=$DIRCOUNT+1
-		echo Processing $estdir \($DIRCOUNT\/$DIRTOTAL\)
-		rm -f $TMP_DIR/rmg_readest_filelist
-		find "$estdir" -type f -iname "*.csv" | sort -r >$TMP_DIR/rmg_readest_filelist
-		mkdir -p $RMG_SERVER_EST_ARCHIVE/"$estdir"
-		FILECOUNT=`cat $TMP_DIR/rmg_readest_filelist | wc -l`
-		let TOTALFILES=$TOTALFILES+$FILECOUNT
-		echo $FILECOUNT files
-		for estfile in `head -100 $TMP_DIR/rmg_readest_filelist`
+		echo Processing "$site"
+		#find $RMG_SERVER_EST_DIR/$site -type f -iname "*.csv" -newer latest_$site | sort >filelist_$site
+		rm -f $TMP_DIR/rmg_readest_dirlist
+		find "$site" -type d -links 2 | sort -r >$TMP_DIR/rmg_readest_dirlist
+		let DIRCOUNT=0
+		let DIRTOTAL=`cat $TMP_DIR/rmg_readest_dirlist | wc -l`
+		# Loop over each directory within this site that needs processing, do just 1 at a time
+		for estdir in `head -1 $TMP_DIR/rmg_readest_dirlist`
 		do
-			rmg_readestfile "$estfile" "$site" $AUTHFILE
-			#touch --reference=$estfile latest_$site
-			mv $estfile $RMG_SERVER_EST_ARCHIVE/"$estdir"
+			let DIRCOUNT=$DIRCOUNT+1
+			echo Processing $estdir \($DIRCOUNT\/$DIRTOTAL\)
+			rm -f $TMP_DIR/rmg_readest_filelist
+			find "$estdir" -type f -iname "*.csv" | sort -r >$TMP_DIR/rmg_readest_filelist
+			mkdir -p $RMG_SERVER_EST_ARCHIVE/"$estdir"
+			FILECOUNT=`cat $TMP_DIR/rmg_readest_filelist | wc -l`
+			let TOTALFILES=$TOTALFILES+$FILECOUNT
+			echo $FILECOUNT files
+			# Loop over each file within this directory, up to a maximum of 100
+			for estfile in `head -100 $TMP_DIR/rmg_readest_filelist`
+			do
+				rmg_readestfile "$estfile" "$site" $AUTHFILE
+				#touch --reference=$estfile latest_$site
+				mv $estfile $RMG_SERVER_EST_ARCHIVE/"$estdir"
+			done
 		done
+		find "$site" -depth -empty -delete
 	done
-	find "$site" -depth -empty -delete
 done
 echo processed $TOTALFILES files
 echo Finished `date`

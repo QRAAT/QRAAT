@@ -6,6 +6,7 @@
 # Usage: $0 filename sitename authfile
 #
 # Created 2013 06 10 ML. Based on readstats.pl for buoy data
+# Updated 2013 07 04 ML. Modified writetable() to no longer check for existing records with the same data. Just add each record and suck it up.
 #
 use strict ;
 use warnings ;
@@ -299,6 +300,7 @@ sub writetable($$$$)
 	if( $Debug ) { print "debug: writetable: site code for site '$sitename' is $site\n" ; }
 	my $countdone = 0 ;
 	my $countread = 0 ;
+	my $starttime = time() ;
 	for my $refentry ( @data )
 	{
 		$countread++ ;
@@ -309,15 +311,20 @@ sub writetable($$$$)
 			if( $Debug ) { print "debug: writetable: undefined timestamp, skipping this row\n" ; }
 			next ;
 		}
+		#
 		# Check if the database already has an entry for these exact same data
-		$query = "select id from $tablename where site='${site}' and timestamp='${timestamp}' ;" ;
-		if( $Debug ) { print "debug: writetable: query=$query\n" ; }
-		$result = dblookup($dbh,$query) ;
-		if( defined $result and ($result ne "") )
-		{
-			if( $Debug ) { print "debug: writetable: timestamp exists at ID=$result, skipping this row\n" ; }
-			next ;
-		}
+		#
+		#$query = "select id from $tablename where site='${site}' and timestamp='${timestamp}' ;" ;
+		#if( $Debug ) { print "debug: writetable: query=$query\n" ; }
+		#$result = dblookup($dbh,$query) ;
+		#if( defined $result and ($result ne "") )
+		#{
+		#	if( $Debug ) { print "debug: writetable: timestamp exists at ID=$result, skipping this row\n" ; }
+		#	next ;
+		#}
+		#
+		# Add new entry
+		#
 		$query = "insert into $tablename values(DEFAULT," ;	# first column is ID, automatically allocated
 		$query .= "'${site}'" ;
 		my @entry = @$refentry ;
@@ -334,7 +341,11 @@ sub writetable($$$$)
 		}
 		$countdone++ ;
 	}
-	print "Added $countdone entries to table '$tablename'\n" ;
+	my $finishtime = time() ;
+	my $elapsed = $finishtime - $starttime ;
+	my $rate = 0 ;
+	if( $elapsed > 0 ) { $rate = $countdone/$elapsed ; }
+	print "Added $countdone entries to table '$tablename' in $elapsed seconds\n" ;
 	return 0 ;
 }
 
