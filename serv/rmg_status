@@ -46,6 +46,9 @@ echo
 echo rmg_estcount
 rmg_estcount $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
 echo
+echo rmg_dbstats
+rmg_dbstats $RMG_SERVER_METADATA_DIR/authfile_readest
+echo
 echo rmg_plotstatus
 rmg_plotstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
 echo `date`

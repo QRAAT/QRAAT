@@ -1,0 +1,424 @@
+#!/usr/bin/perl
+#rmg_dbstats
+#
+# This script is part of the QRAAT system.
+#
+# Copyright (C) 2013 Marcel Losekoot
+#
+# Reads stats from database tables and writes a database table containing stats
+#
+# Usage: $0 authfile
+#
+# Created 2013 07 08 ML Based on rmg_readestfile
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+use strict ;
+use warnings ;
+use DBI ;
+#use DBD::mysql ;
+use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
+use POSIX qw(strftime) ;
+
+my $Debug = 0 ;					# Set to 1 for debug output, 0 to silence
+my $TableNameStats = "procount" ;		# The name of the db table
+my $TableNameSitelist = "sitelist" ;		# The name of the db table
+my $ProgramStartTime = undef ;
+my $Interval = 10*60 ;				# The interval for counting processing stats, in seconds
+
+sub usage() ;
+sub main() ;
+sub process($) ;
+sub initdatabase($$$) ;
+sub createtables($$) ;
+sub dbexecute($$) ;
+sub dblookup($$) ;
+sub updatedatabase($) ;
+sub opendatabase($) ;
+
+sub usage()
+{
+	print "Usage: $0 authfile [debug]\n" ;
+	print "Calculates processing stats and writes them to the database\n" ;
+	print "\tauthfile is the name of the file containing the mysql account credentials\n" ;
+}
+
+sub main()
+{
+	$ProgramStartTime = time() ;
+	my $argc = scalar @ARGV ;
+	if( $argc < 1 )
+	{
+		usage() ;
+		return 1 ;
+	}
+	if( $argc == 2 )
+	{
+		if( $ARGV[1] eq "debug" )
+		{
+			$Debug = 1 ;
+		}
+	}
+	my $err = process(\@ARGV) ;
+	return $err ;
+}
+
+sub process($)
+{
+	my ( $refargs ) = @_ ;
+	my @args = @$refargs ;
+	my $authfile = $args[0] ;
+	if( $Debug )
+	{
+		print "authfile=$authfile\n" ;
+	}
+	if( not -e $authfile )
+	{
+		print "Cannot find authfile '$authfile'\n" ;
+		return 1;
+	}
+	updatedatabase($authfile) ;
+	return 0 ;
+}
+
+sub readstatsfile($)	# Reads a CSV file of stats data and creates a hash of it, returns a reference to the hash, or undef
+{
+	my ( $filename ) = @_ ;
+	if( $Debug ) { print "debug: readstatsfile: start\n" ; }
+	if( not defined($filename) ) { return undef } ;
+	my $fd ;
+	if( not defined open($fd,"<".$filename) )
+	{
+		print "Error: cannot open data file '$filename'\n" ;
+		return undef ;
+	}
+	my @data = () ;
+	my $line ;
+	my $linecount = 0 ;
+	while( $line = <$fd> )
+	{
+		$linecount++ ;
+		chomp($line) ;
+		my @args = split /,\s*/,$line ;
+		my $argc = scalar @args ;
+		if( $argc < 2 )	# 2013-05-31 20:57:04, 1370033824.115382, 164022933, 164020000, 1.824834e-01, ...
+		{
+			if( $Debug ) { print "debug: readstatsfile: too few args: $argc on line $linecount: $line\n" ; }
+			next ;
+		}
+		my $datetime = $args[0] ;
+		if( $datetime =~ /Date/ )
+		{
+			if( $Debug ) { print "debug: readstatsfile: header line\n" ; }
+			next ;
+		}
+		if( length($datetime) != 19 )
+		{
+			if( $Debug ) { print "debug: readstatsfile: bad datetime: $datetime on line $linecount: $line\n" ; }
+			next ;
+		}
+		#
+		push @data, [ @args ] ;	# Add an array entry to @data that contains a reference to the args array
+		if( $Debug ) { print "debug: readstatsfile: read $argc values from line $linecount\n" ; }
+	}
+	close($fd) ;
+	if( $Debug ) { print "debug: readstatsfile: finish\n" ; }
+	return \@data ;
+}
+
+sub updatedatabase($)
+{
+	my ( $authfile ) = @_ ;
+	if( $Debug ) { print "debug: updatedatabase: start\n" ; }
+	my $dbh = opendatabase($authfile) ;
+	if( not defined $dbh ) { return 1 ; }
+	if( $Debug ) { print "debug: updatedatabase: opendatabase OK\n" ; }
+	#
+	my $result = update_procount($dbh) ;
+	closedatabase($dbh) ;
+	if( $result )
+	{
+		return 1 ;
+	}
+	if( $Debug ) { print "debug: updatedatabase: finish\n" ; }
+	return 0 ;
+}
+
+sub update_procount($)
+{
+	my ( $dbh ) = @_ ;
+	if( $Debug ) { print "debug: update_procount: start\n" ; }
+	#
+	# Read a list of site names from the sitelist table
+	my $query = "select id,name from sitelist;" ;
+	my @sitelist = dbgetdata($dbh,$query) ;
+	if( scalar @sitelist < 1 )
+	{
+		print "Error reading sitelist table\n" ;
+		return 1 ;
+	}
+	if( $Debug ) { show_refarray(\@sitelist) ; }
+	for my $ref_site ( @sitelist )
+	{
+		my $siteid = $ref_site->[0] ;
+		my $sitename = $ref_site->[1] ;
+		print "$siteid: $sitename\n" ;
+		my %sitedata = getsitestats($dbh,$siteid) ;
+		if( !%sitedata )
+		{
+			print "Error reading data for $sitename\n" ;
+			next ;
+		}
+		showsitedata(%sitedata) ;
+		my $result = writetablerow($dbh,$TableNameStats,%sitedata) ;
+		if( $result )
+		{
+			print "Error writing data for $sitename\n" ;
+			next ;
+		}
+	}
+	if( $Debug ) { print "debug: update_procount: finish\n" ; }
+	return 0 ;
+}
+
+sub show_refarray($)
+{
+	my ( $refarray ) = @_ ;
+	for my $refrow ( @$refarray )
+	{
+		for my $cell ( @$refrow )
+		{
+			if( not defined $cell ) { $cell = "" ; }
+			print "$cell " ;
+		}
+		print "\n" ;
+	}
+}
+
+sub getsitestats($$)
+{
+	my ( $dbh, $siteid ) = @_ ;
+	my %data = () ;
+	my $dtstart = strftime("%Y-%m-%d %H:%M:%S",gmtime($ProgramStartTime-$Interval)) ;
+	my $dtstop = strftime("%Y-%m-%d %H:%M:%S",gmtime($ProgramStartTime)) ;
+	my $query = "select count(id) from est where site = $siteid and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	my $estserver = dblookup($dbh,$query) ;
+	if( not defined $estserver ) { $estserver = "" ; }
+	if( $Debug ) { print "debug: getsitestats: estserver=$estserver\n" ; }
+	$data{datetime} = $dtstop ;
+	$data{timezone} = "UTC" ;
+	$data{siteid} = $siteid ;
+	$data{estserver} = $estserver ;
+	return %data ;
+}
+
+sub showsitedata($)
+{
+	my ( %sitedata ) = @_ ;
+	my @keys = keys %sitedata ;
+	for my $key ( @keys )
+	{
+		my $value = $sitedata{$key} ;
+		if( not defined $value )
+		{
+			$value = "" ;
+		}
+		print "$key=$value " ;
+	}
+	print "\n" ;
+}
+
+sub writetablerow($$$$)	# Write one row of data to the named table, uses a hash to name the columns that we have data for
+{
+	my ( $dbh, $tablename, %hash_data ) = @_ ;
+	my @keys = keys %hash_data ;
+	my $count = scalar @keys ;
+	if( $count == 0 )
+	{
+		print "Error: no new data for table '$tablename'\n" ;
+		return 1 ;
+	}
+	if( $Debug ) { print "debug: writetablerow: count=$count\n" ; }
+	my $starttime = time() ;
+	#
+	# Add new entry
+	#
+	my $query = "insert into $tablename ( ID" ;	# first column is ID, automatically allocated
+	for my $key ( @keys )
+	{
+		$query .= ",$key" ;
+	}
+	$query .= " ) values ( DEFAULT" ;
+	for my $key ( @keys )
+	{
+		my $value = $hash_data{$key} ;
+		if( not defined $value or $value eq "" )
+		{
+			$query .= ",NULL" ;
+		}
+		else
+		{
+			$query .= ",'${value}'" ;
+		}
+	}
+	$query .= " ) ;" ;
+	if( $Debug ) { print "debug: writetablerow: query=$query\n" ; }
+	if( dbexecute($dbh,$query) )
+	{
+		print "Error: cannot add row to table '$tablename'\n" ;
+		return 1 ;
+	}
+	return 0 ;
+}
+
+sub opendatabase($)	# connects to the database and returns the database handle
+{
+	my ( $authfile ) = @_ ;
+	my $fd ;
+	if( not defined open($fd,"<".$authfile) )
+	{
+		print "Error: cannot open authfile '$authfile'\n" ;
+		return undef ;
+	}
+	my $host = <$fd> ;
+	chomp($host) ;
+	my $user = <$fd> ;
+	chomp($user) ;
+	my $pass = <$fd> ;
+	chomp($pass) ;
+	my $database = <$fd> ;
+	chomp($database) ;
+	if( not defined $user or $user eq "" )
+	{
+		print "Error: cannot read user from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $pass or $pass eq "")
+	{
+		print "Error: cannot read pass from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $host or $host eq "" )
+	{
+		print "Error: cannot read host from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $database or $database eq "" )
+	{
+		print "Error: cannot read database from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	close($fd) ;
+	my $port = 3306 ;
+	my $timeout = 10 ;
+	#my $dsn = "dbi:mysql:$database" ;
+	my $dsn = "DBI:Wire10:database=$database;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
+	my $dbh = DBI->connect($dsn,$user,$pass) ;
+	if( not $dbh )
+	{
+		print "Error: cannot connect to database host: $DBI::errstr\n" ;
+		return undef ;
+	}
+	return $dbh ;
+}
+
+sub dbexecute($$)		# executes a given query, returns 0 for OK, 1 for error
+{
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "Error: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	if( not $sth->execute() )
+	{
+		print "Error: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	return 0 ;
+}
+
+sub dblookup($$)
+{
+	#
+	# Executes the given query to return one value, or undef
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "Error: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	if( not $sth->execute() )
+	{
+		print "Error: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	my $matches = $sth->rows() ;
+	if( not $matches )
+	{
+		return undef ;
+	}
+	my $ref_row = $sth->fetchrow_arrayref ;
+	if( not defined($ref_row) )
+	{
+		return undef ;
+	}
+	return $ref_row->[0] ;
+}
+
+sub dbgetdata($$)
+{
+	#
+	# Executes the given query to return an array of data
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "Error: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	if( not $sth->execute() )
+	{
+		print "Error: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	my $matches = $sth->rows() ;
+	if( not $matches )
+	{
+		return undef ;
+	}
+	my @data = () ;
+	my $linecount = 0 ;
+	while( my $ref_row = $sth->fetchrow_arrayref )
+	{
+		if( not defined($ref_row) ) { last ; }
+		my @row = @$ref_row ;
+		if( scalar(@row) < 1 ) { last ; }
+		push @data, [ @row ] ;
+		$linecount++ ;
+	}
+	if( $Debug ) { print "debug: dbgetdata: read $linecount rows\n" ; }
+	return @data ;
+}
+
+sub closedatabase($)
+{
+	my ( $dbh ) = @_ ;
+	if( not $dbh->disconnect() )
+	{
+		print "Error: cannot close database: $DBI::errstr\n" ;
+	}
+}
+
+exit main() ;
+#END
