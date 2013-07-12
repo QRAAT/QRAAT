@@ -5,8 +5,11 @@
 #
 # Copyright (C) 2013 Marcel Losekoot
 #
-# This script creates plot images for the site telemetry using the data in the qraat database,
-# using the gnuplot program.
+# This script creates a variety of plot images from data in the qraat database for the web pages:
+#	site telemetry such as temperatures and battery voltage
+#	runtime stats such as the time offset
+#	processing stats such as the number of det and est files
+#	...others
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -117,6 +120,14 @@ my @Products =
 		title=> "site det count",
 		yrange=> [0,1000],
 		lines=> [ {column=>4,color=>'red'} ]
+	}, 
+	# Database est entries per site
+	{
+		table=> "procount",
+		file=> "server_est_count",
+		title=> "est files read in the last 10 minutes",
+		yrange=> [0,100],
+		lines=> [ {column=>3,color=>'red'} ]
 	}, 
 ) ;
 
