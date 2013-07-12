@@ -190,6 +190,12 @@ class est_data():
 
         if not dirname[-1] == '/':
             dirname += '/'
+        try:
+            os.makedirs(dirname)
+        except OSError as exc:
+            if exc.errno == errno.EEXIST and os.path.isdir(dirname):
+                pass
+            else: raise
         for tag_index, tag_name in enumerate(self.tag_names):
             filtered_data = self.data.filter_by_tag_number(tag_index)
             csv_filename = tag_name + '.csv'
