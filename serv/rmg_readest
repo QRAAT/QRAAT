@@ -92,8 +92,12 @@ do
 		# Loop over each directory within this site that needs processing, do just 1 at a time
 		for estdir in `head -1 $TMP_DIR/rmg_readest_dirlist`
 		do
-			let DIRCOUNT=$DIRCOUNT+1
-			echo Processing $estdir \($DIRCOUNT\/$DIRTOTAL\)
+			if [ -e $estdir/.busy ]
+			then
+				echo "Directory $estdir is being written, skipping it."
+				continue
+			fi
+			echo Processing $estdir \($DIRTOTAL total\)
 			rm -f $TMP_DIR/rmg_readest_filelist
 			find "$estdir" -type f -iname "*.csv" | sort -r >$TMP_DIR/rmg_readest_filelist
 			mkdir -p $RMG_SERVER_EST_ARCHIVE/"$estdir"
