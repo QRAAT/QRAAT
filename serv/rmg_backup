@@ -68,7 +68,7 @@ mysql -B -e 'select * from timecheck' >$BACKUP/database/timecheck.txt
 mysql -B -e 'select * from detcount' >$BACKUP/database/detcount.txt
 mysql -B -e 'select * from estcount' >$BACKUP/database/estcount.txt
 mysql -B -e 'select * from procount' >$BACKUP/database/procount.txt
-mysql -B -e 'select datetime,site from est where datetime between date_add(now(),interval -8 hour) and now();' >$BACKUP/database/est_`date +"%Y-%m-%d"`.txt
+mysql -B -e 'select * from est where datetime between date_add(now(),interval -8 hour) and now();' >$BACKUP/database/est_`date +"%Y-%m-%d"`.txt
 ls -l $BACKUP/database
 du -s $BACKUP
 echo Finished `date`
