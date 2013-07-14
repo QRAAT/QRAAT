@@ -42,6 +42,10 @@ export RMG_SERVER_DIR="/rmg_server"
 # are sitelist.csv and transmitter spec files.
 export RMG_SERVER_METADATA_DIR="$RMG_SERVER_DIR"
 
+# Location of archive on the server, used to store processed det and est files
+# This vairable is used to identify the directory that should be backed up
+export RMG_SERVER_ARCHIVE_DIR="$RMG_SERVER_DIR/archive"
+
 # The location of the site configuration file sitelist.csv
 # This file is used by server scripts to configure remote sites.
 export RMG_SERVER_SITELIST="$RMG_SERVER_METADATA_DIR/sitelist.csv"
@@ -50,13 +54,13 @@ export RMG_SERVER_SITELIST="$RMG_SERVER_METADATA_DIR/sitelist.csv"
 export RMG_SERVER_DET_DIR="$RMG_SERVER_DIR/det_files"
 
 # The location on the server for processed det files
-export RMG_SERVER_DET_ARCHIVE="$RMG_SERVER_DIR/archive/det_files"
+export RMG_SERVER_DET_ARCHIVE="$RMG_SERVER_ARCHIVE_DIR/det_files"
 
 # The location on the server for estimator output files.
 export RMG_SERVER_EST_DIR="$RMG_SERVER_DIR/est_files"
 
 # The location on the server for est files that have been uploaded to the database.
-export RMG_SERVER_EST_ARCHIVE="$RMG_SERVER_DIR/archive/est_files"
+export RMG_SERVER_EST_ARCHIVE="$RMG_SERVER_ARCHIVE_DIR/est_files"
 
 # The maximum number of attempts to start the pulse detector before a
 # fatal error state is reached. This value is needed by the site.

@@ -22,28 +22,14 @@
 # m h  dom mon dow   command
 PATH=/bin:/usr/bin:/usr/local/bin
 
-# testing
-#*	*	*	*	*	echo `date` >>/var/log/rmg/cron.log
-
 # Fetch det files from all sites
 */2	*	*	*	*	rmg fetch all >>/var/log/rmg/rmg_fetch.log 2>&1
 
-# Process all det files into est file
-*	*	*	*	*	rmg_det_to_est >>/var/log/rmg/rmg_det_to_est.log 2>&1
+# Process all det files into est files AND read all est files into the qraat database
+*	*	*	*	*	( rmg_det_to_est ; rmg_readest /rmg_server/sitelist.csv /rmg_server/authfile_readest ) >>/var/log/rmg/rmg_detest.log 2>&1
 
-# Read processed est files into the database
-*/2	*	*	*	*	rmg_readest /rmg_server/sitelist.csv /rmg_server/authfile_readest >>/var/log/rmg/rmg_readest.log 2>&1
-
-# Turn on all sites at 1900
-#56	18	*	*	*	rmg on all >>/var/log/rmg/rmg_schedule.log 2>&1
-#58	18	*	*	*	rmg up all >>/var/log/rmg/rmg_schedule.log 2>&1
-#59	18	*	*	*	rmg start all >>/var/log/rmg/rmg_schedule.log 2>&1
-#
-# Turn off all sites at 0730, just in case rmg_schedule didn't work
-#30	07	*	*	*	rmg stop all >>/var/log/rmg/rmg_schedule.log 2>&1
-#32	07	*	*	*	rmg down all >>/var/log/rmg/rmg_schedule.log 2>&1
-#42	07	*	*	*	rmg off all >>/var/log/rmg/rmg_schedule.log 2>&1
-
-# Collect site status information, turn sites on and off according to schedule, make plots for the web page
+# Turn sites on and off automatically, Collect site status information, make plots for the web page
 */5	*	*	*	*	rmg_status >>/var/log/rmg/rmg_status.log 2>&1
 
+# Backup data to external disk
+00	12	*	*	*	rmg_backup >>/var/log/rmg/rmg_backup.log 2>&1

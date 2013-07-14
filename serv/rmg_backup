@@ -1,0 +1,76 @@
+#!/bin/bash
+#rmg_backup
+#
+# This script is part of the QRAAT system.
+#
+# Copyright (C) 2013 Marcel Losekoot
+#
+# This script is responsible for copying qraat data to an external backup disk
+# Call this script from cron:
+#	59 12 * * * rmg_backup
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# Check for attempted reentry
+name=`basename $0`
+count=`pgrep -c $name`
+if [ "$count" -gt "1" ]
+then
+	echo $name already running, bye!
+	exit 1
+fi
+
+echo
+echo Starting `date`
+# Set RMG environment variables
+rmg_env
+
+# Set local variables
+BACKUP=/mnt/external/backup/rmg_server
+
+# Check destination directories
+if [ ! -e $BACKUP ]
+then
+	echo ERROR: backup directory '$BACKUP' not found
+	exit 1
+fi
+if [ ! -e $BACKUP/archive ]
+then
+	echo WARNING: creating backup directory '$BACKUP/archive'
+	mkdir -p $BACKUP/archive
+fi
+if [ ! -e $BACKUP/database ]
+then
+	echo WARNING: creating backup directory '$BACKUP/database'
+	mkdir -p $BACKUP/database
+fi
+
+# Backup $RMG_SERVER_ARCHIVE_DIR to $BACKUP/archive
+rsync -av $RMG_SERVER_ARCHIVE_DIR $BACKUP/archive
+
+# Extract tables from the qraat database to $BACKUP/database
+echo Dumping database tables
+mysql -B -e 'select * from sitelist' >$BACKUP/database/sitelist.txt
+mysql -B -e 'select * from telemetry' >$BACKUP/database/telemetry.txt
+mysql -B -e 'select * from timecheck' >$BACKUP/database/timecheck.txt
+mysql -B -e 'select * from detcount' >$BACKUP/database/detcount.txt
+mysql -B -e 'select * from estcount' >$BACKUP/database/estcount.txt
+mysql -B -e 'select * from procount' >$BACKUP/database/procount.txt
+mysql -B -e 'select datetime,site from est where datetime between date_add(now(),interval -8 hour) and now();' >$BACKUP/database/est_`date +"%Y-%m-%d"`.txt
+ls -l $BACKUP/database
+du -s $BACKUP
+echo Finished `date`
+
+#END
