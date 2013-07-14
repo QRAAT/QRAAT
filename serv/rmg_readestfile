@@ -332,6 +332,7 @@ sub writetable($$$$)
 		{
 			$query .= ",'${value}'" ;
 		}
+		$query .= ",'UTC'" ;	# timezone
 		$query .= ") ;" ;
 		if( $Debug ) { print "debug: updatetable: query=$query\n" ; }
 		if( dbexecute($dbh,$query) )
