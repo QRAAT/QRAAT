@@ -210,8 +210,8 @@ sub writetable($$$$)
 	my $site = $result ;
 	if( $Debug ) { print "debug: writetable: site code for site '$sitename' is $site\n" ; }
 	$query = "insert into $tablename values(DEFAULT" ;	# first column is ID, automatically allocated
-	$query .= ",'${site}'" ;				# next is the site ID value, from the above query
-	$query .= strftime ",'%Y-%m-%d %H:%M:%S','%z'", localtime();	# next the datetime and timezone
+	$query .= ",'${site}'" ;				# next, the site ID value, from the above query
+	$query .= strftime ",'%Y-%m-%d %H:%M:%S','UTC'", gmtime();	# next, the datetime and timezone
 	for my $value ( @$refdata )
 	{
 		if( not defined $value or $value eq "" )

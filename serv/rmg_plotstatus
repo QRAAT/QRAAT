@@ -34,7 +34,7 @@ use Time::Local ;				# timegm()
 use POSIX ;					# strftime()
 
 my $Debug = 0 ;					# Enable verbose output
-my $MovePlots = 0 ;				# Enable the moving of the plots to the WebPath
+my $MovePlots = 1 ;				# Enable the moving of the plots to the WebPath
 
 my $TableNameTelemetry = "telemetry" ;		# Name of the database table that holds telemetry
 my $TableNameSitelist = "sitelist" ;		# Name of the database table that holds site list
@@ -62,7 +62,7 @@ my @Products =
 		title=> "internal temperature (C)",
 		yrange=> [0,60],
 		timezone=> "localtime",
-		lines=> [ {column=>3,color=>'orange'} ]	# the value of key 'lines' is an array of hashes, in this case there's only one
+		lines=> [ {column=>3,color=>'orange'} ],	# the value of key 'lines' is an array of hashes, in this case there's only one
 	}, 
 	# External temperature of pingbrother thermocouple
 	{
@@ -71,7 +71,7 @@ my @Products =
 		title=> "external temperature (C)",
 		yrange=> [0,60],
 		timezone=> "localtime",
-		lines=> [ {column=>4,color=>'magenta'} ]
+		lines=> [ {column=>4,color=>'magenta'} ],
 	}, 
 	# Battery voltage measured at the pingbrother DC input
 	{
@@ -80,7 +80,7 @@ my @Products =
 		title=> "battery voltage (V)",
 		yrange=> [9,15],
 		timezone=> "localtime",
-		lines=> [ {column=>5,color=>'red'} ]
+		lines=> [ {column=>5,color=>'red'} ],
 	}, 
 	# Compound plot of both internal and external temperatures
 	{
@@ -92,8 +92,8 @@ my @Products =
 		lines=>
 		[
 			{ column=>3,label=>'int',color=>'orange' },
-			{ column=>4,label=>'ext',color=>'magenta' }
-		]
+			{ column=>4,label=>'ext',color=>'magenta' },
+		],
 	}, 
 	# Run Level: a status value that reflects both site power and RMG status, ranging from 0 to 5
 	{
@@ -112,34 +112,37 @@ my @Products =
 		title=> "time offset (ms)",
 		yrange=> [-100,100],
 		timezone=> "localtime",
-		lines=> [ {column=>3,color=>'blue'} ]
+		lines=> [ {column=>3,color=>'blue'} ],
 	}, 
 	# Server det file count: the number of det files at the server
 	{
 		table=> "detcount",
 		file=> "server_det_count",
 		title=> "server det count",
-		yrange=> [0,1000],
+		yrange=> [1,1000],
 		timezone=> "localtime",
-		lines=> [ {column=>3,color=>'red'} ]
+		lines=> [ {column=>3,color=>'red'} ],
+		gpextra=> "set logscale y",
 	}, 
 	# Site det file count: the number of det files at the site
 	{
 		table=> "detcount",
 		file=> "site_det_count",
 		title=> "site det count",
-		yrange=> [0,1000],
+		yrange=> [1,1000],
 		timezone=> "localtime",
-		lines=> [ {column=>4,color=>'red'} ]
+		lines=> [ {column=>4,color=>'red'} ],
+		gpextra=> "set logscale y",
 	}, 
 	# Database est entries per site
 	{
 		table=> "procount",
 		file=> "server_est_count",
-		title=> "est files read in the last 10 minutes",
-		yrange=> [0,100],
+		title=> "est files read per 10 minutes",
+		yrange=> [1,1000],
 		timezone=> "localtime",
-		lines=> [ {column=>3,color=>'red'} ]
+		lines=> [ {column=>3,color=>'red'} ],
+		gpextra=> "set logscale y",
 	}, 
 ) ;
 
@@ -199,11 +202,8 @@ sub make($$$)
 	if( $err ) { print "Error writing gp file: $err\n" ; }
 	$err = makeplot($site,$file) ;
 	if( $err ) { print "Error making make: $err\n" ; }
-	if( $MovePlots )
-	{
-		$err = moveplot($site,$file) ;	# move the plot from the TmpPath to the WebPath
-		if( $err ) { print "Error moving plot: $err\n" ; }
-	}
+	$err = moveplot($site,$file) ;	# move the plot from the TmpPath to the WebPath
+	if( $err ) { print "Error moving plot: $err\n" ; }
 }
 
 sub writecsv($$$$)
@@ -447,7 +447,15 @@ sub moveplot($$)
 	}
 	my $command = "/bin/cp --verbose --force --no-dereference --remove-destination $source $WebPath" ;
 	if( $Debug ) { print "debug: moveplot: command=$command\n" ; }
-	my $result = `$command` ;
+	my $result = "" ;
+	if( $MovePlots )
+	{
+		$result = `$command` ;
+	}
+	else
+	{
+		print "WARNING: move plots disabled\n" ;
+	}
 	if( $Debug ) { print "debug: moveplot: result=$result\n" ; }
 	return 0 ;
 }
