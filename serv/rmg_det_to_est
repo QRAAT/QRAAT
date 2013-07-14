@@ -42,7 +42,7 @@ do
 	for SITE in $SITES
 	do
 		site_dir=$RMG_SERVER_DET_DIR/$SITE/
-		leaf_dirs=$(find $site_dir/????/??/??/??/?? -type d | sort -r | head -20)
+		leaf_dirs=$(find $site_dir/????/??/??/??/?? -type d | sort -r | head -21 | tail -20)	# strip newest from newest 20
 		for leaf_dir in $leaf_dirs
 		do
 			subdirectory=${leaf_dir#$site_dir}

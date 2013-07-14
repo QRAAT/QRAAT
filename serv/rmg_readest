@@ -99,7 +99,8 @@ do
 			fi
 			echo Processing $estdir \($DIRTOTAL total\)
 			rm -f $TMP_DIR/rmg_readest_filelist
-			find "$estdir" -type f -iname "*.csv" | sort -r >$TMP_DIR/rmg_readest_filelist
+			ls $estdir
+			find "$estdir" -type f | sort -r >$TMP_DIR/rmg_readest_filelist
 			mkdir -p $RMG_SERVER_EST_ARCHIVE/"$estdir"
 			FILECOUNT=`cat $TMP_DIR/rmg_readest_filelist | wc -l`
 			let TOTALFILES=$TOTALFILES+$FILECOUNT
@@ -107,8 +108,12 @@ do
 			# Loop over each file within this directory, up to a maximum of 100
 			for estfile in `head -100 $TMP_DIR/rmg_readest_filelist`
 			do
-				rmg_readestfile "$estfile" "$site" $AUTHFILE
-				#touch --reference=$estfile latest_$site
+				if [[ $estfile = *csv ]]	# only actually process csv files
+				then
+					echo reading $estfile
+					rmg_readestfile "$estfile" "$site" $AUTHFILE
+				fi
+				echo moving $estfile to $RMG_SERVER_EST_ARCHIVE/"$estdir"
 				mv $estfile $RMG_SERVER_EST_ARCHIVE/"$estdir"
 			done
 		done
