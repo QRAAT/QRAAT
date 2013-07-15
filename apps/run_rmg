@@ -31,13 +31,13 @@ parser.add_option ("-t", "--time", type="int",
                            default=6,
                            help="time in seconds to look at each frequency")
 parser.add_option ("-p", "--port", type="string",
-                           default="/dev/ttyS0",
+                           default="/dev/ttyUSB0",
                            help="serial port for communication to RMG PIC")
 parser.add_option ("-n", "--no_usrp", action="store_true", dest="NO_USRP",
                            default=False,
                            help="use null_source instead of USRP")
 parser.add_option ("-d", "--directory", type="string",
-                           default="/tmp/ramdisk/det",
+                           default="/tmp/ramdisk/det_files",
                            help="directory to save .det files")
 parser.add_option ("-b", "--bands", type="int",
                            default=32,
