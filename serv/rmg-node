@@ -148,7 +148,7 @@ PREV_TIME=$(rmg_csv --column timestamp <$STATUS_LOG | tail -1)
 
 ## Transition functions ##
 function up() {
-  if [ $RX_STATE -ne 1 ] && [ ! $SDR_PID ]
+  if [[ $RX_STATE -ne 1 ]] && [[ ! $SDR_PID ]]
     then
       if [[ $PREV_STATUS == *"down"* ]] || [[ $PREV_STATUS == "do_nothing" ]]
         then
@@ -172,7 +172,7 @@ function up() {
 }
 
 function down() {
-  if [ $RX_STATE -ne 1 ] && [ ! $SDR_PID ] 
+  if [[ $RX_STATE -ne 1 ]] && [[ ! $SDR_PID ]] 
     then 
       STATUS="Site set to go down in $(($DELAY * 60)) seconds"
   else 
@@ -192,7 +192,7 @@ function down() {
 
 function active() {
    
-  if [ $RX_STATE -ne 0 ] && [ $SDR_PID ]
+  if [[ $RX_STATE -ne 0 ]] && [[ $SDR_PID ]]
     then 
       if [[ $PREV_STATUS == "do_nothing" ]]
         then
