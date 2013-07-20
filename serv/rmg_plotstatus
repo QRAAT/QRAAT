@@ -38,7 +38,8 @@ my $MovePlots = 1 ;				# Enable the moving of the plots to the WebPath
 
 my $TableNameTelemetry = "telemetry" ;		# Name of the database table that holds telemetry
 my $TableNameSitelist = "sitelist" ;		# Name of the database table that holds site list
-my $Interval = 2*86400 ;			# The plot interval, 2*1 day
+#my $Interval = 2*86400 ;			# The plot interval, 2*1 day
+my $INTERVAL_DAY = 86400 ;			# The interval value for one day
 my $TmpPath = "/tmp" ;				# The path of a scratch directory
 my $WebPath = "/var/www/images" ;		# The path of the web images directory
 
@@ -52,97 +53,150 @@ sub usage()
 # An array of hashes to hold definitions for each product
 # Each hash has a few scalar elements for common plot features and one array element called lines that defines each line of the plot
 # The lines array holds hashes, each one defines the column, label and color for one plot line
+# A note about column number. Column 3 corresponds to the first useful parameter. ID,Site,Datetime,Timezone,Parameter1,Parameter2
 
 my @Products =
 (
 	# Internal temperature of pingbrother
 	{
 		table=> "telemetry",
+		columns=> "intemp",
 		file=> "intemp",
 		title=> "internal temperature (C)",
 		yrange=> [0,60],
 		timezone=> "localtime",
-		lines=> [ {column=>3,color=>'orange'} ],	# the value of key 'lines' is an array of hashes, in this case there's only one
+		lines=> [ {column=>1,color=>'orange'} ],	# the value of key 'lines' is an array of hashes, in this case there's only one
+		interval=> 2*$INTERVAL_DAY,
 	}, 
 	# External temperature of pingbrother thermocouple
 	{
 		table=> "telemetry",
+		columns=> "extemp",
 		file=> "extemp",
 		title=> "external temperature (C)",
 		yrange=> [0,60],
 		timezone=> "localtime",
-		lines=> [ {column=>4,color=>'magenta'} ],
+		interval=> 2*$INTERVAL_DAY,
 	}, 
 	# Battery voltage measured at the pingbrother DC input
 	{
 		table=> "telemetry",
+		columns=> "voltage",
 		file=> "battery",
 		title=> "battery voltage (V)",
 		yrange=> [9,15],
 		timezone=> "localtime",
-		lines=> [ {column=>5,color=>'red'} ],
+		lines=> [ {column=>1,color=>'red'} ],
+		interval=> 2*$INTERVAL_DAY,
 	}, 
 	# Compound plot of both internal and external temperatures
 	{
 		table=> "telemetry",
+		columns=> "intemp,extemp",
 		file=> "temps",
 		title=> "temperatures (C)",
 		yrange=> [0,60],
 		timezone=> "localtime",
 		lines=>
 		[
-			{ column=>3,label=>'int',color=>'orange' },
-			{ column=>4,label=>'ext',color=>'magenta' },
+			{ column=>1,label=>'int',color=>'orange' },
+			{ column=>2,label=>'ext',color=>'magenta' },
 		],
+		interval=> 2*$INTERVAL_DAY,
 	}, 
 	# Run Level: a status value that reflects both site power and RMG status, ranging from 0 to 5
 	{
 		table=> "telemetry",
+		columns=> "site_status",
+		file=> "temps",
 		file=> "status",
 		title=> "status",
 		yrange=> [0,6],
 		timezone=> "localtime",
-		lines=> [ {column=>8,color=>'black'} ],
+		lines=> [ {column=>1,color=>'black'} ],
 		gpextra=> "set ytics (\"unknown\" 0, \"off\" 1, \"other\" 2, \"down\" 3, \"up\" 4, \"active\" 5 )",
+		interval=> 2*$INTERVAL_DAY,
 	}, 
 	# Time Offset: the number of milliseconds that the site clock differs from its time reference host
 	{
 		table=> "timecheck",
+		columns=> "time_offset",
 		file=> "offset",
 		title=> "time offset (ms)",
 		yrange=> [-100,100],
 		timezone=> "localtime",
-		lines=> [ {column=>3,color=>'blue'} ],
+		lines=> [ {column=>1,color=>'blue'} ],
+		interval=> 2*$INTERVAL_DAY,
 	}, 
 	# Server det file count: the number of det files at the server
 	{
 		table=> "detcount",
+		columns=> "server",
 		file=> "server_det_count",
 		title=> "server det count",
 		yrange=> [1,1000],
 		timezone=> "localtime",
-		lines=> [ {column=>3,color=>'red'} ],
 		gpextra=> "set logscale y",
+		interval=> 2*$INTERVAL_DAY,
 	}, 
 	# Site det file count: the number of det files at the site
 	{
 		table=> "detcount",
+		columns=> "site",
 		file=> "site_det_count",
 		title=> "site det count",
 		yrange=> [1,1000],
 		timezone=> "localtime",
-		lines=> [ {column=>4,color=>'red'} ],
-		gpextra=> "set logscale y",
+		lines=> [ {column=>1,color=>'red'} ],
+		interval=> 2*$INTERVAL_DAY,
 	}, 
 	# Database est entries per site
 	{
 		table=> "procount",
+		columns=> "estserver",
 		file=> "server_est_count",
 		title=> "est files read per 10 minutes",
 		yrange=> [1,1000],
 		timezone=> "localtime",
-		lines=> [ {column=>3,color=>'red'} ],
 		gpextra=> "set logscale y",
+		interval=> 2*$INTERVAL_DAY,
+	}, 
+	# Database fest entries per site
+	{
+		table=> "procount",
+		columns=> "festserver",
+		file=> "server_fest_count",
+		title=> "filtered est entries per 10 minutes",
+		yrange=> [1,1000],
+		timezone=> "localtime",
+		lines=> [ {column=>1,color=>'red'} ],
+		gpextra=> "set logscale y",
+		interval=> 2*$INTERVAL_DAY,
+	}, 
+	# Database fest power vs time
+	{
+		table=> "fest",
+		columns=> "fdsp",
+		file=> "fest_power_time",
+		title=> "filtered est power",
+		yrange=> [0.01,1000],
+		timezone=> "localtime",
+		lines=> [ {column=>1,color=>'red'} ],
+		gpextra=> "set logscale y",
+		interval=> $INTERVAL_DAY,
+	}, 
+	# Database fest freq vs time
+	{
+		table=> "fest",
+		columns=> "frequency",
+		file=> "fest_frequency_time",
+		title=> "filtered est frequency timeline",
+		yrange=> [164000000,164500000],
+		timezone=> "localtime",
+		lines=> [ {column=>1,color=>'black'} ],
+		interval=> $INTERVAL_DAY,
+		size=> [600,1200],
+		gpextra=> "set format y \"%s\"; set ytics 10000",
 	}, 
 ) ;
 
@@ -182,8 +236,10 @@ sub main()
 		for my $product ( @Products )
 		{
 			my $table = $product->{table} ;
+			my $columns = $product->{columns} ;
 			my $timezone = $product->{timezone} ;
-			my $result = writecsv($site,$dbh,$table,$timezone) ;
+			my $interval = $product->{interval} ;
+			my $result = writecsv($site,$dbh,$table,$columns,$timezone,$interval) ;
 			if( $result ) { next ; }
 			make($site,$dbh,$product) ;
 		}
@@ -197,7 +253,7 @@ sub make($$$)
 	my ( $site,$dbh,$refhash ) = @_ ;
 	my $file = $refhash->{file} ;
 	my $title = $refhash->{title} ;
-	print "Creating plot for $site $title\n" ;
+	print "Creating plot for $site: $title\n" ;
 	my $err = writegp($site,$refhash) ;
 	if( $err ) { print "Error writing gp file: $err\n" ; }
 	$err = makeplot($site,$file) ;
@@ -206,9 +262,9 @@ sub make($$$)
 	if( $err ) { print "Error moving plot: $err\n" ; }
 }
 
-sub writecsv($$$$)
+sub writecsv($$$$$)
 {
-	my ( $sitename, $dbh, $tablename, $display_timezone ) = @_ ;
+	my ( $sitename, $dbh, $tablename, $columns, $display_timezone, $interval ) = @_ ;
 	if( not defined $dbh ) { return 1 ; }
 	# Get the site number from the sitename table
 	my $query = "select id from $TableNameSitelist where name='${sitename}' ;" ;
@@ -221,11 +277,16 @@ sub writecsv($$$$)
 	}
 	my $site = $result ;
 	my $timenow = time() ;
-	my $dtstart = strftime "%Y-%m-%d %H:%M:%S", gmtime($timenow-$Interval);
+	my $dtstart = strftime "%Y-%m-%d %H:%M:%S", gmtime($timenow-$interval);
 	my $dtstop = strftime "%Y-%m-%d %H:%M:%S", gmtime($timenow);
 	$query = "select count(id) from $tablename where siteid = $site and datetime between \"$dtstart\" and \"$dtstop\";" ;
 	if( $Debug ) { print "debug: writecsv: query=$query\n" ; }
 	my $count = dblookup($dbh,$query) ;
+	if( not defined $count )
+	{
+		print "ERROR: query returned no results\n" ;
+		return 1 ;
+	}
 	if( $Debug ) { print "debug: writecsv: query result has $count rows\n" ; }
 	if( $count < 2 ) { return 1 ; }
 	my $filename = "$TmpPath/${sitename}_${tablename}.csv" ;
@@ -235,7 +296,7 @@ sub writecsv($$$$)
 		print "ERROR: cannot write to csv file '$filename'\n" ;
 		return 1 ;
 	}
-	$query = "select * from $tablename where siteid = $site and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	$query = "select datetime,timezone,$columns from $tablename where siteid = $site and datetime between \"$dtstart\" and \"$dtstop\";" ;
 	my @data = dbdata($dbh,$query) ;
 	$count = scalar @data ;
 	if( $Debug ) { print "debug: writecsv: query result has $count rows\n" ; }
@@ -245,8 +306,8 @@ sub writecsv($$$$)
 		{
 			if( not defined $refrow ) { last ; }
 			my @row = @$refrow ;
-			shift @row ;	# drop the ID column
-			shift @row ;	# drop the siteid column
+			#shift @row ;	# drop the ID column
+			#shift @row ;	# drop the siteid column
 			my $dt = shift @row ;
 			if( not defined $dt ) { next ; }
 			my $data_timezone = shift @row ;
@@ -347,9 +408,10 @@ my @GnuplotCommands =
 	"set xdata time",
 	"set timefmt \"%Y-%m-%d %H:%M:%S\"",
 	#set format x "%H:%M\n%m/%d"",
-	"set format x \"%l %p\\n%m/%d\"",
+	#"set format x \"%l %p\\n%m/%d\"",
+	"set format x \"%l %p\\n%d\"",
 	"set grid",
-	"set lmargin 9",
+	"set lmargin 11",
 	"set xtics out nomirror",
 	"#"
 ) ;
@@ -358,14 +420,19 @@ sub writegp($$)
 {
 	my ( $site, $refhash ) = @_ ;			# a reference to a hash containing all other parameters
 	my $filename = "${site}_$refhash->{file}" ;
-	my $refyrange = $refhash->{yrange} ;	# a reference to an array of 2 vales for y axis range
+	my $columns = $refhash->{columns} ;	# Not sure we need this one here
+	my $refyrange = $refhash->{yrange} ;	# a reference to an array of 2 vales for y axis range (optional)
 	my $ymin = $refyrange->[0] ;
 	my $ymax = $refyrange->[1] ;
+	my $refsize = $refhash->{size} ;	# a reference to an array of 2 vales for plot x and y size (optional)
+	my $xsize = $refsize->[0] ;
+	my $ysize = $refsize->[1] ;
 	my $timezone = $refhash->{timezone} ;	# a sting with either UTC or localtime
 	my $reflines = $refhash->{lines} ;	# a reference to an array of line definition hashes
 	my $tablename = $refhash->{table} ;
 	my $title = "$site $refhash->{title}" ;
-	my $gpextra = $refhash->{gpextra} ;
+	my $interval = $refhash->{interval} ;
+	my $gpextra = $refhash->{gpextra} ; # (optional)
 	if( not defined $gpextra ) { $gpextra = "" ; }
 	my $csvfilename = "$TmpPath/${site}_${tablename}.csv" ;
 	my $gpfilename = "$TmpPath/$filename.gp" ;
@@ -378,11 +445,11 @@ sub writegp($$)
 	}
 	my $timenow = time() ;
 	# By default, assume localtime for the plot time axis
-	my $dtstart = strftime "%Y-%m-%d %H:%M:%S", localtime($timenow-$Interval);
+	my $dtstart = strftime "%Y-%m-%d %H:%M:%S", localtime($timenow-$interval);
 	my $dtstop = strftime "%Y-%m-%d %H:%M:%S", localtime($timenow);
 	if( $timezone eq "UTC" )
 	{
-		$dtstart = strftime "%Y-%m-%d %H:%M:%S", gmtime($timenow-$Interval);
+		$dtstart = strftime "%Y-%m-%d %H:%M:%S", gmtime($timenow-$interval);
 		$dtstop = strftime "%Y-%m-%d %H:%M:%S", gmtime($timenow);
 	}
 	for my $line ( @GnuplotCommands )
@@ -391,7 +458,14 @@ sub writegp($$)
 	}
 	print $gp "set output \"$pngfilename\"\n" ;
 	print $gp "set title \"$title\"\n" ;
-	print $gp "set yrange [$ymin:$ymax]\n" ;
+	if( defined $ymin and defined $ymax )
+	{
+		print $gp "set yrange [$ymin:$ymax]\n" ;
+	}
+	if( defined $xsize and defined $ysize )
+	{
+		print $gp "set terminal png size $xsize,$ysize truecolor nocrop enhanced\n" ;
+	}
 	print $gp "set xrange [\"$dtstart\":\"$dtstop\"]\n" ;
 	print $gp "$gpextra\n" ;
 	# Assemble the plot command, possibly for multiple lines per plot. Always start with "plot"
@@ -401,6 +475,7 @@ sub writegp($$)
 	{
 		#my %line = %$refline ;
 		my $column = $refline->{column} ;
+		$column += 2 ;	# prefix datetime and timezone
 		my $label = $refline->{label} ;
 		if( not defined $label ) { $label = "" ; }
 		my $color = $refline->{color} ;
