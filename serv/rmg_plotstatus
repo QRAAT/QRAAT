@@ -46,27 +46,28 @@ my $WebPath = "/var/www/images" ;		# The path of the web images directory
 sub usage()
 {
 	print "$0: sitelist authfile [debug]\n" ;
-	print "Reads telemetry data for each site listed in the sitelist file, from the database defined in authfile\n" ;
+	print "Reads telemetry data from the qraat database for each site listed in the sitelist file, using the database identifined in authfile\n" ;
 	print "Writes plot image files\n" ;
 }
 
-# An array of hashes to hold definitions for each product
-# Each hash has a few scalar elements for common plot features and one array element called lines that defines each line of the plot
-# The lines array holds hashes, each one defines the column, label and color for one plot line
-# A note about column number. Column 3 corresponds to the first useful parameter. ID,Site,Datetime,Timezone,Parameter1,Parameter2
+# Products is an array of hashes to hold definitions for each plot product. One day this array will be read from a config file.
+# Each hash contains both simple scalar elements such as plot title and array elements such as yrange (min and max).
+# The hash element called lines defines each line in a multi-line plot and is therefore an array with generally one element.
+# Each line is defined using a hash containing elements that defined the column number where the data is and the plot line color.
+# The line definition's column number refer to the parameters listed in the hash element 'columns', starting at 1.
 
 my @Products =
 (
 	# Internal temperature of pingbrother
 	{
-		table=> "telemetry",
-		columns=> "intemp",
-		file=> "intemp",
-		title=> "internal temperature (C)",
-		yrange=> [0,60],
-		timezone=> "localtime",
-		lines=> [ {column=>1,color=>'orange'} ],	# the value of key 'lines' is an array of hashes, in this case there's only one
-		interval=> 2*$INTERVAL_DAY,
+		table=> "telemetry",				# The name of the table in the qraat database that holds the data to be plotted
+		columns=> "intemp",				# The column names for the above table that need to be extracted
+		file=> "intemp",				# The name used to identify files containing data for this product
+		title=> "internal temperature (C)",		# The title at the top of the plot, automatically prefixed with the site name
+		yrange=> [0,60],				# An optional array element to manually set limits for the y axis
+		timezone=> "localtime",				# The timezone to be used for the x axis, either 'localtime' or 'UTC'
+		lines=> [ {column=>1,color=>'orange'} ],	# An array with one element, a hash that defines plot line source data and color
+		interval=> 2*$INTERVAL_DAY,			# The time interval in seconds for this plot, defines the start relative to now
 	}, 
 	# External temperature of pingbrother thermocouple
 	{
@@ -98,9 +99,9 @@ my @Products =
 		yrange=> [0,60],
 		timezone=> "localtime",
 		lines=>
-		[
-			{ column=>1,label=>'int',color=>'orange' },
-			{ column=>2,label=>'ext',color=>'magenta' },
+		[						# Here is an example of a multi-line plot, the lines array contains multiple entries
+			{ column=>1,label=>'int',color=>'orange' },	# Each entry is still a hash, hence the { }
+			{ column=>2,label=>'ext',color=>'magenta' },	# Each hash may also contain the element 'label', for the plot legend
 		],
 		interval=> 2*$INTERVAL_DAY,
 	}, 
@@ -114,6 +115,7 @@ my @Products =
 		yrange=> [0,6],
 		timezone=> "localtime",
 		lines=> [ {column=>1,color=>'black'} ],
+		# Here the optional hash element 'gpextra' is used to provide an ad hoc gnuplot command, here used to set the y axis tic labels.
 		gpextra=> "set ytics (\"unknown\" 0, \"off\" 1, \"other\" 2, \"down\" 3, \"up\" 4, \"active\" 5 )",
 		interval=> 2*$INTERVAL_DAY,
 	}, 
@@ -195,7 +197,7 @@ my @Products =
 		timezone=> "localtime",
 		lines=> [ {column=>1,color=>'black'} ],
 		interval=> $INTERVAL_DAY,
-		size=> [600,1200],
+		size=> [600,1200],					# Here the optional hash element 'size' is used to override the default
 		gpextra=> "set format y \"%s\"; set ytics 10000",
 	}, 
 ) ;
