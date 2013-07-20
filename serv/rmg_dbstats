@@ -209,14 +209,20 @@ sub getsitestats($$)
 	my %data = () ;
 	my $dtstart = strftime("%Y-%m-%d %H:%M:%S",gmtime($ProgramStartTime-$Interval)) ;
 	my $dtstop = strftime("%Y-%m-%d %H:%M:%S",gmtime($ProgramStartTime)) ;
-	my $query = "select count(id) from est where site = $siteid and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	my $query = "select count(id) from est where siteid = $siteid and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	if( $Debug ) { print "debug: getsitestats: query=$query\n" ; }
 	my $estserver = dblookup($dbh,$query) ;
 	if( not defined $estserver ) { $estserver = "" ; }
-	if( $Debug ) { print "debug: getsitestats: estserver=$estserver\n" ; }
+	$query = "select count(id) from fest where siteid = $siteid and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	if( $Debug ) { print "debug: getsitestats: query=$query\n" ; }
+	my $festserver = dblookup($dbh,$query) ;
+	if( not defined $festserver ) { $festserver = "" ; }
+	if( $Debug ) { print "debug: getsitestats: estserver=$estserver festserver=$festserver\n" ; }
 	$data{datetime} = $dtstop ;
 	$data{timezone} = "UTC" ;
 	$data{siteid} = $siteid ;
 	$data{estserver} = $estserver ;
+	$data{festserver} = $festserver ;
 	return %data ;
 }
 

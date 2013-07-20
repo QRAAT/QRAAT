@@ -296,8 +296,8 @@ sub writetable($$$$)
 		if( $Debug ) { print "debug: writetable: cannot find site code for site '$sitename'\n" ; }
 		return 1 ;
 	}
-	my $site = $result ;
-	if( $Debug ) { print "debug: writetable: site code for site '$sitename' is $site\n" ; }
+	my $siteid = $result ;
+	if( $Debug ) { print "debug: writetable: siteid for site '$sitename' is $siteid\n" ; }
 	my $countdone = 0 ;
 	my $countread = 0 ;
 	my $starttime = time() ;
@@ -314,7 +314,7 @@ sub writetable($$$$)
 		#
 		# Check if the database already has an entry for these exact same data
 		#
-		#$query = "select id from $tablename where site='${site}' and timestamp='${timestamp}' ;" ;
+		#$query = "select id from $tablename where siteid='${siteid}' and timestamp='${timestamp}' ;" ;
 		#if( $Debug ) { print "debug: writetable: query=$query\n" ; }
 		#$result = dblookup($dbh,$query) ;
 		#if( defined $result and ($result ne "") )
@@ -326,7 +326,7 @@ sub writetable($$$$)
 		# Add new entry
 		#
 		$query = "insert into $tablename values(DEFAULT," ;	# first column is ID, automatically allocated
-		$query .= "'${site}'" ;
+		$query .= "'${siteid}'" ;
 		my @entry = @$refentry ;
 		for my $value ( @$refentry )
 		{
