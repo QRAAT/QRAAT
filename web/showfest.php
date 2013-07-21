@@ -36,7 +36,7 @@ table.status td {
 	if( $count > 0 )
 	{
 		print "Showing {$data[0][0]} entries between {$data[0][1]} and {$data[0][2]} UTC<br />\n" ;
-		$data = getdata("select frequency,datetime,name,fdsp,fdsnr,band3,band10 from fest,sitelist where sitelist.id = fest.site and datetime > date_add(now(), interval -1 day) order by frequency,datetime,name") ;
+		$data = getdata("select frequency,datetime,name,fdsp,fdsnr,band3,band10 from fest,sitelist where sitelist.id = fest.siteid and datetime > date_add(now(), interval -1 day) order by frequency,datetime,name") ;
 		showdata(array("Frequency","Datetime (UTC)","Site","Power","SNR","Band3dB","Band10dB"),$data) ;
 	}
 	else
