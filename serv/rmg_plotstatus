@@ -54,7 +54,7 @@ sub usage()
 # Each hash contains both simple scalar elements such as plot title and array elements such as yrange (min and max).
 # The hash element called lines defines each line in a multi-line plot and is therefore an array with generally one element.
 # Each line is defined using a hash containing elements that defined the column number where the data is and the plot line color.
-# The line definition's column number refer to the parameters listed in the hash element 'columns', starting at 1.
+# The line definition's column number refers to the parameters listed in the hash element 'columns', starting at 1.
 
 my @Products =
 (
@@ -149,6 +149,7 @@ my @Products =
 		title=> "site det count",
 		yrange=> [1,1000],
 		timezone=> "localtime",
+		gpextra=> "set logscale y",
 		lines=> [ {column=>1,color=>'red'} ],
 		interval=> 2*$INTERVAL_DAY,
 	}, 
@@ -161,6 +162,7 @@ my @Products =
 		yrange=> [1,1000],
 		timezone=> "localtime",
 		gpextra=> "set logscale y",
+		lines=> [ {column=>1,color=>'red'} ],
 		interval=> 2*$INTERVAL_DAY,
 	}, 
 	# Database fest entries per site
