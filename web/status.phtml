@@ -36,6 +36,15 @@ table.status td {
 <p><a href="power.html">Power</a></p>
 <p><a href="showfest.php">Activity</a></p>
 <?php
+	$df = disk_free_space("/") ;
+	$dt = disk_total_space("/") ;
+	$pc = intval(100*$df/$dt) ;
+	$fc = "#000000" ;
+	if( $pc < 10 )
+	{
+		$fc = "#FF0000" ;
+	}
+	print "<p><font color=\"$fc\">Free disk space on / is $pc%</font></p>\n" ;
 	include("qr_status.php") ;
 	qr_status() ;
 ?>
