@@ -90,7 +90,6 @@
 		global $path_to_sitelist_csv ;
 		global $path_to_status_log ;
 		print "<p>Date is: ".date(DATE_RFC822)."</p>" ;
-		print "<p>System status is: GOOD!</p>" ;
 		$data = read_csv($path_to_sitelist_csv) ;
 		show_data($data,"Site configuration file") ;
 		$data = read_csv($path_to_tx_csv) ;
