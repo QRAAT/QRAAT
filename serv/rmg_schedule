@@ -262,79 +262,106 @@ sub nudge($$)	# nudges the site from its current state towards action. returns 0
 	#
 	# Here's all the ways you can try to turn ON a site
 	#
-	# computer up, rmg running: do nothing
-	if( $action && $ping_computer && ($site_status == 5) )
-	{
-		print "$sitename is active\n" ;
-		if( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
-		return 0 ;
-	}
-	# computer up, rmg stopped: start the rmg
-	if( $action && $ping_computer && ($site_status == 4) )
-	{
-		print "$sitename is up\n" ;
-		if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
-		return do_rmg_start($sitename) ;
-	}
-	# computer up, other state: start the rmg
-	if( $action && $ping_computer )
-	{
-		print "$sitename is up\n" ;
-		if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
-		return do_rmg_start($sitename) ;
-	}
-	# computer off, power switch present, turn on the computer
-	if( $action && ($site_status == 1) && $ping_power )
-	{
-		print "$sitename is off\n" ;
-		if( $Debug ) { print "debug: nudge: rmg on $sitename\n" ; }
-		return do_rmg_on($sitename) ;
-	}
-	# abnormal state, power switch present: turn off the computer
-	if( $action && $ping_power )
-	{
-		print "$sitename is in an abnormal state\n" ;
-		if( $Debug ) { print "debug: nudge: rmg off $sitename\n" ; }
-		return do_rmg_off($sitename) ;
-	}
+	if( $action )#Want to turn site ON
+        {
+		if( $ping_computer )#computer is up and responding
+		{
+			# computer up, rmg running: do nothing
+			if( ($site_status == 5) )
+			{
+				print "$sitename is active\n" ;
+				if( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
+				return 0 ;
+			}
+			# computer up, rmg stopped: start the rmg
+			elsif( ($site_status == 4) )
+			{
+				print "$sitename is up\n" ;
+				if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
+				return do_rmg_start($sitename) ;
+			}
+			# computer up, other state: start the rmg
+			else
+			{
+				print "$sitename is up\n" ;
+				if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
+				return do_rmg_start($sitename) ;
+			}
+                }
+                elsif( $ping_power )#computer down, powerswitch responding
+		{
+			# computer off, power switch present, turn on the computer
+			if( ($site_status == 1) )
+			{
+				print "$sitename is off\n" ;
+				if( $Debug ) { print "debug: nudge: rmg on $sitename\n" ; }
+				if ( do_rmg_on($sitename) )
+				{
+					sleep(30) ;
+					if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
+					return do_rmg_start($sitename) ;
+				}
+				else
+				{
+					return 1 ;
+				}
+			}
+			# abnormal state, power switch present: turn off the computer
+			else
+			{
+				print "$sitename is in an abnormal state\n" ;
+				if( $Debug ) { print "debug: nudge: rmg off $sitename\n" ; }
+				return do_rmg_off($sitename) ;#TODO this won't work
+			}
+		}
+        }#end turn ON
 	#
 	# Here's all the ways you can try to turn OFF a site
 	#
-	# computer off: do nothing
-	if( (not $action) && ($site_status == 1) )
-	{
-		print "$sitename is off\n" ;
-		if( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
-		return 0 ;
-	}
-	# computer up, rmg running: stop the rmg
-	if( (not $action) && $ping_computer && ($site_status == 5) )
-	{
-		print "$sitename is active\n" ;
-		if( $Debug ) { print "debug: nudge: rmg stop $sitename\n" ; }
-		return do_rmg_stop($sitename) ;
-	}
-	# computer up, rmg stopped, power switch present: shutdown the computer (do not shut down computers without a power switch)
-	if( (not $action) && $ping_computer && ($site_status == 4) && $ping_power )
-	{
-		print "$sitename is up\n" ;
-		if( $Debug ) { print "debug: nudge: rmg down $sitename\n" ; }
-		return do_rmg_down($sitename) ;
-	}
-	# computer down and power switch present: turn off the computer
-	if( (not $action) && ($site_status == 3) && $ping_power )
-	{
-		print "$sitename is down\n" ;
-		if( $Debug ) { print "debug: nudge: rmg off $sitename\n" ; }
-		return do_rmg_off($sitename) ;
-	}
-	# abnormal state, power switch present: turn off the computer
-	if( (not $action) && $ping_power )
-	{
-		print "$sitename is in an abnormal state\n" ;
-		if( $Debug ) { print "debug: nudge: rmg off $sitename\n" ; }
-		return do_rmg_off($sitename) ;
-	}
+        else#Want to turn site OFF
+        {
+		# computer off: do nothing
+		if( ($site_status == 1) )
+		{
+			print "$sitename is off\n" ;
+			if( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
+			return 0 ;
+		}
+		elsif( $ping_computer )#computer is up and responding
+		{
+			# computer responding, power switch present: shutdown the computer 
+			if( $ping_power )#powerswitch is responding
+			{
+				print "$sitename is up\n" ;
+				if( $Debug ) { print "debug: nudge: rmg down $sitename\n" ; }
+				return do_rmg_down($sitename) ;
+			}
+			# computer responding but not in up state, power switch not present: put computer in up state
+			elsif ( ($site_status != 4) )
+			{
+				print "$sitename is not up\n" ;
+				if( $Debug ) { print "debug: nudge: rmg stop $sitename\n" ; }
+				return do_rmg_stop($sitename) ;
+			}
+		}
+		elsif( $ping_power )#computer not responding, powerswitch responding
+		{
+			# computer down and power switch present: turn off the computer
+			if( ($site_status == 3))
+			{
+				print "$sitename is down\n" ;
+				if( $Debug ) { print "debug: nudge: rmg off $sitename\n" ; }
+				return do_rmg_off($sitename) ;
+			}
+			# abnormal state, power switch present: turn off the computer
+			else
+			{
+				print "$sitename is in an abnormal state\n" ;
+				if( $Debug ) { print "debug: nudge: rmg off $sitename\n" ; }
+				return do_rmg_off($sitename) ;#TODO this won't work
+			}
+		}
+        }#end turn OFF
 	print "error: $sitename unexpected case: action=$action site_status=$site_status ping_computer=$ping_computer ping_power=$ping_power\n" ;
 	return 1 ;
 }
@@ -380,10 +407,13 @@ sub do_rmg($$)
 	if( $Debug ) { print "debug: do_rmg: command=$command\n" ; }
 	my $result = `$command` ;
 	chomp($result) ;
-	if( $Debug ) { print "debug: do_rmg: result=$result\n" ; }
-	sleep(10) ;
-	my ( $ping_power, $ping_computer, $site_status ) = get_rmg_status($sitename) ;
-	if( $Debug ) { print "debug: do_rmg: ping_power $ping_power ping_computer $ping_computer site_status $site_status\n" ; }
+	if( $Debug )
+	{
+		print "debug: do_rmg: result=$result\n" ;
+		sleep(10) ;
+		my ( $ping_power, $ping_computer, $site_status ) = get_rmg_status($sitename) ;
+		print "debug: do_rmg: ping_power $ping_power ping_computer $ping_computer site_status $site_status\n" ;
+	}
 	return 0 ;
 }
 
