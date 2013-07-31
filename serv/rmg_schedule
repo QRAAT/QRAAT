@@ -335,9 +335,10 @@ sub nudge($$)	# nudges the site from its current state towards action. returns 0
 			if( $ping_power )#powerswitch is responding
 			{
 				print "$sitename is up\n" ;
-				if( $Debug ) { print "debug: nudge: rmg down $sitename\n" ; }
+				if( $Debug ) { print "debug: nudge: rmg die $sitename\n" ; }
 				if ( ! do_rmg_die($sitename) )
 				{
+					sleep(5) ;
 					return do_rmg_off($sitename) ;
 				}
 				else
