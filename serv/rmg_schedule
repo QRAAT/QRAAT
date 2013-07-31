@@ -295,7 +295,7 @@ sub nudge($$)	# nudges the site from its current state towards action. returns 0
 			{
 				print "$sitename is off\n" ;
 				if( $Debug ) { print "debug: nudge: rmg on $sitename\n" ; }
-				if ( do_rmg_on($sitename) )
+				if ( ! do_rmg_on($sitename) )#returns 0 if successful
 				{
 					sleep(30) ;
 					if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
