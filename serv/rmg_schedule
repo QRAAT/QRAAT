@@ -142,26 +142,28 @@ sub get_rmg_status($)
 			if( defined $status1 )
 			{
 				if( $status1 eq "failure" ) { $ping_power = 0 ; }	# 0 means failure
-				if( $status1 eq "success" ) { $ping_power = 1 ; }	# 1 means success
+				elsif( $status1 eq "success" ) { $ping_power = 1 ; }	# 1 means success
+				else { $ping_power = 0 ; }
 				if( $Debug ) { print "debug: get_rmg_status: status1=$status1 ping_power=$ping_power\n" ; }
 			}
 			if( defined $status2 )
 			{
 				if( $status2 eq "failure" ) { $ping_computer = 0 ; }	# 0 means failure
-				if( $status2 eq "success" ) { $ping_computer = 1 ; }	# 1 means success
+				elsif( $status2 eq "success" ) { $ping_computer = 1 ; }	# 1 means success
+				else { $ping_computer = 0 ; }
 				if( $Debug ) { print "debug: get_rmg_status: status2=$status2 ping_computer=$ping_computer\n" ; }
 			}
 			if( defined $status3 )
 			{
 				if( $status3 eq "unknown" ) { $site_status = 0 ; }			# 0 means unknown
-				if( $status3 eq "off" ) { $site_status = 1 ; }				# 1 means off
+				elsif( $status3 eq "off" ) { $site_status = 1 ; }				# 1 means off
+				elsif( $status3 eq "down" ) { $site_status = 3 ; }				# 3 means down (off)
+				elsif( $status3 eq "Site stopped; is now up" ) { $site_status = 4 ; }	# 4 means on not running
+				elsif( $status3 eq "Site set to go down in 300 seconds" ) { $site_status = 4 ; }	# 4 means on not running
+				elsif( $status3 eq "Site is now up" ) { $site_status = 4 ; }		# 4 means on not running
+				elsif( $status3 eq "Site started" ) { $site_status = 5 ; }			# 5 means running RMG
+				elsif( $status3 eq "Site restarted" ) { $site_status = 5 ; }		# 5 means running RMG ?
 				else { $site_status = 2 ; }						# 2 means not off
-				if( $status3 eq "down" ) { $site_status = 3 ; }				# 3 means down (off)
-				if( $status3 eq "Site stopped; is now up" ) { $site_status = 4 ; }	# 4 means on not running
-				if( $status3 eq "Site set to go down in 300 seconds" ) { $site_status = 4 ; }	# 4 means on not running
-				if( $status3 eq "Site is now up" ) { $site_status = 4 ; }		# 4 means on not running
-				if( $status3 eq "Site started" ) { $site_status = 5 ; }			# 5 means running RMG
-				if( $status3 eq "Site restarted" ) { $site_status = 5 ; }		# 5 means running RMG ?
 				#
 				if( $Debug ) { print "debug: get_rmg_status: status3=$status3 site_status=$site_status\n" ; }
 			}
@@ -334,7 +336,14 @@ sub nudge($$)	# nudges the site from its current state towards action. returns 0
 			{
 				print "$sitename is up\n" ;
 				if( $Debug ) { print "debug: nudge: rmg down $sitename\n" ; }
-				return do_rmg_down($sitename) ;
+				if ( ! do_rmg_die($sitename) )
+				{
+					return do_rmg_off($sitename) ;
+				}
+				else
+				{
+					return 1 ;
+				}
 			}
 			# computer responding but not in up state, power switch not present: put computer in up state
 			elsif ( ($site_status != 4) )
@@ -382,6 +391,12 @@ sub do_rmg_down($)
 {
 	my ( $sitename ) = @_ ;
 	return do_rmg($sitename,"down") ;
+}
+
+sub do_rmg_die($)
+{
+	my ( $sitename ) = @_ ;
+	return do_rmg($sitename,"die") ;
 }
 
 sub do_rmg_on($)
