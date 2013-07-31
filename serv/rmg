@@ -151,7 +151,7 @@ case $TASK in
     fi
   ;;
 
-  status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing)
+  status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing|die)
   ;; 
     
   *)
@@ -238,7 +238,7 @@ function do_update() {
 # Update a site's state remotely. Copy a new site.csv file 
 # and run rmg-node check. 
   SITE=$1
-  rmg_csv --row $SITE <$RMG_SERVER_METADATA_DIR/sitelist.csv | \
+  rmg_csv --row $SITE <$SITELIST | \
   ssh $SITE "cat > site.csv; rmg-node check"  
 
 }
@@ -343,6 +343,15 @@ do
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
      fi
     ;;
+
+    die)
+      echo "die $STIE"
+      if [[ "$ping_computer" == "success" ]]
+        then
+          rmg_csv $SITE state down < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
+          do_update $SITE
+          rsync -av $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
+          ssh $SITE "rmg-node -d 0; rmg-node check"
 
     start) # * -> active 
       echo "start $SITE"
