@@ -351,7 +351,7 @@ do
           rmg_csv $SITE state down < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
           do_update $SITE
           rsync -av $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
-          ssh $SITE "rmg-node -d 0; rmg-node check"
+          ssh $SITE "rmg-node down -d 0; sleep 1; rmg-node check"
         else
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
      fi
