@@ -37,12 +37,17 @@ source rmg_env
 
 SITES=$(ls -1 $RMG_SERVER_DET_DIR)
 
-for loop in {1..10}
-do
+#for loop in {1..10}
+#do
 	for SITE in $SITES
 	do
 		site_dir=$RMG_SERVER_DET_DIR/$SITE/
-		leaf_dirs=$(find $site_dir/????/??/??/??/?? -type d | sort -r | head -21 | tail -20)	# strip newest from newest 20
+		#remains from die
+		if [ -e $site_dir/status.txt ]
+		then
+			rm $site_dir/status.txt
+		fi
+		leaf_dirs=$(find $site_dir????/??/??/??/?? -type d | sort -r | head -21 | tail -20)	# strip newest from newest 20
 		for leaf_dir in $leaf_dirs
 		do
 			subdirectory=${leaf_dir#$site_dir}
@@ -55,14 +60,14 @@ do
 			rm -f $est_dir/.busy
 
 			mkdir -p $archive_dir
-			tarname=$archive_dir/$SITE.${subdirectory//"/"/"."}.tar.gz
+			tarname=$archive_dir/$SITE.${subdirectory//"/"/"."}.tar
 			if [ -e $tarname ]
 			then
-				tar -rzf $tarname -C $leaf_dir .
+				tar -rf $tarname -C $leaf_dir .
 			else
-				tar -czf $tarname -C $leaf_dir .
+				tar -cf $tarname -C $leaf_dir .
 			fi
-			rm -r leaf_dir
+			rm -r $leaf_dir
                       
 #			mkdir -p $archive_parent
 #			echo mv $leaf_dir $archive_parent
@@ -72,8 +77,8 @@ do
 #				find $leaf_dir -type f -exec mv -f {} $archive_dir \;
 #			fi
 		done
-		find $site_dir -depth -empty -delete
+		find $site_dir/.. -depth -empty -delete
 	done
-done
+#done
 echo Finished `date`
 #END
