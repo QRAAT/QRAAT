@@ -53,13 +53,24 @@ do
 			touch $est_dir/.busy	# mark it to avoid predation of est files
 			est_processing $leaf_dir $est_dir
 			rm -f $est_dir/.busy
-			mkdir -p $archive_parent
-			echo mv $leaf_dir $archive_parent
-			if ! mv $leaf_dir $archive_parent
+
+			mkdir -p $archive_dir
+			tarname=$archive_dir/$SITE.${subdirectory//"/"/"."}.tar.gz
+			if [ -e $tarname ]
 			then
-				echo directory move failed, moving files
-				find $leaf_dir -type f -exec mv -f {} $archive_dir \;
+				tar -rzf $tarname -C $leaf_dir .
+			else
+				tar -czf $tarname -C $leaf_dir .
 			fi
+			rm -r leaf_dir
+                      
+#			mkdir -p $archive_parent
+#			echo mv $leaf_dir $archive_parent
+#			if ! mv $leaf_dir $archive_parent
+#			then
+#				echo directory move failed, moving files
+#				find $leaf_dir -type f -exec mv -f {} $archive_dir \;
+#			fi
 		done
 		find $site_dir -depth -empty -delete
 	done
