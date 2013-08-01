@@ -383,16 +383,14 @@ do
       echo "fetch $SITE"
       if [[ "$ping_computer" == "success" ]]
         then
-          DIRECTORIES_TO_COPY=$(ssh $SITE "cd $RMG_SITE_DET_DIR \
-            && find -type d" | rmg_fetch) # directories to copy
+          DIRECTORIES_TO_COPY=$(ssh $SITE "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch)
           mkdir -p $RMG_SERVER_DET_DIR/$SITE 
           ct=0
           for DIR in $DIRECTORIES_TO_COPY; do
             echo "copying $DIR"
             mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
               # download to RMG server
-            rsync -av $SITE:$RMG_SITE_DET_DIR/$DIR/* \
-              $RMG_SERVER_DET_DIR/$SITE/$DIR
+            rsync -az $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
             if [ $? -eq 0 ]; then
                 # delete from RMG remote
               ssh $SITE "rm -r $RMG_SITE_DET_DIR/$DIR" 
