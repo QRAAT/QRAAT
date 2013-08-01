@@ -39,9 +39,9 @@ SITES=$(find $RMG_SERVER_DET_DIR -maxdepth 1 -mindepth 1 -type d)
 
 #for loop in {1..10}
 #do
-	for SITE in $SITES
+	for site_dir in $SITES
 	do
-		site_dir=$RMG_SERVER_DET_DIR/$SITE/
+		#site_dir=$SITE/
 		leaf_dirs=$(find $site_dir????/??/??/??/?? -type d | sort -r | head -21)	# want newest 20 that aren't being written by fetch
 		leaf_dirs=$(echo $leaf_dirs | cut -d' ' -f2-) #remove first entry (this is a stupid way to do this)
 		for leaf_dir in $leaf_dirs
