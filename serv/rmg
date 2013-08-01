@@ -385,19 +385,24 @@ do
         then
           DIRECTORIES_TO_COPY=$(ssh $SITE "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch)
           mkdir -p $RMG_SERVER_DET_DIR/$SITE 
-          ct=0
-          for DIR in $DIRECTORIES_TO_COPY; do
-            echo "copying $DIR"
-            mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
-              # download to RMG server
-            rsync -az $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
-            if [ $? -eq 0 ]; then
-                # delete from RMG remote
-              ssh $SITE "rm -r $RMG_SITE_DET_DIR/$DIR" 
-            fi
-            let ct=ct+1
-          done
-          if [ $ct -eq 0 ]; then echo "Nothing to fetch."; fi
+          if [[ $DIRECTORIES_TO_COPY ]]
+          then
+            touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
+            for DIR in $DIRECTORIES_TO_COPY; do
+              echo "copying $DIR"
+              mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
+                # download to RMG server
+              rsync -az $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
+              if [ $? -eq 0 ]; then
+                  # delete from RMG remote
+                ssh $SITE "rm -r $RMG_SITE_DET_DIR/$DIR" 
+              fi
+              let ct=ct+1
+            done
+            rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
+          else
+            echo "Nothing to fetch."
+          fi
         else
           echo "error: Computer ping test wasn't successful" 1>&2
       fi

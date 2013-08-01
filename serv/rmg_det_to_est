@@ -43,12 +43,11 @@ SITES=$(find $RMG_SERVER_DET_DIR -maxdepth 1 -mindepth 1 -type d)
 	do
 		SITE=${site_dir#$RMG_SERVER_DET_DIR/}
 		leaf_dirs=$(find $site_dir/????/??/??/??/?? -type d | sort -r | head -21)	# want newest 20 that aren't being written by fetch
-		first_dir="yes"
 		for leaf_dir in $leaf_dirs
 		do
-			if [[ "$first_dir"=="yes" ]]
+			if [[ -e $site_dir/fetching.site ]]
 			then
-				first_dir="no"
+				echo "Skipping site, currently being fetched"
 			else
 				subdirectory=${leaf_dir#$site_dir/}
 				est_dir=$RMG_SERVER_EST_DIR/$SITE/$subdirectory
