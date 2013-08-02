@@ -51,9 +51,9 @@ sub main()
 		print "ERROR: missing parameter for sitelist\n" ;
 		return 1 ;
 	}
+
 	print "Reading sitelist from '$sitelist'\n" ;
-	my @data = readcsv($sitelist) ;
-	shift @data ;	# discard header line
+	my @data = `rmg_csv -c name < $sitelist`;
 	if( scalar @data < 1 )
 	{
 		print "ERROR: cannot read sitelist\n" ;
@@ -62,14 +62,10 @@ sub main()
 	#
 	# Loop through each site in the sitelist data array
 	my $linecount = 0 ;
-	for my $ref_row ( @data )
+	for my $sitename ( @data )
 	{
 		$linecount++ ;
-		my $sitename = $ref_row->[0] ;
-		my $comp_ip = $ref_row->[1] ;
-		my $power_ip = $ref_row->[2] ;
-		my $automatic = $ref_row->[7] ;
-		my $schedule = $ref_row->[8] ;
+		my ($comp_ip, $power_ip, $automatic, $schedule) = `rmg_csv -r $sitename comp_ip power_ip auto schedule` ;
 		if( (not defined $sitename) or ($sitename eq "") )
 		{
 			print "No sitename on line $linecount of sitelist\n" ;
@@ -90,27 +86,6 @@ sub main()
 	}	
 	#
 	return 0 ;
-}
-
-sub readcsv($)
-{
-	my ( $filename ) = @_ ;
-	my $fd ;
-	if( not defined open($fd,"<".$filename) )
-	{
-		print "ERROR: cannot open file '$filename'" ;
-		return undef ;
-	}
-	my @data = () ;
-	my $line ;
-	while( $line = <$fd> )
-	{
-		chomp($line) ;
-		my @argv = split(',',$line) ;
-		push @data, [ @argv ] ;	# create an array of references to an array 
-	}
-	close($fd) ;
-	return @data ;
 }
 
 sub get_rmg_status($)

@@ -253,12 +253,13 @@ fi
 count=0
 for SITE in $SITES
 do
-  get_status $SITE
+
   read serv_goal <<< $(rmg_csv --row $SITE state <$SITELIST)
   if [ $? -ne 0 ]; then 
-    echo "error: site '$SITE' not recognized." 1>&2
+    echo "error: site '$SITE' not recognized in sitelist." 1>&2
     exit 1
   fi 
+  get_status $SITE
 
   case $TASK in 
     status)
