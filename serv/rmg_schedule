@@ -65,7 +65,7 @@ sub main()
 	for my $sitename ( @data )
 	{
 		$linecount++ ;
-		my ($comp_ip, $power_ip, $automatic, $schedule) = `rmg_csv -r $sitename comp_ip power_ip auto schedule` ;
+		my ($comp_ip, $power_ip, $automatic, $schedule) = `rmg_csv -r $sitename comp_ip power_ip auto schedule < $sitelist` ;
 		if( (not defined $sitename) or ($sitename eq "") )
 		{
 			print "No sitename on line $linecount of sitelist\n" ;
