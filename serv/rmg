@@ -151,7 +151,7 @@ case $TASK in
     fi
   ;;
 
-  status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing|die)
+  status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing|die|down_now)
   ;; 
     
   *)
@@ -248,7 +248,7 @@ function do_update() {
 SITES=$@
 if [[ "$SITES" = "all" ]]
   then
-    SITES=`rmg_csv -c name < $RMG_SERVER_METADATA_DIR/sitelist.csv`
+    SITES=`rmg_csv -c name < $SITELIST`
 fi
 count=0
 for SITE in $SITES
@@ -344,17 +344,37 @@ do
      fi
     ;;
 
-    die)
-      echo "die $STIE"
+    down_now)
+      echo "down_now $SITE"
       if [[ "$ping_computer" == "success" ]]
         then
+          if [[ "$powertype" == "nil" ]]
+            then
+              echo "Powertype is nil; setting site to up instead of down"
+              rmg_csv $SITE state up < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
+              do_update $SITE
+          fi
           rmg_csv $SITE state down < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
           do_update $SITE
-          rsync -av $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
+          mkdir -p $RMG_SERVER_DET_DIR/$SITE 
+          touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
+          rsync -az $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
+          rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
           ssh $SITE "rmg-node down -d 0; sleep 1; rmg-node check"
         else
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
      fi
+    ;;
+
+    die)
+      echo "die $SITE"
+      if [[ "$ping_router" == "success" ]]
+        then
+          rmg_powerswitch $powertype $power_ip $rx_outlet OFF --invert=true
+          rmg_powerswitch $powertype $power_ip $comp_outlet OFF
+        else 
+          echo "error: Router ping test wasn't sucessful" 1>&2
+      fi
     ;;
 
     start) # * -> active 
@@ -384,9 +404,9 @@ do
       if [[ "$ping_computer" == "success" ]]
         then
           DIRECTORIES_TO_COPY=$(ssh $SITE "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch)
-          mkdir -p $RMG_SERVER_DET_DIR/$SITE 
           if [[ $DIRECTORIES_TO_COPY ]]
           then
+            mkdir -p $RMG_SERVER_DET_DIR/$SITE 
             touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
             for DIR in $DIRECTORIES_TO_COPY; do
               echo "copying $DIR"

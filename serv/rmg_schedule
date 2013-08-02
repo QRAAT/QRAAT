@@ -312,8 +312,8 @@ sub nudge($$)	# nudges the site from its current state towards action. returns 0
 			else
 			{
 				print "$sitename is in an abnormal state\n" ;
-				if( $Debug ) { print "debug: nudge: rmg off $sitename\n" ; }
-				return do_rmg_off($sitename) ;#TODO this won't work
+				if( $Debug ) { print "debug: nudge: rmg die $sitename\n" ; }
+				return do_rmg_die($sitename) ;
 			}
 		}
         }#end turn ON
@@ -335,8 +335,8 @@ sub nudge($$)	# nudges the site from its current state towards action. returns 0
 			if( $ping_power )#powerswitch is responding
 			{
 				print "$sitename is up\n" ;
-				if( $Debug ) { print "debug: nudge: rmg die $sitename\n" ; }
-				if ( ! do_rmg_die($sitename) )
+				if( $Debug ) { print "debug: nudge: rmg down_now $sitename\n" ; }
+				if ( ! do_rmg_down_now($sitename) )
 				{
 					sleep(5) ;
 					return do_rmg_off($sitename) ;
@@ -367,8 +367,8 @@ sub nudge($$)	# nudges the site from its current state towards action. returns 0
 			else
 			{
 				print "$sitename is in an abnormal state\n" ;
-				if( $Debug ) { print "debug: nudge: rmg off $sitename\n" ; }
-				return do_rmg_off($sitename) ;#TODO this won't work
+				if( $Debug ) { print "debug: nudge: rmg die $sitename\n" ; }
+				return do_rmg_die($sitename) ;
 			}
 		}
         }#end turn OFF
@@ -398,6 +398,12 @@ sub do_rmg_die($)
 {
 	my ( $sitename ) = @_ ;
 	return do_rmg($sitename,"die") ;
+}
+
+sub do_rmg_down_now($)
+{
+	my ( $sitename ) = @_ ;
+	return do_rmg($sitename,"down_now") ;
 }
 
 sub do_rmg_on($)
