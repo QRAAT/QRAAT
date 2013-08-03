@@ -151,7 +151,7 @@ case $TASK in
     fi
   ;;
 
-  status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing)
+  status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing|die|down_now)
   ;; 
     
   *)
@@ -238,7 +238,7 @@ function do_update() {
 # Update a site's state remotely. Copy a new site.csv file 
 # and run rmg-node check. 
   SITE=$1
-  rmg_csv --row $SITE <$RMG_SERVER_METADATA_DIR/sitelist.csv | \
+  rmg_csv --row $SITE <$SITELIST | \
   ssh $SITE "cat > site.csv; rmg-node check"  
 
 }
@@ -248,17 +248,17 @@ function do_update() {
 SITES=$@
 if [[ "$SITES" = "all" ]]
   then
-    SITES=`rmg_csv -c name < $RMG_SERVER_METADATA_DIR/sitelist.csv`
+    SITES=`rmg_csv -c name < $SITELIST`
 fi
 count=0
 for SITE in $SITES
 do
-  get_status $SITE
   read serv_goal <<< $(rmg_csv --row $SITE state <$SITELIST)
   if [ $? -ne 0 ]; then 
-    echo "error: site '$SITE' not recognized." 1>&2
+    echo "error: site '$SITE' not recognized in sitelist at $SITELIST." 1>&2
     exit 1
   fi 
+  get_status $SITE
 
   case $TASK in 
     status)
@@ -344,6 +344,39 @@ do
      fi
     ;;
 
+    down_now)
+      echo "down_now $SITE"
+      if [[ "$ping_computer" == "success" ]]
+        then
+          if [[ "$powertype" == "nil" ]]
+            then
+              echo "Powertype is nil; setting site to up instead of down"
+              rmg_csv $SITE state up < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
+              do_update $SITE
+          fi
+          rmg_csv $SITE state down < $SITELIST > tmp.csv && mv tmp.csv $SITELIST
+          do_update $SITE
+          mkdir -p $RMG_SERVER_DET_DIR/$SITE 
+          touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
+          rsync -az $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
+          rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
+          ssh $SITE "rmg-node down -d 0; sleep 1; rmg-node check"
+        else
+          echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
+     fi
+    ;;
+
+    die)
+      echo "die $SITE"
+      if [[ "$ping_router" == "success" ]]
+        then
+          rmg_powerswitch $powertype $power_ip $rx_outlet OFF --invert=true
+          rmg_powerswitch $powertype $power_ip $comp_outlet OFF
+        else 
+          echo "error: Router ping test wasn't sucessful" 1>&2
+      fi
+    ;;
+
     start) # * -> active 
       echo "start $SITE"
       if [[ "$ping_computer" == "success" ]]
@@ -370,23 +403,26 @@ do
       echo "fetch $SITE"
       if [[ "$ping_computer" == "success" ]]
         then
-          DIRECTORIES_TO_COPY=$(ssh $SITE "cd $RMG_SITE_DET_DIR \
-            && find -type d" | rmg_fetch) # directories to copy
-          mkdir -p $RMG_SERVER_DET_DIR/$SITE 
-          ct=0
-          for DIR in $DIRECTORIES_TO_COPY; do
-            echo "copying $DIR"
-            mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
-              # download to RMG server
-            rsync -av $SITE:$RMG_SITE_DET_DIR/$DIR/* \
-              $RMG_SERVER_DET_DIR/$SITE/$DIR
-            if [ $? -eq 0 ]; then
-                # delete from RMG remote
-              ssh $SITE "rm -r $RMG_SITE_DET_DIR/$DIR" 
-            fi
-            let ct=ct+1
-          done
-          if [ $ct -eq 0 ]; then echo "Nothing to fetch."; fi
+          DIRECTORIES_TO_COPY=$(ssh $SITE "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch)
+          if [[ $DIRECTORIES_TO_COPY ]]
+          then
+            mkdir -p $RMG_SERVER_DET_DIR/$SITE 
+            touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
+            for DIR in $DIRECTORIES_TO_COPY; do
+              echo "copying $DIR"
+              mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
+                # download to RMG server
+              rsync -az $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
+              if [ $? -eq 0 ]; then
+                  # delete from RMG remote
+                ssh $SITE "rm -r $RMG_SITE_DET_DIR/$DIR" 
+              fi
+              let ct=ct+1
+            done
+            rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
+          else
+            echo "Nothing to fetch."
+          fi
         else
           echo "error: Computer ping test wasn't successful" 1>&2
       fi

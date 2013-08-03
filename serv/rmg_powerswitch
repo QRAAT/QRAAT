@@ -139,7 +139,10 @@ class PBRelayStatus(HTMLParser):
 
 parser = PBRelayStatus()
 parser.feed(sys.stdin.read())
-print parser.relays['$OUTLET']
+try: 
+  print parser.relays['$OUTLET']
+except KeyError: 
+  print 'nil'
 "
 }
 
@@ -215,7 +218,11 @@ case $OP in
       
       pingbrother)
         q=`pb_query`
-        if [ $q -eq 0 ] && [ $ON -eq 0 ]
+        if [ "$q" == "nil" ]
+          then  
+            echo "warning (powerswitch): power switch specified but not found" 1>&2
+            echo -1 #No result
+        elif [ $q -eq 0 ] && [ $ON -eq 0 ]
           then echo 1
         elif [ $q -eq 1 ] && [ $ON -eq 0 ]
           then echo 0
