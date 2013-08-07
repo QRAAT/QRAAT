@@ -664,7 +664,9 @@ function gitfetch {
 	my_echo -n Fetching Gnu Radio via GIT...
 	if [ $JOSHMODE = False ]
 	then
-		git clone --progress http://gnuradio.org/git/gnuradio.git >>$LOGDEV 2>&1
+		#git clone --progress http://gnuradio.org/git/gnuradio.git >>$LOGDEV 2>&1
+                wget http://gnuradio.org/releases/gnuradio/gnuradio-3.6.5.1.tar.gz 
+                tar -zxf gnuradio-3.6.5.1.tar.gz && mv gnuradio-3.6.5.1 gnuradio
 		if [ ! -d gnuradio/gnuradio-core -a ! -d gnuradio/gnuradio-runtime ]
 		then
 			my_echo "Could not find gnuradio/gnuradio-{core,runtime} after GIT checkout"
