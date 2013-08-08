@@ -415,7 +415,7 @@ do
               mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
               # download to RMG server and delete from site if xfer succeeds
               rsync -az --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
-              if [ $? -eq 0 ]; then
+              if [ $? -ne 0 ]; then
                 echo "rsync error copying $DIR from $SITE"
               fi
               ssh $SITE "find $RMG_SITE_DET_DIR -mindepth 1 -depth -empty -delete"
