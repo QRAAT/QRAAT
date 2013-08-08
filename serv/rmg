@@ -404,7 +404,7 @@ do
       if [[ "$ping_computer" == "success" ]]
         then
           DIRECTORIES_TO_COPY=$(ssh $SITE "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch)
-          if [[ $DIRECTORIES_TO_COPY ]]
+          if [[ $DIRECTORIES_TO_COPY -a ! -e $RMG_SERVER_DET_DIR/$SITE/fetching.site ]]
           then
             mkdir -p $RMG_SERVER_DET_DIR/$SITE 
             touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
@@ -412,10 +412,9 @@ do
               echo "copying $DIR"
               mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
                 # download to RMG server
-              rsync -az $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
+              rsync -az --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
               if [ $? -eq 0 ]; then
-                  # delete from RMG remote
-                ssh $SITE "rm -r $RMG_SITE_DET_DIR/$DIR" 
+                echo "rsync error copying $DIR from $SITE"
               fi
               let ct=ct+1
             done
