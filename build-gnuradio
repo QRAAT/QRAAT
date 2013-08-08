@@ -1,17 +1,36 @@
 #!/bin/bash
 #
-# Build script for UHD+GnuRadio on Fedora and Ubuntu. This 
-# not ours, but is provided freely for users of GNU Radio. 
-# Written by Marcus Leech.
+# Build script for UHD+GnuRadio on Fedora and Ubuntu
+#
+#
 #
 # Updates: https://github.com/guruofquality/grextras/wiki
 # Updates: https://github.com/balint256/gr-baz.git
 #
+#
+#
+# Exit function--Id like to be able to upload stats to a website somewhere...
+#
+function doexit
+{
+	echo -n "Send success/fail info to sbrac.org?"
+	read ans
+		case $ans in
+			y|Y|YES|yes|Yes)
+				wget http://www.sbrac.org/bgrstats.php?status="$1"?systype=${SYSTYPE}?sysinfo="`uname -a`" >/dev/null 2>&1
+				echo Thanks
+				;;
+		esac
+	exit
+}
+	
 function help {
 	cat <<!EOF!
 	
 Usage: build-gnuradio [--help|-h] [-v|--verbose] [-jN] [-ja] 
-                      [-l|--logfile logfile ] [-u|--users ulist] funcs
+                      [-l|--logfile logfile ] [-u|--users ulist] [-m] funcs
+
+-m             - Use master branch, rather than 3.6.5.1.  Use compatible extras as well
 
 -v|--verbose   - turn on verbose logging to stdout
 
@@ -61,7 +80,14 @@ UTAG=None
 GTAG=None
 export LC_LANG=C
 EXTRAS=""
-
+MASTER_MODE=0
+PULLED_LIST="gnuradio uhd rtl-sdr gr-osmosdr gr-iqbal hackrf gr-baz"
+which python3 >/dev/null 2>&1
+if [ $? -eq 0 ]
+then
+			CMAKE_FLAG1=-DPythonLibs_FIND_VERSION:STRING="2.7"
+			CMAKE_FLAG2=-DPythonInterp_FIND_VERSION:STRING="2.7"
+fi
 while : 
 do
 	case $1 in
@@ -109,6 +135,11 @@ do
 		-u|--users)
 			USERSLIST=$2
 			shift
+			shift
+			;;
+		
+		-m)
+			MASTER_MODE=1
 			shift
 			;;
 
@@ -196,7 +227,7 @@ echo -n Proceed?
 
 read ans
 case $ans in
-	y|yes|Y|YES|Yes)
+	y|Y|YES|yes|Yes)
 		PROCEED=y
 	;;
 	*)
@@ -212,33 +243,56 @@ then
 	echo "You don't appear to have enough free disk space on $HOME"
 	echo to complete this build/install
 	echo exiting
-	exit
+	doexit DISKSPACE
 fi
 
 total=0
-for file in uhd.20* gnuradio.20*
+for file in $PULLED_LIST
 do
-	if [ -d $file ]
-	then
-		sz=`du -s $file|awk '{print $1}'`
-		total=`expr $total + $sz`
-	fi
+	found=0
+	for instance in ${file}.20*
+	do
+		if [ -d $instance ]
+		then
+			found=1
+			sz=`du -s $instance|awk '{print $1}'`
+			total=`expr $total + $sz`
+		fi
+	done
 done
 total=`expr $total '*' 1024`
 total=`expr $total / 1000000`
-if [ $total -gt 400 ]
+if [ $total -gt 100 ]
 then
-	echo Your old 'uhd.*' and 'gnuradio.*' directories are using roughly $total MB
+	echo Your old 'uhd.*' and 'gnuradio.*' etc directories are using roughly $total MB
 	echo of disk space:
-	ls -ld uhd.20* gnuradio.20*
+	for file in $PULLED_LIST
+	do
+		for instance in ${file}.20*
+		do
+			if [ -d $instance ]
+			then
+				ls -ld $instance
+			fi
+		done
+	done
 	echo " "
 	echo -n Remove them'?'
 	read ans
 	
 	case $ans in
-		yes|YES)
-			echo removing uhd.20* and gnuradio.20*
-			rm -rf uhd.20* gnuradio.20*
+		y|Y|YES|yes|Yes)
+			for file in $PULLED_LIST
+			do
+				for instance in ${file}.20*
+				do
+					if [ -d $instance ]
+					then
+						echo removing ${instance}
+						rm -rf ${instance}
+					fi
+				done
+			done
 			echo Done
 			;;
 	esac
@@ -257,7 +311,13 @@ function my_echo {
 
 function checkcmd {
 	found=0
-	for place in /bin /usr/bin /usr/local/bin
+	which $1 >/dev/null 2>&1
+	x=$?
+	if [ $x -eq 0 ]
+	then
+		found=1
+	fi
+	for place in /bin /usr/bin /usr/local/bin /opt/bin /opt/local/bin
 	do
 		if [ -e $place/$1 ]
 		then
@@ -269,7 +329,7 @@ function checkcmd {
 		my_echo Failed to find just-installed command \'$1\' after pre-requisite installation.
 		my_echo This very likely indicates that the pre-requisite installation failed
 		my_echo to install one or more critical pre-requisites for Gnu Radio/UHD
-		exit
+		doexit PREREQFAIL-CMD-$1
 	fi
 }
 
@@ -292,7 +352,7 @@ function checklib {
 		my_echo This very likely indicates that the pre-requisite installation failed
 		my_echo to install one or more critical pre-requisites for Gnu Radio/UHD
 		my_echo exiting build
-		exit
+		doexit PREREQFAIL-LIB-$1
 	else
 		my_echo Found library $1
 	fi
@@ -306,13 +366,14 @@ function checkpkg {
 		my_echo Perhaps you need to add the Ubuntu universe or multiverse PPA?
 		my_echo see https://help.ubuntu.com/community/Repositories/Ubuntu
 		my_echo exiting build
-		exit
+		doexit PREREQFAIL-PKG-$1
 	fi
 }
 		
 function prereqs {
 	sudocheck
-	my_echo -n Installing prequisites...
+	my_echo Installing prerequisites.
+	my_echo "====>" THIS MAY TAKE QUITE SOME TIME "<====="
 	#
 	# It's a Fedora system
 	#
@@ -320,21 +381,36 @@ function prereqs {
 	then
 		SYSTYPE=Fedora
 		case `cat /etc/fedora-release` in
-		*12*|*13*|*14*|*15*|*16*|*17*)
+		*12*|*13*|*14*|*15*|*16*|*17*|*18*)
 			sudo yum -y erase 'gnuradio*' >>$LOGDEV 2>&1
 			sudo yum -y erase 'libgruel-*' >>$LOGDEV 2>&1
 			sudo yum -y erase 'libgruel*' >>$LOGDEV 2>&1
 			sudo yum -y groupinstall "Engineering and Scientific" "Development Tools" >>$LOGDEV 2>&1
-			sudo yum -y install fftw-devel cppunit-devel wxPython-devel libusb-devel \
-			  guile boost-devel alsa-lib-devel numpy gsl-devel python-devel pygsl \
-			  python-cheetah python-lxml guile-devel PyOpenGL qt-devel qt qt4 qt4-devel \
-			  PyQt4-devel qwt-devel qwtplot3d-qt4-devel libusb libusb-devel \
+			sudo yum -y install fftw-devel cppunit-devel wxPython-devel \
+			  boost-devel alsa-lib-devel numpy gsl-devel python-devel pygsl \
+			  python-cheetah python-lxml PyOpenGL qt-devel qt qt4 qt4-devel \
+			  PyQt4-devel qwt-devel qwtplot3d-qt4-devel libusb-devel libusb \
 			  libusb1 libusb1-devel cmake git wget python-docutils \
-			  PyQwt PyQwt-devel qwt-devel gtk2-engines xmlrpc-c-"*" tkinter orc >>$LOGDEV 2>&1
+			  PyQwt PyQwt-devel qwt-devel gtk2-engines xmlrpc-c-"*" tkinter orc \
+			  orc-devel python-sphinx SDL-devel swig >>$LOGDEV 2>&1
+		;;
+		
+		*19*)
+			sudo yum -y erase 'gnuradio*' >>$LOGDEV 2>&1
+			sudo yum -y erase 'libgruel-*' >>$LOGDEV 2>&1
+			sudo yum -y erase 'libgruel*' >>$LOGDEV 2>&1
+			sudo yum -y groupinstall "Engineering and Scientific" "Development Tools" >>$LOGDEV 2>&1
+			sudo yum -y install fftw-devel cppunit-devel wxPython-devel \
+			  boost-devel alsa-lib-devel numpy gsl-devel python-devel pygsl \
+			  python-cheetah python-lxml PyOpenGL qt-devel qt qt4 qt4-devel \
+			  PyQt4-devel qwt-devel qwtplot3d-qt4-devel \
+			  libusbx-devel cmake git wget python-docutils \
+			  PyQwt PyQwt-devel qwt-devel gtk2-engines xmlrpc-c-"*" tkinter orc \
+			  orc-devel python-sphinx SDL-devel swig >>$LOGDEV 2>&1
 		;;
 		*)
-			my_echo Only Fedora release 12 - 17 are supported by this script
-			exit
+			my_echo Only Fedora release 12 - 18 are supported by this script
+			doexit WRONGRELEASE
 			;;
 		esac
 	
@@ -350,15 +426,15 @@ function prereqs {
 			sudo yum -y erase 'libgruel*' >>$LOGDEV 2>&1
 			sudo yum -y groupinstall "Engineering and Scientific" "Development Tools" >>$LOGDEV 2>&1
 			sudo yum -y install fftw-devel cppunit-devel wxPython-devel libusb-devel \
-			  guile boost-devel alsa-lib-devel numpy gsl-devel python-devel pygsl \
-			  python-cheetah python-lxml guile-devel PyOpenGL qt-devel qt qt4 qt4-devel \
+			  boost-devel alsa-lib-devel numpy gsl-devel python-devel pygsl \
+			  python-cheetah python-lxml PyOpenGL qt-devel qt qt4 qt4-devel \
 			  PyQt4-devel qwt-devel qwtplot3d-qt4-devel libusb libusb-devel \
 			  libusb1 libusb1-devel cmake git wget python-docutils \
 			  PyQwt PyQwt-devel qwt-devel gtk2-engines xmlrpc-c-"*" tkinter orc >>$LOGDEV 2>&1
 		;;
 		*)
 			my_echo Your Redhat system release must be release 6 to proceed
-			exit
+			doexit WRONGRELEASE
 			;;
 		esac
 
@@ -379,7 +455,7 @@ function prereqs {
 			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
 			automake autoconf libtool python-dev libfftw3-dev
 			libcppunit-dev libboost-all-dev libusb-dev libusb-1.0-0-dev fort77
-			libsdl1.2-dev python-wxgtk2.8 git-core guile-1.8-dev
+			libsdl1.2-dev python-wxgtk2.8 git-core
 			libqt4-dev python-numpy ccache python-opengl libgsl0-dev
 			python-cheetah python-lxml doxygen qt4-dev-tools libusb-1.0-0-dev
 			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools python-qwt5-qt4
@@ -389,7 +465,7 @@ function prereqs {
 			
 		*)
 			my_echo Your Mint release must be at least Linux Mint 11 to proceed
-			exit
+			doexit WRONGRELEASE
 			;;
 		esac
 		for pkg in $PKGLIST; do checkpkg $pkg; done
@@ -408,23 +484,39 @@ function prereqs {
 		sudo apt-get -y purge 'libgnuradio*' >>$LOGDEV 2>&1
 		sudo apt-get -y purge 'python-gnuradio*' >>$LOGDEV 2>&1
 		case `grep DISTRIB_RELEASE /etc/lsb-release` in
-		*11.*|*12.10*|*13*)
+		*13.*)
 			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
 			automake autoconf libtool python-dev libfftw3-dev
 			libcppunit-dev libboost-all-dev libusb-dev libusb-1.0-0-dev fort77
-			libsdl1.2-dev python-wxgtk2.8 git-core guile-1.8-dev
+			libsdl1.2-dev python-wxgtk2.8 git-core
+			libqt4-dev python-numpy ccache python-opengl libgsl0-dev
+			python-cheetah python-lxml doxygen qt4-default qt4-dev-tools libusb-1.0-0-dev
+			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools python-qwt5-qt4
+			cmake git-core wget libxi-dev python-docutils gtk2-engines-pixbuf r-base-dev python-tk
+			liborc-0.4-0 liborc-0.4-dev libasound2-dev python-gtk2"
+			CMAKE_FLAG1=-DPythonLibs_FIND_VERSION:STRING="2.7"
+			CMAKE_FLAG2=-DPythonInterp_FIND_VERSION:STRING="2.7"
+			;;
+			
+		*11.*|*12.10*)
+			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
+			automake autoconf libtool python-dev libfftw3-dev
+			libcppunit-dev libboost-all-dev libusb-dev libusb-1.0-0-dev fort77
+			libsdl1.2-dev python-wxgtk2.8 git-core
 			libqt4-dev python-numpy ccache python-opengl libgsl0-dev
 			python-cheetah python-lxml doxygen qt4-dev-tools libusb-1.0-0-dev
 			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools python-qwt5-qt4
 			cmake git-core wget libxi-dev python-docutils gtk2-engines-pixbuf r-base-dev python-tk
 			liborc-0.4-0 liborc-0.4-dev libasound2-dev python-gtk2"
+			CMAKE_FLAG1=-DPythonLibs_FIND_VERSION:STRING="2.7"
+			CMAKE_FLAG2=-DPythonInterp_FIND_VERSION:STRING="2.7"
 			;;
 		
 		*12.04*)
 			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
 			automake autoconf libtool python-dev libfftw3-dev
 			libcppunit-dev libboost1.48-all-dev libusb-dev libusb-1.0-0-dev fort77
-			libsdl1.2-dev python-wxgtk2.8 git-core guile-1.8-dev
+			libsdl1.2-dev python-wxgtk2.8 git-core
 			libqt4-dev python-numpy ccache python-opengl libgsl0-dev
 			python-cheetah python-lxml doxygen qt4-dev-tools libusb-1.0-0-dev
 			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools python-qwt5-qt4
@@ -436,7 +528,7 @@ function prereqs {
 			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
 			automake autoconf libtool python-dev libfftw3-dev
 			libcppunit-dev libboost-all-dev libusb-dev libusb-1.0-0-dev fort77
-			libsdl1.2-dev python-wxgtk2.8 git-core guile-1.8-dev
+			libsdl1.2-dev python-wxgtk2.8 git-core
 			libqt4-dev python-numpy ccache python-opengl libgsl0-dev
 			python-cheetah python-lxml doxygen qt4-dev-tools libusb-1.0-0-dev
 			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools python-qwt5-qt4
@@ -446,7 +538,7 @@ function prereqs {
 		*9.10*)
 			PKGLIST="swig g++ automake autoconf libtool python-dev libfftw3-dev
 			libcppunit-dev libboost1.38-dev libusb-dev libusb-1.0-0-dev fort77
-			libsdl1.2-dev python-wxgtk2.8 git-core guile-1.8-dev
+			libsdl1.2-dev python-wxgtk2.8 git-core
 			libqt4-dev python-numpy ccache python-opengl libgsl0-dev
 			python-cheetah python-lxml doxygen qt4-dev-tools libusb-1.0-0-dev
 			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools
@@ -457,7 +549,7 @@ function prereqs {
 			sudo apt-get purge python-wxgtk2.6
 			PKGLIST="swig g++ automake1.9 autoconf libtool python-dev fftw3-dev 
 			libcppunit-dev libboost1.35-dev libusb-dev libusb-1.0-0-dev 
-			libsdl1.2-dev python-wxgtk2.8 git-core guile-1.8-dev 
+			libsdl1.2-dev python-wxgtk2.8 git-core 
 			libqt4-dev python-numpy ccache python-opengl libgsl0-dev 
 			python-cheetah python-lxml doxygen qt4-dev-tools 
 			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools 
@@ -466,10 +558,11 @@ function prereqs {
 			
 		*)
 			my_echo Your Ubuntu release must be at least 9.04 to proceed
-			exit
+			doexit WRONGRELEASE
 			;;
 		esac
 		for pkg in $PKGLIST; do checkpkg $pkg; done
+		my_echo Done checking packages
 		sudo apt-get -y --ignore-missing install $PKGLIST >>$LOGDEV 2>&1
 	#
 	# It's a Debian system
@@ -488,7 +581,7 @@ function prereqs {
 			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
 			automake autoconf libtool python-dev libfftw3-dev
 			libcppunit-dev libboost-all-dev libusb-dev libusb-1.0-0-dev fort77
-			libsdl1.2-dev python-wxgtk2.8 git-core guile-1.8-dev
+			libsdl1.2-dev python-wxgtk2.8 git-core
 			libqt4-dev python-numpy ccache python-opengl libgsl0-dev
 			python-cheetah python-lxml doxygen qt4-dev-tools libusb-1.0-0-dev
 			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools python-qwt5-qt4
@@ -497,7 +590,7 @@ function prereqs {
 			;;
 		*)
 			my_echo Only Debian release 6 is supported
-			exit
+			doexit WRONGRELEASE
 			;;
 		esac
 		for pkg in $PKGLIST; do checkpkg $pkg; done
@@ -510,7 +603,7 @@ function prereqs {
 			cool=1
 		else
 			my_echo Only OpenSuSE 12.1 is supported by this script
-			exit
+			doexit WRONGRELEASE
 		fi
 		sudo zypper install cmake cppunit-devel doxygen fftw3-devel \
 		git gsl-devel libjack-devel libqt4-devel libqwtplot3d-devel \
@@ -522,13 +615,13 @@ function prereqs {
 		my_echo This script supports only Ubuntu,Mint,Fedora, Debian and OpenSuse systems
 		my_echo Your Fedora system must be at least Fedora 12
 		my_echo Your Ubuntu system must be at least Ubuntu 9.04
+		my_echo Your Mint system must be at least Mint 11
 		my_echo Your Debian system must be release 6
-		exit
+		doexit WRONGSYSTEM
 	fi
 	PATH=$PATH
 	export PATH
 
-	checkcmd guile
 	checkcmd git
 	checkcmd cmake
 	
@@ -542,7 +635,6 @@ function prereqs {
 	
 	checklib libboost 5
 	checklib libcppunit 0
-	checklib libguile 5
 	checklib libfftw 5
 	checklib libgsl 0
 	
@@ -553,39 +645,18 @@ function prereqs {
 function gitfetch {
 	date=`date +%Y%m%d%H%M%S`
 
-	#
-	# Check for existing gnuradio directory
-	#
-	if [ $JOSHMODE = False ]
-	then
-		if [ -d gnuradio ]
-		then
-			mv gnuradio gnuradio.$date
-		fi
-	else
-		if [ -d jblum ]
-		then
-			mv jblum jblum.$date
-		fi
-	fi
-	
-	#
-	# Check for existing UHD directory
-	#
-	if [ -d uhd ]
-	then
-		mv uhd uhd.$date
-	fi
+	my_echo "Fetching various packages (Gnu Radio, UHD, gr-osmosdr, gr-iqbal, etc)"
+	my_echo "  via the Internet"
+	my_echo "=======> THIS MAY TAKE QUITE SOME TIME <========="
 
-	if [ -d rtl-sdr ]
-	then
-		mv rtl-sdr rtl-sdr.$date
-	fi
-	
-	if [ -d gr-osmosdr ]
-	then
-		mv gr-osmosdr gr-osmosdr.$date
-	fi
+	cd $CWD
+	for dir in ${PULLED_LIST}
+	do
+		if [ -d $dir ]
+		then
+			mv $dir ${dir}.$date
+		fi
+	done
 	
 	#
 	# GIT the gnu radio source tree
@@ -593,13 +664,22 @@ function gitfetch {
 	my_echo -n Fetching Gnu Radio via GIT...
 	if [ $JOSHMODE = False ]
 	then
-		git clone --progress http://gnuradio.org/git/gnuradio.git >>$LOGDEV 2>&1
-		if [ ! -d gnuradio/gnuradio-core ]
+		#git clone --progress http://gnuradio.org/git/gnuradio.git >>$LOGDEV 2>&1
+                wget http://gnuradio.org/releases/gnuradio/gnuradio-3.6.5.1.tar.gz 
+                tar -zxf gnuradio-3.6.5.1.tar.gz && mv gnuradio-3.6.5.1 gnuradio
+		if [ ! -d gnuradio/gnuradio-core -a ! -d gnuradio/gnuradio-runtime ]
 		then
-			my_echo Could not find gnuradio/gnuradio-core after GIT checkout
+			my_echo "Could not find gnuradio/gnuradio-{core,runtime} after GIT checkout"
 			my_echo GIT checkout of Gnu Radio failed!
-			exit
+			doexit FETCH-GR-FAIL
 		fi
+		if [ $MASTER_MODE -eq 0 ]
+		then
+			cd gnuradio
+			git checkout v3.6.5.1  >>$LOGDEV 2>&1
+			cd $CWD
+		fi
+		
 		if [ $GTAG != None ]
 		then
 			cd gnuradio
@@ -612,7 +692,7 @@ function gitfetch {
 			else
 				my_echo Could not fetch Gnu Radio tagged $GTAG from GIT
 				rm -f tmp$$
-				exit
+				doexit FETCH-GR-FAIL-$GTAG
 			fi
 			cd ..
 		fi
@@ -627,7 +707,7 @@ function gitfetch {
 		if [ ! -d jblum/gnuradio-core ]
 		then
 			my_echo GIT checkout of Gnu Radio from jblum.git failed!
-			exit
+			doexit FETCH-GR-JOSH-FAIL
 		fi
 	fi
 	my_echo Done
@@ -637,20 +717,13 @@ function gitfetch {
 	#
 	rm -rf uhd
 	my_echo -n Fetching UHD via GIT...
-	git clone --progress git://code.ettus.com/ettus/uhd.git >>$LOGDEV 2>&1
+	git clone --progress  http://github.com/EttusResearch/uhd >>$LOGDEV 2>&1
 
 	if [ ! -d uhd/host ]
 	then
-		my_echo GIT checkout of UHD using GIT protocol failed...trying
-		my_echo    with http instead
-		rm -rf UHD-Mirror
-		git clone --progress http://github.com/EttusResearch/UHD-Mirror.git >>$LOGDEV 2>&1
-		if [ ! -d UHD-Mirror/host ]
-		then
-			my_echo GIT check of UHD using http protocol failed--exiting
-			exit
-		fi
-		mv UHD-Mirror uhd
+		my_echo GIT checkout of UHD FAILED
+		rm -f tmp$$
+		doexit FETCH-UHD-FAIL
 	fi
 	if [ $UTAG != None ]
 	then
@@ -673,10 +746,24 @@ function gitfetch {
 	#
 	rm -rf rtl-sdr
 	rm -rf gr-osmosdr
-	rm -rf gr-baz
-	my_echo Fetching rtl-sdr "(rtl-sdr, and gr-osmosdr)" via GIT
+	rm  -rf gr-baz
+	rm -rf hackrf
+	my_echo Fetching rtl-sdr "(rtl-sdr, gr-osmosdr, gr-iqbal and hackrf)" via GIT
 	git clone --progress git://git.osmocom.org/rtl-sdr >>$LOGDEV 2>&1
 	git clone --progress git://git.osmocom.org/gr-osmosdr >>$LOGDEV 2>&1
+	git clone --progress git://git.osmocom.org/gr-iqbal.git
+	if [ -d gr-iqbal ]
+	then
+		cd gr-iqbal
+		if [ $MASTER_MODE -eq 0 ]
+		then
+			git checkout gr3.6
+		fi
+		git submodule init  >>$LOGDEV 2>&1
+		git submodule update >>$LOGDEV 2>&1
+		cd ..
+	fi
+	git clone --progress http://github.com/mossmann/hackrf.git >>$LOGDEV 2>&1
 	my_echo Done
 }
 
@@ -690,7 +777,7 @@ function uhd_build {
 		my_echo you do not appear to have the \'uhd\' directory
 		my_echo you should probably use $0 gitfetch to fetch the appropriate
 		my_echo files using GIT
-		exit
+		doexit BUILD-UHD-NOT-THERE
 	fi
 	if [ $UTAG != None ]
 	then
@@ -698,7 +785,9 @@ function uhd_build {
 		git checkout $UTAG >/dev/null 2>&1
 		cd ..
 	fi
-	my_echo -n Building UHD...
+	my_echo Building UHD...
+	my_echo "=============> THIS WILL TAKE SOME TIME <============="
+	my_echo
 	cd uhd/host
 	if [ ! -d build ]
 	then
@@ -706,23 +795,24 @@ function uhd_build {
 	fi
 	cd build
 	make clean >/dev/null 2>&1
-	cmake ../ >>$LOGDEV 2>&1
+	cmake $CMAKE_FLAG1 $CMAKE_FLAG2 ../ >>$LOGDEV 2>&1
 	make clean >>$LOGDEV 2>&1
 	make $JFLAG >>$LOGDEV 2>&1
 	if [ $? -ne 0  ]
 	then
 		my_echo UHD build apparently failed
 		my_echo Exiting UHD build
-		exit
+		doexit UHD-BUILD-FAIL1
 	fi
 	sudo make $JFLAG install >>$LOGDEV 2>&1
-	
-	if [ ! -f /usr/local/bin/uhd_find_devices ]
+	which uhd_find_devices >/dev/null 2>&1
+	x=$?
+	if [ $x -ne 0 -a ! -f /usr/local/bin/uhd_find_devices -a ! -f /opt/local/bin/uhd_find_devices ]
 	then
 		my_echo UHD build/install apparently failed since I cannot find /usr/local/bin/uhd_find_devices
 		my_echo after doing make and make install
 		my_echo Exiting UHD build
-		exit
+		doexit UHD-BUILD-FAIL2
 	fi
 	sudo ldconfig >>$LOGDEV 2>&1
 	my_echo Done building/installing UHD
@@ -739,12 +829,12 @@ function rtl_build {
 		my_echo you do not appear to have the \'rtl-sdr\' directory
 		my_echo you should probably use $0 gitfetch to fetch the appropriate
 		my_echo files using GIT
-		exit
+		doexit BUILD-RTL-NOT-THERE
 	fi
 	
 	my_echo -n Building rtl-sdr...
 	cd rtl-sdr
-	cmake . >>$LOGDEV 2>&1
+	cmake $CMAKE_FLAG1 $CMAKE_FLAG2 . >>$LOGDEV 2>&1
 	make clean >>$LOGDEV 2>&1
 	make $JFLAG >>$LOGDEV 2>&1
 
@@ -752,9 +842,50 @@ function rtl_build {
 	then
 		my_echo rtl-sdr build apparently failed
 		my_echo Exiting rtl-sdr build
-		exit
+		doexit RTL-BUILD-FAIL1
 	fi
 	sudo make $JFLAG install >>$LOGDEV 2>&1
+	my_echo Done building rtl-sdr
+	
+	cd $CWD
+	if [ -d hackrf ]
+	then
+		my_echo -n Building hackrf...
+		cd hackrf
+		cmake $CMAKE_FLAG1 $CMAKE_FLAG2 host/ >>$LOGDEV 2>&1
+		make clean >>$LOGDEV 2>&1
+		make >>$LOGDEV 2>&1
+		if [ $? -ne 0 ]
+		then
+			my_echo hackrf build failed
+			my_echo Exiting hackrf build
+		else
+			sudo make install >>$LOGDEV 2>&1
+		fi
+		my_echo Done building hackrf
+		cd $CWD
+	fi
+	cd $CWD
+	if [ -d gr-iqbal ]
+	then
+		my_echo -n Building gr-iqbal...
+		cd gr-iqbal
+		mkdir -p build
+		cd build
+		cmake .. $CMAKE_FLAG1 $CMAKE_FLAG2 >>$LOGDEV 2>&1
+		make clean >>$LOGDEV 2>&1
+		make >>$LOGDEV 2>&1
+		if [ $? -ne 0 ]
+		then
+			my_echo gr-iqbal build apparently failed
+			my_echo Exiting gr-iqbal build
+			doexit IQBAL-BUILD-FAIL1
+		fi
+		sudo make install  >>$LOGDEV 2>&1
+		cd $CWD
+		my_echo Done building gr-iqbal
+	fi
+	
 
 	cd $CWD
 	if [ ! -d gr-osmosdr ]
@@ -762,10 +893,15 @@ function rtl_build {
 		my_echo you do not appear to have the \'gr-osmosdr\' directory
 		my_echo you should probably use $0 gitfetch to fetch the appropriate
 		my_echo files using GIT
-		exit
+		doexit RTL-BUILD-FAIL2
 	fi
 	cd gr-osmosdr
-	cmake . >>$LOGDEV 2>&1
+	if [ $MASTER_MODE -eq 0 ]
+	then
+		git checkout gr3.6 >/dev/null 2>&1
+	fi
+	my_echo -n Building gr-osmosdr...
+	cmake . >>$LOGDEV $CMAKE_FLAG1 $CMAKE_FLAG2 2>&1
 	make clean >>$LOGDEV 2>&1
 	make $JFLAG >>$LOGDEV 2>&1
 	
@@ -773,10 +909,10 @@ function rtl_build {
 	then
 		my_echo gr-osmosdr build apparently failed
 		my_echo Exit rtl-sdr/gr-osmosdr build
-		exit
+		doexit OSMOSDR-BUILD-FAIL
 	fi
 	sudo make $JFLAG install >>$LOGDEV 2>&1
-	
+	my_echo Done building gr-osmosdr
 	sudo ldconfig >>$LOGDEV 2>&1
 	
 	cd $CWD
@@ -786,99 +922,24 @@ function rtl_build {
 function firmware {
 	sudocheck
 	FOUND_DOWNLOADER=False
+	dirlist="/usr/local/share /usr/local/lib /usr/local/lib64"
+	prog=uhd_images_downloader.py
 	
-	if [ -f /usr/local/share/uhd/utils/uhd_images_downloader.py ]
-	then
-		FOUND_DOWNLOADER=True
-		DOWNLOADER=/usr/local/share/uhd/utils/uhd_images_downloader.py
-	fi
-	if [ -f /usr/local/lib/uhd/utils/uhd_images_downloader.py ]
-	then
-		FOUND_DOWNLOADER=True
-		DOWNLOADER=/usr/local/lib/uhd/utils/uhd_images_downloader.py
-	fi
-	if [ -f /usr/local/lib64/uhd/utils/uhd_images_downloader.py ]
-	then
-		FOUND_DOWNLOADER=True
-		DOWNLOADER=/usr/local/lib64/uhd/utils/uhd_images_downloader.py
-	fi
-	
+	for dir in $dirlist
+	do
+		if [ -f $dir/uhd/utils/$prog ]
+		then
+			FOUND_DOWNLOADER=True
+			DOWNLOADER=$dir/uhd/utils/$prog
+		fi
+	done
+
 	if [ $FOUND_DOWNLOADER = True ]
 	then
 		sudo $DOWNLOADER
 	else
-		#
-		# Firmware/FPGA images...
-		#
-		my_echo Fetching and installing FPGA/Firmware images via wget...
-		
-		rm -rf wget-tmp*
-		mkdir wget-tmp$$
-		cd wget-tmp$$
-		
-		#
-		# Fetch the tar file
-		#
-		UHD_IMG_PREFIX=http://files.ettus.com/uhd_releases/master_images
-		fn=NOTEXIST
-		
-		#
-		# Try for any .tar.gz files
-		#
-		wget http://files.ettus.com/binaries/master_images/auto/current.tar.gz >/dev/null 2>&1
-
-		xx=`ls *.gz|sort|tail -1`
-		if [ "@@" != @${xx}@ ]
-		then
-			fn=$xx
-		fi
-		
-		if [ $fn = NOTEXIST ]
-		then
-			my_echo Failed to download any usable images file from: $UHD_IMG_PREFIX
-			exit
-		fi
-
-		#
-		# Check to make sure we got it
-		#
-		if [ ! -f $fn ]
-		then
-			my_echo Failed to fetch $fn: with latest UHD firmware/fpga images
-			exit
-		fi
-		
-		#
-		# Now unpack the tar file
-		#
-		my_echo ...Installing from: $fn
-		tar xf $fn
-		
-		if [ ! -d uhd-images*/share/uhd/images ]
-		then
-			my_echo There was a problem with the TAR file: $fn
-			my_echo The appropriate directories were not unpacked from it
-			my_echo In particular, UHD.../share/uhd/images does not exist
-			exit
-		fi
-		
-		#
-		# There's now a directory structure from the tar file
-		# Descend into it and copy the images to /usr/local/share/uhd/images
-		#
-		cd uhd-images*/share/uhd/images
-		if [ ! -d /usr/local/share/uhd/images ]
-		then
-			sudo mkdir -p /usr/local/share/uhd/images
-		fi
-		my_echo ...Copying into /usr/local/share/uhd
-		sudo cp *.bin /usr/local/share/uhd/images
-		sudo cp *.ihx /usr/local/share/uhd/images
-		sudo cp *.rbf /usr/local/share/uhd/images
-		sudo cp *.tag /usr/local/share/uhd/images
-		sudo chmod 644 /usr/local/share/uhd/images/*
-		cd $CWD
-		rm -rf wget-tmp$$
+		my_echo Could not find images downloader: $prog in any of $dirlist
+		doexit UHD-FIRMWARE-FAIL
 	fi
 	my_echo Done downloading firmware to /usr/local/share/uhd/images
 }
@@ -893,7 +954,7 @@ function gnuradio_build {
 			my_echo you do not appear to have the \'gnuradio\' directory
 			my_echo you should probably use $0 gitfetch to fetch the appropriate
 			my_echo files using GIT
-			exit
+			doexit GNURADIO-BUILD-NOT-THERE
 		fi
 		if [ $GTAG != None ]
 		then
@@ -907,7 +968,7 @@ function gnuradio_build {
 			my_echo you do not appear to have the \'jblum\' directory
 			my_echo you should probably use $0 gitfetch to fetch the appropriate
 			my_echo files using GIT
-			exit
+			doexit GNURADIO-BUILD-NO-JOSH
 		fi
 	fi
 		
@@ -948,6 +1009,8 @@ function gnuradio_build {
 	fi
 
 	my_echo Building Gnu Radio...
+	my_echo "=========> THIS WILL TAKE QUITE A WHILE <============="
+	my_echo " "
 	my_echo ...Doing cmake
 	if [ -d build ]
 	then
@@ -958,7 +1021,7 @@ function gnuradio_build {
 	cd build
 	make clean >/dev/null 2>&1
 	my_echo ...Cmaking
-	cmake ../ >>$LOGDEV 2>&1
+	cmake -DENABLE_BAD_BOOST=ON $CMAKE_FLAG1 $CMAKE_FLAG2 ../ >>$LOGDEV 2>&1
 	my_echo ...Building
 	make $JFLAG clean >>$LOGDEV 2>&1
 	make $JFLAG >>$LOGDEV 2>&1
@@ -966,9 +1029,11 @@ function gnuradio_build {
 	then
 		my_echo make failed
 		my_echo Exiting Gnu Radio build/install
-		exit
+		doexit GNURADIO-BUILD-FAIL
 	fi
 	my_echo ...Installing
+	sudo rm -rf /usr/local/include/gnuradio/
+	sudo rm -f /usr/local/lib*/libgnuradio*
 	sudo make $JFLAG install >>$LOGDEV 2>&1
 	sudo ldconfig >>$LOGDEV 2>&1
 	my_echo Done building and installing Gnu Radio
@@ -986,7 +1051,7 @@ function do_an_extra {
 	then
 		my_echo Building extra module $1
 		cd $1
-		if [ ! -e bootstrap ]
+		if [  -f CMakeLists.txt ]
 		then
 			mkdir -p build >>$LOGDEV 2>&1
 			cd build
@@ -994,7 +1059,8 @@ function do_an_extra {
 			make >>$LOGDEV 2>&1
 			sudo make install >>$LOGDEV 2>&1
 			sudo ldconfig
-		else
+		elif [ - bootstrap ]
+		then
 			chmod 755 bootstrap
 			./bootstrap  >>$LOGDEV 2>&1
 			PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig
@@ -1002,6 +1068,8 @@ function do_an_extra {
 			make >>$LOGDEV 2>&1
 			sudo make install >>$LOGDEV 2>&1
 			sudo ldconfig
+		else
+			my_echo Couldnt determine how to make module $1 neither bootstrap nor CmakeLists.txt present
 		fi
 	else
 		my_echo Couldnt build module $1 directory not there
@@ -1189,8 +1257,8 @@ function all {
 		gitfetch
 	fi
 	rm -f touch$$
-	EXTRAS=$EXTRAS" https://github.com/balint256/gr-baz.git"
-	EXTRAS=$EXTRAS" https://github.com/guruofquality/grextras.git"
+	EXTRAS=$EXTRAS" http://github.com/balint256/gr-baz.git"
+	EXTRAS=$EXTRAS" http://github.com/guruofquality/grextras.git"
 	for fcn in uhd_build firmware gnuradio_build rtl_build extras mod_groups mod_udev mod_sysctl pythonpath
 	do
 		my_echo Starting function $fcn at: `date`
@@ -1242,7 +1310,7 @@ function sudocheck {
 		echo -n Do you have SUDO privileges'?'
 		read ans
 		case $ans in
-			y|yes|YES|Y)
+			y|Y|YES|yes|Yes)
 				echo Continuing with script
 				SUDOASKED=y
 				sudo grep timestamp_timeout /etc/sudoers >tmp$$
@@ -1278,7 +1346,7 @@ case $# in
 	0)
 		all
 		my_echo All Done
-		exit
+		doexit SUCCESS
 esac
 
 for arg in $*
@@ -1287,4 +1355,4 @@ do
 	$arg
 done
 my_echo All Done
-
+doexit SUCCESS
