@@ -402,20 +402,23 @@ do
     fetch)
       echo "fetch $SITE"
       if [[ "$ping_computer" == "success" ]]
+      then
+        if [[ ! -e $RMG_SERVER_DET_DIR/$SITE/fetching.site ]]
         then
           DIRECTORIES_TO_COPY=$(ssh $SITE "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch)
-          if [[ $DIRECTORIES_TO_COPY -a ! -e $RMG_SERVER_DET_DIR/$SITE/fetching.site ]]
+          if [[ $DIRECTORIES_TO_COPY ]]
           then
             mkdir -p $RMG_SERVER_DET_DIR/$SITE 
             touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
             for DIR in $DIRECTORIES_TO_COPY; do
               echo "copying $DIR"
               mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
-                # download to RMG server
+              # download to RMG server and delete from site if xfer succeeds
               rsync -az --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
               if [ $? -eq 0 ]; then
                 echo "rsync error copying $DIR from $SITE"
               fi
+              ssh $SITE "find $RMG_SITE_DET_DIR -mindepth 1 -depth -empty -delete"
               let ct=ct+1
             done
             rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
@@ -423,7 +426,10 @@ do
             echo "Nothing to fetch."
           fi
         else
-          echo "error: Computer ping test wasn't successful" 1>&2
+          echo "$SITE is currently being fetched"
+        fi
+      else
+        echo "error: Computer ping test wasn't successful" 1>&2
       fi
     ;;
     
