@@ -45,7 +45,7 @@ from rmg_swig import *
 
 # import any pure python here
 import rmg_run
-import rmg_setup
+#import rmg_setup
 
 # ----------------------------------------------------------------
 # Tail of workaround
