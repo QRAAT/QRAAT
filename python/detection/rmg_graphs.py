@@ -179,6 +179,7 @@ class software_backend(gr.hier_block2):
 # defines a noisey source for testing without usrp. 
 class no_usrp_top_block(gr.top_block):
 	def __init__(self, fpga_frequency = -10.7e6, decim_factor = 250, channels = 4, variance = 0.0):
+                """ A noisy signal source used for testing. Replaces :class:`qraat.rmg.rmg_graphs.usrp_top_block`. """
 		gr.top_block.__init__(self)
                 noise_src = gr.noise_source_c(gr.GR_GAUSSIAN, variance, int(time.time()))
                 throttle  = gr.throttle(gr.sizeof_gr_complex, 64e6/float(decim_factor)*channels)
