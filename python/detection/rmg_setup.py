@@ -18,6 +18,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+  UI frontend for entering transmitter information. This should be 
+  moved elswehere since it doesn't have anythhing to do with signal
+  processing. (Uses :mod:`qraat.rmg.rmg_editors` and 
+  :mod:`qraat.rmg.rmg_editors`.)
+"""
+
+
 import wx
 import wx.grid as grd
 import rmg_editors
