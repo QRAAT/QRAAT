@@ -38,7 +38,7 @@ GR_PYTHON_INSTALL(
     rmg_editors.py
     rmg_pic_interface.py
     rmg_validators.py
-    DESTINATION ${GR_PYTHON_DIR}/rmg/detection
+    DESTINATION ${GR_PYTHON_DIR}/qraat/rmg
 )
 
 ########################################################################
