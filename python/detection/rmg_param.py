@@ -17,8 +17,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+""" 
+  The classes in this module encapsulate the various tuning parameters 
+  for the backend detector arrays. **TODO:** an explanation of the 
+  various parameters would be very useful.
+"""
+
 import math, csv
 
+#: **TODO:** this is a bit messy. 
 PULSE, CONT = range(2)#detector types used in the bands
 det_type_str = ["Pulse Detector", "Raw Baseband Recording"]
 transmitter_types = {"Pulse":PULSE, "Continuous":CONT, "Other":CONT}
@@ -26,10 +33,19 @@ usrp_sampling_rate = 64e6
 usrp_max_decimation = 250
 
 class band:
-#
-# Data for a single band for detection
-#
-
+    """ Data for a single detector band. 
+    
+    :param tx_data: Transmitter configuration(?) 
+    :type tx_data: (?) 
+    :param band_num: (?) 
+    :type band_num: (?) 
+    :param band_cf: (?) 
+    :type band_cf: (?) 
+    :param filter_length: (?) 
+    :type filter_length: (?) 
+    :param directory: (?)
+    :type directory: string
+    """
     def __init__(self, tx_data, band_num, band_cf, filter_length, directory):
         self.name = tx_data[0]
         self.directory = directory
@@ -48,6 +64,7 @@ class band:
             self.alpha = 0.0
 
     def combine_tx(self, tx_data, filter_length):
+        """ **TODO:** needs explanation. """ 
         self.name = self.name + tx_data[0] + '_'
 #        self.file_prefix = self.file_prefix + tx_data[0] + '_'
         if (self.tx_type != CONT):
@@ -65,8 +82,10 @@ class band:
                     self.alpha = tx_data[6]
 
     def __str__(self):
+        """ Print band paramters to console. """ 
         if (self.tx_type == PULSE):
-            band_str = "Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: {2}\n\tType: {3}\n\tFilter Length: {4:d} samples\n\tRise: {5:.2f}, Fall: {6:.2f}, Alpha: {7:.3f}".format(self.band_num, self.cf/1000000, self.name, det_type_str[self.tx_type], self.filter_length,self.rise,self.fall,self.alpha)
+            band_str = "Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: {2}\n\tType: {3}\n\tFilter Length: {4:d} samples\n\tRise: {5:.2f}, Fall: {6:.2f}, Alpha: {7:.3f}".format(
+              self.band_num, self.cf/1000000, self.name, det_type_str[self.tx_type], self.filter_length,self.rise,self.fall,self.alpha)
         else:
             band_str = "Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: {2}\n\tType: {3}".format(self.band_num, self.cf/1000000, self.name, det_type_str[self.tx_type])
 
@@ -74,10 +93,18 @@ class band:
 
 
 class tuning:
-#
-# Data for a single tuning of the RMG receiver
-#
+    """ Data for a single tuning of the RMG receiver. 
+      
+      **TODO:** needs explanation. 
 
+    :param backend: Backend paramters(?) 
+    :type backend: qraat.rmg.rmg_param.backend
+    :param cf: (?)
+    :type cf: float
+    :param lo1: (?)
+    :type lo1: float
+    """ 
+    
     def __init__(self, backend, cf = 0.0, lo1 = 0.0):
         self.cf = cf
         self.lo1 = lo1
@@ -87,6 +114,11 @@ class tuning:
         self.directory = backend.directory
 
     def add_tx(self, tx_data):
+        """ **TODO:** needs explanation. 
+        
+        :param tx_data: Transmitter configuration(?) 
+        :type tx_data: (?) 
+        """
 
         tx_freq = tx_data[1]*1000000.0
         baseband_freq = tx_freq - self.cf
@@ -115,15 +147,20 @@ class tuning:
 
 
 class backend:
-#
-# Top level RMG parameters (backend tunings, high_lo, decim)
-# calculate tuning  
-#
+    """ Top level RMG parameters (backend tunings, high_lo, decim).
+
+      Load a list of transmitters from a .csv file. (This is for modifying 
+      the list of transmitters.) Calculate the backend tuning. 
+
+    :param path: filename of transmitter configuration file. 
+    :type path: string
+    :param num_bads: (?)
+    :type num_bands: int
+    :param directory: target directory for .det files produced by detector. 
+    :type directory: string
+    """ 
+
     def __init__(self, path, num_bands = 1, directory = "./det_files"):
-    #
-    # Load a list of transmitters from a .csv file. This is for modifying 
-    # the list of transmitters.  Chris ~18 Sep 2012
-    #
         self.num_bands = num_bands
         self.directory = directory
         if self.directory[-1] == "/":
@@ -168,13 +205,16 @@ class backend:
         self.__backend_calc()
         
     def add_tuning(self, cf = 0.0, lo1 = 0.0):
+        """ **TODO:** needs explanation. """ 
         self.tunings.append(tuning(self, cf, lo1))
         self.num_tunings += 1
 
     def add_tx(self, tx_data, tuning_index = -1):
+        """ **TODO:** needs explanation. """ 
         self.tunings[tuning_index].add_tx(tx_data)
 
     def __str__(self):
+        """ Print tuning parameters to console. """ 
         be_str = "Number of Frequency Bands in Filterbank: {0:d}\nBandwidth: {1:.3f} kHz\nNumber of Tunings: {2:d}".format(self.num_bands, self.bw/1000.0, self.num_tunings)
         for j in range(self.num_tunings):
             be_str += '\n' + str(self.tunings[j])
@@ -182,6 +222,7 @@ class backend:
 
 
     def __lo_calc(self):
+        """ **TODO:** needs explanation. """ 
 
         self.if_max = self.lo2 - (self.if2_cf - self.if2_bw/2.0)
         if self.if_max > self.if1_cf + self.if1_bw/2.0:
@@ -209,8 +250,10 @@ class backend:
         
 
     def __backend_calc(self):
-        #Calculates the smallest set of tunings to record all transmitters
-        #this is a "set covering optimization problem", NP-hard
+        """ Calculate the smallest set of tunings to record all transmitters. 
+
+          Instance of the set cover problem (NP-hard). **TODO:** what's the solution(?) 
+        """
 
         data = self.data
 

@@ -29,6 +29,25 @@ CHANNELS = 4
 class detector_array:
 
     def __init__(self,filename = "tx.csv",directory = "./det_files", num_bands = 1, serial_port = '/dev/ttyS0', no_usrp = None):
+        
+        """ A set of detectors for each specified frequency.
+
+          A set of GR signal processing graphs comprised of the blocks defined 
+          in :mod:`qraat.rmg.rmg_graphs`. The graph is made up of the USRP source, 
+          some fitlers, and the pulse detector. A graph is created for each 
+          frequency specified by the transmitter configuration file *filename*.
+
+        :param filename: CSV-formatted transmitter configuration file. 
+        :type filename: string
+        :param directory: target directory for .det files produced by the detecto array. 
+        :type directory: string
+        :param num_bands: (?) 
+        :type num_bands: int
+        :param serial_port: serial interface for PIC controller. 
+        :type serial_port: string
+        :no_usrp_flag: use :class:`qraat.rmg.rmg_graphs.no_usrp_top_block` instead of the USRP source block. 
+        :type: no_usrp_flag bool
+        """ 
 
         print "Writing RMG status information to " + directory + '/status.txt'
         if not os.path.exists(directory):
