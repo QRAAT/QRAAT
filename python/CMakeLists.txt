@@ -31,11 +31,14 @@ endif()
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
-    DESTINATION ${GR_PYTHON_DIR}/rmg
+    det_file.py
+    est_data.py
+    DESTINATION ${GR_PYTHON_DIR}/qraat
 )
 
 ########################################################################
 # Add subdirectories
 ########################################################################
-add_subdirectory(estimation)
 add_subdirectory(detection)
+
+
