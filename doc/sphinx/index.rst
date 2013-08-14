@@ -18,10 +18,14 @@ Contents:
 .. automodule:: qraat 
 
 .. autoclass:: qraat.est_data.est_data 
+   :members: 
 
 .. autoclass:: qraat.est_data.data_arrays
+   :members:
 
+.. automodule:: qraat.det_file
 .. autoclass:: qraat.det_file.det_file
+   :members:
 
 
 
