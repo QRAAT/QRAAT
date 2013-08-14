@@ -19,7 +19,8 @@
 # The presence of this file turns this directory into a Python package
 
 '''
-This is the python RMG module.
+This is the python qraat module, comprising our application programming
+interface. 
 '''
 
 # import any pure python here
