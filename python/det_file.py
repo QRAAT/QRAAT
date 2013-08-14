@@ -1,6 +1,5 @@
-# det_file.py
-# Python encapsulation for .det files. This file is 
-# part of QRAAT, an automated animal tracking system based on GNU Radio. 
+# det_file.py - Python encapsulation for .det files. This file is part 
+# of QRAAT, an automated animal tracking system based on GNU Radio. 
 #
 # Copyright (C) 2012 Todd Borrowman
 # 
@@ -22,7 +21,20 @@ import struct
 import os
 import time
 
+
 class det_file():
+    """ Encapsulation of .det files, the output of the pulse detector. 
+
+      This class also has some math on the signal (desc). **TODO**: 
+      This class should be extended to interface with the database 
+      as well. 
+
+    :param filename: The name of the .det file. 
+    :type filename: string
+    """
+
+    #: Result of pulse data's fast fourier transform. (See :func:`det_file.fft`.)
+    f = None 
 
     def __init__(self, filename):
 
@@ -59,10 +71,11 @@ class det_file():
                         self.null_file = False
 
     def __str__(self):
-
+        """ Return the filename as a string. """
         return self.filename
 
     def print_det(self):
+        """ Print the record's metdata to standard output. """
 
         print "File: {0}".format(self.filename)
         print "Date: {0}".format(time.strftime('%d-%m-%Y %H:%M:%S', time.gmtime(self.time)))
@@ -72,8 +85,13 @@ class det_file():
         print "Data Length: {0}".format(self.data_length)
         print "Pulse Length: {0}".format(self.acc_length)
 
-    #performs an fft on pulse in data, saves to f
     def fft(self):
+        """ Performs an fft on pulse data. 
+              
+              Saves result as instance attribute f.
+
+        :returns: result of fft calculation
+        """
         if not hasattr(self,'f'):
             self.f = np.zeros((self.acc_length,self.num_ch),np.complex)
             for j in range(self.num_ch):
@@ -81,8 +99,13 @@ class det_file():
 
         return self.f
 
-    #determines pulse parameters based on Fourier Analysis
     def f_signal(self):
+        """ Calculate pulse paramters based on Fourier Analysis. 
+            **TODO:** description of paramters(?)
+        
+        :returns: parameters
+        :rtype: (?)
+        """
 
         if not hasattr(self,'f'):
             self.fft()
@@ -111,8 +134,11 @@ class det_file():
 
         return self.f_sig
 
-    #eigenvalue decomposition of pulse covariance
     def eig(self):
+        """ Calculate the eigenvalue decomposition of pulse covariance. 
+        
+        :rtype: (?) 
+        """
 
         if not hasattr(self,'eigenvalues'):
             pulse_ct = self.pulse.conjugate().transpose()
@@ -131,6 +157,10 @@ class det_file():
 
     #calculates noise covariance from front of data with same size as the pulse
     def noise_cov(self):
+        """ Calculate the noise covariance from front of data with some size as the pulse. 
+        
+        :rtype: (?) 
+        """
 
         if not hasattr(self,'n_cov'):
             if self.data_length - self.pulse_start >= self.acc_length:
