@@ -19,6 +19,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #Todd Borrowman ECE-UIUC 02/2010
 
+"""
+  Events and fucntions for validating the informatin in the setup form. 
+  This should be moved elsewhere, as it doesn't have anything to do 
+  with signal processing. 
+"""
+
+
+
 import wx
 import re
 
