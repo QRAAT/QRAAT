@@ -26,4 +26,5 @@ This is the python RMG module.
 #import detection
 #import estimation
 
-
+from est_data import data_arrays, est_data
+from det_file import det_file
