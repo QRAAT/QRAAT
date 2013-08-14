@@ -202,6 +202,19 @@ my @Products =
 		size=> [600,1200],					# Here the optional hash element 'size' is used to override the default
 		gpextra=> "set format y \"%s\"; set ytics 10000",
 	}, 
+	# Database fest freq vs time
+	{
+		table=> "fest",
+		columns=> "frequency,fdsp",
+		file=> "fest_frequency_power_time",
+		title=> "filtered est frequency timeline",
+		yrange=> [164000000,164500000],
+		timezone=> "localtime",
+		lines=> [ {column=>1,color=>'black'} ],
+		interval=> $INTERVAL_DAY,
+		size=> [600,1200],					# Here the optional hash element 'size' is used to override the default
+		gpextra=> "set format y \"%s\"; set ytics 10000",
+	}, 
 ) ;
 
 sub main()
