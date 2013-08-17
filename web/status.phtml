@@ -14,14 +14,14 @@ table.status {
 }
 table.status th {
 	border-width: 1px;
-	padding: 8px;
+	padding: 6px;
 	border-style: solid;
 	border-color: #666666;
 	background-color: #dedede;
 }
 table.status td {
 	border-width: 1px;
-	padding: 8px;
+	padding: 6px;
 	border-style: solid;
 	border-color: #666666;
 	background-color: #ffffff;
@@ -29,23 +29,209 @@ table.status td {
 </style>
 </head>
 <body>
+
 <h1>System Status</h1>
-<p><a href="telemetry.html">Site telemetry</a></p>
-<p><a href="processing.html">Processing</a></p>
-<p><a href="frequency.html">Frequency</a></p>
-<p><a href="power.html">Power</a></p>
-<p><a href="showfest.php">Activity</a></p>
 <?php
-	$df = disk_free_space("/") ;
-	$dt = disk_total_space("/") ;
-	$pc = intval(100*$df/$dt) ;
-	$fc = "#000000" ;
-	if( $pc < 10 )
+	// Show system datetime and clock synchronization status, using ntpq
+	$ntpq_offset = "" ;
+	$ntpq_result = `ntpq -p` ;
+	$lines = preg_split("/\n/",$ntpq_result) ;
+	foreach( $lines as $line )
 	{
-		$fc = "#FF0000" ;
+		if( strlen($line) > 50 )
+		{
+			if( substr($line,0,1) == "*" )
+			{
+				$args = preg_split("/\s+/",$line) ;
+				if( count($args) > 9 )
+				{
+					$ntpq_offset = $args[8] ;
+				}
+			}
+		}
 	}
-	print "<p><font color=\"$fc\">Free disk space on / is $pc%</font></p>\n" ;
-	include("qr_status.php") ;
+	$sync_status = "not synchronized" ;
+	if( ($ntpq_offset > 0) && ($ntpq_offset < 1000) )
+	{
+		$sync_status = "synchronized" ;
+	}
+	print "<p>RMG Server date and time: ".date("g:i:s a T, l M d, Y").".&nbsp;" ;
+	print "Server time is $sync_status, offset is $ntpq_offset ms.</p>" ;
+?>
+
+<h2>System Monitoring Plots</h2>
+<p><a href="telemetry.html">Site telemetry</a>&nbsp;&nbsp;<a href="processing.html">Processing</a>&nbsp;&nbsp;<a href="frequency.html">Frequency</a>&nbsp;&nbsp;<a href="power.html">Power</a>&nbsp;&nbsp;<a href="showfest.php">Activity</a></p>
+
+<h2>RMG Server Disk Space</h2>
+<table class="status">
+<tr><th>Disk</th><th>% Used</th><th>% iUsed</th><th>Free</th></tr>
+<?php
+	// Show disk usage: percentage space used, percentage inodes used, free space in GB or MB
+	function disk_report($name)
+	{
+		$font_color_black = "#000000" ;
+		$font_color_red = "#FF0000" ;
+		$fc = $font_color_black ;
+		$disk_used_percent = "N/A" ;
+		$inodes_used_percent = "N/A" ;
+		$disk_free_human = "N/A" ;
+		$disk_free = disk_free_space($name) ;
+		if( $disk_free )
+		{
+			$disk_total = disk_total_space($name) ;
+			$disk_used = $disk_total-$disk_free ;
+			$disk_free_gig = intval($disk_free/1000000000) ;
+			$disk_free_meg = intval($disk_free/1000000) ;
+			$disk_free_human = $disk_free_gig." GB" ;
+			if( $disk_free_gig == 0 )
+			{
+				$disk_free_human = $disk_free_meg." MB" ;
+			}
+			if( $disk_total > 0 )
+			{
+				$disk_used_percent = intval(100*$disk_used/$disk_total) ;
+			}
+			else
+			{
+				$disk_used_percent = 0 ;
+			}
+			$dfi_result = `df -i $name` ;
+			$lines = preg_split("/\R/",$dfi_result) ;
+			$inodes_used_percent = 0 ;
+			if( count($lines) > 1 )
+			{
+				$args = preg_split("/\s+/",$lines[1]) ;
+				if( count($args) > 5 )
+				{
+					$inodes_used_percent = intval($args[4]) ;
+				}
+			}
+			$fc = $font_color_black ;
+			if( $disk_used_percent >= 80 )
+			{
+				$fc = $font_color_red ;
+			}
+			if( $inodes_used_percent >= 80 )
+			{
+				$fc = $font_color_red ;
+			}
+		}
+		print "<tr><td>$name</td><td>$disk_used_percent</td><td>$inodes_used_percent</td><td>$disk_free_human</td></tr>\n" ;
+	}
+
+	function report_all_disks()
+	{
+		disk_report("/") ;
+		disk_report("/rmg_server") ;
+		disk_report("/mnt/external") ;
+		disk_report("/mnt/external2") ;
+	}
+
+	report_all_disks() ;
+?>
+</table>
+
+<?php
+	// Show sitelist.csv and tx.csv files
+	//date_default_timezone_set("UTC") ;
+	include("qr_variables.php") ;	// sets system path and configuration variables
+
+	function read_csv($filename)
+	{
+		$data = array() ;
+		if( file_exists($filename) )
+		{
+			$timestamp = filemtime($filename) ;
+			//$datetime = date("Y M d l H:i:s T",$timestamp) ;
+			$datetime = date("g:i:s a T, l M d, Y",$timestamp) ;
+			$metadata = array( $filename, $datetime ) ;
+			$data[] = $metadata ;
+			$fh=fopen($filename,"r") ;
+			if( $fh )
+			{
+				while( $line = fgets($fh) )
+				{
+					$argv = explode(",",$line) ;
+					$argc = count($argv) ;
+					if( $argc > 1 )
+					{
+						$data[] = $argv ;
+					}
+				}
+				fclose($fh) ;
+			}
+		}
+		return $data ;
+	}
+
+	function show_data($data,$title)
+	{
+		print "<h2>$title</h2>\n" ;
+		if( count($data) )
+		{
+			$metadata = array_shift($data) ;
+			$filename = $metadata[0] ;
+			$filemtime = $metadata[1] ;
+			print "<p>$filename last modified $filemtime</p>\n" ;
+			if( count($data) )
+			{
+				print "<table class=\"status\">" ;
+				$header = array_shift($data) ;
+				print "<tr>" ;
+				foreach( $header as $cell )
+				{
+					print "<th>" ;
+					print htmlspecialchars($cell) ;
+					print "</th>" ;
+				}
+				print "</tr>" ;
+				foreach( $data as $row )
+				{
+					print "<tr>" ;
+					foreach( $row as $cell )
+					{
+						print "<td>" ;
+						print htmlspecialchars($cell) ;
+						print "</td>" ;
+					}
+					print "</tr>" ;
+				}
+				print "</table>" ;
+			}
+		}
+		else
+		{
+			print "<p>No data</p>\n" ;
+		}
+	}
+
+	function fixup_timestamp(&$data)
+	{
+		foreach( $data as &$row )
+		{
+			$timestamp = intval($row[0]) ;
+			if( $timestamp > 0 )
+			{
+				$datetime = date("Y M d l H:i:s T",$timestamp) ;
+				$row[0] = $datetime ;
+			}
+		}
+	}
+
+	function qr_status()
+	{
+		global $path_to_tx_csv ;
+		global $path_to_sitelist_csv ;
+		global $path_to_status_log ;
+		$data = read_csv($path_to_sitelist_csv) ;
+		show_data($data,"Site configuration file") ;
+		$data = read_csv($path_to_tx_csv) ;
+		show_data($data,"Transmitter configuration file") ;
+		//$data = read_csv($path_to_status_log) ;
+		//fixup_timestamp($data) ;
+		//show_data($data,"Status log file") ;
+	}
+
 	qr_status() ;
 ?>
 </body>
