@@ -13,6 +13,7 @@ table.status {
 	border-collapse: collapse;
 }
 table.status th {
+	text-align:center;
 	border-width: 1px;
 	padding: 6px;
 	border-style: solid;
@@ -20,12 +21,14 @@ table.status th {
 	background-color: #dedede;
 }
 table.status td {
+	text-align:center;
 	border-width: 1px;
 	padding: 6px;
 	border-style: solid;
 	border-color: #666666;
-	background-color: #ffffff;
 }
+td.ok { background-color: #ffffff; }
+td.nok { background-color: #ffaaaa; }
 </style>
 </head>
 <body>
@@ -51,7 +54,7 @@ table.status td {
 		}
 	}
 	$sync_status = "not synchronized" ;
-	if( ($ntpq_offset > 0) && ($ntpq_offset < 1000) )
+	if( ($ntpq_offset != "") && ($ntpq_offset > -1000) && ($ntpq_offset < 1000) )
 	{
 		$sync_status = "synchronized" ;
 	}
@@ -64,20 +67,22 @@ table.status td {
 
 <h2>RMG Server Disk Space</h2>
 <table class="status">
-<tr><th>Disk</th><th>% Used</th><th>% iUsed</th><th>Free</th></tr>
+<tr><th>Path</th><th>% space used</th><th>% inodes used</th><th>space free</th></tr>
 <?php
 	// Show disk usage: percentage space used, percentage inodes used, free space in GB or MB
 	function disk_report($name)
 	{
-		$font_color_black = "#000000" ;
-		$font_color_red = "#FF0000" ;
-		$fc = $font_color_black ;
+		$name_class = "nok" ;
 		$disk_used_percent = "N/A" ;
+		$disk_used_class = "nok"  ;
 		$inodes_used_percent = "N/A" ;
+		$inodes_used_class = "nok"  ;
 		$disk_free_human = "N/A" ;
+		$disk_free_class = "nok"  ;
 		$disk_free = disk_free_space($name) ;
 		if( $disk_free )
 		{
+			$name_class = "ok" ;
 			$disk_total = disk_total_space($name) ;
 			$disk_used = $disk_total-$disk_free ;
 			$disk_free_gig = intval($disk_free/1000000000) ;
@@ -106,17 +111,28 @@ table.status td {
 					$inodes_used_percent = intval($args[4]) ;
 				}
 			}
-			$fc = $font_color_black ;
+			$disk_used_class = "ok"  ;
 			if( $disk_used_percent >= 80 )
 			{
-				$fc = $font_color_red ;
+				$disk_used_class = "nok"  ;
 			}
+			$inodes_used_class = "ok"  ;
 			if( $inodes_used_percent >= 80 )
 			{
-				$fc = $font_color_red ;
+				$inodes_used_class = "nok"  ;
+			}
+			$disk_free_class = "ok"  ;
+			if( $disk_free_gig < 5 )
+			{
+				$disk_free_class = "nok"  ;
 			}
 		}
-		print "<tr><td>$name</td><td>$disk_used_percent</td><td>$inodes_used_percent</td><td>$disk_free_human</td></tr>\n" ;
+		print "<tr>" ;
+		print "<td class=\"$name_class\">$name</td>" ;
+		print "<td class=\"$disk_used_class\">$disk_used_percent</td>" ;
+		print "<td class=\"$inodes_used_class\">$inodes_used_percent</td>" ;
+		print "<td class=\"$disk_free_class\">$disk_free_human</td>" ;
+		print "</tr>\n" ;
 	}
 
 	function report_all_disks()
