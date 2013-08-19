@@ -1,12 +1,11 @@
 #!/usr/bin/perl
-#read_est.pl
+#rmg_readestfile.pl
 #
-# Reads est csv files and updates a database
+# Reads one est csv file and writes the data to a database
 #
 # Usage: $0 filename sitename authfile
 #
 # Created 2013 06 10 ML. Based on readstats.pl for buoy data
-# Updated 2013 07 04 ML. Modified writetable() to no longer check for existing records with the same data. Just add each record and suck it up.
 #
 use strict ;
 use warnings ;
@@ -206,7 +205,7 @@ sub updatetable($$$$)
 		return 1 ;
 	}
 	#
-	my $result = writetable($dbh,$tablename,$sitename,$stats) ;
+	my $result = writetable($dbh,$csvfilename,$tablename,$sitename,$stats) ;
 	if( $result )
 	{
 		if( $Debug ) { print "debug: updatetable: error updating the table '$tablename'\n" ; }
@@ -254,10 +253,18 @@ sub opendatabase($)	# connects to the database and returns the database handle
 		return undef ;
 	}
 	close($fd) ;
+	if( $Debug )
+	{
+		print "debug: opendatabase: host=$host\n" ;
+		print "debug: opendatabase: user=$user\n" ;
+		#print "debug: opendatabase: pass=$pass\n" ;
+		print "debug: opendatabase: database=$database\n" ;
+	}
 	my $port = 3306 ;
 	my $timeout = 10 ;
 	#my $dsn = "dbi:mysql:$database" ;
 	my $dsn = "DBI:Wire10:database=$database;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
+	if( $Debug ) { print "debug: opendatabase: dsn=$dsn\n" ; }
 	my $dbh = DBI->connect($dsn,$user,$pass) ;
 	if( not $dbh )
 	{
@@ -276,9 +283,9 @@ sub closedatabase($)
 	}
 }
 
-sub writetable($$$$)
+sub writetable($$$$$)
 {
-	my ( $dbh, $tablename, $sitename, $refdata ) = @_ ;
+	my ( $dbh, $filename, $tablename, $sitename, $refdata ) = @_ ;
 	my @data = @$refdata ;
 	my $count = scalar @data ;
 	if( $count == 0 )
@@ -332,7 +339,8 @@ sub writetable($$$$)
 		{
 			$query .= ",'${value}'" ;
 		}
-		$query .= ",'UTC'" ;	# timezone
+		$query .= ",'UTC'" ;		# timezone
+		$query .= ",'$filename'" ;	# filename
 		$query .= ") ;" ;
 		if( $Debug ) { print "debug: updatetable: query=$query\n" ; }
 		if( dbexecute($dbh,$query) )
