@@ -33,54 +33,114 @@ then
 fi
 
 echo
-echo Starting `date`
+echo Starting $0 at `date`
 # Set RMG environment variables
 rmg_env
 
 # Set local variables
-BACKUP=/mnt/external/backup/rmg_server
+BACKUP_DRIVE=/mnt/external
+BACKUP_DRIVE2=/mnt/external2
+BACKUP_DIR=$BACKUP_DRIVE/backup/rmg_server
+BACKUP_DIR2=$BACKUP_DRIVE2/backup/rmg_server
+BACKUP_ARCHIVE_DIR=$BACKUP_DRIVE/backup/rmg_server/archive
 
 # Check destination directories
-if [ ! -e $BACKUP ]
+if [ ! -e $BACKUP_DRIVE ]
 then
-	echo ERROR: backup directory '$BACKUP' not found
+	echo ERROR: backup drive '$BACKUP_DRIVE' not found
 	exit 1
 fi
-if [ ! -e $BACKUP/archive ]
+if [ ! -e $BACKUP_DIR ]
 then
-	echo WARNING: creating backup directory '$BACKUP/archive'
-	mkdir -p $BACKUP/archive
-	if [ ! -e $BACKUP/archive ]
+	echo WARNING: creating backup directory '$BACKUP_DIR'
+	mkdir -p $BACKUP_DIR	# create all necessary subdirectories
+	if [ ! -e $BACKUP_DIR ]
 	then
-		echo ERROR: cannot create backup directory '$BACKUP/archive'
+		echo ERROR: cannot create backup directory '$BACKUP_DIR'
 		exit 1
 	fi
 fi
-if [ ! -e $BACKUP/database ]
+if [ ! -e $BACKUP_ARCHIVE_DIR ]
 then
-	echo WARNING: creating backup directory '$BACKUP/database'
-	mkdir -p $BACKUP/database
-	if [ ! -e $BACKUP/database ]
+	echo WARNING: creating backup archive directory '$BACKUP_ARCHIVE_DIR'
+	mkdir $BACKUP_ARCHIVE_DIR
+	if [ ! -e $BACKUP_ARCHIVE_DIR]
 	then
-		echo ERROR: cannot create backup directory '$BACKUP/database'
+		echo ERROR: cannot create backup archive directory '$BACKUP_ARCHIVE_DIR'
+		exit 1
+	fi
+fi
+if [ ! -e $BACKUP_DIR/database ]
+then
+	echo WARNING: creating backup directory '$BACKUP_DIR/database'
+	mkdir $BACKUP_DIR/database
+	if [ ! -e $BACKUP_DIR/database ]
+	then
+		echo ERROR: cannot create backup directory '$BACKUP_DIR/database'
 		exit 1
 	fi
 fi
 
-# Backup $RMG_SERVER_ARCHIVE_DIR to $BACKUP/archive
-rsync -av $RMG_SERVER_ARCHIVE_DIR $BACKUP/archive
+# Backup $RMG_SERVER_ARCHIVE_DIR to $BACKUP_ARCHIVE_DIR
+BACKUP_ARCHIVE_FILELIST=/var/log/rmg/rmg_backup_archive_synclog
+echo Copying files from $RMG_SERVER_ARCHIVE_DIR to $BACKUP_ARCHIVE_DIR
+rm -f $BACKUP_ARCHIVE_FILELIST
+rsync -av --out-format='%n' $RMG_SERVER_ARCHIVE_DIR/  $BACKUP_ARCHIVE_DIR >$BACKUP_ARCHIVE_FILELIST
+# MUST have trailing / on the rsync source directory, to avoid spurious destination subdirectory
+if [ $? -ne 0 ]
+then
+	echo Error in rsync, bailing out
+fi
+echo Backup of archive directory completed
+if [[ -e $BACKUP_ARCHIVE_FILELIST ]]
+then
+	scancount=`cat $BACKUP_ARCHIVE_FILELIST | grep '/' | wc -l`			# count lines containing a / anywhere
+	copycount=`cat $BACKUP_ARCHIVE_FILELIST | grep '/' | grep -v '/$' | wc -l`	# as above, then exclude lines ending in /
+	echo Scanned $scancount files and directories, copied $copycount files
+else
+	echo Backup failed, no log file.
+fi
 
-# Extract tables from the qraat database to $BACKUP/database
+# Copy log files and clean them from the log directory
+#TODO
+
+# Extract tables from the qraat database to $BACKUP_DIR/database
 echo Dumping database tables
-mysql -B -e 'select * from sitelist' >$BACKUP/database/sitelist.txt
-mysql -B -e 'select * from telemetry' >$BACKUP/database/telemetry.txt
-mysql -B -e 'select * from timecheck' >$BACKUP/database/timecheck.txt
-mysql -B -e 'select * from detcount' >$BACKUP/database/detcount.txt
-mysql -B -e 'select * from estcount' >$BACKUP/database/estcount.txt
-mysql -B -e 'select * from procount' >$BACKUP/database/procount.txt
-mysql -B -e 'select * from est where datetime between date_add(now(),interval -25 hour) and now();' >$BACKUP/database/est_`date +"%Y-%m-%d"`.txt
-ls -l $BACKUP/database
-du -s $BACKUP
-echo Finished `date`
+mysql -B -e 'select * from sitelist' >$BACKUP_DIR/database/sitelist.txt
+mysql -B -e 'select * from telemetry' >$BACKUP_DIR/database/telemetry.txt
+mysql -B -e 'select * from timecheck' >$BACKUP_DIR/database/timecheck.txt
+mysql -B -e 'select * from detcount' >$BACKUP_DIR/database/detcount.txt
+mysql -B -e 'select * from estcount' >$BACKUP_DIR/database/estcount.txt
+mysql -B -e 'select * from procount' >$BACKUP_DIR/database/procount.txt
+#mysql -B -e 'select * from est where datetime between date_add(now(),interval -25 hour) and now();' >$BACKUP_DIR/database/est_`date +"%Y-%m-%d"`.txt
+
+# Synchronize second backup drive
+echo Synchronizing $BACKUP_DRIVE and $BACKUP_DRIVE2
+BACKUP_DRIVE_SYNCLOG=/var/log/rmg/rmg_backup_drive_synclog
+rsync -av $BACKUP_DIR/ $BACKUP_DIR2 >$BACKUP_DRIVE_SYNCLOG
+if [ $? -ne 0 ]
+then
+	echo Error in rsync, bailing out
+fi
+df $BACKUP_DRIVE $BACKUP_DRIVE2
+
+# Check backup files and clean files from server
+#TODO
+cd $RMG_SERVER_ARCHIVE_DIR
+badcount=0
+for filename in `find ./ -type f`
+do
+	if [[ ! -e $BACKUP_ARCHIVE_DIR/$i ]]
+	then
+		echo File ${RMG_SERVER_ARCHIVE_DIR}/${filename} is not backed up
+		let badcount++
+	else
+		# file is safely backed up
+		# determine if file should be deleted from the server
+	fi
+done
+echo Found $badcount files that are not backed up
+
+echo Finished $0 at `date`
 
 #END
