@@ -85,8 +85,8 @@ td.nok { background-color: #ffaaaa; }
 			$name_class = "ok" ;
 			$disk_total = disk_total_space($name) ;
 			$disk_used = $disk_total-$disk_free ;
-			$disk_free_gig = intval($disk_free/1000000000) ;
-			$disk_free_meg = intval($disk_free/1000000) ;
+			$disk_free_gig = intval($disk_free/1073741824) ;
+			$disk_free_meg = intval($disk_free/1048576) ;
 			$disk_free_human = $disk_free_gig." GB" ;
 			if( $disk_free_gig == 0 )
 			{
