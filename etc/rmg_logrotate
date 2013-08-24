@@ -1,7 +1,7 @@
 /var/log/rmg/*.log
 {
-	weekly
-	rotate 12
+	daily
+	rotate 10
 	compress
 	delaycompress
 	notifempty
