@@ -17,7 +17,11 @@ INSTALL(PROGRAMS
   rmg_readestfile
   rmg_detcount
   rmg_estcount
+  rmg_dbstats
+  rmg_status
+  rmg_filterest
+  rmg_backup
+  rmg_clean
   DESTINATION bin)
-
 
 
