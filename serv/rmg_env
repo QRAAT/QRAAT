@@ -84,5 +84,20 @@ export RMG_SITE_LOG_DIR="$RMG_SITE_METADATA_DIR/log"
 # Log directory for server
 export RMG_SERVER_LOG_DIR="/var/log/rmg"
 
+# Path for mount point of archive backup drive
+export BACKUP_DRIVE=/mnt/external
+
+# Path for mount point of archive backup drive2
+export BACKUP_DRIVE2=/mnt/external2
+
+# Path for rmg_server directory on archive backup drive
+export BACKUP_DIR=$BACKUP_DRIVE/backup/$RMG_SERVER_DIR
+
+# Path for rmg_server directory on archive backup drive2
+export BACKUP_DIR2=$BACKUP_DRIVE2/backup/$RMG_SERVER_DIR
+
+# Path for archive directory on backup drive
+export BACKUP_ARCHIVE_DIR=$BACKUP_DIR/archive
+
 #END
 
