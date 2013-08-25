@@ -37,13 +37,6 @@ echo Starting $0 at `date`
 # Set RMG environment variables
 rmg_env
 
-# Set local variables
-BACKUP_DRIVE=/mnt/external
-BACKUP_DRIVE2=/mnt/external2
-BACKUP_DIR=$BACKUP_DRIVE/backup/rmg_server
-BACKUP_DIR2=$BACKUP_DRIVE2/backup/rmg_server
-BACKUP_ARCHIVE_DIR=$BACKUP_DRIVE/backup/rmg_server/archive
-
 # Check destination directories
 if [ ! -e $BACKUP_DRIVE ]
 then
@@ -101,7 +94,7 @@ else
 	echo Backup failed, no log file.
 fi
 
-# Copy log files and clean them from the log directory
+# Copy log files
 #TODO
 
 # Extract tables from the qraat database to $BACKUP_DIR/database
@@ -123,23 +116,6 @@ then
 	echo Error in rsync, bailing out
 fi
 df $BACKUP_DRIVE $BACKUP_DRIVE2
-
-# Check backup files and clean files from server
-#TODO
-cd $RMG_SERVER_ARCHIVE_DIR
-badcount=0
-for filename in `find ./ -type f`
-do
-	if [[ ! -e $BACKUP_ARCHIVE_DIR/$i ]]
-	then
-		echo File ${RMG_SERVER_ARCHIVE_DIR}/${filename} is not backed up
-		let badcount++
-	else
-		# file is safely backed up
-		# determine if file should be deleted from the server
-	fi
-done
-echo Found $badcount files that are not backed up
 
 echo Finished $0 at `date`
 
