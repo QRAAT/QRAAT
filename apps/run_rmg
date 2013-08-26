@@ -33,9 +33,10 @@ parser.add_option ("-t", "--time", type="int",
 parser.add_option ("-p", "--port", type="string",
                            default="/dev/ttyUSB0",
                            help="serial port for communication to RMG PIC")
-parser.add_option ("-n", "--no-usrp", action="store_true", dest="NO_USRP",
-                           default=False,
-                           help="use null_source instead of USRP")
+parser.add_option ("-n", "--no-usrp", type="float", 
+                           default=float("-inf"), metavar="VAR",
+                           help="Noisy signal source instead of USRP, using a "
+                                "Gaussian distribution. Specify the variance.")
 parser.add_option ("-d", "--directory", type="string",
                            default="/tmp/ramdisk/det_files",
                            help="directory to save .det files")
@@ -49,10 +50,12 @@ if len(args) != 0:
     parser.print_help()
     raise SystemExit
 
+no_usrp = False if options.no_usrp < 0 else True
+
 dir_finder = sdr.detector_array(options.tx_file,
                                         options.directory,
                                         options.bands,
                                         options.port,
-                                        options.NO_USRP)
+                                        no_usrp)
 dir_finder.run(options.time)
 
