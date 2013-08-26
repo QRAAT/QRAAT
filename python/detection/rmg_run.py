@@ -55,7 +55,7 @@ class detector_array:
         self.backend = None
         self.num_be = 0
         self.connected_be = 0
-        if (serial_port.lower() == 'none'):
+        if no_usrp_flag:
             self.sc = None
             print "Serial Communication Disabled"
         else:

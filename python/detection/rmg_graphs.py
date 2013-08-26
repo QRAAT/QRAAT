@@ -144,11 +144,11 @@ class software_backend(gr.hier_block2):
         self.enable(be_param)
 
 
-#defines a null front-end for testing without usrp
+# defines a noisey source for testing without usrp. 
 class no_usrp_top_block(gr.top_block):
-	def __init__(self, fpga_frequency = -10.7e6, decim_factor = 250, channels = 4):
+	def __init__(self, variance = 0, fpga_frequency = -10.7e6, decim_factor = 250, channels = 4):
 		gr.top_block.__init__(self)
-                null_src = gr.null_source(gr.sizeof_gr_complex)
+                noise_src = gr.noise_source_c(gr.GR_GAUSSIAN, variance, int(time.time()))
                 throttle  = gr.throttle(gr.sizeof_gr_complex, 64e6/float(decim_factor)*channels)
                 self.u = gr.deinterleave(gr.sizeof_gr_complex)
-                self.connect(null_src,throttle,self.u)
+                self.connect(noise_src,throttle,self.u)

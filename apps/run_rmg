@@ -33,7 +33,7 @@ parser.add_option ("-t", "--time", type="int",
 parser.add_option ("-p", "--port", type="string",
                            default="/dev/ttyUSB0",
                            help="serial port for communication to RMG PIC")
-parser.add_option ("-n", "--no_usrp", action="store_true", dest="NO_USRP",
+parser.add_option ("-n", "--no-usrp", action="store_true", dest="NO_USRP",
                            default=False,
                            help="use null_source instead of USRP")
 parser.add_option ("-d", "--directory", type="string",
