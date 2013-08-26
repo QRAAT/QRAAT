@@ -34,7 +34,7 @@ parser.add_option ("-p", "--port", type="string",
                            default="/dev/ttyUSB0",
                            help="serial port for communication to RMG PIC")
 parser.add_option ("-n", "--no-usrp", type="float", 
-                           default=float("-inf"), metavar="VAR",
+                           default=None, metavar="VAR",
                            help="Noisy signal source instead of USRP, using a "
                                 "Gaussian distribution. Specify the variance.")
 parser.add_option ("-d", "--directory", type="string",
@@ -50,12 +50,10 @@ if len(args) != 0:
     parser.print_help()
     raise SystemExit
 
-no_usrp = False if options.no_usrp < 0 else True
-
 dir_finder = sdr.detector_array(options.tx_file,
                                         options.directory,
                                         options.bands,
                                         options.port,
-                                        no_usrp)
+                                        options.no_usrp)
 dir_finder.run(options.time)
 
