@@ -19,13 +19,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from gnuradio import gr, blks2, uhd, gru
-import rmg, sys
+import rmg.detection, sys
 
 if(len(sys.argv) == 1):
   print "usage: read_det pulse_data.det"
   sys.exit(1)
 
-det = rmg.pulse_data(sys.argv[1])
+det = rmg.detection.pulse_data(sys.argv[1])
 p = det.param()
 
 
