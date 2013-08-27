@@ -26,10 +26,8 @@ GR_PYTHON_INSTALL(
     4channel_spectrum_server
     4channel_spectrum_client
     read_det
-    tx_setup
     active_rmg
     run_rmg
-    run_rmg_alt
     DESTINATION bin
 )
 
