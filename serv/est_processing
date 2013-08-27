@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from rmg.estimation import est_data
+from qraat import est_data
 
 def process_det_files(det_dirname, est_dirname):
     print "Processing " + det_dirname
