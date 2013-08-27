@@ -1,7 +1,6 @@
-# est_data.py
-# Structure for holding processed .det files. Output
-# formats: .csv and .est. This file is part of QRAAT, 
-# an automated animal tracking system based on GNU Radio. 
+# est_data.py - Structure for holding processed .det files. Output 
+# formats: .csv and .est. This file is part of QRAAT, an automated 
+# animal tracking system based on GNU Radio. 
 #
 # Copyright (C) 2013 Todd Borrowman
 # 
@@ -23,8 +22,17 @@ import os,time,errno
 import numpy as np
 import struct
 
-#class to contain data lists for the det info in numpy arrays
 class data_arrays():
+
+    """ class to contain data lists for the det info in numpy arrays. 
+    
+      **TODO:** description is needed. 
+
+    :param num_channels: number of signal channels in .det files. 
+    :type num_channels: int
+    :param size: (?)
+    :type size: (?)
+    """
 
     def __init__(self, num_channels, size = 0):
 
@@ -44,6 +52,11 @@ class data_arrays():
         self.n_cov = np.empty((size, num_channels, num_channels), np.complex)
 
     def append(self, data):
+        """ **TODO:** description required. 
+        
+        :param data: (?) 
+        :type data: (?)        
+        """
 
         self.num_records += data.num_records
         self.tag_number = np.hstack((self.tag_number, data.tag_number))
@@ -60,12 +73,26 @@ class data_arrays():
         self.n_cov = np.vstack((self.n_cov, data.n_cov))
 
     def filter_by_tag_number(self, number):
+        """ **TODO:** description required.
+
+        :param number: could this be a string(?)
+        :type number: (?) 
+        :returns: (?)
+        :rtype: (?) 
+        """
 
         tag_filter = self.tag_number == number
         new_data = self.filter_by_bool(tag_filter)
         return new_data
 
     def filter_by_bool(self, tag_filter):
+        """ **TODO:** description required. 
+
+        :param tag_filter: what is this(?) 
+        :type tag_filter: (?) 
+        :rtype: (?) 
+        """
+
         new_data = data_arrays(self.num_channels,np.sum(tag_filter))
         new_data.tag_number = self.tag_number[tag_filter]
         new_data.epoch_time = self.epoch_time[tag_filter]
@@ -82,6 +109,16 @@ class data_arrays():
         return new_data
 
     def add_det(self, det, tag_index, index):
+        """ **TODO:** description required.
+
+        :param det: what is this(?) 
+        :type det: (?) 
+        :param tag_index: what is this(?) 
+        :type tag_index: (?) 
+        :param tag_index: what is this(?) 
+        :type tag_index: (?) 
+        """
+
         if index >= self.num_records:
             raise IndexError('Index: {0} exceeded number of records: {1}'.format(index, self.num_records))
         det.eig()
@@ -111,6 +148,15 @@ class data_arrays():
 
 #est file class
 class est_data():
+    """ Encapsulation of .est files. 
+
+      **TODO:** this should be extended to interface with the database.     
+
+    :param filename: filename of the .est file.
+    :type filename: string
+    :param num_channels: number of channels produced by pulse detector.
+    :type num_channels: int
+    """
 
     def __init__(self, filename = '', num_channels = 4):
         
@@ -124,6 +170,11 @@ class est_data():
 
     #writes an .est file for each tag
     def write_est(self,dirname = './'):
+        """ Writes an .est file for each tag. (Name scheme(?)) 
+
+        :param dirname: output directory of files.
+        :type dirname: string
+        """
 
         if not dirname[-1] == '/':
             dirname += '/'
@@ -185,8 +236,16 @@ class est_data():
                     stat_file.write('Avg. Signal Level: {0} dB\n'.format(10*np.log10(np.mean(good_data.f_pwr))))
                     stat_file.write('Std. Dev. Signal Level: {0}\n'.format(np.std(good_data.f_pwr)))
 
-    #writes .csv file for each tag
+
     def write_csv(self, dirname = './'):
+        """ Write a .csv file for each tag. 
+
+          **TODO:** Output format(?) Does this contain the same data as .est files(?) 
+          Is this obsolete(?)           
+
+        :param dirname: output directory of files.
+        :type dirname: string
+        """
 
         if not dirname[-1] == '/':
             dirname += '/'
@@ -241,6 +300,11 @@ class est_data():
 
     #reads data from a est file
     def read_est(self, est_filename):
+        """ Read .est file. 
+
+        :param est_filename: filename. 
+        :type est_filename: string
+        """
 
         if est_filename[-4:] == ".est":
             with open(est_filename) as estfile:
@@ -302,8 +366,14 @@ class est_data():
         else:
             raise IOError, "{0} is not an .est file".format(est_filename)
 
-    #reads in all .det files in the given directory
     def read_dir(self,dirname):
+        """ Read all .det files in the given directory.
+
+          **TODO:** recurse into subdirectories(?) 
+        
+        :param dirname: input directory.
+        :type dirname: string
+        """
 
         dir_list = os.listdir(dirname)
         print "{0} files found at {1}".format(len(dir_list), dirname)
@@ -329,8 +399,12 @@ class est_data():
             
             self.data.append(new_data.filter_non_filled())
 
-    #adds given det_file object
     def add_det(self, det):
+        """ Add det object. 
+
+        :param det: pulse data (?)
+        :type det: qraat.det_file.det_file
+        """
 
         if not det.null_file:
             det.eig()

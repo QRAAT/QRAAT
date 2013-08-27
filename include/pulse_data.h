@@ -41,7 +41,8 @@ typedef struct {
   float sample_rate, 
         ctr_freq;
   //time_t pulse_time;
-  struct timeval pulse_time;
+  //struct timeval pulse_time;
+  int t_sec, t_usec; 
 } param_t; 
 
 ostream& operator<< ( ostream &out, const param_t &p );
@@ -69,7 +70,8 @@ public:
    int pulse_index,
    float sample_rate, 
    float ctr_freq,
-   struct timeval *pulse_time,
+   int t_sec,
+   int t_usec, 
    const char *fn
   );
   

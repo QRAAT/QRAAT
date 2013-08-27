@@ -23,7 +23,7 @@
 
 from gnuradio import gr, eng_notation, uhd, gru
 from gnuradio.eng_option import eng_option
-from rmg import rmg_pic_interface as pic_io
+from qraat.rmg import rmg_pic_interface as pic_io
 from optparse import OptionParser
 import sys, math, time
 import SocketServer

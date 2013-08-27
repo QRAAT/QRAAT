@@ -42,10 +42,11 @@ typedef struct {
       pulse_index;
   float sample_rate, 
         ctr_freq;
-  struct timeval pulse_time;
+  int t_sec, t_usec; 
   %extend{ 
     char* __str__() {
       static char tmp [256];
+      time_t pulse_time = $self->t_sec + ($self->t_usec * 0.000001); 
       sprintf(tmp, 
 "channel_ct     %d\n\
 data_ct        %d\n\
@@ -55,7 +56,7 @@ sample_rate    %g\n\
 ctr_freq       %g\n\
 pulse_time     %s", 
        $self->channel_ct, $self->data_ct, $self->filter_data_ct, $self->pulse_index,
-       $self->sample_rate, $self->ctr_freq, asctime(gmtime(&($self->pulse_time.tv_sec)))
+       $self->sample_rate, $self->ctr_freq, asctime(gmtime(&pulse_time))
       );
       return &tmp[0];
     }
@@ -105,7 +106,8 @@ public:
    int pulse_index,
    float sample_rate, 
    float ctr_freq,
-   struct timeval *pulse_time,
+   int t_sec,
+   int t_usec, 
    const char *fn
   );
   

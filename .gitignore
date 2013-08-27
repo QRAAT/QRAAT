@@ -1,4 +1,5 @@
 build/
+_build/
 install_rmg_log.txt
 *.swp
 .DS_Store

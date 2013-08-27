@@ -18,6 +18,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+""" 
+  This module defines various textbox editors used for setting up the 
+  transmitter configuration file. It should be moved elsewhere, since 
+  it doeesn't have anything to do with signal processing. We could 
+  push it to wherever top-level application code lives. 
+"""
+
 import wx
 import wx.grid as grd
 import rmg_validators as rmg_val

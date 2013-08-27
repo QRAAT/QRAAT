@@ -19,9 +19,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from gnuradio import gr, blks2, uhd, gru
-import rmg, wx
+import qraat.rmg, wx
 
 app = wx.PySimpleApp()
-frame = rmg.rmg_setup.rmg_window(None, wx.ID_ANY, "Transmitter Setup for RMG")
+frame = qraat.rmg.rmg_setup.rmg_window(None, wx.ID_ANY, "Transmitter Setup for RMG")
 
 app.MainLoop()

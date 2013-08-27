@@ -18,6 +18,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+  **TODO:** It'd be good to explain a little bit how the hardware works and 
+  what the various paramters are. 
+"""
+
+
 try:
     import serial
 except ImportError:
@@ -29,9 +35,17 @@ except ImportError:
 
 import time
 
+#: TODO What is this (?) 
 lo_str = ['No Calc', 'High LO', 'Low LO']
 
 class rmg_pic_interface:
+        """ Communication with the PIC interface for the RMG, developed at UUIC-ECE. 
+
+          The PIC controls various tuning parameters for the RMG hardware. 
+
+        :param port: Serial device file, e.g */dev/ttyS0*, */dev/ttyUSB0*.
+        :type port: string
+        """
 
 	def __init__(self, port = '/dev/ttyS0'):
 		self.ser = serial.Serial(port, timeout = 1)  #open serial port
@@ -39,8 +53,8 @@ class rmg_pic_interface:
                 self.lo = -1
                 self._read()
 
-	#Set frequency in Hz
 	def tune(self, freq):
+                """ Set center frequency at *freq* Hz. """
 		if (freq != 0):
 			self.ser.write("f")
                 	time.sleep(.05)
@@ -49,8 +63,8 @@ class rmg_pic_interface:
 			self.ser.read(len('%d' %(freq,)))
 		#return self.check(freq)
 
-	#Reads pll information
 	def _read(self):
+                """ Read PLL information. """
                 self._flush_buffer()
 		self.ser.write('/')
 		output = self.ser.readline()
@@ -69,23 +83,23 @@ class rmg_pic_interface:
 		else:
 			self.lock = False
 
-	#Loads pic firmware variables from EEPROM
         def load(self):
+                """ Load PIC firmware variables from EEPROM. """
                 self.ser.write('l')
                 time.sleep(.1)
 
-	#Saves pic firmware variables from EEPROM
         def save(self):
+                """ Saves PIC firmware variables to EEPROM. """
                 self.ser.write('s')
                 time.sleep(.1)
 
-	#Resests the PIC, waits for it to come back up
         def reset_pic(self):
+                """ Reset the PIC< wait a few seconds to come back up. """
                 self.ser.write('0')
                 time.sleep(1.5)
 
-	#Changes the contrast of the LCD
         def change_contrast(self, t):
+                """ Change the contrast of the LCD. """
                 if t > 0 and t < 10:
                         self.ser.write('t')
                         time.sleep(.05)
@@ -94,38 +108,44 @@ class rmg_pic_interface:
 		else:
 			raise ValueError
 
-	#Prints characters to the LCD
         def lcd_print(self, string, row = 1, col = 1):
+	        """ Print a string to the LCD. """
                 self.ser.write('p')
                 time.sleep(.05)
                 self.ser.write('%d\r' %(row, ))
                 self.ser.write('%d\r' %(col, ))
                 self.ser.write('%s\r' %(string, ))
 
-	#Increment the frequency
         def inc_freq(self):
+                """ Increment the frequency.
+                    
+                  **TODO:** some explanation(?)
+                """
                 self.ser.write('+')
                 time.sleep(.1)
 
-	#Decrement the frequency
         def dec_freq(self):
+                """ Decrement the frequency.
+                    
+                  **TODO:** some explanation(?) 
+                """
                 self.ser.write('-')
                 time.sleep(.1)
 
-	#Sets LCD to display frequency based on High LO
         def use_high_lo(self):
+	        """ Set LCD to display frequency based on High LO. """ 
                 self._change_lo(1)
 
-	#Sets LCD to display frequency based on Low LO
         def use_low_lo(self):
+	        """ Set LCD to display frequency based on Low LO. """ 
                 self._change_lo(2)
 
-	#Sets LCD to display frequency of the pll
         def use_no_lo(self):
+	        """ Set LCD to display frequency of the PLL. """ 
                 self._change_lo(0)
 
-	#Does the clange in display
         def _change_lo(self, n):
+	        """ Do the clange in display(?) """ 
                 self.ser.write('a')
                 time.sleep(.8)
                 self.ser.write('o')
@@ -137,33 +157,38 @@ class rmg_pic_interface:
                 self.lo = n
                 self._flush_buffer()
 
-	#Flushes the read buffer of the serial connection
-	#This relies on the timeout arguement
         def _flush_buffer(self):
+                """ Flush the read buffer of the serial connection. 
+                
+                  This relies on the timeout argument. 
+                """
                 buff = self.ser.readline()
                 while not buff == '':
                     buff = self.ser.readline()
 
-	#Closes the serial connection when the object is deleted
 	def __del__(self):
+                """ Close the serial connection. """
 		self.ser.close()
 
-	#Determines if the pll is at the given frequency
 	def check(self, in_freq):
+                """ Determine if the PLL ss at the given frequency. 
+
+                  **TODO:** explanation(?)
+                """
 		self._read()
 		out = (self.freq == in_freq, self.w, self.lock)
 		return out
 
-	#Displays the current frequency
         def freq_check(self):
+                """ Print frequency to the terminal. """ 
                 self._read()
                 if self.lock:
                         print "Frequency: %d LOCKED" % (self.freq,)
                 else:
                         print "Write Status: %d, Lock Status: %d" %(self.w, self.lock)
 
-	#Returns the current LO display setting
         def check_lo(self):
+                """ Get the current LO display setting. """ 
                 if self.lo == -1:
                         self._flush_buffer()
                         self.ser.write('a')

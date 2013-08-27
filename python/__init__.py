@@ -19,11 +19,13 @@
 # The presence of this file turns this directory into a Python package
 
 '''
-This is the python RMG module.
+This is the python qraat module, comprising our application programming
+interface. 
 '''
 
 # import any pure python here
 #import detection
 #import estimation
 
-
+from est_data import data_arrays, est_data
+from det_file import det_file

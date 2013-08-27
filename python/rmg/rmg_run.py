@@ -28,7 +28,26 @@ CHANNELS = 4
 
 class detector_array:
 
-    def __init__(self,filename = "tx.csv",directory = "./det_files", num_bands = 1, serial_port = '/dev/ttyS0',no_usrp_flag = False):
+    def __init__(self,filename = "tx.csv",directory = "./det_files", num_bands = 1, serial_port = '/dev/ttyS0', no_usrp = None):
+        
+        """ A set of detectors for each specified frequency.
+
+          A set of GR signal processing graphs comprised of the blocks defined 
+          in :mod:`qraat.rmg.rmg_graphs`. The graph is made up of the USRP source, 
+          some fitlers, and the pulse detector. A graph is created for each 
+          frequency specified by the transmitter configuration file *filename*.
+
+        :param filename: CSV-formatted transmitter configuration file. 
+        :type filename: string
+        :param directory: target directory for .det files produced by the detecto array. 
+        :type directory: string
+        :param num_bands: (?) 
+        :type num_bands: int
+        :param serial_port: serial interface for PIC controller. 
+        :type serial_port: string
+        :no_usrp_flag: use :class:`qraat.rmg.rmg_graphs.no_usrp_top_block` instead of the USRP source block. 
+        :type: no_usrp_flag bool
+        """ 
 
         print "Writing RMG status information to " + directory + '/status.txt'
         if not os.path.exists(directory):
@@ -36,7 +55,7 @@ class detector_array:
             os.makedirs(directory)
         timestr = "\nInitializing RMG at {0}\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
         paramstr = "\tTransmitter File: {0}\n\tDirectory: {1}\n\tNumber of Bands: {2}\n\tSerial Port: {3}\n\tSource: ".format(filename, directory, num_bands, serial_port)
-        if no_usrp_flag:
+        if no_usrp != None:
             paramstr += "Null\n\n"
         else:
             paramstr += "USRP\n\n"
@@ -44,7 +63,7 @@ class detector_array:
             status_file.write(timestr)
             status_file.write(paramstr)
 
-        self.NO_USRP = no_usrp_flag
+        self.NO_USRP = no_usrp
         self.high_lo = True
         self.decim = 250
         self.filename = filename
@@ -55,7 +74,7 @@ class detector_array:
         self.backend = None
         self.num_be = 0
         self.connected_be = 0
-        if (serial_port.lower() == 'none'):
+        if no_usrp != None:
             self.sc = None
             print "Serial Communication Disabled"
         else:
@@ -110,10 +129,10 @@ class detector_array:
             lo3 = FPGA_FREQ
         else:
             lo3 = -FPGA_FREQ
-        if not self.NO_USRP:
+        if self.NO_USRP == None:
             self.frontend = rmg_graphs.usrp_top_block(lo3, int(self.decim), CHANNELS)
         else:
-            self.frontend = rmg_graphs.no_usrp_top_block(lo3, int(self.decim), CHANNELS)
+            self.frontend = rmg_graphs.no_usrp_top_block(lo3, int(self.decim), CHANNELS, self.NO_USRP)
             print "Using Null Frontend"
 
     def __create_backend(self):
