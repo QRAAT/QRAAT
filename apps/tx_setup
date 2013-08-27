@@ -22,6 +22,6 @@ from gnuradio import gr, blks2, uhd, gru
 import qraat.rmg, wx
 
 app = wx.PySimpleApp()
-frame = rmg.rmg_setup.rmg_window(None, wx.ID_ANY, "Transmitter Setup for RMG")
+frame = qraat.rmg.rmg_setup.rmg_window(None, wx.ID_ANY, "Transmitter Setup for RMG")
 
 app.MainLoop()

@@ -282,11 +282,11 @@ def producer( ):
   # the data structure gets locked up. (NOTE that del dir_finder
   # didn't work) 
 
-  dir_finder = rmg.rmg_run.detector_array(options.tx_file,
-                                          options.directory,
-                                          options.bands,
-                                          options.port,
-                                          options.NO_USRP)
+  dir_finder = qraat.rmg.rmg_run.detector_array(options.tx_file,
+                                                options.directory,
+                                                options.bands,
+                                                options.port,
+                                                options.NO_USRP)
   
   dir_finder.run(options.time)
 

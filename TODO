@@ -1,7 +1,0 @@
-~14 Aug 2013
-
-(1)   Remove "rmg_" redundancies, rename the files a bit. 
-(2)   Think of a place for rmg_{setup,editors,validators}. 
-(3)   Fill in (?) and TODOs in doc strings. 
-(4)   Rename classes. 
-
