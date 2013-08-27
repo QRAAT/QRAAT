@@ -12,10 +12,12 @@ use warnings ;
 use DBI ;
 #use DBD::mysql ;
 use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
+use File::Basename ;
 
 my $Debug = 0 ;					# Set to 1 for debug output, 0 to silence
 my $TableNameEST = "est" ;			# The name of the db table
 my $TableNameSitelist = "sitelist" ;		# The name of the db table
+my $TableNameTxlist = "txlist" ;		# The name of the db table
 
 sub usage() ;
 sub main() ;
@@ -294,6 +296,7 @@ sub writetable($$$$$)
 		return 1 ;
 	}
 	if( $Debug ) { print "debug: updatetable: count=$count\n" ; }
+	#
 	# Get the site number from the sitename table
 	my $query = "select id from $TableNameSitelist where name='${sitename}' ;" ;
 	if( $Debug ) { print "debug: writetable: query=$query\n" ; }
@@ -305,6 +308,20 @@ sub writetable($$$$$)
 	}
 	my $siteid = $result ;
 	if( $Debug ) { print "debug: writetable: siteid for site '$sitename' is $siteid\n" ; }
+	#
+	# Get the tx id from the txlist
+	$filename =~ s/\.csv// ;
+	$filename = basename($filename) ;
+	$query = "select id from $TableNameTxlist where name='${filename}' ;" ;
+	if( $Debug ) { print "debug: writetable: query=$query\n" ; }
+	$result = dblookup($dbh,$query) ;
+	if( not defined $result or ($result eq "") )
+	{
+		if( $Debug ) { print "debug: writetable: cannot find tx code for '$filename'\n" ; }
+		return 1 ;
+	}
+	my $txid = $result ;
+	if( $Debug ) { print "debug: writetable: txid for '$filename' is $txid\n" ; }
 	my $countdone = 0 ;
 	my $countread = 0 ;
 	my $starttime = time() ;
@@ -330,7 +347,7 @@ sub writetable($$$$$)
 		#	next ;
 		#}
 		#
-		# Add new entry
+		# Add new entry		TODO reformat this query to explicity list all columns rather than depend on the order!
 		#
 		$query = "insert into $tablename values(DEFAULT," ;	# first column is ID, automatically allocated
 		$query .= "'${siteid}'" ;
@@ -339,8 +356,8 @@ sub writetable($$$$$)
 		{
 			$query .= ",'${value}'" ;
 		}
-		$query .= ",'UTC'" ;		# timezone
-		$query .= ",'$filename'" ;	# filename
+		$query .= ",'UTC'" ;	# timezone
+		$query .= ",'$txid'" ;	# txid
 		$query .= ") ;" ;
 		if( $Debug ) { print "debug: updatetable: query=$query\n" ; }
 		if( dbexecute($dbh,$query) )
