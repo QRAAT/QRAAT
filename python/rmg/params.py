@@ -1,4 +1,4 @@
-# rmg_param.py
+# params.py
 # Parameter classes for software defined detector backend. This file 
 # is part of QRAAT, an automated animal tracking system based on GNU Radio. 
 #
@@ -98,7 +98,7 @@ class tuning:
       **TODO:** needs explanation. 
 
     :param backend: Backend paramters(?) 
-    :type backend: qraat.rmg.rmg_param.backend
+    :type backend: qraat.rmg.params.backend
     :param cf: (?)
     :type cf: float
     :param lo1: (?)

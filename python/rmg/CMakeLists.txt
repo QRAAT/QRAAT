@@ -31,13 +31,10 @@ endif()
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
-    rmg_graphs.py
-    rmg_run.py
-    rmg_param.py
-    rmg_setup.py
-    rmg_editors.py
-    rmg_pic_interface.py
-    rmg_validators.py
+    blocks.py
+    params.py
+    pic_interface.py
+    run.py
     DESTINATION ${GR_PYTHON_DIR}/qraat/rmg
 )
 
