@@ -23,8 +23,9 @@
 #include <fstream>
 #include <ctime>
 #include <cstdio>
-#include <cstring> // memcpy
+#include <cstring> // memcpy, strerror
 #include <sys/stat.h>
+#include <errno.h>
 
 #include "pulse_data.h"
 
@@ -35,13 +36,14 @@ using namespace std;
    */
 
 ostream& operator<< ( ostream &out, const param_t &p ) {
+  time_t pulse_time = p.t_sec + (p.t_usec * 0.000001);
   out << "channel_ct     " << p.channel_ct << endl;
   out << "data_ct        " << p.data_ct << endl;
   out << "filter_data_ct " << p.filter_data_ct << endl;
   out << "pulse_index    " << p.pulse_index << endl;
   out << "sample_rate    " << p.sample_rate << endl;
   out << "ctr_freq       " << p.ctr_freq << endl;
-  printf("pulse_time     %s", asctime(gmtime(&(p.pulse_time.tv_sec)))); 
+  printf("pulse_time     %s", asctime(gmtime(&pulse_time)));
   return out;
 }
 
@@ -73,7 +75,8 @@ void pulse_data::open(
    int pulse_index,
    float sample_rate, 
    float ctr_freq,
-   struct timeval *pulse_time,
+   int t_sec,
+   int t_usec,
    const char *fn)
 {
   params.channel_ct     =  channel_ct; 
@@ -82,7 +85,8 @@ void pulse_data::open(
   params.pulse_index    =  pulse_index; 
   params.sample_rate    =  sample_rate; 
   params.ctr_freq       =  ctr_freq; 
-  params.pulse_time     = *pulse_time; 
+  params.t_sec        =  t_sec;
+  params.t_usec       =  t_usec;
 
   if( data ) 
     delete [] data; 
@@ -132,18 +136,20 @@ int pulse_data::read(const char *fn) {
 
   /* get parameters */
   fstream file( filename, ios::in | ios::binary ); 
-  if( !file.read((char*)&params, sizeof(param_t)) ) {
-    file.close();
-    return -1;
-  }
-
+  file.read((char*)&params, sizeof(param_t)); 
+  
   /* get data */
   data = new gr_complex [params.channel_ct * params.data_ct]; 
-  if( !file.read((char*)data, sizeof(gr_complex) * params.data_ct * params.channel_ct) )
-    return -1; 
+  file.read((char*)data, sizeof(gr_complex) * params.data_ct * params.channel_ct);
+
+  int res; 
+  if (file)
+    res = results.st_size; 
+  else 
+    res = -1; 
 
   file.close(); 
-  return results.st_size; 
+  return res; 
 }
 
 
