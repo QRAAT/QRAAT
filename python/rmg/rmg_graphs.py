@@ -176,7 +176,6 @@ class software_backend(gr.hier_block2):
         self.enable(be_param)
 
 
-# defines a noisey source for testing without usrp. 
 class no_usrp_top_block(gr.top_block):
 	def __init__(self, fpga_frequency = -10.7e6, decim_factor = 250, channels = 4, variance = 0.0):
                 """ A noisy signal source used for testing. Replaces :class:`qraat.rmg.rmg_graphs.usrp_top_block`. """
