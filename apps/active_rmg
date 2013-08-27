@@ -28,7 +28,7 @@ import wx, wx.html
 from gnuradio import gr, blks2, uhd, gru
 from optparse import OptionParser
 from numpy import mean, std
-import rmg, csv
+import qraat.rmg, csv
 import os, sys, signal, time
 import collections
 

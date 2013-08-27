@@ -39,6 +39,6 @@ GR_PYTHON_INSTALL(
 ########################################################################
 # Add subdirectories
 ########################################################################
-add_subdirectory(detection)
+add_subdirectory(rmg)
 
 

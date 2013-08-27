@@ -26,7 +26,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from gnuradio import gr, blks2, uhd, gru
-from rmg import *
+from qraat.rmg import *
 import shelve
 
 USE_PSD = 1 #1 to use pulse_shape_detector in pulse detector, 0 to not use it
