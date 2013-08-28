@@ -279,7 +279,8 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   strcat(filename, ".det"); 
   
   // Open .det file. 
-  if (!open_file(filename) || !d_fp) {
+  if (!open(filename) || !d_fp) {
+    printf("Can't open file \"%s\"\n",filename);
     free(u_sec); 
     free(time_string); 
     //free(str);
@@ -289,8 +290,17 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   }
 
   // Write metadata. 
+  fwrite(&ch,sizeof(int),1,(FILE *)d_fp);
+  fwrite(&save_length,sizeof(int),1,(FILE *)d_fp);
+  fwrite(&acc_length,sizeof(int),1,(FILE *)d_fp);
+  int pulse_start = save_length - acc_length-fill_length;
+  fwrite(&pulse_start,sizeof(int),1,(FILE *)d_fp);
+  fwrite(&rate,sizeof(float),1,(FILE *)d_fp);
+  fwrite(&c_freq,sizeof(float),1,(FILE *)d_fp);
   fwrite(&int_seconds,sizeof(int),1,(FILE *)d_fp);
   fwrite(&int_useconds,sizeof(int),1,(FILE *)d_fp);
+
+  // Print some stuff. 
   float snr = 10.0*log10(pkdet->peak_value/pkdet->avg);
   float noise_db = 10.0*log10(pkdet->avg/1e-5);
   strftime(time_string,40,"%H:%M:%S %d %b %Y",time_struct);
@@ -356,30 +366,6 @@ detectmod_detect::close()
   }
   
 }
-
-bool detectmod_detect::open_file(const char *filename)
-/** 
- * opens a .det file and writes the header information
- */
-{
-    
-  if(!open(filename)){
-    printf("Can't open file \"%s\"\n",filename);
-    return 0;
-  }
-  else{
-    fwrite(&ch,sizeof(int),1,(FILE *)d_fp);
-    fwrite(&save_length,sizeof(int),1,(FILE *)d_fp);
-    fwrite(&acc_length,sizeof(int),1,(FILE *)d_fp);
-    int pulse_start = save_length - acc_length-fill_length;
-    fwrite(&pulse_start,sizeof(int),1,(FILE *)d_fp);
-    fwrite(&rate,sizeof(float),1,(FILE *)d_fp);
-    fwrite(&c_freq,sizeof(float),1,(FILE *)d_fp);
-  return 1;
-  }
-
-}
-
 
 bool detectmod_detect::pulse_shape_discriminator(circ_buffer *data_holder){
 /** 
