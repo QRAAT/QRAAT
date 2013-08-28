@@ -68,7 +68,7 @@ pulse_data::~pulse_data() {
     delete [] data;
 } // destr
 
-void pulse_data::open( 
+bool pulse_data::open( 
    int channel_ct,
    int data_ct,
    int filter_data_ct,
@@ -93,18 +93,21 @@ void pulse_data::open(
   data = NULL; //new sample_t [params.data_ct];
 
   det.open( fn, ios::out | ios::binary );
+
+  if (!det.is_open())
+    return false; 
   
   /* write parameters */
   det.write((char*)&params, sizeof(param_t)); 
-
+  return true;     
 } //open()
 
 
 /**
  * write n bytes from data to det stream
  */
-void pulse_data::write(const char *data, int n) {
-  det.write(data, n);  
+void pulse_data::write_chunk(const char *chunk, int bytes) {
+  det.write(chunk, bytes);  
 } //write()
 
 
@@ -157,7 +160,7 @@ int pulse_data::read(const char *fn) {
  * write out *.det file
  * filename has an optional prefix
  */
-void pulse_data::writeout( const char *fn ) {
+void pulse_data::write( const char *fn ) {
   /* filename for writing */
   if( strcmp(fn,"")==0 ) 
     fn = filename; 
