@@ -1,4 +1,4 @@
-# rmg_pic_interface.py
+# pic_interface.py
 # Communication with the PIC interace on the RMG, developed at UIUC-ECE. 
 # This file is part of QRAAT, an automated animal tracking system based 
 # on GNU Radio. 
@@ -38,7 +38,7 @@ import time
 #: TODO What is this (?) 
 lo_str = ['No Calc', 'High LO', 'Low LO']
 
-class rmg_pic_interface:
+class pic_interface:
         """ Communication with the PIC interface for the RMG, developed at UUIC-ECE. 
 
           The PIC controls various tuning parameters for the RMG hardware. 
@@ -205,7 +205,7 @@ class rmg_pic_interface:
 #Test code for the module
 if __name__ == "__main__":
 
-    sc = rmg_pic_interface()
+    sc = pic_interface()
 #    sc.reset_pic()
     sc.check_lo()
     sc.freq_check()

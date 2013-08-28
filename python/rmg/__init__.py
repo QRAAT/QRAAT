@@ -44,8 +44,7 @@ if _RTLD_GLOBAL != 0:
 from rmg_swig import *
 
 # import any pure python here
-import rmg_run
-#import rmg_setup
+import run
 
 # ----------------------------------------------------------------
 # Tail of workaround
