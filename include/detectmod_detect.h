@@ -77,7 +77,6 @@ private:
   bool pulse_shape_discriminator(circ_buffer *);
   void write_data(circ_buffer *data_holder);
   bool open(const char *filename);
-  bool open_file(const char *filename);
   void close();
 
 //added enable to eliminate reconfig

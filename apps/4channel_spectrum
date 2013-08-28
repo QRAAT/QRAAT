@@ -26,7 +26,7 @@ from optparse import OptionParser
 from gnuradio.wxgui import stdgui2, fftsink2, form
 import wx, sys, math
 import time
-from qraat.rmg import rmg_pic_interface as pic_io
+from qraat.rmg import pic_interface as pic_io
 
 # required FPGA that can do 4 rx channels.
 
