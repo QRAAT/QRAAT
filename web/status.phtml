@@ -79,53 +79,60 @@ td.nok { background-color: #ffaaaa; }
 		$inodes_used_class = "nok"  ;
 		$disk_free_human = "N/A" ;
 		$disk_free_class = "nok"  ;
-		$disk_free = disk_free_space($name) ;
-		if( $disk_free )
+		$df_result = `df $name` ;
+		//	df /mnt/external
+		//	Filesystem     1K-blocks      Used Available Use% Mounted on
+		//	/dev/sdc1      488384532 272978928 215405604  56% /mnt/external
+		$lines = preg_split("/\R/",$df_result) ;
+		if( count($lines) > 1 )
 		{
-			$name_class = "ok" ;
-			$disk_total = disk_total_space($name) ;
-			$disk_used = $disk_total-$disk_free ;
-			$disk_free_gig = intval($disk_free/1073741824) ;
-			$disk_free_meg = intval($disk_free/1048576) ;
-			$disk_free_human = $disk_free_gig." GB" ;
-			if( $disk_free_gig == 0 )
+			$args = preg_split("/\s+/",$lines[1]) ;
+			if( count($args) > 5 )
 			{
-				$disk_free_human = $disk_free_meg." MB" ;
+				$disk_name = $args[5] ;
+				if( $disk_name == $name )
+				{
+					$name_class = "ok" ;
+					$disk_free = $args[3] ;
+					$disk_used_percent = $args[4] ;
+					$disk_free_gig = intval($disk_free/1048576) ;
+					$disk_free_meg = intval($disk_free/1024) ;
+					$disk_free_human = $disk_free_gig." GB" ;
+					if( $disk_free_gig == 0 )
+					{
+						$disk_free_human = $disk_free_meg." MB" ;
+					}
+				}
 			}
-			if( $disk_total > 0 )
+		}
+		$dfi_result = `df -i $name` ;
+		//	df -i /mnt/external
+		//	Filesystem        Inodes    IUsed     IFree IUse% Mounted on
+		//	/dev/sdc1      239555620 15315811 224239809    7% /mnt/external
+		$lines = preg_split("/\R/",$dfi_result) ;
+		if( count($lines) > 1 )
+		{
+			$args = preg_split("/\s+/",$lines[1]) ;
+			if( count($args) > 5 )
 			{
-				$disk_used_percent = intval(100*$disk_used/$disk_total) ;
-			}
-			else
-			{
-				$disk_used_percent = 0 ;
-			}
-			$dfi_result = `df -i $name` ;
-			$lines = preg_split("/\R/",$dfi_result) ;
-			$inodes_used_percent = 0 ;
-			if( count($lines) > 1 )
-			{
-				$args = preg_split("/\s+/",$lines[1]) ;
-				if( count($args) > 5 )
+				$disk_name = $args[5] ;
+				if( $disk_name == $name )
 				{
 					$inodes_used_percent = intval($args[4]) ;
 				}
 			}
+		}
+		if( ($disk_used_percent != "N/A") && ($disk_used_percent < 80) )
+		{
 			$disk_used_class = "ok"  ;
-			if( $disk_used_percent >= 80 )
-			{
-				$disk_used_class = "nok"  ;
-			}
+		}
+		if( ($inodes_used_percent != "N/A") && ($inodes_used_percent < 80) )
+		{
 			$inodes_used_class = "ok"  ;
-			if( $inodes_used_percent >= 80 )
-			{
-				$inodes_used_class = "nok"  ;
-			}
+		}
+		if( ($disk_free_gig != "N/A") && ($disk_free_gig > 5) )
+		{
 			$disk_free_class = "ok"  ;
-			if( $disk_free_gig < 5 )
-			{
-				$disk_free_class = "nok"  ;
-			}
 		}
 		print "<tr>" ;
 		print "<td class=\"$name_class\">$name</td>" ;
