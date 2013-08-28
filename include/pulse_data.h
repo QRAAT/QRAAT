@@ -63,7 +63,7 @@ public:
   ~pulse_data ();
 
   /* open stream for writing */
-  void open(
+  bool open(
    int channel_ct,
    int data_ct,
    int filter_data_ct,
@@ -76,14 +76,14 @@ public:
   );
   
   /* write something to stream */
-  void write(const char *data, int n);
+  void write_chunk(const char *chunk, int bytes);
 
   /* close stream */
   void close();
 
   /* file io */
   int read(const char *fn); 
-  void writeout(const char *fn="");
+  void write(const char *fn="");
 
   /* accessors - throw PulseDataErr */
   const param_t& param() const; 
