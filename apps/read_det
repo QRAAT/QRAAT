@@ -37,7 +37,7 @@ for i in range(p.channel_ct-1):
 print 'channel %d (real, imag)' % p.channel_ct 
 print '-'*4 + ('-'*24+'+')*(p.channel_ct-1) + '-'*22
 
-for i in range(p.data_ct):
+for i in range(p.sample_ct):
   print "%-4d" % (i+1) + " |".join(
    [ "%11s %11s" % ("%-4.02f" % det.real((i*p.channel_ct)+j), 
                     "%-4.02f" % det.imag((i*p.channel_ct)+j))

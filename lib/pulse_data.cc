@@ -37,13 +37,13 @@ using namespace std;
 
 ostream& operator<< ( ostream &out, const param_t &p ) {
   time_t pulse_time = p.t_sec + (p.t_usec * 0.000001);
-  out << "channel_ct     " << p.channel_ct << endl;
-  out << "sample_ct        " << p.sample_ct << endl;
+  out << "channel_c t     " << p.channel_ct << endl;
+  out << "sample_ct       " << p.sample_ct << endl;
   out << "pulse_sample_ct " << p.pulse_sample_ct << endl;
-  out << "pulse_index    " << p.pulse_index << endl;
-  out << "sample_rate    " << p.sample_rate << endl;
-  out << "ctr_freq       " << p.ctr_freq << endl;
-  printf("pulse_time     %s", asctime(gmtime(&pulse_time)));
+  out << "pulse_inde x    " << p.pulse_index << endl;
+  out << "sample_rate     " << p.sample_rate << endl;
+  out << "ctr_freq        " << p.ctr_freq << endl;
+  printf("pulse_time      %s", asctime(gmtime(&pulse_time)));
   return out;
 }
 
@@ -55,7 +55,8 @@ ostream& operator<< ( ostream &out, const param_t &p ) {
 pulse_data::pulse_data( const char *fn ) {
   /* save filename and read *.det file */
   data = NULL;
-  filename = NULL; 
+  filename = NULL;
+  index = 0; 
   if( fn && read(fn)==-1 ) 
     throw FileReadError;
 } // constr
@@ -173,44 +174,49 @@ const param_t& pulse_data::param() const {
  * this should be modifiable.
  */ 
 gr_complex& pulse_data::operator[] (int i){
+  int size = params.sample_ct * params.channel_ct; 
   if( !data ) 
     throw NoDataError;
-  if( i<0 || i>(params.sample_ct * params.channel_ct) ) 
+  if( i < 0 || i > size ) 
     throw IndexError; 
-  return data[i];
+  return data[(i + index) % size];
 }
 
 
 float pulse_data::real(int i) {
+  int size = params.sample_ct * params.channel_ct; 
   if( !data ) 
     throw NoDataError;
-  if( i<0 || i>(params.sample_ct * params.channel_ct) ) 
+  if( i < 0 || i> size ) 
     throw IndexError; 
-  return data[i].real();
+  return data[(i + index) % size].real();
 }
 
 float pulse_data::imag(int i) {
+  int size = params.sample_ct * params.channel_ct; 
   if( !data ) 
     throw NoDataError;
-  if( i<0 || i>(params.sample_ct * params.channel_ct) ) 
+  if( i< 0 || i > size ) 
     throw IndexError; 
-  return data[i].imag();
+  return data[(i + index) % size].imag();
 }
 
 void pulse_data::set_real(int i, float val) {
+  int size = params.sample_ct * params.channel_ct; 
   if( !data ) 
     throw NoDataError;
-  if( i<0 || i>(params.sample_ct * params.channel_ct) ) 
+  if( i < 0 || i > size ) 
     throw IndexError; 
-  data[i].real(val);
+  data[(i + index) % size].real(val);
 }
 
 void pulse_data::set_imag(int i, float val) {
+  int size = params.sample_ct * params.channel_ct; 
   if( !data ) 
     throw NoDataError;
-  if( i<0 || i>(params.sample_ct * params.channel_ct) ) 
+  if( i < 0 || i > size ) 
     throw IndexError; 
-  data[i].imag(val);
+  data[(i + index) % size].imag(val);
 }
 
 

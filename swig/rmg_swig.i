@@ -48,13 +48,13 @@ typedef struct {
       static char tmp [256];
       time_t pulse_time = $self->t_sec + ($self->t_usec * 0.000001); 
       sprintf(tmp, 
-"channel_ct     %d\n\
-sample_ct        %d\n\
+"channel_ct      %d\n\
+sample_ct       %d\n\
 pulse_sample_ct %d\n\
-pulse_index    %d\n\
-sample_rate    %g\n\
-ctr_freq       %g\n\
-pulse_time     %s", 
+pulse_index     %d\n\
+sample_rate     %g\n\
+ctr_freq        %g\n\
+pulse_time      %s", 
        $self->channel_ct, $self->sample_ct, $self->pulse_sample_ct, $self->pulse_index,
        $self->sample_rate, $self->ctr_freq, asctime(gmtime(&pulse_time))
       );
