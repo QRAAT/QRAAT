@@ -11,27 +11,27 @@ The RMG module
 The pulse detector array 
 ------------------------
 
-.. automodule:: qraat.rmg.rmg_run
+.. automodule:: qraat.rmg.run
 
-.. autoclass:: qraat.rmg.rmg_run.detector_array
+.. autoclass:: qraat.rmg.run.detector_array
 
   
 Signal processing blocks
 ------------------------
 
-.. automodule:: qraat.rmg.rmg_graphs
+.. automodule:: qraat.rmg.blocks
 
-.. autodata:: qraat.rmg.rmg_graphs.USE_PSD
+.. autodata:: qraat.rmg.blocks.USE_PSD
 
-.. autoclass:: qraat.rmg.rmg_graphs.usrp_top_block
+.. autoclass:: qraat.rmg.blocks.usrp_top_block
    :show-inheritance:
    :members:
 
-.. autoclass:: qraat.rmg.rmg_graphs.no_usrp_top_block
+.. autoclass:: qraat.rmg.blocks.no_usrp_top_block
    :show-inheritance:
    :members:
 
-.. autoclass:: qraat.rmg.rmg_graphs.software_backend
+.. autoclass:: qraat.rmg.blocks.software_backend
    :show-inheritance: 
    :members:
 
@@ -39,45 +39,29 @@ Signal processing blocks
 Parameters
 ----------
 
-.. automodule:: qraat.rmg.rmg_param
+.. automodule:: qraat.rmg.params
 
-.. autoclass:: qraat.rmg.rmg_param.backend
+.. autoclass:: qraat.rmg.params.backend
    :members:
 
-.. autoclass:: qraat.rmg.rmg_param.band
+.. autoclass:: qraat.rmg.params.band
    :members:
 
-.. autoclass:: qraat.rmg.rmg_param.tuning
+.. autoclass:: qraat.rmg.params.tuning
    :members:
 
 
 PIC interface
 -------------
 
-.. automodule:: qraat.rmg.rmg_pic_interface
+.. automodule:: qraat.rmg.pic_interface
 
-.. autoclass:: qraat.rmg.rmg_pic_interface.rmg_pic_interface
+.. autoclass:: qraat.rmg.pic_interface.pic_interface
    :members:
 
 
-rmg_setup
+C++ stuff
 ---------
-
-.. automodule:: qraat.rmg.rmg_setup
-
-rmg_editors
------------
-
-.. automodule:: qraat.rmg.rmg_editors
-
-rmg_validators
---------------
-
-.. automodule:: qraat.rmg.rmg_validators 
-
-
-C++ stuf
---------
 
 I need to organize this, but there you go. 
 
