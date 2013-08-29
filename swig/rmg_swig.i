@@ -96,30 +96,18 @@ friend class detectmod_detect;
 public:
   
   pulse_data (const char *fn=NULL); // throw PulseDataErr
+  pulse_data (
+    int channel_ct, 
+    int data_ct,
+    int filter_data_ct,
+    float sample_rate,
+    float ctr_freq
+  ); 
   ~pulse_data ();
-
-  /* open stream for writing */
-  bool open(
-   int channel_ct,
-   int data_ct,
-   int filter_data_ct,
-   int pulse_index,
-   float sample_rate, 
-   float ctr_freq,
-   int t_sec,
-   int t_usec, 
-   const char *fn
-  );
-  
-  /* write something to stream */
-  void write_chunk(const char *chunk, int bytes);
-
-  /* close stream */
-  void close();
 
   /* file io */
   int read(const char *fn); 
-  void write(const char *fn="");
+  int write(const char *fn="");
 
   /* accessors - throw PulseDataErr */
   const param_t& param(); 

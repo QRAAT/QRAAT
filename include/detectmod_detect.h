@@ -27,7 +27,7 @@
 #include <gr_block.h>
 #include <peak_detect.h>
 #include <accumulator.h>
-#include <circ_buffer.h>
+#include <pulse_data.h>
 #include <gr_sync_block.h>
 
 
@@ -62,8 +62,8 @@ private:
   int ch;
   int fill_length;
   accumulator *acc;
-  circ_buffer *save_holder;
-  circ_buffer *peak_holder;
+  pulse_data *save_holder;
+  pulse_data *peak_holder;
   peak_detect *pkdet;
   float rate;
   float c_freq;
@@ -74,8 +74,8 @@ private:
   void	       *d_fp;
   char psd;
 
-  bool pulse_shape_discriminator(circ_buffer *);
-  void write_data(circ_buffer *data_holder);
+  bool pulse_shape_discriminator(pulse_data *);
+  void write_data(pulse_data *data_holder);
   bool open(const char *filename);
   void close();
 
