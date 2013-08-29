@@ -35,13 +35,11 @@ typedef enum { FileReadError, NoDataError, IndexError } PulseDataError;
 /* parameters */
 typedef struct {
   int channel_ct,
-      data_ct,
-      filter_data_ct,
+      sample_ct,
+      pulse_sample_ct,
       pulse_index;
   float sample_rate, 
         ctr_freq;
-  //time_t pulse_time;
-  //struct timeval pulse_time;
   int t_sec, t_usec; 
 } param_t; 
 

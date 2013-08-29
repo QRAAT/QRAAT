@@ -38,8 +38,8 @@ using namespace std;
 ostream& operator<< ( ostream &out, const param_t &p ) {
   time_t pulse_time = p.t_sec + (p.t_usec * 0.000001);
   out << "channel_ct     " << p.channel_ct << endl;
-  out << "data_ct        " << p.data_ct << endl;
-  out << "filter_data_ct " << p.filter_data_ct << endl;
+  out << "sample_ct        " << p.sample_ct << endl;
+  out << "pulse_sample_ct " << p.pulse_sample_ct << endl;
   out << "pulse_index    " << p.pulse_index << endl;
   out << "sample_rate    " << p.sample_rate << endl;
   out << "ctr_freq       " << p.ctr_freq << endl;
@@ -62,20 +62,20 @@ pulse_data::pulse_data( const char *fn ) {
 
 pulse_data::pulse_data(
    int channel_ct,
-   int data_ct,
-   int filter_data_ct,
+   int sample_ct,
+   int pulse_sample_ct,
    float sample_rate, 
    float ctr_freq)
 {
   params.channel_ct = channel_ct;
-  params.data_ct = data_ct;
-  params.filter_data_ct = filter_data_ct;
+  params.sample_ct = sample_ct;
+  params.pulse_sample_ct = pulse_sample_ct;
   params.sample_rate = sample_rate; 
   params.ctr_freq = ctr_freq; 
   index = 0;
   
   filename = NULL; 
-  data = new gr_complex [params.channel_ct * params.data_ct]; 
+  data = new gr_complex [params.channel_ct * params.sample_ct]; 
 
 }
 
@@ -83,8 +83,8 @@ pulse_data::pulse_data(const pulse_data &det){
   params = det.params; 
   index = det.index;
   filename = NULL; 
-  data = new gr_complex [params.channel_ct * params.data_ct]; 
-  memcpy(data,det.data, params.channel_ct * params.data_ct * sizeof(gr_complex));
+  data = new gr_complex [params.channel_ct * params.sample_ct]; 
+  memcpy(data,det.data, params.channel_ct * params.sample_ct * sizeof(gr_complex));
 
 }
 
@@ -122,8 +122,8 @@ int pulse_data::read(const char *fn) {
   file.read((char*)&params, sizeof(param_t)); 
   
   /* get data */
-  data = new gr_complex [params.channel_ct * params.data_ct]; 
-  file.read((char*)data, sizeof(gr_complex) * params.data_ct * params.channel_ct);
+  data = new gr_complex [params.channel_ct * params.sample_ct]; 
+  file.read((char*)data, sizeof(gr_complex) * params.sample_ct * params.channel_ct);
 
   int res; 
   if (file)
@@ -154,7 +154,7 @@ int pulse_data::write( const char *fn ) {
 
   /* Unwrap circular buffer and write data */
   file.write((char*)(data + (index * params.channel_ct)), 
-          sizeof(gr_complex) * (params.data_ct - index) * params.channel_ct);
+          sizeof(gr_complex) * (params.sample_ct - index) * params.channel_ct);
   file.write((char*)data, sizeof(gr_complex) * index * params.channel_ct); 
   file.close();
   return 0; 
@@ -175,7 +175,7 @@ const param_t& pulse_data::param() const {
 gr_complex& pulse_data::operator[] (int i){
   if( !data ) 
     throw NoDataError;
-  if( i<0 || i>(params.data_ct * params.channel_ct) ) 
+  if( i<0 || i>(params.sample_ct * params.channel_ct) ) 
     throw IndexError; 
   return data[i];
 }
@@ -184,7 +184,7 @@ gr_complex& pulse_data::operator[] (int i){
 float pulse_data::real(int i) {
   if( !data ) 
     throw NoDataError;
-  if( i<0 || i>(params.data_ct * params.channel_ct) ) 
+  if( i<0 || i>(params.sample_ct * params.channel_ct) ) 
     throw IndexError; 
   return data[i].real();
 }
@@ -192,7 +192,7 @@ float pulse_data::real(int i) {
 float pulse_data::imag(int i) {
   if( !data ) 
     throw NoDataError;
-  if( i<0 || i>(params.data_ct * params.channel_ct) ) 
+  if( i<0 || i>(params.sample_ct * params.channel_ct) ) 
     throw IndexError; 
   return data[i].imag();
 }
@@ -200,7 +200,7 @@ float pulse_data::imag(int i) {
 void pulse_data::set_real(int i, float val) {
   if( !data ) 
     throw NoDataError;
-  if( i<0 || i>(params.data_ct * params.channel_ct) ) 
+  if( i<0 || i>(params.sample_ct * params.channel_ct) ) 
     throw IndexError; 
   data[i].real(val);
 }
@@ -208,7 +208,7 @@ void pulse_data::set_real(int i, float val) {
 void pulse_data::set_imag(int i, float val) {
   if( !data ) 
     throw NoDataError;
-  if( i<0 || i>(params.data_ct * params.channel_ct) ) 
+  if( i<0 || i>(params.sample_ct * params.channel_ct) ) 
     throw IndexError; 
   data[i].imag(val);
 }
@@ -221,22 +221,22 @@ pulse_data& pulse_data::operator=(const pulse_data &det){
 
   /* TODO: clean up. */ 
 
-  if (params.channel_ct == det.params.channel_ct && params.data_ct == det.params.data_ct){
-    memcpy(data,det.data,params.channel_ct*params.data_ct*sizeof(gr_complex));
+  if (params.channel_ct == det.params.channel_ct && params.sample_ct == det.params.sample_ct){
+    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(gr_complex));
     index = det.index;
   }
-  else if (params.channel_ct*params.data_ct == det.params.channel_ct*det.params.data_ct){  /* What's this? */ 
+  else if (params.channel_ct*params.sample_ct == det.params.channel_ct*det.params.sample_ct){  /* What's this? */ 
     params.channel_ct = det.params.channel_ct;
-    params.data_ct = det.params.data_ct;
-    memcpy(data,det.data,params.channel_ct*params.data_ct*sizeof(gr_complex));
+    params.sample_ct = det.params.sample_ct;
+    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(gr_complex));
     index = det.index;
   }
   else{
     params.channel_ct = det.params.channel_ct;
-    params.data_ct = det.params.data_ct;
+    params.sample_ct = det.params.sample_ct;
     delete [] data; 
-    data = new gr_complex [params.channel_ct * params.data_ct]; 
-    memcpy(data,det.data,params.channel_ct*params.data_ct*sizeof(gr_complex));
+    data = new gr_complex [params.channel_ct * params.sample_ct]; 
+    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(gr_complex));
     index = det.index;
   }
   return *this;
@@ -250,7 +250,7 @@ void pulse_data::add(gr_complex *in){
 
   memcpy(data + (index * params.channel_ct), in, params.channel_ct * sizeof(gr_complex));
   index ++;
-  if(index >= params.data_ct){
+  if(index >= params.sample_ct){
     index = 0;
   }
   
@@ -280,7 +280,7 @@ void pulse_data::inc_index(){
 //increments index
 
   index++;
-  if(index >= params.data_ct){
+  if(index >= params.sample_ct){
     index = 0;
   }
   
@@ -304,7 +304,7 @@ int main (int argc, const char** argv) {
 
     pulse_data pd(argv[1]); 
     cout << pd();
-    for( int i = 0; i < pd().data_ct; i++ ) 
+    for( int i = 0; i < pd().sample_ct; i++ ) 
        cout << pd[i];
     pd.write("new_");
 

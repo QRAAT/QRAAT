@@ -37,8 +37,8 @@ GR_SWIG_BLOCK_MAGIC(detectmod,detect);
 
 typedef struct {
   int channel_ct,
-      data_ct,
-      filter_data_ct,
+      sample_ct,
+      pulse_sample_ct,
       pulse_index;
   float sample_rate, 
         ctr_freq;
@@ -49,13 +49,13 @@ typedef struct {
       time_t pulse_time = $self->t_sec + ($self->t_usec * 0.000001); 
       sprintf(tmp, 
 "channel_ct     %d\n\
-data_ct        %d\n\
-filter_data_ct %d\n\
+sample_ct        %d\n\
+pulse_sample_ct %d\n\
 pulse_index    %d\n\
 sample_rate    %g\n\
 ctr_freq       %g\n\
 pulse_time     %s", 
-       $self->channel_ct, $self->data_ct, $self->filter_data_ct, $self->pulse_index,
+       $self->channel_ct, $self->sample_ct, $self->pulse_sample_ct, $self->pulse_index,
        $self->sample_rate, $self->ctr_freq, asctime(gmtime(&pulse_time))
       );
       return &tmp[0];
@@ -98,8 +98,8 @@ public:
   pulse_data (const char *fn=NULL); // throw PulseDataErr
   pulse_data (
     int channel_ct, 
-    int data_ct,
-    int filter_data_ct,
+    int sample_ct,
+    int pulse_sample_ct,
     float sample_rate,
     float ctr_freq
   ); 
