@@ -76,3 +76,21 @@ rmg_validators
 .. automodule:: qraat.rmg.rmg_validators 
 
 
+C++ stuf
+--------
+
+I need to organize this, but there you go. 
+
+.. doxygenclass:: detectmod_detect
+   :members:
+
+.. doxygenclass:: pulse_data
+   :members:
+
+.. doxygenclass:: accumulator
+   :members:
+
+.. doxygenclass:: peak_detect
+   :members:
+
+.. doxygenstruct:: param_t

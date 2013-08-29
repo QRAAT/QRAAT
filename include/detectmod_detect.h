@@ -32,10 +32,13 @@
 class detectmod_detect;
 
 //! The states of the pulse detector. 
-typedef enum {FILL_ACCUMULATOR, 
-              DETECT, 
-              CONFIRM_PEAK,
-              FILL_BUFFER} module_state_t;
+typedef enum 
+{
+  FILL_ACCUMULATOR, //!< fill accumulator
+  DETECT,           //!< detect
+  CONFIRM_PEAK,     //!< confirm peak
+  FILL_BUFFER       //!< fill buffer
+} module_state_t;
 
 /*
  * GNU Radio uses boost smart pointers for all access to signal processing

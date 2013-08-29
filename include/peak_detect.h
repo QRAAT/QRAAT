@@ -17,11 +17,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-//! States for peak detector. 
-typedef enum {BELOW_THRESHOLD, 
-              ABOVE_THRESHOLD, 
-              PEAK, 
-              TRIGGER} detect_state_t;
+/*! States for peak detector. */
+typedef enum 
+{
+  BELOW_THRESHOLD, //!< below threshold
+  ABOVE_THRESHOLD, //!< above threshold
+  PEAK,            //!< peak
+  TRIGGER          //!< trigger
+} detect_state_t;
 
 class detectmod_detect;
 
