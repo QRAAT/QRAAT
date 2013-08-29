@@ -1,7 +1,6 @@
-/* accumulator.h
- * Maintain a running sum of the USRP input signal. This is treated as 
- * a time-matched filter for use by the detector class. This file is part 
- * of QRAAT, an automated animal tracking system based on GNU Radio. 
+/** \file accumulator.h
+ * his file is part of QRAAT, an automated animal tracking system based 
+ * on GNU Radio. 
  *
  * Copyright (C) 2012 Todd Borrowman
  * 
@@ -19,18 +18,48 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*!
+ * Maintain a running sum of the USRP input signal. This is treated as 
+ * a time-matched filter for use by the detector class. The signal 
+ * itself is stored in a circular buffer. 
+ */ 
 class accumulator
 {
 private:
-  int size;
-  float *buffer;
-  double total_sum;
-  int index;
 
+  //! Signal buffer. 
+  float *buffer;
+
+  //! Size of the buffer
+  int size;
+
+  //! The running sum. 
+  double total_sum;
+
+  //! Index of the front of the circular buffer. 
+  int index;
   
 public:
+
+  /*!
+   * accumulator constructor
+   */
   accumulator(int s);
+
+  /*!
+   * accumulator destructor
+   */
   ~accumulator();
+
+  /*! 
+   * Add a new datum to buffer. 
+   * \param in - the new datum
+   * \return The running sum 
+   */ 
   float add(float in);
+
+  /*! 
+   * Get the current total. 
+   */ 
   float value();
 };

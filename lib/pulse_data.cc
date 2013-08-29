@@ -61,6 +61,7 @@ pulse_data::pulse_data( const char *fn ) {
     throw FileReadError;
 } // constr
 
+
 pulse_data::pulse_data(
    int channel_ct,
    int sample_ct,
@@ -77,8 +78,7 @@ pulse_data::pulse_data(
   
   filename = NULL; 
   data = new gr_complex [params.channel_ct * params.sample_ct]; 
-
-}
+} 
 
 pulse_data::pulse_data(const pulse_data &det){
   params = det.params; 

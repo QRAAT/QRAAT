@@ -1,7 +1,5 @@
-/* peak_detect.h
- * Peak detection state machine to determine pulse locations. 
- * This file is part of QRAAT, an automated animal tracking system 
- * based on GNU Radio. 
+/* peak_detect.h. This file is part of QRAAT, an automated animal tracking 
+ * system based on GNU Radio. 
  *
  * Copyright (C) 2012 Todd Borrowman
  * 
@@ -19,10 +17,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-typedef enum {BELOW_THRESHOLD, ABOVE_THRESHOLD, PEAK, TRIGGER} detect_state_t;
+//! States for peak detector. 
+typedef enum {BELOW_THRESHOLD, 
+              ABOVE_THRESHOLD, 
+              PEAK, 
+              TRIGGER} detect_state_t;
 
 class detectmod_detect;
 
+/*!
+ * \brief Peak detection state machine. 
+ */
 class peak_detect
 {
 
@@ -30,16 +35,28 @@ friend class detectmod_detect;
 
 private:
 
-  float rise;
-  float fall;
-  float alpha;
-  float peak_value;
-  float avg;
+  float rise;       //! Rise trigger
+  float fall;       //! Fall trigger
+  float alpha;      //! Alpha factor
+  float peak_value; //! Previous peak value?
+  float avg;        //! What is this? 
 
-  detect_state_t state;
+  detect_state_t state; //! Current state. 
 
 public:
 
+  /*! 
+   * \brief Constructor.
+   * \param rise_in - Rise trigger
+   * \param fall_in - Fall trigger
+   * \param alpha_in - Alpha factor
+   */
   peak_detect(float rise_in, float fall_in, float alpha_in);
+
+  /*!
+   * \brief Run state machine. 
+   * \param data - Next datum. 
+   */
   detect_state_t detect(const float data);
+
 };
