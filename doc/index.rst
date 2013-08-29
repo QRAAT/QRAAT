@@ -28,7 +28,6 @@ Contents:
    :members:
 
 
-
 Indices and tables
 ==================
 

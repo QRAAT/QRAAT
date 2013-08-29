@@ -45,13 +45,29 @@ typedef enum { FileReadError, NoDataError, IndexError } PulseDataError;
  * then use param_t.  
  */
 typedef struct {
-  int channel_ct,      //! Number of input channels.
-      sample_ct,       //! Number of signal samples.
-      pulse_sample_ct, //! Number of samples corresponding to the pulse. 
-      pulse_index;     //! Index of the start of pulse in samples. 
-  float sample_rate,   //! Rate which the samples were prdocued (units?) 
-        ctr_freq;      //! Center frequency used by detector. 
-  int t_sec, t_usec;   //! Timestamp of pulse (seconds since epcoh, milliseconds) 
+  //! Number of input channels.
+  int channel_ct;      
+
+  //! Number of signal samples.
+  int sample_ct;       
+  
+  //! Number of samples corresponding to the pulse. 
+  int pulse_sample_ct; 
+  
+  //! Index of the start of pulse in samples. 
+  int pulse_index;     
+  
+  //! Rate which the samples were prdocued (units?) 
+  float sample_rate;   
+  
+  //! Center frequency used by detector. 
+  float ctr_freq;      
+  
+  //! Timestamp of pulse (seconds since epoch) 
+  int t_sec;    
+
+  //! Timestamp of pulse (milliseconds) 
+  int t_usec;   
 } param_t; 
 
 /*!
