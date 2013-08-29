@@ -60,6 +60,33 @@ pulse_data::pulse_data( const char *fn ) {
     throw FileReadError;
 } // constr
 
+pulse_data::pulse_data(
+   int channel_ct,
+   int data_ct,
+   int filter_data_ct,
+   float sample_rate, 
+   float ctr_freq)
+{
+  params.channel_ct = channel_ct;
+  params.data_ct = data_ct;
+  params.filter_data_ct = filter_data_ct;
+  params.sample_rate = sample_rate; 
+  params.ctr_freq = ctr_freq; 
+  index = 0;
+  
+  filename = NULL; 
+  data = new gr_complex [params.channel_ct * params.data_ct]; 
+
+}
+
+pulse_data::pulse_data(const pulse_data &det){
+  params = det.params; 
+  index = det.index;
+  filename = NULL; 
+  data = new gr_complex [params.channel_ct * params.data_ct]; 
+  memcpy(data,det.data, params.channel_ct * params.data_ct * sizeof(gr_complex));
+
+}
 
 pulse_data::~pulse_data() {
   if( filename )
@@ -67,53 +94,6 @@ pulse_data::~pulse_data() {
   if( data ) 
     delete [] data;
 } // destr
-
-bool pulse_data::open( 
-   int channel_ct,
-   int data_ct,
-   int filter_data_ct,
-   int pulse_index,
-   float sample_rate, 
-   float ctr_freq,
-   int t_sec,
-   int t_usec,
-   const char *fn)
-{
-  params.channel_ct     =  channel_ct; 
-  params.data_ct        =  data_ct; 
-  params.filter_data_ct =  filter_data_ct; 
-  params.pulse_index    =  pulse_index; 
-  params.sample_rate    =  sample_rate; 
-  params.ctr_freq       =  ctr_freq; 
-  params.t_sec        =  t_sec;
-  params.t_usec       =  t_usec;
-
-  if( data ) 
-    delete [] data; 
-  data = NULL; //new sample_t [params.data_ct];
-
-  det.open( fn, ios::out | ios::binary );
-
-  if (!det.is_open())
-    return false; 
-  
-  /* write parameters */
-  det.write((char*)&params, sizeof(param_t)); 
-  return true;     
-} //open()
-
-
-/**
- * write n bytes from data to det stream
- */
-void pulse_data::write_chunk(const char *chunk, int bytes) {
-  det.write(chunk, bytes);  
-} //write()
-
-
-void pulse_data::close() {
-  det.close();
-} //close()
 
 
 /** 
@@ -160,20 +140,24 @@ int pulse_data::read(const char *fn) {
  * write out *.det file
  * filename has an optional prefix
  */
-void pulse_data::write( const char *fn ) {
+int pulse_data::write( const char *fn ) {
   /* filename for writing */
   if( strcmp(fn,"")==0 ) 
     fn = filename; 
 
   fstream file( fn, ios::out | ios::binary );
+  if (!file.is_open())
+    return -1; 
   
   /* write parameters */
   file.write((char*)&params, sizeof(param_t)); 
 
-  /* write data */
-  file.write((char*)data, sizeof(gr_complex) * params.channel_ct * params.data_ct); 
-
+  /* Unwrap circular buffer and write data */
+  file.write((char*)(data + (index * params.channel_ct)), 
+          sizeof(gr_complex) * (params.data_ct - index) * params.channel_ct);
+  file.write((char*)data, sizeof(gr_complex) * index * params.channel_ct); 
   file.close();
+  return 0; 
 }
 
 /**
@@ -228,6 +212,81 @@ void pulse_data::set_imag(int i, float val) {
     throw IndexError; 
   data[i].imag(val);
 }
+
+
+
+
+
+pulse_data& pulse_data::operator=(const pulse_data &det){
+
+  /* TODO: clean up. */ 
+
+  if (params.channel_ct == det.params.channel_ct && params.data_ct == det.params.data_ct){
+    memcpy(data,det.data,params.channel_ct*params.data_ct*sizeof(gr_complex));
+    index = det.index;
+  }
+  else if (params.channel_ct*params.data_ct == det.params.channel_ct*det.params.data_ct){  /* What's this? */ 
+    params.channel_ct = det.params.channel_ct;
+    params.data_ct = det.params.data_ct;
+    memcpy(data,det.data,params.channel_ct*params.data_ct*sizeof(gr_complex));
+    index = det.index;
+  }
+  else{
+    params.channel_ct = det.params.channel_ct;
+    params.data_ct = det.params.data_ct;
+    delete [] data; 
+    data = new gr_complex [params.channel_ct * params.data_ct]; 
+    memcpy(data,det.data,params.channel_ct*params.data_ct*sizeof(gr_complex));
+    index = det.index;
+  }
+  return *this;
+}
+
+
+void pulse_data::add(gr_complex *in){
+/** 
+ * Adds new values to the buffer
+ */
+
+  memcpy(data + (index * params.channel_ct), in, params.channel_ct * sizeof(gr_complex));
+  index ++;
+  if(index >= params.data_ct){
+    index = 0;
+  }
+  
+  return;
+}
+
+int pulse_data::get_index(){
+  return index;
+}
+
+gr_complex* pulse_data::get_buffer(){
+/** 
+ * Returns the current buffer contents
+ * The contents are not re-ordered before the return
+ */
+
+  return data;
+}
+
+gr_complex* pulse_data::get_sample(){
+//Returns address to the current sample to be replaced when adding data
+
+  return data + (index * params.channel_ct);
+}
+
+void pulse_data::inc_index(){
+//increments index
+
+  index++;
+  if(index >= params.data_ct){
+    index = 0;
+  }
+  
+  return;
+}
+
 
 
 

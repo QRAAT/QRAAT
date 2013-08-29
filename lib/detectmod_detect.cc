@@ -112,8 +112,8 @@ detectmod_detect::detectmod_detect (int pulse_width,
   d_fp = 0;
   
   acc = new accumulator(acc_length);
-  save_holder = new circ_buffer(ch, save_length);
-  peak_holder = new circ_buffer(ch, save_length);
+  save_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
+  peak_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
   pkdet = new peak_detect(1.1,1.05,.05);
 
   psd = _psd;
@@ -248,7 +248,7 @@ detectmod_detect::work (int noutput_items,
 }
 
 
-void detectmod_detect::write_data(circ_buffer *data_holder){
+void detectmod_detect::write_data(pulse_data *data_holder){
 /** 
  * Writes the pulse data as a .det file
  */
@@ -279,11 +279,12 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   strcat(filename, "_"); 
   strcat(filename, time_string); 
   strcat(filename, ".det"); 
+  
+  data_holder->params.pulse_index = save_length - acc_length - fill_length; 
+  data_holder->params.t_sec = int_seconds; 
+  data_holder->params.t_usec = int_useconds; 
 
-  pulse_data det;
-  int pulse_start = save_length - acc_length-fill_length;
-  if (!det.open(ch, save_length, acc_length, pulse_start, rate, 
-                c_freq, int_seconds, int_useconds, filename))
+  if (data_holder->write(filename) == -1)
   {
     printf("Can't open file \"%s\"\n",filename);
     free(u_sec); 
@@ -292,16 +293,6 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
     free(directory_time_string);
     return;
   }
-
-  // Write pulse data. Get data buffer and index from data_holder
-  gr_complex *data = data_holder->get_buffer();
-  int index = data_holder->get_index();
-
-  // Unwrap circular buffer and write data to file
-  temp = data + (index)*ch;
-  det.write_chunk((const char*)temp, sizeof(gr_complex) * (save_length - index) * ch);
-  det.write_chunk((const char*)data, sizeof(gr_complex) * index * ch); 
-  det.close(); 
 
   // Print some stuff. 
   float snr = 10.0*log10(pkdet->peak_value/pkdet->avg);
@@ -359,7 +350,7 @@ detectmod_detect::close()
   
 }
 
-bool detectmod_detect::pulse_shape_discriminator(circ_buffer *data_holder){
+bool detectmod_detect::pulse_shape_discriminator(pulse_data *data_holder){
 /** 
  * determines whether the detected pulse looks like a rectangle or not
  */
@@ -502,8 +493,8 @@ void detectmod_detect::enable(int pulse_width,
   strcpy(tx_name, _tx_name); 
 
   acc = new accumulator(acc_length);
-  save_holder = new circ_buffer(ch, save_length);
-  peak_holder = new circ_buffer(ch, save_length);
+  save_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
+  peak_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
 
   enable_detect = 1;
 }
