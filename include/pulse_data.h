@@ -56,34 +56,18 @@ friend class detectmod_detect;
   param_t params; 
   gr_complex *data;
   char *filename;
+  
+    /* circ_buffer */
+  int index;
 
 public:
   
   pulse_data (const char *fn=NULL); // throw PulseDataErr
   ~pulse_data ();
 
-  /* open stream for writing */
-  bool open(
-   int channel_ct,
-   int data_ct,
-   int filter_data_ct,
-   int pulse_index,
-   float sample_rate, 
-   float ctr_freq,
-   int t_sec,
-   int t_usec, 
-   const char *fn
-  );
-  
-  /* write something to stream */
-  void write_chunk(const char *chunk, int bytes);
-
-  /* close stream */
-  void close();
-
   /* file io */
   int read(const char *fn); 
-  void write(const char *fn="");
+  int write(const char *fn="");
 
   /* accessors - throw PulseDataErr */
   const param_t& param() const; 
@@ -93,6 +77,23 @@ public:
   float imag(int i); 
   void set_real(int i, float val);
   void set_imag(int i, float val);
+
+     /* circ_buffer */
+  pulse_data(
+   int channel_ct,
+   int data_ct,
+   int filter_data_ct,
+   float sample_rate, 
+   float ctr_freq
+  );
+
+  pulse_data(const pulse_data &det);
+  pulse_data& operator=(const pulse_data &det);
+  void add(gr_complex *in);
+  int get_index();
+  gr_complex *get_buffer();
+  gr_complex *get_sample();
+  void inc_index();
 
 };
 
