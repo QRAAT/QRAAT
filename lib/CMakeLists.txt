@@ -25,7 +25,6 @@ include(GrPlatform) #define LIB_SUFFIX
 add_library(gnuradio-rmg SHARED 
   detectmod_detect.cc 
   accumulator.cc 
-  circ_buffer.cc 
   peak_detect.cc 
   pulse_data.cc
 )
