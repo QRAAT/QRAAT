@@ -31,8 +31,8 @@ endif()
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
-    det_file.py
-    est_data.py
+    det.py
+    est.py
     DESTINATION ${GR_PYTHON_DIR}/qraat
 )
 

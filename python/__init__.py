@@ -27,6 +27,5 @@ interface.
 #import detection
 #import estimation
 
-from pulse_data_swig import pulse_data, param_t
-from est_data import data_arrays, est_data
-from det_file import det_file
+from est import data_arrays, est_data
+from det import det_file
