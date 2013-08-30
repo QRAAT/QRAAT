@@ -28,4 +28,4 @@ interface.
 #import estimation
 
 from est import data_arrays, est_data
-from det import det_file
+from det import det_file, det

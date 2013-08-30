@@ -25,7 +25,17 @@ from pulse_swig import pulse_data, param_t
 
 
 class det (pulse_data):
-  pass
+  def __str__(self):
+    """ Return the filename as a string. """
+    return self.filename
+
+  def print_det(self):
+    """ Print the record's metdata to standard output. """
+    print self.param()
+
+  def dumb(self):
+    print self.data[2]
+
 
 
 class det_file():

@@ -59,7 +59,6 @@ pulse_time      %s",
   }
 } param_t; 
 
-//%rename(sample) pulse_data::operator[] (int i);
 
 %exception {
   try { 
@@ -82,6 +81,7 @@ pulse_time      %s",
 
 class pulse_data {
 friend class detectmod_detect; 
+protected:
 
   fstream det; 
   param_t params; 
@@ -111,5 +111,9 @@ public:
   float real(int i); 
   void set_imag(int i, float val);
   void set_real(int i, float val);
+  gr_complex *get(); 
 
 };
+  
+
+
