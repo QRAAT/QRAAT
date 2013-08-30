@@ -239,6 +239,11 @@ void pulse_data::set_imag(int i, float val) {
   data[(i + index) % size].imag(val);
 } // set_imag()
 
+gr_complex* pulse_data::get()
+{
+  return data;
+} // get()
+
 
   /**
    * Circular buffer methods. 

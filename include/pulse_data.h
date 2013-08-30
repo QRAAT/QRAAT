@@ -89,6 +89,7 @@ class detectmod_detect;
  */ 
 class RMG_API pulse_data {
 friend class detectmod_detect; 
+protected:
 
   //! Record metadata. 
   param_t params;   
@@ -191,6 +192,14 @@ public:
    */
   void set_imag(int i, float val);
 
+  /*!
+   * Return pointer to the data buffer. 
+   *
+   * Note that the buffer is not unwrapped. 
+   */
+  gr_complex *get(); 
+
+
 
   /* Routines for the circular buffer. */
 
@@ -208,12 +217,7 @@ public:
    */ 
   int get_index();
 
-  /*!
-   * \brief Return pointer to front of buffer. 
-   * 
-   * Note that the buffer is not unwrapped. This method is obsolete 
-   * since pulse_data is friends with class detectmod_detect. 
-   */
+  /*! TODO deprecate */
   gr_complex *get_buffer();
 
   /*!
