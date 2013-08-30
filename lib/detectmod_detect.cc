@@ -89,7 +89,7 @@ detectmod_detect::detectmod_detect (int pulse_width,
   acc_length = pulse_width;//size of the accumulator
   
   
-  /** 
+  /* 
    * length of the file needs to be at least 3 times as long as 
    * the pulse to accomidate the noise covariance calculation
    */
@@ -247,7 +247,9 @@ detectmod_detect::work (int noutput_items,
   return noutput_items;
 }
 
-
+/*
+ * WRite pulse data as a .det file. 
+ */
 void detectmod_detect::write_data(pulse_data *data_holder){
 /** 
  * Writes the pulse data as a .det file

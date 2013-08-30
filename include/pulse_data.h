@@ -41,7 +41,7 @@ typedef enum { FileReadError, NoDataError, IndexError } PulseDataError;
  * pulse_data's constructor the header version to use, which will
  * correspond to to a particular struct. pulse_data::read() will determine 
  * if a .det's header is versioned or legacy by looking at the first four 
- * bytes. I.e., file.read((char*)&version, sizeof(int)); if version != 0, 
+ * bytes. I.e., ``file.read((char*)&version, sizeof(int));`` if version != 0, 
  * then use param_t.  
  */
 typedef struct {
@@ -90,20 +90,24 @@ class detectmod_detect;
 class RMG_API pulse_data {
 friend class detectmod_detect; 
 
-  param_t params;   //! Record metadata. 
-  gr_complex *data; //! Data array, size = params.channel_ct * params.sample_ct. 
-  char *filename;   //! Name of input file.  
+  //! Record metadata. 
+  param_t params;   
+
+  //! Data array, size = params.channel_ct * params.sample_ct. 
+  gr_complex *data; 
   
-  int index; //! Point to start of the circular buffer (oldest sample). 
+  //! Name of input file.  
+  char *filename;   
+  
+  //! Point to start of the circular buffer (oldest sample). 
+  int index; 
 
 public:
   
   /*!
-   * \brief Constructor for the Python API. 
-   *
-   * Throws PulseDataErr.
-   * \param fn - Input file name. 
-   * */ 
+   * \brief Constructor for the Python API. Throws PulseDataErr.
+   * \param fn Input file name. 
+   */ 
   pulse_data (const char *fn=NULL); 
   
   /*! 
@@ -122,7 +126,7 @@ public:
   );
   
   /*! 
-   * \brief Default cosntructor. 
+   * \brief Constructor from another pulse_data instance. 
    */ 
   pulse_data(const pulse_data &det);
 
@@ -137,7 +141,11 @@ public:
   pulse_data& operator=(const pulse_data &det);
 
   /*!
-   * \brief Rad pulse data from file. 
+   * \brief Read pulse data from file. 
+   *
+   * \param fn File name to read.  
+   * \returns The number of bytes read. -1 if the file doesn't 
+   *          exists or is corrupted. 
    */
   int read(const char *fn); 
 
@@ -183,6 +191,7 @@ public:
    */
   void set_imag(int i, float val);
 
+
   /* Routines for the circular buffer. */
 
   /*!
@@ -201,6 +210,9 @@ public:
 
   /*!
    * \brief Return pointer to front of buffer. 
+   * 
+   * Note that the buffer is not unwrapped. This method is obsolete 
+   * since pulse_data is friends with class detectmod_detect. 
    */
   gr_complex *get_buffer();
 
