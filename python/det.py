@@ -21,6 +21,12 @@ import struct
 import os
 import time
 
+from pulse_swig import pulse_data, param_t
+
+
+class det (pulse_data):
+  pass
+
 
 class det_file():
     """ Encapsulation of .det files, the output of the pulse detector. 
