@@ -52,7 +52,7 @@ pulse_data::pulse_data( const char *fn )
 {
   data = NULL;
   filename = NULL;
-  index = 0; 
+  index = size = 0;  
   if( fn && read(fn)==-1 ) 
     throw FileReadError;
 } // constructor for Python interface
@@ -70,6 +70,7 @@ pulse_data::pulse_data(
   params.sample_rate = sample_rate; 
   params.ctr_freq = ctr_freq; 
   index = 0;
+  size = params.channel_ct * params.sample_ct; 
  
   filename = NULL; 
   data = new gr_complex [params.channel_ct * params.sample_ct]; 
@@ -79,6 +80,7 @@ pulse_data::pulse_data(const pulse_data &det)
 {
   params = det.params; 
   index = det.index;
+  size = det.size; 
   filename = NULL; 
   data = new gr_complex [params.channel_ct * params.sample_ct]; 
   memcpy(data,det.data, params.channel_ct * params.sample_ct * sizeof(gr_complex));
@@ -101,12 +103,14 @@ pulse_data& pulse_data::operator=(const pulse_data &det)
   if (params.channel_ct == det.params.channel_ct && params.sample_ct == det.params.sample_ct){
     memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(gr_complex));
     index = det.index;
+    size = det.size; 
   }
   else if (params.channel_ct*params.sample_ct == det.params.channel_ct*det.params.sample_ct){  /* What's this? */ 
     params.channel_ct = det.params.channel_ct;
     params.sample_ct = det.params.sample_ct;
     memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(gr_complex));
     index = det.index;
+    size = det.size;
   }
   else{
     params.channel_ct = det.params.channel_ct;
@@ -115,6 +119,7 @@ pulse_data& pulse_data::operator=(const pulse_data &det)
     data = new gr_complex [params.channel_ct * params.sample_ct]; 
     memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(gr_complex));
     index = det.index;
+    size = det.size; 
   }
   return *this;
 } // operator=
@@ -143,6 +148,7 @@ int pulse_data::read(const char *fn)
   /* Get parameters. */
   fstream file( filename, ios::in | ios::binary ); 
   file.read((char*)&params, sizeof(param_t)); 
+  size = params.sample_ct * params.channel_ct; 
   
   /* Get data. */
   data = new gr_complex [params.channel_ct * params.sample_ct]; 
@@ -195,27 +201,22 @@ const param_t& pulse_data::param() const {
    */
 
 gr_complex& pulse_data::operator[] (int i) {
-  int size = params.sample_ct * params.channel_ct; 
-  if( !data ) 
-    throw NoDataError;
-  if( i < 0 || i > size ) 
-    throw IndexError; 
-  return data[(i + index) % size];
+  return sample(i); 
 } // operator[]
 
+gr_complex& pulse_data::sample(int i) {
+  if( i< 0 || i > size ) 
+    throw IndexError; 
+  return data[(i + index) % size];    
+} // sample()
+
 float pulse_data::real(int i) {
-  int size = params.sample_ct * params.channel_ct; 
   if( !data ) 
     throw NoDataError;
-  if( i < 0 || i> size ) 
-    throw IndexError; 
   return data[(i + index) % size].real();
 } // real()
 
 float pulse_data::imag(int i) {
-  int size = params.sample_ct * params.channel_ct; 
-  if( !data ) 
-    throw NoDataError;
   if( i< 0 || i > size ) 
     throw IndexError; 
   return data[(i + index) % size].imag();

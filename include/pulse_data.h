@@ -91,9 +91,6 @@ class RMG_API pulse_data {
 friend class detectmod_detect; 
 protected:
 
-  //! Record metadata. 
-  param_t params;   
-
   //! Data array, size = params.channel_ct * params.sample_ct. 
   gr_complex *data; 
   
@@ -103,7 +100,15 @@ protected:
   //! Point to start of the circular buffer (oldest sample). 
   int index; 
 
+  int size; // Store the size of the data array.
+
 public:
+  
+  /*!
+   * Record metadata. Declared as public so that it's accessible
+   * in the Python interface. 
+   */
+  param_t params;   
   
   /*!
    * \brief Constructor for the Python API. Throws PulseDataErr.
@@ -164,12 +169,16 @@ public:
    */
   const param_t& param() const; 
 
+
   /*!
    * \brief Arbitrary access over data array. 
    *
    * To get the jth channel of the ith sample, 
    * do det[(i * det.param().channel_ct) + j].
    */
+  gr_complex& sample(int i); 
+
+  /*! Same as pulse_data::sample(). */
   gr_complex& operator[] (int i); 
 
   /*!
