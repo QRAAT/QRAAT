@@ -25,6 +25,12 @@ from pulse_swig import pulse_data, param_t
 
 
 class det (pulse_data):
+
+  f = None
+  f_sig = None
+  eigenvalues = None
+  eigenvectors = None
+  n_cov = None
  
   def __init__(self, fn):
     pulse_data.__init__(self, fn)
@@ -42,6 +48,91 @@ class det (pulse_data):
   def print_det(self):
     """ Print the record's metdata to standard output. """
     print self.params
+    
+  def fft(self):
+    """ Performs an fft on pulse data. 
+          
+          Saves result as instance attribute f.
+
+    :returns: result of fft calculation
+    """
+    if not self.f:
+      self.f = np.zeros((self.params.pulse_sample_ct,self.params.channel_ct),np.complex)
+      for j in range(self.params.channel_ct):
+        self.f[:,j] = np.fft.fft(self.pulse[:,j])
+    return self.f
+
+  def f_signal(self):
+    """ Calculate pulse paramters based on Fourier Analysis. 
+        **TODO:** description of paramters(?)
+    
+    :returns: parameters
+    :rtype: (?)
+    """
+    if not self.f: self.fft()
+    
+    if not self.f_sig: 
+      bin_width = self.params.sample_rate/self.params.pulse_sample_ct
+      f_pwr = np.sum(self.f*self.f.conjugate(),axis = 1)
+      freq_index = np.argmax(f_pwr)
+
+      #complex signal vector
+      self.f_sig = self.f[freq_index,:][:,np.newaxis]/np.sqrt(f_pwr[freq_index])
+
+      #3dB pulse bandwidth
+      self.f_bandwidth3 = np.sum(f_pwr > f_pwr[freq_index]/2)*bin_width
+
+      #10dB pulse bandwidth
+      self.f_bandwidth10 = np.sum(f_pwr > f_pwr[freq_index]/10)*bin_width
+
+      #frequency of peak
+      freq = freq_index*bin_width
+      if freq_index >= self.params.pulse_sample_ct/2:
+        freq = freq - self.params.sample_rate
+      self.freq = freq + self.params.ctr_freq
+
+      #total received power in bin with peak
+      self.f_pwr = np.abs(f_pwr[freq_index])*bin_width
+
+    return self.f_sig
+
+  def eig(self):
+    """ Calculate the eigenvalue decomposition of pulse covariance. 
+    
+    :rtype: (?) 
+    """
+
+    if not self.eigenvalues:
+      pulse_ct = self.pulse.conjugate().transpose()
+      sq = np.dot(pulse_ct,self.pulse)
+      (self.eigenvalues, self.eigenvectors) = np.linalg.eigh(sq)
+        
+      #column vector of eigenvectors, complex signal vector
+      self.e_sig = self.eigenvectors[:,(self.eigenvalues == np.amax(self.eigenvalues))]
+
+      #total received power
+      self.e_pwr = np.max(self.eigenvalues)/self.params.pulse_sample_ct*self.params.sample_rate
+
+      #confidence measure, ratio of signal eigenvalue to total power
+      self.e_conf = np.max(self.eigenvalues)/np.sum(self.eigenvalues)
+    return self.e_sig
+
+  #calculates noise covariance from front of data with same size as the pulse
+  def noise_cov(self):
+    """ Calculate the noise covariance from front of data with some size as the pulse. 
+    
+    :rtype: (?) 
+    """
+
+    if not self.n_cov:
+      if self.params.sample_ct - self.params.pulse_index >= self.params.pulse_sample_ct:
+        noise_start = int(self.params.sample_ct - self.params.pulse_index - self.params.pulse_sample_ct)/2
+        noise = self.data[noise_start:noise_start+self.params.pulse_sample_ct,:]
+        noise_ct = noise.conjugate().transpose()
+        self.n_cov = np.dot(noise_ct,noise)/self.params.pulse_sample_ct*self.params.sample_rate
+      else:
+        self.n_cov = np.array([[]])
+    return self.n_cov
 
 
 
@@ -205,7 +296,6 @@ if __name__ == '__main__':
     #pp.plot(abs(df.f))
     #pp.show()
     df.eig()
-    df.get_signal()
     print abs(df.eigenvalues)
     print abs(df.eigenvectors)
     
