@@ -94,15 +94,15 @@ protected:
   //! Data array, size = params.channel_ct * params.sample_ct. 
   gr_complex *data; 
   
-  //! Name of input file.  
-  char *filename;   
-  
   //! Point to start of the circular buffer (oldest sample). 
   int index; 
 
   int size; // Store the size of the data array.
 
 public:
+  
+  /*! Name of input file. Declared as public for the Python interface. */
+  char *filename;   
   
   /*!
    * Record metadata. Declared as public so that it's accessible

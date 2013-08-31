@@ -41,7 +41,7 @@ class det (pulse_data):
 
   def print_det(self):
     """ Print the record's metdata to standard output. """
-    print self.param()
+    print self.params
 
 
 
