@@ -77,20 +77,26 @@ pulse_time      %s",
   } 
 }
 
+%typemap(out) gr_complex& {
+  $result = PyTuple_New(2);
+  PyObject *r = PyFloat_FromDouble((double) $1->real()); 
+  PyObject *i = PyFloat_FromDouble((double) $1->imag()); 
+  PyTuple_SetItem($result, 0, r);
+  PyTuple_SetItem($result, 1, i);
+}
+
 /* pulse_data */
 
 class pulse_data {
 friend class detectmod_detect; 
 protected:
 
-  fstream det; 
-  param_t params; 
-  sample_t prev; 
   gr_complex *data;
   char *filename;
 
 public:
   
+  param_t params; 
   pulse_data (const char *fn=NULL); // throw PulseDataErr
   pulse_data (
     int channel_ct, 
@@ -111,9 +117,7 @@ public:
   float real(int i); 
   void set_imag(int i, float val);
   void set_real(int i, float val);
-  gr_complex *get(); 
+  gr_complex &sample(int i); 
 
 };
   
-
-

@@ -25,6 +25,16 @@ from pulse_swig import pulse_data, param_t
 
 
 class det (pulse_data):
+ 
+  def __init__(self, fn):
+    pulse_data.__init__(self, fn)
+    self.data = np.zeros((self.params.sample_ct,self.params.channel_ct),np.complex)
+    for j in range(self.params.sample_ct):
+      for k in range(self.params.channel_ct):
+        (r, i) = self.sample((j * self.params.channel_ct) + k)
+        self.data[j,k] = np.complex(r,i)
+    self.pulse = self.data[self.params.pulse_index:self.params.pulse_index+self.params.pulse_sample_ct,:]
+
   def __str__(self):
     """ Return the filename as a string. """
     return self.filename
@@ -33,8 +43,6 @@ class det (pulse_data):
     """ Print the record's metdata to standard output. """
     print self.param()
 
-  def dumb(self):
-    print self.data[2]
 
 
 
