@@ -92,11 +92,12 @@ friend class detectmod_detect;
 protected:
 
   gr_complex *data;
-  char *filename;
 
 public:
   
   param_t params; 
+  char *filename;
+
   pulse_data (const char *fn=NULL); // throw PulseDataErr
   pulse_data (
     int channel_ct, 
