@@ -17,11 +17,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from qraat import est_data
+import qraat
 
 def process_det_files(det_dirname, est_dirname):
     print "Processing " + det_dirname
-    est = est_data.est_data()
+    est = qraat.est.est_data()
     est.read_dir(det_dirname)
     if est.num_tags > 0:
         #est.write_est(est_dirname)
