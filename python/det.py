@@ -66,11 +66,27 @@ class det (pulse_data):
     """ Print the record's metdata to standard output. """
     print self.params
 
+  
+  @classmethod
+  def read_many(i, j, base_dir): 
+    """ Return a set of det instances over time interval ``(i, j)``. 
+
+      :param i: Interval start
+      :type i: datetime.datetime
+      :param j: Interval end
+      :type j: datetime.datetime
+      :param base_dir: Root directory for det files. 
+      :type base_dir: str
+      :rtype: det list
+
+    """
+    return [] #TODO
+
 
   def fft(self):
     """ Performs an fft on pulse data. 
           
-          Saves result as instance attribute f.
+      Saves result as instance attribute f.
 
     :returns: result of fft calculation
     """
