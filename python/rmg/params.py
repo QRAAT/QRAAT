@@ -21,15 +21,51 @@
   The classes in this module encapsulate the various tuning parameters 
   for the backend detector arrays. **TODO:** an explanation of the 
   various parameters would be very useful.
+
+  Preamps: 
+
+  Analog filtering (on the quad board): 
+   (1) Amplify by +22 dB. 
+   (2) Mix with tunable oscillator (the PLL), controlled by the PIC 
+       interface, down to 70 Mhz. cf = pll_cf - if1_cf. 
+   (3) Saw filter at 70 Mhz (if1_cf), +/- 250 Khz (if1_bw). 
+   (4) Amplify by +22 dB. 
+   (5) Mix with oscillator at 80.7 Mhz.
+   (6) Ceramic filter at 10.7 Mhz (if2_cf), +/- 125 Khz (if2_bw).
+   (7) Amplify by +22 dB
+   (8) Output to USRP. 
+   
+  USRP: Sample analog signal at 64 Ms/sec (usrp_sampling_rate). Each 
+  per channel sample has a real part (in-phase) and imaginary part 
+  (quadrature). The quadrature part is mixed to with the NCO
+  by +/- 10.7 Mhz. 
+
+  RF paramters: pa_min, pa_max, if1_cf, if1_bw, if2_cf, if2_bw, lo2, 
+                pv_min, pv_max, pv_step, pv_offset
+
+  Decimation: The signal coming from the USRP into software is down-
+  sampled to 256 Ks/sec. We need to maintain the Nyquist-Shannon 
+  theorem criterion in order to avoid aliasing in the resulting 
+  digital signal. The process of first passing the signal through a 
+  low-pass anti-aliasing filter and then reducing the sampling rate 
+  is known as decimation. The low pass filter yields an approximation, 
+  since a perfect realtime filter isn't realizable. 
+   
+  USRP parameters: usrp_sampling_rate, usrp_max_decimation, decim, high_lo
 """
 
 import math, csv
 
-#: **TODO:** this is a bit messy. 
+#: TODO this is a bit messy. 
 PULSE, CONT = range(2)#detector types used in the bands
 det_type_str = ["Pulse Detector", "Raw Baseband Recording"]
 transmitter_types = {"Pulse":PULSE, "Continuous":CONT, "Other":CONT}
+
+
+#: Number of samples processed by the USRP per second. (Usually 64 Ms/sec.)  
 usrp_sampling_rate = 64e6 
+
+#: Maximum decimation factor for the USRP. 
 usrp_max_decimation = 250
 
 class band:
@@ -66,7 +102,7 @@ class band:
     def combine_tx(self, tx_data, filter_length):
         """ **TODO:** needs explanation. """ 
         self.name = self.name + tx_data[0] + '_'
-#        self.file_prefix = self.file_prefix + tx_data[0] + '_'
+        # self.file_prefix = self.file_prefix + tx_data[0] + '_'
         if (self.tx_type != CONT):
         
             if (tx_data[2] == CONT):
@@ -85,10 +121,11 @@ class band:
         """ Print band paramters to console. """ 
         if (self.tx_type == PULSE):
             band_str = "Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: {2}\n\tType: {3}\n\tFilter Length: {4:d} samples\n\tRise: {5:.2f}, Fall: {6:.2f}, Alpha: {7:.3f}".format(
-              self.band_num, self.cf/1000000, self.name, det_type_str[self.tx_type], self.filter_length,self.rise,self.fall,self.alpha)
+                self.band_num, self.cf/1000000, self.name, det_type_str[self.tx_type], 
+                self.filter_length,self.rise,self.fall,self.alpha)
         else:
-            band_str = "Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: {2}\n\tType: {3}".format(self.band_num, self.cf/1000000, self.name, det_type_str[self.tx_type])
-
+            band_str = "Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: {2}\n\tType: {3}".format(
+                 self.band_num, self.cf/1000000, self.name, det_type_str[self.tx_type])
         return band_str
 
 
@@ -139,7 +176,8 @@ class tuning:
 
     def __str__(self):
 
-        be_str = "Center Frequency: {0:.1f} MHz\nPLL Frequency: {1:.1f} MHz\nNumber of Occupied Bands: {2:d}".format(self.cf/1000000.0, self.lo1/1000000.0, len(self.bands))
+        be_str = "Center Frequency: {0:.1f} MHz\nPLL Frequency: {1:.1f} MHz\nNumber of Occupied Bands: {2:d}".format(
+                 self.cf/1000000.0, self.lo1/1000000.0, len(self.bands))
         for j in self.bands:
             be_str += '\n' + str(j)
         return be_str
@@ -147,43 +185,62 @@ class tuning:
 
 
 class backend:
-    """ Top level RMG parameters (backend tunings, high_lo, decim).
+    """ RF parameters for the RMG receivers.  
 
       Load a list of transmitters from a .csv file. (This is for modifying 
       the list of transmitters.) Calculate the backend tuning. 
 
     :param path: filename of transmitter configuration file. 
     :type path: string
-    :param num_bads: (?)
+    :param num_bands: (?)
     :type num_bands: int
     :param directory: target directory for .det files produced by detector. 
     :type directory: string
     """ 
 
+
+    pa_min = 148000000 #: Lower bound frequency (Hz) for the pre amps output. 
+    pa_max = 178000000 #: Upper bound frequency (Hz) for the pre amp output.
+
+    if1_cf = 70000000 #: Center frequency of the first saw filter (intermediate freqency). 
+    if1_bw = 500000   #: Bandwidth of the first saw filter. 
+    if2_cf = 10700000 #: Center freqency of the second ceramic filter (intermediate frequency). 
+    if2_bw = 250000   #: Bandwidth of the the second ceramic filter. 
+    
+    #: Frequency of oscillator between the saw and ceramic filters.  
+    lo2 = 80700000  
+      
+    #: Step size (Hz) for the phase-locked loop (PLL), controlled by the 
+    #: PIC interface of the RMG receiver. (Default is 100 Khz; you don't 
+    #: want to change this, since the circuitry is optimized for this step.)
+    pv_step = 100000
+
+    pv_min = 218500000 #: Lower bound frequency (Hz) for the PLL. 
+    pv_max = 248000000 #: Upper bound frequency (Hz) for the PLL. 
+
+    #: Account for minor frequency error for the RMG receiver. It may be 
+    #: possible that the output frequency of the PLL is off the center
+    #: frequency by a few Khz. ``pv_tune + pv_offset = actual_pv_tune``.
+    #: **NOTE**: this should be callibrated per RMG receiver. 
+    pv_offset = 0 
+
     def __init__(self, path, num_bands = 1, directory = "./det_files"):
         self.num_bands = num_bands
+
+        # TODO put this somewhere else? This class should be dedicated 
+        # to RF stuff. 
         self.directory = directory
         if self.directory[-1] == "/":
             self.directory = self.directory[:-1]
         self.num_tunings = 0
         self.tunings = []
     
-        #hardcoded RF parameters
-        self.pa_min = 148000000
-        self.pa_max = 178000000
-        self.if1_cf = 70000000
-        self.if1_bw = 500000
-        self.if2_cf = 10700000
-        self.if2_bw = 250000
-        self.lo2 = 80700000
-        self.pv_min = 218500000
-        self.pv_max = 248000000
-        self.pv_step = 100000
-        self.pv_offset = 0#pv_tune + pv_offset = actual frequency output of the pll
-
         self.__lo_calc()
-        self.data = []
         
+        #: Transmitter data.
+        self.data = []
+   
+        # Load transmitter configuration. FIXME use qraat.csv 
         inf = open(path, 'rb')
         transmitters = csv.reader(inf, delimiter = ",", quotechar='"') 
         cols  = transmitters.next() # first row is header
@@ -215,7 +272,8 @@ class backend:
 
     def __str__(self):
         """ Print tuning parameters to console. """ 
-        be_str = "Number of Frequency Bands in Filterbank: {0:d}\nBandwidth: {1:.3f} kHz\nNumber of Tunings: {2:d}".format(self.num_bands, self.bw/1000.0, self.num_tunings)
+        be_str = "Number of Frequency Bands in Filterbank: {0:d}\nBandwidth: {1:.3f} kHz\nNumber of Tunings: {2:d}".format(
+            self.num_bands, self.bw/1000.0, self.num_tunings)
         for j in range(self.num_tunings):
             be_str += '\n' + str(self.tunings[j])
         return be_str
@@ -224,28 +282,41 @@ class backend:
     def __lo_calc(self):
         """ **TODO:** needs explanation. """ 
 
-        self.if_max = self.lo2 - (self.if2_cf - self.if2_bw/2.0)
-        if self.if_max > self.if1_cf + self.if1_bw/2.0:
-            self.if_max = self.if1_cf + self.if1_bw/2.0
-        self.if_min = self.lo2 - (self.if2_cf + self.if2_bw/2.0)
-        if self.if_min > self.if1_cf + self.if1_bw/2.0:
-            self.if_min = self.if1_cf + self.if1_bw/2.0
+        self.if_min = self.lo2 - (self.if2_cf + self.if2_bw/2)
+        if self.if_min > self.if1_cf + self.if1_bw/2:
+            self.if_min = self.if1_cf + self.if1_bw/2
+        
+        self.if_max = self.lo2 - (self.if2_cf - self.if2_bw/2)
+        if self.if_max < self.if1_cf - self.if1_bw/2:
+            self.if_max = self.if1_cf - self.if1_bw/2
 
         actual_pv_min = self.pv_min + self.pv_offset
         actual_pv_max = self.pv_max + self.pv_offset
 
-        self.high_lo = True
-        if self.pa_min > self.if_max + actual_pv_min:
-            self.high_lo = False
+        #: The USRP has a numerically controlled oscillator (NCO)
+        #: which mixes the frequency of the in-phase and quadrature 
+        #: signals. If ``high_lo == True``, then mix by 10.7 Mhz; 
+        #: otherwise, mix by -10.7 Mhz. The intermediate frequency 
+        #: domain is defined by the hardware filters on the quad 
+        #: board. When mixed by the PLL, the frequency domain of the 
+        #: preamp signal should fall in this range. If ``high_lo`` is
+        #: ``False``, then the sign of if domain is switched. (?) 
+        self.high_lo = False if self.pa_min > self.if_max + actual_pv_min else True
         
-        bandwidth = self.if_max - self.if_min
-        decim = math.floor(usrp_sampling_rate / (self.num_bands/(self.num_bands-(1-self.num_bands % 2))*bandwidth))
-        if decim > usrp_max_decimation:
-            decim = usrp_max_decimation
-        self.bw = usrp_sampling_rate / decim / self.num_bands
-        self.decim = decim
+        bandwidth = self.if_max - self.if_min 
 
-        print "USRP Rate: {3}\nDecimation Factor: {1}\nNumber of Bands: {2}\nBandwidth: {0}".format(self.bw, self.decim, self.num_bands, usrp_sampling_rate)
+        #: Decimation factor for the USRP. This parameter controls the rate 
+        #: at which the uhd source block produces samples. Default is 250. 
+        #: usrp_sampling_rate (64 Ms/sec) / decim (250) = 256 Ks/sec.
+        self.decim = math.floor(usrp_sampling_rate / (self.num_bands/(self.num_bands-(1-self.num_bands % 2))*bandwidth))
+        if self.decim > usrp_max_decimation:
+            self.decim = usrp_max_decimation
+        
+        #: Width of each band in s/sec. 
+        self.bw = usrp_sampling_rate / self.decim / self.num_bands
+        
+        print "USRP Rate: {3}\nDecimation Factor: {1}\nNumber of Bands: {2}\nBandwidth: {0}".format(
+              self.bw, self.decim, self.num_bands, usrp_sampling_rate)
         
         
 
@@ -363,3 +434,6 @@ class backend:
                 tx_data[2] = transmitter_types[tx_data[2]]
                 self.add_tx(tx_data)
 
+
+if __name__ == "__main__": # testing, testing ... 
+  be = backend("tx.csv", 32)
