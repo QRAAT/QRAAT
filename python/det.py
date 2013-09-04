@@ -27,9 +27,7 @@ class det (pulse_data):
   
   """ Encapsulation of .det files, the output of the pulse detector. 
 
-    This class also has some math on the signal (desc). **TODO**: 
-    This class should be extended to interface with the database 
-    as well. 
+    This class also does some math on the signal (desc). 
 
   :param filename: The name of the .det file. 
   :type filename: string
