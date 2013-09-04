@@ -30,7 +30,7 @@ class detector_array:
 
     def __init__(self,filename = "tx.csv",directory = "./det_files", num_bands = 1, serial_port = '/dev/ttyS0', no_usrp = None):
         
-        """ A set of detectors for each specified frequency.
+        """ An array of detectors.
 
           A set of GR signal processing graphs comprised of the blocks defined 
           in :mod:`qraat.rmg.blocks`. The graph is made up of the USRP source, 
