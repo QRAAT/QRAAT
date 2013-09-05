@@ -82,12 +82,13 @@ class band:
     :param directory: (?)
     :type directory: string
     """
+
     def __init__(self, tx_data, band_num, band_cf, filter_length, directory):
         self.name = tx_data[0]
         self.directory = directory
-        self.band_num = band_num
-        self.cf = band_cf
-        self.tx_type = tx_data[2]
+        self.band_num = band_num # index in pd array 
+        self.cf = band_cf # ref upstream
+        self.tx_type = tx_data[2] 
         if (self.tx_type == PULSE):
             self.filter_length = filter_length
             self.rise = tx_data[4]
@@ -99,8 +100,13 @@ class band:
             self.fall = 0.0
             self.alpha = 0.0
 
-    def combine_tx(self, tx_data, filter_length):
-        """ **TODO:** needs explanation. """ 
+    def combine_tx(self, tx_data, filter_length): # TODO
+        """ Listen to many transmitters on the same frequency in the same band. 
+
+          It's impossible to avoid false positives in this situation in general, 
+          so we'll pick up pulses from any tranmmitter on this frequency. The 
+          idea is that there may be a way to uniquely identify them downstream. 
+        """ 
         self.name = self.name + tx_data[0] + '_'
         # self.file_prefix = self.file_prefix + tx_data[0] + '_'
         if (self.tx_type != CONT):
@@ -144,11 +150,13 @@ class tuning:
     
     def __init__(self, backend, cf = 0.0, lo1 = 0.0):
         self.cf = cf
-        self.lo1 = lo1
-        self.num_possible_bands = backend.num_bands
-        self.bw = backend.bw
-        self.bands = []
-        self.directory = backend.directory
+
+        self.lo1 = lo1 #: PLL frequency (derived from center frequency and RF parameters) [ref].
+
+        self.num_possible_bands = backend.num_bands # ref up stream
+        self.bw = backend.bw # ref upstream
+        self.bands = [] 
+        self.directory = backend.directory # ref upstream
 
     def add_tx(self, tx_data):
         """ **TODO:** needs explanation. 
@@ -280,7 +288,7 @@ class backend:
 
 
     def __lo_calc(self):
-        """ **TODO:** needs explanation. """ 
+        """ Decide whether to use high lo or low lo. """ 
 
         self.if_min = self.lo2 - (self.if2_cf + self.if2_bw/2)
         if self.if_min > self.if1_cf + self.if1_bw/2:
