@@ -33,6 +33,7 @@ GR_PYTHON_INSTALL(
     __init__.py
     det.py
     est.py
+    csv.py
     DESTINATION ${GR_PYTHON_DIR}/qraat
 )
 
