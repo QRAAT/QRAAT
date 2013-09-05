@@ -30,9 +30,10 @@ class csv:
     :type fn: str
   """
 
+  #: The CSV table.
+  table = []
+  
   def __init__(self, fn=None): 
-    #: The CSV table. 
-    self.table = []
     if fn: 
       self.read(fn)
 
@@ -44,22 +45,8 @@ class csv:
     """
 
     fd = open(fn, 'r')
+    headers = self.__build_header(fd)
 
-    # Store the maximum row length per column. This value will 
-    # be used to compute a string template for displaying the 
-    # table. 
-    headers = { header : len(header) 
-                      for header in fd.readline().strip().split(',') }
-
-    # Create an object for rows. TODO Row.__str__() should print 
-    # the row in a pretty way. Perhaps some sort of fancy meta 
-    # template string thing? In any case, I don't need to worry 
-    # about this right now. ~cjp 9/5/2013
-    self.Row = type('Row', (object,), {header : None for header in headers})
-    def f(self):
-      return "TODO"
-    self.Row.__str__ = f
-    
     # Populate the table.
     for line in map(lambda l: l.strip().split(','), fd.readlines()): 
       self.table.append(self.Row())
@@ -68,20 +55,9 @@ class csv:
           headers[cell] = len(value)  
         setattr(self.table[-1], cell, value)
     fd.close()
+    
+    self.__build_row_template(headers)
 
-    #: Template string for displaying table rows. 
-    self._row_template = ' '.join(
-          [ '%-{0}s'.format(i) for i in headers.itervalues()])
-
-    #: Header names.
-    self.headers = headers.keys()
-
-  def __str__(self):
-    res = self._row_template % tuple(self.headers) + '\n'
-    res += '\n'.join(
-      (self._row_template % tuple(
-        getattr(row, col) for col in self.headers)) for row in self.table) 
-    return res
 
   def write(self, fn): 
     """ Write data table to CSV file. 
@@ -93,12 +69,64 @@ class csv:
     """
     pass
   
+  
+  def __str__(self):
+    res = self._row_template % tuple(self.headers) + '\n'
+    res += '\n'.join(
+      (self._row_template % tuple(
+        getattr(row, col) for col in self.headers)) for row in self.table) 
+    return res
+ 
+
   def __getitem__(self, i): 
     return self.table[i]
+
 
   def __getslice__(self, i, j):
     return self.table[i:j]
 
+
+  def __build_header(self, fd):
+    """ 
+      Read column names from file descriptor and create the Row 
+      type. Return a dictionary mapping the names of columns to 
+      the their length. This will be used to compute the row 
+      template string. 
+    """
+
+    # Store the maximum row length per column. This value will 
+    # be used to compute a string template for displaying the 
+    # table. 
+    headers = { header : len(header) 
+                      for header in fd.readline().strip().split(',') }
+
+    #: Type for table rows. This allows us to use the column 
+    #: names as class attributes. 
+    self.Row = type('Row', (object,), {header : None for header in headers})
+    
+    # Create an object for rows. TODO Row.__str__() should print 
+    # the row in a pretty way. Perhaps some sort of fancy meta 
+    # template string thing? In any case, I don't need to worry 
+    # about this right now. ~cjp 9/5/2013
+    def f(self):
+      return "TODO"
+    self.Row.__str__ = f
+
+    #: Column names. 
+    self.headers = headers.keys()
+    
+    return headers
+   
+
+  def __build_row_template(self, d):
+    """ 
+      Build row template string from dictionary d, which maps 
+      column headers to the maximum string lengths of columns. 
+    """
+
+    #: Template string for displaying table rows. 
+    self._row_template = ' '.join(
+          [ '%-{0}s'.format(i) for i in d.itervalues()])
 
 if __name__ == '__main__': 
   tx = csv('../build/tx.csv')

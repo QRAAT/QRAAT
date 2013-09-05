@@ -55,6 +55,7 @@
 """
 
 import math, csv
+import qraat.csv as better_csv
 
 #: TODO this is a bit messy. 
 PULSE, CONT = range(2)#detector types used in the bands
@@ -444,4 +445,5 @@ class backend:
 
 
 if __name__ == "__main__": # testing, testing ... 
-  be = backend("tx.csv", 32)
+  be = backend("../../build/tx.csv", 32)
+  
