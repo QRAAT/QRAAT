@@ -29,3 +29,4 @@ interface.
 
 from est import data_arrays, est_data
 from det import det 
+from csv import * 
