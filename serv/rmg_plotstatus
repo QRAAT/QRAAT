@@ -46,7 +46,7 @@ my $WebPath = "/var/www/images" ;		# The path of the web images directory
 sub usage()
 {
 	print "$0: sitelist authfile [debug]\n" ;
-	print "Reads telemetry data from the qraat database for each site listed in the sitelist file, using the database identifined in authfile\n" ;
+	print "Reads telemetry data from the qraat database for each site listed in the sitelist file, using the database identified in authfile\n" ;
 	print "Writes plot image files\n" ;
 }
 
@@ -307,7 +307,7 @@ sub writecsv($$$$$)
 		return 1 ;
 	}
 	if( $Debug ) { print "debug: writecsv: query result has $count rows\n" ; }
-	if( $count < 2 ) { return 1 ; }
+	#if( $count < 2 ) { return 1 ; }	# Need to continue and make an 'empty' file
 	my $filename = "$TmpPath/${sitename}_${tablename}.csv" ;
 	my $fd ;
 	if( not defined open($fd,">".$filename) )
@@ -319,7 +319,10 @@ sub writecsv($$$$$)
 	my @data = dbdata($dbh,$query) ;
 	$count = scalar @data ;
 	if( $Debug ) { print "debug: writecsv: query result has $count rows\n" ; }
-	if( $count > 0 )
+	my $new_timezone ;
+	my $dt ;
+	my $data_timezone ;
+	if( $count > 1 )
 	{
 		for my $refrow ( @data )
 		{
@@ -327,20 +330,39 @@ sub writecsv($$$$$)
 			my @row = @$refrow ;
 			#shift @row ;	# drop the ID column
 			#shift @row ;	# drop the siteid column
-			my $dt = shift @row ;
+			$dt = shift @row ;
 			if( not defined $dt ) { next ; }
-			my $data_timezone = shift @row ;
-			my $new_timezone ;
+			$data_timezone = shift @row ;
 			( $dt, $new_timezone ) = tzconvert($dt,$data_timezone,$display_timezone) ;
 			print $fd "$dt" ;
 			print $fd ",$new_timezone" ;
 			for my $column ( @row )
 			{
-				if( not defined $column ) { $column = "" ; }
+				if( not defined $column ) { $column = "NULL" ; }
 				print $fd ",$column" ;
 			}
 			print $fd "\n" ;
 		}
+	}
+	else	# When there's no real data, make bookend entries allowing gnuplot to make an empty plot
+	{
+		my @each_column = split(/,/,$columns) ;
+		my $n_columns = scalar @each_column ;
+		if( $Debug ) { print "debug: writecsv: writing bookend data with $n_columns columns\n" ; }
+		print $fd "$dtstart" ;
+		print $fd ",UTC" ;
+		foreach ( @each_column )
+		{
+			print $fd ",NULL" ;
+		}
+		print $fd "\n" ;
+		print $fd "$dtstop" ;
+		print $fd ",UTC" ;
+		foreach ( @each_column )
+		{
+			print $fd ",NULL" ;
+		}
+		print $fd "\n" ;
 	}
 	close($fd) ;
 	return 0 ;
