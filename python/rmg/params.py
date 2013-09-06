@@ -248,6 +248,7 @@ class backend:
         #: Transmitter data.
         self.data = qraat.csv(path)
         print 'Transmitters from {0}'.format(path)
+        #print self.data
       
         for tx in self.data.table: 
           if tx.use in ['Y', 'y', 'yes', 'Yes', 'YES']: 
@@ -283,13 +284,12 @@ class backend:
     def __lo_calc(self):
         """ Decide whether to use high lo or low lo. """ 
 
-        self.if_min = self.lo2 - (self.if2_cf + self.if2_bw/2)
-        if self.if_min > self.if1_cf + self.if1_bw/2:
-            self.if_min = self.if1_cf + self.if1_bw/2
-        
-        self.if_max = self.lo2 - (self.if2_cf - self.if2_bw/2)
-        if self.if_max < self.if1_cf - self.if1_bw/2:
-            self.if_max = self.if1_cf - self.if1_bw/2
+        self.if_min = self.lo2 - (self.if2_cf + self.if2_bw/2.0)
+        if self.if_min > self.if1_cf + self.if1_bw/2.0:
+            self.if_min = self.if1_cf + self.if1_bw/2.0
+        self.if_max = self.lo2 - (self.if2_cf - self.if2_bw/2.0)
+        if self.if_max < self.if1_cf - self.if1_bw/2.0:
+            self.if_max = self.if1_cf - self.if1_bw/2.0
 
         actual_pv_min = self.pv_min + self.pv_offset
         actual_pv_max = self.pv_max + self.pv_offset
