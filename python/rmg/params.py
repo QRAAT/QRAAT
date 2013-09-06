@@ -84,44 +84,44 @@ class band:
     :type directory: string
     """
 
-    def __init__(self, tx_data, band_num, band_cf, filter_length, directory):
-        self.name = tx_data.name
+    def __init__(self, tx, band_num, band_cf, filter_length, directory):
+        self.name = tx.name
         self.directory = directory
         self.band_num = band_num # index in pd array 
         self.cf = band_cf # ref upstream
-        self.tx_type = tx_data.type 
+        self.tx_type = tx.type 
         if (self.tx_type == PULSE):
             self.filter_length = filter_length
-            self.rise = tx_data.rise_trigger
-            self.fall = tx_data.fall_trigger
-            self.alpha = tx_data.filter_alpha
+            self.rise = tx.rise_trigger
+            self.fall = tx.fall_trigger
+            self.alpha = tx.filter_alpha
         else:
             self.filter_length = 0
             self.rise = 0.0
             self.fall = 0.0
             self.alpha = 0.0
 
-    def combine_tx(self, tx_data, filter_length): # TODO
+    def combine_tx(self, tx, filter_length): # TODO
         """ Listen to many transmitters on the same frequency in the same band. 
 
           It's impossible to avoid false positives in this situation in general, 
           so we'll pick up pulses from any tranmmitter on this frequency. The 
           idea is that there may be a way to uniquely identify them downstream. 
         """ 
-        self.name = self.name + tx_data.name + '_'
+        self.name = self.name + tx.name + '_'
         if (self.tx_type != CONT):
         
-            if (tx_data.type == CONT):
+            if (tx.type == CONT):
                 self.tx_type = CONT
             else:
                 if (filter_length > self.filter_length):
                     self.filter_length = filter_length
-                if (tx_data.rise_trigger < self.rise):
-                    self.rise = tx_data.rise_trigger
-                if (tx_data.fall_trigger > self.fall  and self.rise > tx_data.fall_trigger):
-                    self.fall = tx_data.fall_trigger
-                if (tx_data.filter_alpha < self.alpha):
-                    self.alpha = tx_data.filter_alpha
+                if (tx.rise_trigger < self.rise):
+                    self.rise = tx.rise_trigger
+                if (tx.fall_trigger > self.fall  and self.rise > tx.fall_trigger):
+                    self.fall = tx.fall_trigger
+                if (tx.filter_alpha < self.alpha):
+                    self.alpha = tx.filter_alpha
 
     def __str__(self):
         """ Print band paramters to console. """ 
@@ -138,57 +138,79 @@ class band:
 class tuning:
     """ Data for a single tuning of the RMG receiver. 
       
-      **TODO:** needs explanation. 
+      The RMG receiver was built with bandwidth restrictions in mind. 
+      When two transmitters use frequencies differing by more than the 
+      USRP output bandwidth (typically 256 Khz), it is necessary to 
+      time-multiplex the frequencies, retuning the RMG receiver during 
+      the transition. (See :class:`qraat.rmg.run.detector_array`.) 
 
-    :param backend: Backend paramters(?) 
+    :param backend: Backend paramters
     :type backend: qraat.rmg.params.backend
-    :param cf: (?)
+    :param cf: Center frequency for tuning. 
     :type cf: float
-    :param lo1: (?)
+    :param lo1: Actual PLL frequency of receiver. 
     :type lo1: float
     """ 
     
     def __init__(self, backend, cf = 0.0, lo1 = 0.0):
-        self.cf = cf
+      self.cf = cf
+      self.lo1 = lo1 #: PLL frequency (derived from center frequency and RF parameters) [ref].
+      self.num_possible_bands = backend.num_bands # ref up stream
+      self.bw = backend.bw # ref upstream
+      self.directory = backend.directory # ref upstream
 
-        self.lo1 = lo1 #: PLL frequency (derived from center frequency and RF parameters) [ref].
+      #: Detector bands of type :class:`qraat.rmg.params.band`.  
+      self.bands = [] 
 
-        self.num_possible_bands = backend.num_bands # ref up stream
-        self.bw = backend.bw # ref upstream
-        self.bands = [] 
-        self.directory = backend.directory # ref upstream
+    def add_tx(self, tx):
+      """ Assign transmitter to a band.
+      
+        The transmitter's baseband is the tuning's center frequency 
+        subtracted from the transmission frequency. This value is 
+        used to bin the transmitter. It's possible that we may have 
+        many transmitters on the same frequency, or whose frequencies
+        are close enough to be indistinguishable in this context. To 
+        deal with this as elegantly as possible, we check to see if 
+        there is already a transmitter assigned ot this band on this 
+        tuning. If so, then combine the detector parameters in an 
+        intelligent way. (See :func:`band.combine-tx`.) 
 
-    def add_tx(self, tx_data):
-        """ **TODO:** needs explanation. 
+        **TODO**: structure of detector array w.r.t band frequency. 
         
-        :param tx_data: Transmitter configuration(?) 
-        :type tx_data: (?) 
-        """
+      :param tx: Transmitter configuration
+      :type tx: qraat.csv.Row
+      """
 
-        tx_freq = tx_data.freq*1000000.0
-        baseband_freq = tx_freq - self.cf
-        baseband_band_num = round(baseband_freq/self.bw)
-        if (baseband_band_num >=0):
-            band_num = int(baseband_band_num)
-        else:
-            band_num = int(self.num_possible_bands + baseband_band_num)
-        filter_length = int(round(tx_data.pulse_width*self.bw/1000))
-        #check if already a tx on this band
-        for c in self.bands:
-            if (c.band_num == band_num):
-                c.combine_tx(tx_data, filter_length)
-                return
+      tx_freq = tx.freq * 1000000.0
+      baseband_freq = tx_freq - self.cf
+      baseband_band_num = round(baseband_freq / self.bw)
 
-        band_cf = baseband_band_num*self.bw+self.cf
-        self.bands.append(band(tx_data, band_num, band_cf, filter_length, self.directory))
+      if (baseband_band_num >= 0):
+        band_num = int(baseband_band_num)
+      else:
+        band_num = int(self.num_possible_bands + baseband_band_num)
+      filter_length = int(round(tx.pulse_width * self.bw / 1000))
+
+      # Check to see if there is already a transmitter assigned ot 
+      # this band on this tuning. 
+      for c in self.bands:
+        if (c.band_num == band_num):
+           c.combine_tx(tx, filter_length)
+           return
+      
+      # Otherwise, add the band. 
+      band_cf = baseband_band_num*self.bw+self.cf
+      self.bands.append(
+        band(tx, band_num, band_cf, filter_length, self.directory))
+
 
     def __str__(self):
-
-        be_str = "Center Frequency: {0:.1f} MHz\nPLL Frequency: {1:.1f} MHz\nNumber of Occupied Bands: {2:d}".format(
-                 self.cf/1000000.0, self.lo1/1000000.0, len(self.bands))
-        for j in self.bands:
-            be_str += '\n' + str(j)
-        return be_str
+      """ Return string representation of the tuning. """ 
+      be_str = "Center Frequency: {0:.1f} MHz\nPLL Frequency: {1:.1f} MHz\nNumber of Occupied Bands: {2:d}".format(
+               self.cf/1000000.0, self.lo1/1000000.0, len(self.bands))
+      for j in self.bands:
+        be_str += '\n' + str(j)
+      return be_str
 
 
 
@@ -200,12 +222,11 @@ class backend:
 
     :param path: filename of transmitter configuration file. 
     :type path: string
-    :param num_bands: (?)
+    :param num_bands: Number of detector bands
     :type num_bands: int
     :param directory: target directory for .det files produced by detector. 
     :type directory: string
     """ 
-
 
     pa_min = 148000000 #: Lower bound frequency (Hz) for the pre amps output. 
     pa_max = 178000000 #: Upper bound frequency (Hz) for the pre amp output.
@@ -233,91 +254,93 @@ class backend:
     pv_offset = 0 
 
     def __init__(self, path, num_bands = 1, directory = "./det_files"):
-        self.num_bands = num_bands
 
-        # TODO put this somewhere else? This class should be dedicated 
-        # to RF stuff. 
-        self.directory = directory
-        if self.directory[-1] == "/":
-            self.directory = self.directory[:-1]
-        self.num_tunings = 0
-        self.tunings = []
-    
-        self.__lo_calc()
-        
-        #: Transmitter data.
-        self.data = qraat.csv(path)
-        print 'Transmitters from {0}'.format(path)
-        #print self.data
+      # TODO put this somewhere else? This class should be dedicated 
+      # to RF stuff. 
+      self.directory = directory
+      if self.directory[-1] == "/":
+        self.directory = self.directory[:-1]
+     
+      #: The bandwidth of the digital signal produced by the USRP is 
+      #: divided into bands. A pulse detector is instantiated for 
+      #: each of these bands. 
+      self.num_bands = num_bands
+
+      #: Receiver tuning groups of type :class:`qraat.rmg.params.tunings`. 
+      self.tunings = [] 
       
-        for tx in self.data.table: 
-          if tx.use in ['Y', 'y', 'yes', 'Yes', 'YES']: 
-            tx.use = True
-          else:
-            tx.use = False 
-          tx.freq = float(tx.freq) 
-          tx.pulse_width = float(tx.pulse_width) 
-          tx.rise_trigger = float(tx.rise_trigger) 
-          tx.fall_trigger = float(tx.fall_trigger) 
-          tx.filter_alpha = float(tx.filter_alpha) 
-        
-        self.__backend_calc()
+      self.transmitters = qraat.csv(path) #: Transmitter data.
+      print 'Transmitters from {0}'.format(path)
+    
+      for tx in self.transmitters.table: 
+        if tx.use in ['Y', 'y', 'yes', 'Yes', 'YES']: 
+          tx.use = True
+        else:
+          tx.use = False 
+        tx.freq = float(tx.freq) 
+        tx.pulse_width = float(tx.pulse_width) 
+        tx.rise_trigger = float(tx.rise_trigger) 
+        tx.fall_trigger = float(tx.fall_trigger) 
+        tx.filter_alpha = float(tx.filter_alpha) 
+      
+      self.__lo_calc()
+      self.__backend_calc()
         
     def add_tuning(self, cf = 0.0, lo1 = 0.0):
-        """ **TODO:** needs explanation. """ 
-        self.tunings.append(tuning(self, cf, lo1))
-        self.num_tunings += 1
-
-    def add_tx(self, tx_data, tuning_index = -1):
-        """ **TODO:** needs explanation. """ 
-        self.tunings[tuning_index].add_tx(tx_data)
+      """ Add tuning. 
+        
+        **TODO**: This is only called once in the code in __backend_calc. 
+        The is only necesary because the for-loops use the variable 
+        ``tuning``, which conflicts with the class name.  
+      """ 
+      self.tunings.append(tuning(self, cf, lo1))
 
     def __str__(self):
-        """ Print tuning parameters to console. """ 
-        be_str = "Number of Frequency Bands in Filterbank: {0:d}\nBandwidth: {1:.3f} kHz\nNumber of Tunings: {2:d}".format(
-            self.num_bands, self.bw/1000.0, self.num_tunings)
-        for j in range(self.num_tunings):
-            be_str += '\n' + str(self.tunings[j])
-        return be_str
+      """ Print tuning parameters to console. """ 
+      be_str = "Number of Frequency Bands in Filterbank: {0:d}\nBandwidth: {1:.3f} kHz\nNumber of Tunings: {2:d}".format(
+        self.num_bands, self.bw/1000.0, len(self.tunings))
+      for tuning in self.tunings:
+        be_str += '\n' + str(tuning)
+      return be_str
 
 
     def __lo_calc(self):
-        """ Decide whether to use high lo or low lo. """ 
+      """ Decide whether to use high lo or low lo. """ 
 
-        self.if_min = self.lo2 - (self.if2_cf + self.if2_bw/2.0)
-        if self.if_min > self.if1_cf + self.if1_bw/2.0:
-            self.if_min = self.if1_cf + self.if1_bw/2.0
-        self.if_max = self.lo2 - (self.if2_cf - self.if2_bw/2.0)
-        if self.if_max < self.if1_cf - self.if1_bw/2.0:
-            self.if_max = self.if1_cf - self.if1_bw/2.0
+      self.if_min = self.lo2 - (self.if2_cf + self.if2_bw/2.0)
+      if self.if_min > self.if1_cf + self.if1_bw/2.0:
+        self.if_min = self.if1_cf + self.if1_bw/2.0
+      self.if_max = self.lo2 - (self.if2_cf - self.if2_bw/2.0)
+      if self.if_max < self.if1_cf - self.if1_bw/2.0:
+        self.if_max = self.if1_cf - self.if1_bw/2.0
 
-        actual_pv_min = self.pv_min + self.pv_offset
-        actual_pv_max = self.pv_max + self.pv_offset
+      actual_pv_min = self.pv_min + self.pv_offset
+      actual_pv_max = self.pv_max + self.pv_offset
 
-        #: The USRP has a numerically controlled oscillator (NCO)
-        #: which mixes the frequency of the in-phase and quadrature 
-        #: signals. If ``high_lo == True``, then mix by 10.7 Mhz; 
-        #: otherwise, mix by -10.7 Mhz. The intermediate frequency 
-        #: domain is defined by the hardware filters on the quad 
-        #: board. When mixed by the PLL, the frequency domain of the 
-        #: preamp signal should fall in this range. If ``high_lo`` is
-        #: ``False``, then the sign of if domain is switched. (?) 
-        self.high_lo = False if self.pa_min > self.if_max + actual_pv_min else True
-        
-        bandwidth = self.if_max - self.if_min 
+      #: The USRP has a numerically controlled oscillator (NCO)
+      #: which mixes the frequency of the in-phase and quadrature 
+      #: signals. If ``high_lo == True``, then mix by 10.7 Mhz; 
+      #: otherwise, mix by -10.7 Mhz. The intermediate frequency 
+      #: domain is defined by the hardware filters on the quad 
+      #: board. When mixed by the PLL, the frequency domain of the 
+      #: preamp signal should fall in this range. If ``high_lo`` is
+      #: ``False``, then the sign of if domain is switched. (?) 
+      self.high_lo = False if self.pa_min > self.if_max + actual_pv_min else True
+      
+      bandwidth = self.if_max - self.if_min 
 
-        #: Decimation factor for the USRP. This parameter controls the rate 
-        #: at which the uhd source block produces samples. Default is 250. 
-        #: usrp_sampling_rate (64 Ms/sec) / decim (250) = 256 Ks/sec.
-        self.decim = math.floor(usrp_sampling_rate / (self.num_bands/(self.num_bands-(1-self.num_bands % 2))*bandwidth))
-        if self.decim > usrp_max_decimation:
-            self.decim = usrp_max_decimation
-        
-        #: Width of each band in s/sec. 
-        self.bw = usrp_sampling_rate / self.decim / self.num_bands
-        
-        print "USRP Rate: {3}\nDecimation Factor: {1}\nNumber of Bands: {2}\nBandwidth: {0}".format(
-              self.bw, self.decim, self.num_bands, usrp_sampling_rate)
+      #: Decimation factor for the USRP. This parameter controls the rate 
+      #: at which the uhd source block produces samples. Default is 250. 
+      #: usrp_sampling_rate (64 Ms/sec) / decim (250) = 256 Ks/sec.
+      self.decim = math.floor(usrp_sampling_rate / (self.num_bands/(self.num_bands-(1-self.num_bands % 2))*bandwidth))
+      if self.decim > usrp_max_decimation:
+        self.decim = usrp_max_decimation
+      
+      #: Width of each band in s/sec. 
+      self.bw = usrp_sampling_rate / self.decim / self.num_bands
+      
+      print "USRP Rate: {3}\nDecimation Factor: {1}\nNumber of Bands: {2}\nBandwidth: {0}".format(
+        self.bw, self.decim, self.num_bands, usrp_sampling_rate)
         
         
 
@@ -327,17 +350,15 @@ class backend:
           Instance of the set cover problem (NP-hard). **TODO:** what's the solution(?) 
         """
 
-        data = self.data
-
         #make list of transmitter frequencies
-        num_freqs = len(data)
+        num_freqs = len(self.transmitters)
         list_of_tx_freqs = []#list of frequencys
         dict_of_tunings_per_freq = dict()#dictionary of sets of tunings for a given frequency
         set_of_needed_tunings = set()#list of tunings to get all the transmitters
         data_index = []
         for j in range(num_freqs):
-            if data[j].use:
-                curr_freq = int(data[j].freq*1000000)
+            if self.transmitters[j].use:
+                curr_freq = int(self.transmitters[j].freq*1000000)
                 list_of_tx_freqs.append(curr_freq)
                 data_index.append(j)
 
@@ -430,10 +451,10 @@ class backend:
                 tx_index = list_of_tx_freqs.index(tx_freq)
 
                 #get transmitter data
-                tx_data = data[data_index[tx_index]]
+                tx_data = self.transmitters[data_index[tx_index]]
                 print "\t{0} {1:.3f} MHz".format(tx_data.name, tx_data.freq)
                 tx_data.type = transmitter_types[tx_data.type]
-                self.add_tx(tx_data)
+                self.tunings[-1].add_tx(tx_data)
 
 
 

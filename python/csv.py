@@ -119,12 +119,12 @@ class csv:
     return lengths
    
 
-  def __build_row_template(self, ls):
+  def __build_row_template(self, lengths):
     """ Build row template string from maximum column lengths ``ls``. """
 
     #: Template string for displaying table rows. 
     self._row_template = ' '.join(
-       ['%-{0}s'.format(i) for i in ls])
+       ['%-{0}s'.format(i) for i in lengths])
 
 
 if __name__ == '__main__': 
