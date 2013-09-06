@@ -77,6 +77,7 @@ my @Products =
 		title=> "external temperature (C)",
 		yrange=> [0,60],
 		timezone=> "localtime",
+		lines=> [ {column=>1,color=>'red'} ],
 		interval=> 2*$INTERVAL_DAY,
 	}, 
 	# Battery voltage measured at the pingbrother DC input
@@ -139,6 +140,7 @@ my @Products =
 		yrange=> [1,1000],
 		timezone=> "localtime",
 		gpextra=> "set logscale y",
+		lines=> [ {column=>1,color=>'red'} ],
 		interval=> 2*$INTERVAL_DAY,
 	}, 
 	# Site det file count: the number of det files at the site
@@ -437,18 +439,63 @@ sub writegp($$)
 {
 	my ( $site, $refhash ) = @_ ;			# a reference to a hash containing all other parameters
 	my $filename = "${site}_$refhash->{file}" ;
+	if( (not defined $filename) or ($filename eq "") )
+	{
+		print "ERROR: missing filename in plot definition\n" ;
+		return 1 ;
+	}
 	my $columns = $refhash->{columns} ;	# Not sure we need this one here
+	if( not defined $columns )
+	{
+		print "ERROR: missing column in plot definition '$filename'\n" ;
+		return 1 ;
+	}
 	my $refyrange = $refhash->{yrange} ;	# a reference to an array of 2 vales for y axis range (optional)
 	my $ymin = $refyrange->[0] ;
 	my $ymax = $refyrange->[1] ;
+	if( (not defined $ymin) or (not defined $ymax) )
+	{
+		print "ERROR: missing ymin/ymax in plot definition '$filename'\n" ;
+		return 1 ;
+	}
 	my $refsize = $refhash->{size} ;	# a reference to an array of 2 vales for plot x and y size (optional)
-	my $xsize = $refsize->[0] ;
-	my $ysize = $refsize->[1] ;
-	my $timezone = $refhash->{timezone} ;	# a sting with either UTC or localtime
+	my $xsize = undef ;
+	my $ysize = undef ;
+	if( defined $refsize )
+	{
+		$xsize = $refsize->[0] ;
+		$ysize = $refsize->[1] ;
+	}
+	my $timezone = $refhash->{timezone} ;	# a string with either UTC or localtime
+	if( (not defined $timezone) or ($timezone eq "") )
+	{
+		print "ERROR: missing timezone in plot definition '$filename'\n" ;
+		return 1 ;
+	}
 	my $reflines = $refhash->{lines} ;	# a reference to an array of line definition hashes
+	if( (not defined $reflines) or (scalar @$reflines < 1) )
+	{
+		print "ERROR: missing lines in plot definition '$filename'\n" ;
+		return 1 ;
+	}
 	my $tablename = $refhash->{table} ;
+	if( (not defined $tablename) or ($tablename eq "") )
+	{
+		print "ERROR: missing tablename in plot definition '$filename'\n" ;
+		return 1 ;
+	}
 	my $title = "$site $refhash->{title}" ;
+	if( not defined $tablename )
+	{
+		print "ERROR: missing title in plot definition '$filename'\n" ;
+		return 1 ;
+	}
 	my $interval = $refhash->{interval} ;
+	if( not defined $interval )
+	{
+		print "ERROR: missing interval in plot definition '$filename'\n" ;
+		return 1 ;
+	}
 	my $gpextra = $refhash->{gpextra} ; # (optional)
 	if( not defined $gpextra ) { $gpextra = "" ; }
 	my $csvfilename = "$TmpPath/${site}_${tablename}.csv" ;
