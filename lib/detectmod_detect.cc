@@ -36,6 +36,8 @@
 #include <errno.h>
 #include "boost/filesystem.hpp"
 
+#include <pulse_data.h>
+
 #ifndef O_BINARY
 #define	O_BINARY 0
 #endif 
@@ -87,7 +89,7 @@ detectmod_detect::detectmod_detect (int pulse_width,
   acc_length = pulse_width;//size of the accumulator
   
   
-  /** 
+  /* 
    * length of the file needs to be at least 3 times as long as 
    * the pulse to accomidate the noise covariance calculation
    */
@@ -110,8 +112,8 @@ detectmod_detect::detectmod_detect (int pulse_width,
   d_fp = 0;
   
   acc = new accumulator(acc_length);
-  save_holder = new circ_buffer(ch, save_length);
-  peak_holder = new circ_buffer(ch, save_length);
+  save_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
+  peak_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
   pkdet = new peak_detect(1.1,1.05,.05);
 
   psd = _psd;
@@ -245,8 +247,10 @@ detectmod_detect::work (int noutput_items,
   return noutput_items;
 }
 
-
-void detectmod_detect::write_data(circ_buffer *data_holder){
+/*
+ * WRite pulse data as a .det file. 
+ */
+void detectmod_detect::write_data(pulse_data *data_holder){
 /** 
  * Writes the pulse data as a .det file
  */
@@ -278,40 +282,31 @@ void detectmod_detect::write_data(circ_buffer *data_holder){
   strcat(filename, time_string); 
   strcat(filename, ".det"); 
   
-  // Open .det file. 
-  if (!open_file(filename) || !d_fp) {
+  data_holder->params.pulse_index = save_length - acc_length - fill_length; 
+  data_holder->params.t_sec = int_seconds; 
+  data_holder->params.t_usec = int_useconds; 
+
+  if (data_holder->write(filename) == -1)
+  {
+    printf("Can't open file \"%s\"\n",filename);
     free(u_sec); 
     free(time_string); 
-    //free(str);
     free(filename);
     free(directory_time_string);
     return;
   }
 
-  // Write metadata. 
-  fwrite(&int_seconds,sizeof(int),1,(FILE *)d_fp);
-  fwrite(&int_useconds,sizeof(int),1,(FILE *)d_fp);
+  // Print some stuff. 
   float snr = 10.0*log10(pkdet->peak_value/pkdet->avg);
   float noise_db = 10.0*log10(pkdet->avg/1e-5);
   strftime(time_string,40,"%H:%M:%S %d %b %Y",time_struct);
   
   printf("pulse %s,%d,%f,%f\n", tx_name, int_seconds, noise_db, snr);  
   printf("%s\n\t%s\n\t\tNoise Floor: %.2f dB, SNR: %.2f dB\n",time_string, filename, noise_db, snr);
-
-  // Write pulse data. Get data buffer and index from data_holder
-  gr_complex *data = data_holder->get_buffer();
-  int index = data_holder->get_index();
-
-  // Unwrap circular buffer and write data to file
-  temp = data + (index)*ch;
-  fwrite(temp,sizeof(gr_complex),(save_length-index)*ch, (FILE *)d_fp);
-  fwrite(data,sizeof(gr_complex),(index)*ch, (FILE *)d_fp);
-
+  
   // Close file and free string variables.
-  close();
   free(time_string);
   free(filename);
-  //free(str); 
   free(u_sec);
   free(directory_time_string);
 
@@ -357,31 +352,7 @@ detectmod_detect::close()
   
 }
 
-bool detectmod_detect::open_file(const char *filename)
-/** 
- * opens a .det file and writes the header information
- */
-{
-    
-  if(!open(filename)){
-    printf("Can't open file \"%s\"\n",filename);
-    return 0;
-  }
-  else{
-    fwrite(&ch,sizeof(int),1,(FILE *)d_fp);
-    fwrite(&save_length,sizeof(int),1,(FILE *)d_fp);
-    fwrite(&acc_length,sizeof(int),1,(FILE *)d_fp);
-    int pulse_start = save_length - acc_length-fill_length;
-    fwrite(&pulse_start,sizeof(int),1,(FILE *)d_fp);
-    fwrite(&rate,sizeof(float),1,(FILE *)d_fp);
-    fwrite(&c_freq,sizeof(float),1,(FILE *)d_fp);
-  return 1;
-  }
-
-}
-
-
-bool detectmod_detect::pulse_shape_discriminator(circ_buffer *data_holder){
+bool detectmod_detect::pulse_shape_discriminator(pulse_data *data_holder){
 /** 
  * determines whether the detected pulse looks like a rectangle or not
  */
@@ -524,8 +495,8 @@ void detectmod_detect::enable(int pulse_width,
   strcpy(tx_name, _tx_name); 
 
   acc = new accumulator(acc_length);
-  save_holder = new circ_buffer(ch, save_length);
-  peak_holder = new circ_buffer(ch, save_length);
+  save_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
+  peak_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
 
   enable_detect = 1;
 }

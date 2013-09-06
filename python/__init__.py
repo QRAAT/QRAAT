@@ -27,5 +27,6 @@ interface.
 #import detection
 #import estimation
 
-from est_data import data_arrays, est_data
-from det_file import det_file
+from est import data_arrays, est_data
+from det import det 
+from csv import * 

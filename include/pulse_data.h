@@ -1,6 +1,5 @@
-/* pulse_data.h
- * Data structure for .det files. This file is part of QRAAT, an automated 
- * animal tracking system based on GNU Radio. 
+/* pulse_data.h - This file is part of QRAAT, an automated animal tracking 
+ * system based on GNU Radio. 
  *
  * Copyright (C) 2012 Christopher Patton
  * 
@@ -30,69 +29,216 @@
 
 using namespace std;
 
+//! Error handling. 
 typedef enum { FileReadError, NoDataError, IndexError } PulseDataError; 
 
-/* parameters */
+/*! 
+ * \brief Pulse data metadata paramters. 
+ * 
+ * This is the legacy header for .det files. In the future, we plan to 
+ * extend this header information to include database identifiers for the
+ * source transmitter and receiver site. To do this, we'll specify in the
+ * pulse_data's constructor the header version to use, which will
+ * correspond to to a particular struct. pulse_data::read() will determine 
+ * if a .det's header is versioned or legacy by looking at the first four 
+ * bytes. I.e., ``file.read((char*)&version, sizeof(int));`` if version != 0, 
+ * then use param_t.  
+ */
 typedef struct {
-  int channel_ct,
-      data_ct,
-      filter_data_ct,
-      pulse_index;
-  float sample_rate, 
-        ctr_freq;
-  //time_t pulse_time;
-  //struct timeval pulse_time;
-  int t_sec, t_usec; 
+  //! Number of input channels.
+  int channel_ct;      
+
+  //! Number of signal samples.
+  int sample_ct;       
+  
+  //! Number of samples corresponding to the pulse. 
+  int pulse_sample_ct; 
+  
+  //! Index of the start of pulse in samples. 
+  int pulse_index;     
+  
+  //! Rate which the samples were prdocued (units?) 
+  float sample_rate;   
+  
+  //! Center frequency used by detector. 
+  float ctr_freq;      
+  
+  //! Timestamp of pulse (seconds since epoch) 
+  int t_sec;    
+
+  //! Timestamp of pulse (milliseconds) 
+  int t_usec;   
 } param_t; 
 
+/*!
+ * \brief Stream outputter for pulse metadata. 
+ */ 
 ostream& operator<< ( ostream &out, const param_t &p );
 
 class detectmod_detect;
 
+/*!
+ * \brief Container for pulse data. 
+ *
+ * This class is used directly by the pulse detector for data storage
+ * as well as for encapsulation in the Python API (see Swig interface 
+ * in swig/rmg_swig.i). As the data buffer is used to store a continuous
+ * signal in the detector, this class implements routines for circular 
+ * buffer manipulation. However, the Python interface only has read/write
+ * accessors for the data and read access for the metadata. 
+ */ 
 class RMG_API pulse_data {
 friend class detectmod_detect; 
+protected:
 
-  fstream det; 
-  param_t params; 
-  gr_complex *data;
-  char *filename;
+  //! Data array, size = params.channel_ct * params.sample_ct. 
+  gr_complex *data; 
+  
+  //! Point to start of the circular buffer (oldest sample). 
+  int index; 
+
+  int size; // Store the size of the data array.
 
 public:
   
-  pulse_data (const char *fn=NULL); // throw PulseDataErr
-  ~pulse_data ();
-
-  /* open stream for writing */
-  void open(
+  /*! Name of input file. Declared as public for the Python interface. */
+  char *filename;   
+  
+  /*!
+   * Record metadata. Declared as public so that it's accessible
+   * in the Python interface. 
+   */
+  param_t params;   
+  
+  /*!
+   * \brief Constructor for the Python API. Throws PulseDataErr.
+   * \param fn Input file name. 
+   */ 
+  pulse_data (const char *fn=NULL); 
+  
+  /*! 
+   * \brief Constructor for pulse detector. 
+   *
+   * The parameters provided remain constant for the life of the pulse
+   * detector instance. The missing paramters - pulse_index, t_sec, and 
+   * t_usec - are calcluated on the fly. 
+   */ 
+  pulse_data(
    int channel_ct,
-   int data_ct,
-   int filter_data_ct,
-   int pulse_index,
+   int sample_ct,
+   int pulse_sample_ct,
    float sample_rate, 
-   float ctr_freq,
-   int t_sec,
-   int t_usec, 
-   const char *fn
+   float ctr_freq
   );
   
-  /* write something to stream */
-  void write(const char *data, int n);
+  /*! 
+   * \brief Constructor from another pulse_data instance. 
+   */ 
+  pulse_data(const pulse_data &det);
 
-  /* close stream */
-  void close();
+  /*! 
+   * \brief Destructor.
+   */ 
+  ~pulse_data ();
+  
+  /*!
+   * \brief Assignment operator. 
+   */ 
+  pulse_data& operator=(const pulse_data &det);
 
-  /* file io */
+  /*!
+   * \brief Read pulse data from file. 
+   *
+   * \param fn File name to read.  
+   * \returns The number of bytes read. -1 if the file doesn't 
+   *          exists or is corrupted. 
+   */
   int read(const char *fn); 
-  void writeout(const char *fn="");
 
-  /* accessors - throw PulseDataErr */
+  /*!
+   * \brief Write pulse data to file. 
+   *
+   * Unwrap circular buffer if necessary. 
+   */
+  int write(const char *fn="");
+
+  /* Accessors - throw PulseDataErr */
+
+  /*!
+   * \brief Get metadata.
+   */
   const param_t& param() const; 
+
+
+  /*!
+   * \brief Arbitrary access over data array. 
+   *
+   * To get the jth channel of the ith sample, 
+   * do det[(i * det.param().channel_ct) + j].
+   */
+  gr_complex& sample(int i); 
+
+  /*! Same as pulse_data::sample(). */
   gr_complex& operator[] (int i); 
 
+  /*!
+   * \brief Get the real part of an arbitrary datum. 
+   */
   float real(int i); 
+  
+  /*!
+   * \brief Get the imaginary part of an arbitrary datum. 
+   */
   float imag(int i); 
+
+  /*!
+   * \brief Set the real part of an arbitrary datum. 
+   */
   void set_real(int i, float val);
+
+  /*!
+   * \brief Set the imaginary part of an arbitrary datum. 
+   */
   void set_imag(int i, float val);
+
+  /*!
+   * Return pointer to the data buffer. 
+   *
+   * Note that the buffer is not unwrapped. 
+   */
+  gr_complex *get(); 
+
+
+
+  /* Routines for the circular buffer. */
+
+  /*!
+   * \brief Add sample to circular buffer and increment index. 
+   *
+   * \param in - next sample. 
+   */ 
+  void add(gr_complex *in);
+
+  /*! 
+   * \brief Get current index.
+   *
+   * Obsolete, since pulse_data is a friend of class detectmod_detect.
+   */ 
+  int get_index();
+
+  /*! TODO deprecate */
+  gr_complex *get_buffer();
+
+  /*!
+   * \brief Return sample at current index (oldest sample.) 
+   */
+  gr_complex *get_sample();
+
+  /*!
+   * \brief Return current index. 
+   */
+  void inc_index();
+
 
 };
 

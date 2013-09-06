@@ -1,5 +1,7 @@
 build/
 _build/
+doxyxml/
 install_rmg_log.txt
 *.swp
+*.pyc
 .DS_Store

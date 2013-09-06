@@ -1,0 +1,44 @@
+We use Sphinx to generate documentation for our code. This directory contains a
+makefile for building complete docs exported in HTML, Latex, and other popular 
+formats. The Python sources are all directly documented with Sphinx. The C++ 
+source code is documented by importing doxygen XML output into Sphinx via a 
+Python library called Breathe. 
+
+I've already added the doxygen build directives to the make file. To build all
+of the documentation, do 
+
+ $ make clean && make html
+
+
+
+Here's how I setup doxygen/breathe/sphinx: 
+
+(1) Download breathe 1.0.0 here: https://pypi.python.org/pypi/breathe. Untar it
+    and run ``sudo python setup.py install``. 
+
+(2) Next, generate a doxygen configuration file for the C++ interface files. 
+    In include/, do ``doxygen -g doxygen.cfg``. Move doxygen.cfg to doc/.
+
+(3) Set the following parameters in doxygen.cfg: 
+      PROJECT_NAME           = "RMG Pulse Detector"
+      INPUT                  = ../include/
+      GENERATE_HTML          = NO
+      GENERATE_LATEX         = NO
+      GENERATE_XML           = YES
+      XML_OUTPUT             = doxyxml
+
+(4) (The following instructions are from michaeljones.github.io/breathe/quickstart.html.)
+    Add breathe to the Sphinx extensions list in doc/conf.py: 
+      extensions = ['sphinx.ext.autodoc', 
+                    'sphinx.ext.pngmath', 
+                    'sphinx.ext.viewcode', 
+                    'breathe']
+
+(5) Add the doxygen XML exports to the breathe path in doc/conf.py: 
+      breathe_projects = { 'detector' : os.path.abspath('doxyxml/') }
+
+(6) Set 'detector' as the default breathe project: 
+      breathe_default_rpoject = "myproject"
+
+    
+

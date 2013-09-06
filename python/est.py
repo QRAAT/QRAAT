@@ -1,4 +1,4 @@
-# est_data.py - Structure for holding processed .det files. Output 
+# est.py - Structure for holding processed .det files. Output 
 # formats: .csv and .est. This file is part of QRAAT, an automated 
 # animal tracking system based on GNU Radio. 
 #
@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import det_file
+import det as fella
 import os,time,errno
 import numpy as np
 import struct
@@ -126,7 +126,7 @@ class data_arrays():
         det.noise_cov()
         self.tag_number[index] = tag_index
         self.epoch_time[index] = det.time
-        self.center_freq[index] = det.center_freq
+        self.center_freq[index] = det.params.ctr_freq
         self.e_sig[index,:] = det.e_sig.transpose()
         self.e_pwr[index] = det.e_pwr
         self.confidence[index] = det.e_conf
@@ -384,18 +384,18 @@ class est_data():
             new_data = data_arrays(self.num_channels, len(dir_list))
             count = 0
             for fstr in dir_list:
-                if fstr[-4:] == '.det':
-                    det = det_file.det_file(dirname + fstr)
-                    if not det.null_file:
-                        tag_name = det.tag_name
-                        try:
-                            tag_index  = self.tag_names.index(tag_name)
-                        except ValueError:
-                            self.tag_names.append(tag_name)
-                            tag_index = self.num_tags
-                            self.num_tags += 1
-                        new_data.add_det(det, tag_index, count)
-                        count += 1
+              if fstr[-4:] == '.det':
+                try:
+                  det = fella.det(dirname + fstr)
+                  tag_name = det.tag_name
+                  try: tag_index  = self.tag_names.index(tag_name)
+                  except ValueError:
+                    self.tag_names.append(tag_name)
+                    tag_index = self.num_tags
+                    self.num_tags += 1
+                  new_data.add_det(det, tag_index, count)
+                  count += 1
+                except RuntimeError: pass # same as null_file check
             
             self.data.append(new_data.filter_non_filled())
 
@@ -403,7 +403,7 @@ class est_data():
         """ Add det object. 
 
         :param det: pulse data (?)
-        :type det: qraat.det_file.det_file
+        :type det: qraat.det.det
         """
 
         if not det.null_file:

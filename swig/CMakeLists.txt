@@ -39,15 +39,18 @@ foreach(incdir ${GRUEL_INCLUDE_DIRS})
     list(APPEND GR_SWIG_INCLUDE_DIRS ${incdir}/gruel/swig)
 endforeach(incdir)
 
-set(GR_SWIG_LIBRARIES gnuradio-rmg)
+set(GR_SWIG_LIBRARIES gnuradio-rmg gnuradio-rmg-pulse)
 set(GR_SWIG_DOC_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 GR_SWIG_MAKE(rmg_swig rmg_swig.i)
+GR_SWIG_MAKE(pulse_swig pulse_data.i)
 SWIG_LINK_LIBRARIES(rmg_swig gnuradio-rmg)
+SWIG_LINK_LIBRARIES(pulse_swig gnuradio-rmg-pulse)
 
 ########################################################################
 # Install the build swig module
 ########################################################################
 GR_SWIG_INSTALL(TARGETS rmg_swig DESTINATION ${GR_PYTHON_DIR}/qraat/rmg)
+GR_SWIG_INSTALL(TARGETS pulse_swig DESTINATION ${GR_PYTHON_DIR}/qraat)
 
 
 ########################################################################
@@ -56,9 +59,8 @@ GR_SWIG_INSTALL(TARGETS rmg_swig DESTINATION ${GR_PYTHON_DIR}/qraat/rmg)
 install(
     FILES
     rmg_swig.i
+    pulse_data.i
     DESTINATION ${GR_INCLUDE_DIR}/qraat/swig
 )
-    #pulse_data.i
-    #detectmod_detect.i
 
 

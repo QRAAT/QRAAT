@@ -1,4 +1,4 @@
-# rmg_graphs.py 
+# blocks.py 
 # defines the GNU Radio graphs for the software defined detection 
 # backend. (rewrite? TODO) This file is part of QRAAT, an automated
 # animal tracking system based on GNU Radio. 
@@ -25,7 +25,7 @@
 
 from gnuradio import gr, blks2, uhd, gru
 from rmg_swig import detect
-import rmg_param
+import params
 
 import sys, time
 
@@ -76,7 +76,7 @@ class software_backend(gr.hier_block2):
     :param channels: number of input channels from the USRP. 
     :type channels: int
     :param be_param: Backend parameters (?) 
-    :type be_param: qraat.rmg.rmg_param.backend
+    :type be_param: qraat.rmg.params.backend
     
     """ 
       
@@ -145,7 +145,7 @@ class software_backend(gr.hier_block2):
         self.current_bands = bands
         for j in bands:
             print j
-            if (j.tx_type == rmg_param.PULSE):
+            if (j.tx_type == params.PULSE):
                 self.det[j.band_num].rise_factor(j.rise)
                 self.det[j.band_num].fall_factor(j.fall)
                 self.det[j.band_num].alpha_factor(j.alpha)
@@ -156,7 +156,7 @@ class software_backend(gr.hier_block2):
                                             j.cf, 
                                             USE_PSD)
 
-            elif (j.tx_type == rmg_param.CONT):
+            elif (j.tx_type == params.CONT):
                 self.det[j.band_num].enable_cont(str(j.directory + '/' + j.name + '_' + time.strftime('%Y%m%d%H%M%S', time.gmtime()) + '.tdat'))
 
 

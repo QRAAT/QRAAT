@@ -1,4 +1,4 @@
-# rmg_run.py 
+# run.py 
 # Connect GNU Radio processing blocks into a graph. class detector_array
 # defines an array of these graphs for detecting pulses on all frequencies
 # specified. This file is part of QRAAT, an automated animal tracking system 
@@ -19,8 +19,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import rmg_graphs, rmg_param
-from rmg_pic_interface import rmg_pic_interface
+import blocks, params
+from pic_interface import pic_interface
 import os, time
 
 FPGA_FREQ = 10.7e6
@@ -30,10 +30,10 @@ class detector_array:
 
     def __init__(self,filename = "tx.csv",directory = "./det_files", num_bands = 1, serial_port = '/dev/ttyS0', no_usrp = None):
         
-        """ A set of detectors for each specified frequency.
+        """ An array of detectors.
 
           A set of GR signal processing graphs comprised of the blocks defined 
-          in :mod:`qraat.rmg.rmg_graphs`. The graph is made up of the USRP source, 
+          in :mod:`qraat.rmg.blocks`. The graph is made up of the USRP source, 
           some fitlers, and the pulse detector. A graph is created for each 
           frequency specified by the transmitter configuration file *filename*.
 
@@ -45,7 +45,7 @@ class detector_array:
         :type num_bands: int
         :param serial_port: serial interface for PIC controller. 
         :type serial_port: string
-        :no_usrp_flag: use :class:`qraat.rmg.rmg_graphs.no_usrp_top_block` instead of the USRP source block. 
+        :no_usrp_flag: use :class:`qraat.rmg.blocks.no_usrp_top_block` instead of the USRP source block. 
         :type: no_usrp_flag bool
         """ 
 
@@ -78,7 +78,7 @@ class detector_array:
             self.sc = None
             print "Serial Communication Disabled"
         else:
-            self.sc = rmg_pic_interface(serial_port)
+            self.sc = pic_interface(serial_port)
 
         self.__create_graph()
   
@@ -112,7 +112,7 @@ class detector_array:
     # the USRP tuning parameters.  Chris ~18 Sep 2012
     #
         
-        self.backend_param = rmg_param.backend(self.filename, self.num_bands, self.directory)
+        self.backend_param = params.backend(self.filename, self.num_bands, self.directory)
         self.high_lo       = self.backend_param.high_lo
         self.decim         = self.backend_param.decim
 
@@ -130,14 +130,14 @@ class detector_array:
         else:
             lo3 = -FPGA_FREQ
         if self.NO_USRP == None:
-            self.frontend = rmg_graphs.usrp_top_block(lo3, int(self.decim), CHANNELS)
+            self.frontend = blocks.usrp_top_block(lo3, int(self.decim), CHANNELS)
         else:
-            self.frontend = rmg_graphs.no_usrp_top_block(lo3, int(self.decim), CHANNELS, self.NO_USRP)
+            self.frontend = blocks.no_usrp_top_block(lo3, int(self.decim), CHANNELS, self.NO_USRP)
             print "Using Null Frontend"
 
     def __create_backend(self):
 
-        self.backend = rmg_graphs.software_backend(CHANNELS, self.backend_param)
+        self.backend = blocks.software_backend(CHANNELS, self.backend_param)
      
     ## public runnables ##
 

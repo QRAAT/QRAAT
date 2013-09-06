@@ -19,13 +19,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from gnuradio import gr, blks2, uhd, gru
-import qraat.rmg, sys
+import qraat, sys
 
 if(len(sys.argv) == 1):
   print "usage: read_det pulse_data.det"
   sys.exit(1)
 
-det = qraat.rmg.pulse_data(sys.argv[1])
+det = qraat.det(sys.argv[1])
 p = det.param()
 
 
@@ -33,13 +33,13 @@ print p
 
 print ' '*4,
 for i in range(p.channel_ct-1): 
-  print "%-21s  |" % ('channel %d' % (i+1)),
-print 'channel %d' % p.channel_ct
+  print "%-21s  |" % ('channel %-2d' % (i+1)),
+print 'channel %d (real, imag)' % p.channel_ct 
 print '-'*4 + ('-'*24+'+')*(p.channel_ct-1) + '-'*22
 
-for i in range(p.data_ct):
-  print "%-4d" % (i+1) + "    |".join(
-   [ "%-4f  %-4f" % (det.real((i*p.channel_ct)+j), 
-                     det.imag((i*p.channel_ct)+j))
+for i in range(p.sample_ct):
+  print "%-4d" % (i+1) + " |".join(
+   [ "%11s %11s" % ("%-4.02f" % det.real((i*p.channel_ct)+j), 
+                    "%-4.02f" % det.imag((i*p.channel_ct)+j))
       for j in range(p.channel_ct) ] ) 
     

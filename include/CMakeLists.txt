@@ -24,7 +24,6 @@ install(FILES
     rmg_api.h
     accumulator.h
     pulse_data.h
-    circ_buffer.h
     detectmod_detect.h
     peak_detect.h
     DESTINATION include/rmg
