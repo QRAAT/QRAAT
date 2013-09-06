@@ -54,8 +54,8 @@
   USRP parameters: usrp_sampling_rate, usrp_max_decimation, decim, high_lo
 """
 
-import math, csv
-import qraat.csv as better_csv
+import math, sys
+import qraat.csv 
 
 #: TODO this is a bit messy. 
 PULSE, CONT = range(2)#detector types used in the bands
@@ -85,16 +85,16 @@ class band:
     """
 
     def __init__(self, tx_data, band_num, band_cf, filter_length, directory):
-        self.name = tx_data[0]
+        self.name = tx_data.name
         self.directory = directory
         self.band_num = band_num # index in pd array 
         self.cf = band_cf # ref upstream
-        self.tx_type = tx_data[2] 
+        self.tx_type = tx_data.type 
         if (self.tx_type == PULSE):
             self.filter_length = filter_length
-            self.rise = tx_data[4]
-            self.fall = tx_data[5]
-            self.alpha = tx_data[6]
+            self.rise = tx_data.rise_trigger
+            self.fall = tx_data.fall_trigger
+            self.alpha = tx_data.filter_alpha
         else:
             self.filter_length = 0
             self.rise = 0.0
@@ -108,21 +108,20 @@ class band:
           so we'll pick up pulses from any tranmmitter on this frequency. The 
           idea is that there may be a way to uniquely identify them downstream. 
         """ 
-        self.name = self.name + tx_data[0] + '_'
-        # self.file_prefix = self.file_prefix + tx_data[0] + '_'
+        self.name = self.name + tx_data.name + '_'
         if (self.tx_type != CONT):
         
-            if (tx_data[2] == CONT):
+            if (tx_data.type == CONT):
                 self.tx_type = CONT
             else:
                 if (filter_length > self.filter_length):
                     self.filter_length = filter_length
-                if (tx_data[4] < self.rise):
-                    self.rise = tx_data[4]
-                if (tx_data[5] > self.fall  and self.rise > tx_data[5]):
-                    self.fall = tx_data[5]
-                if (tx_data[6] < self.alpha):
-                    self.alpha = tx_data[6]
+                if (tx_data.rise_trigger < self.rise):
+                    self.rise = tx_data.rise_trigger
+                if (tx_data.fall_trigger > self.fall  and self.rise > tx_data.fall_trigger):
+                    self.fall = tx_data.fall_trigger
+                if (tx_data.filter_alpha < self.alpha):
+                    self.alpha = tx_data.filter_alpha
 
     def __str__(self):
         """ Print band paramters to console. """ 
@@ -166,14 +165,14 @@ class tuning:
         :type tx_data: (?) 
         """
 
-        tx_freq = tx_data[1]*1000000.0
+        tx_freq = tx_data.freq*1000000.0
         baseband_freq = tx_freq - self.cf
         baseband_band_num = round(baseband_freq/self.bw)
         if (baseband_band_num >=0):
             band_num = int(baseband_band_num)
         else:
             band_num = int(self.num_possible_bands + baseband_band_num)
-        filter_length = int(round(tx_data[3]*self.bw/1000))
+        filter_length = int(round(tx_data.pulse_width*self.bw/1000))
         #check if already a tx on this band
         for c in self.bands:
             if (c.band_num == band_num):
@@ -247,27 +246,20 @@ class backend:
         self.__lo_calc()
         
         #: Transmitter data.
-        self.data = []
-   
-        # Load transmitter configuration. FIXME use qraat.csv 
-        inf = open(path, 'rb')
-        transmitters = csv.reader(inf, delimiter = ",", quotechar='"') 
-        cols  = transmitters.next() # first row is header
-        index = dict( [(cols[i], i) for i in range(len(cols))] ) 
+        self.data = qraat.csv(path)
         print 'Transmitters from {0}'.format(path)
-        for tx in transmitters:
-            if tx[index['use']] in ['Y', 'y', 'yes', 'Yes', 'YES']: 
-                tx[index['use']] = True
-            else:
-                tx[index['use']] = False
-          
-            tx[index['freq']] = float(tx[index['freq']])
-            tx[index['pulse_width']] = float(tx[index['pulse_width']])
-            tx[index['rise_trigger']] = float(tx[index['rise_trigger']])
-            tx[index['fall_trigger']] = float(tx[index['fall_trigger']])
-            tx[index['filter_alpha']] = float(tx[index['filter_alpha']])
-            self.data.append( tx )
-
+      
+        for tx in self.data.table: 
+          if tx.use in ['Y', 'y', 'yes', 'Yes', 'YES']: 
+            tx.use = True
+          else:
+            tx.use = False 
+          tx.freq = float(tx.freq) 
+          tx.pulse_width = float(tx.pulse_width) 
+          tx.rise_trigger = float(tx.rise_trigger) 
+          tx.fall_trigger = float(tx.fall_trigger) 
+          tx.filter_alpha = float(tx.filter_alpha) 
+        
         self.__backend_calc()
         
     def add_tuning(self, cf = 0.0, lo1 = 0.0):
@@ -344,8 +336,8 @@ class backend:
         set_of_needed_tunings = set()#list of tunings to get all the transmitters
         data_index = []
         for j in range(num_freqs):
-            if data[j][0]:
-                curr_freq = int(data[j][2]*1000000)
+            if data[j].use:
+                curr_freq = int(data[j].freq*1000000)
                 list_of_tx_freqs.append(curr_freq)
                 data_index.append(j)
 
@@ -438,10 +430,11 @@ class backend:
                 tx_index = list_of_tx_freqs.index(tx_freq)
 
                 #get transmitter data
-                tx_data = data[data_index[tx_index]][1:]
-                print "\t{0} {1:.3f} MHz".format(tx_data[0],tx_data[1])
-                tx_data[2] = transmitter_types[tx_data[2]]
+                tx_data = data[data_index[tx_index]]
+                print "\t{0} {1:.3f} MHz".format(tx_data.name, tx_data.freq)
+                tx_data.type = transmitter_types[tx_data.type]
                 self.add_tx(tx_data)
+
 
 
 if __name__ == "__main__": # testing, testing ... 

@@ -77,6 +77,8 @@ class csv:
         getattr(row, col) for col in self.headers)) for row in self.table) 
     return res
  
+  def __len__(self):
+    return len(self.table)
 
   def __getitem__(self, i): 
     return self.table[i]
