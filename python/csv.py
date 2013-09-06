@@ -45,18 +45,18 @@ class csv:
     """
 
     fd = open(fn, 'r')
-    headers = self.__build_header(fd)
+    lengths = self.__build_header(fd)
 
     # Populate the table.
     for line in map(lambda l: l.strip().split(','), fd.readlines()): 
       self.table.append(self.Row())
-      for (cell, value) in zip(headers.keys(), line):
-        if headers[cell] < len(value):
-          headers[cell] = len(value)  
-        setattr(self.table[-1], cell, value)
+      for i in range(len(self.headers)): # self.headers, line, lengths
+        if lengths[i] < len(line[i]):
+          lengths[i] = len(line[i])
+        setattr(self.table[-1], self.headers[i], line[i])
     fd.close()
     
-    self.__build_row_template(headers)
+    self.__build_row_template(lengths)
 
 
   def write(self, fn): 
@@ -93,16 +93,18 @@ class csv:
       the their length. This will be used to compute the row 
       template string. 
     """
+    
+    #: Column names. 
+    self.headers = [ h for h in fd.readline().strip().split(',') ]
 
     # Store the maximum row length per column. This value will 
     # be used to compute a string template for displaying the 
     # table. 
-    headers = { header : len(header) 
-                      for header in fd.readline().strip().split(',') }
+    lengths = [ len(h) for h in self.headers ]
 
     #: Type for table rows. This allows us to use the column 
     #: names as class attributes. 
-    self.Row = type('Row', (object,), {header : None for header in headers})
+    self.Row = type('Row', (object,), {h : None for h in self.headers})
     
     # Create an object for rows. TODO Row.__str__() should print 
     # the row in a pretty way. Perhaps some sort of fancy meta 
@@ -112,21 +114,16 @@ class csv:
       return "TODO"
     self.Row.__str__ = f
 
-    #: Column names. 
-    self.headers = headers.keys()
-    
-    return headers
+    return lengths
    
 
-  def __build_row_template(self, d):
-    """ 
-      Build row template string from dictionary d, which maps 
-      column headers to the maximum string lengths of columns. 
-    """
+  def __build_row_template(self, ls):
+    """ Build row template string from maximum column lengths ``ls``. """
 
     #: Template string for displaying table rows. 
     self._row_template = ' '.join(
-          [ '%-{0}s'.format(i) for i in d.itervalues()])
+       ['%-{0}s'.format(i) for i in ls])
+
 
 if __name__ == '__main__': 
   tx = csv('../build/tx.csv')
