@@ -61,10 +61,11 @@ sub main()
 		print "ERROR: missing parameter for sitelist\n" ;
 		return 1 ;
 	}
-	print "Reading sitelist from '$sitelist'\n" ;
-	my @data = readcsv($sitelist) ;
-	shift @data ;	# discard header line
-	if( scalar @data < 1 )
+	print "$0: reading sitelist from '$sitelist'\n" ;
+	my $rmg_csv = `rmg_csv -c name <$sitelist` ;
+	my @sitenames = split(/\n/,$rmg_csv) ;
+	if( $Debug ) { print "debug: main: sitenames=@sitenames\n" ; }
+	if( scalar @sitenames < 1 )
 	{
 		print "ERROR: cannot read sitelist\n" ;
 		return 1 ;
@@ -86,12 +87,13 @@ sub main()
 	}
 	#
 	# Read the data
-	for my $ref_row ( @data )
+	for my $sitename ( @sitenames )
 	{
-		my $sitename = $ref_row->[0] ;
-		my $ip = $ref_row->[2] ;
-		my $ps = $ref_row->[5] ;
+		if( $Debug ) { print "debug: main: sitename=$sitename\n" ; }
 		if( (not defined $sitename) or ($sitename eq "") ) { next ; }
+		#name,comp_ip,power_ip,comp_outlet,rx_outlet,powertype,state,auto,schedule
+		my $ip = `rmg_csv $sitename comp_ip <$sitelist` ;
+		my $ps = `rmg_csv $sitename power_ip <$sitelist` ;
 		if( (not defined $ip) or ($ip eq "") ) { next ; }
 		if( (not defined $ps) or ($ps eq "") ) { next ; }
 		my ( $ping_power, $ping_computer, $site_status ) = get_rmg_status($sitename) ;
@@ -205,51 +207,6 @@ sub get_rmg_status($)
 		print "Error: missing sitename in get_rmg_status\n" ;
 	}
 	return ( $ping_power, $ping_computer, $site_status ) ;
-}
-
-sub readcsv($)
-{
-	my ( $filename ) = @_ ;
-	my $fd ;
-	if( not defined open($fd,"<".$filename) )
-	{
-		print "ERROR: cannot open file '$filename'" ;
-		return undef ;
-	}
-	my @data = () ;
-	my $line ;
-	while( $line = <$fd> )
-	{
-		chomp($line) ;
-		my @argv = split(',',$line) ;
-		push @data, [ @argv ] ;	# create an array of references to an array 
-	}
-	close($fd) ;
-	return @data ;
-}
-
-# NO LONGER USED
-sub writecsv($@)
-{
-	#my ( $name, $intemp, $extemp, $voltage, $current1, $power1, $current2, $power2 ) = @_ ;
-	my ( $name, @values ) = @_ ;
-	my $filename = "$name.csv" ;
-	my $fd ;
-	if( not defined open($fd,">>".$filename) )
-	{
-		print "ERROR: cannot write to file '$filename'\n" ;
-		return 1 ;
-	}
-	my $dt = strftime "%Y-%m-%d %H:%M:%S,%z", localtime();
-	#print $fd "$dt,$intemp,$extemp,$voltage,$current1,$power1,$current2,$power2\n" ;
-	print $fd "$dt" ;
-	for my $value ( @values )
-	{
-		print $fd ",$value" ;
-	}
-	print $fd "\n" ;
-	close($fd) ;
-	return 0 ;
 }
 
 sub opendatabase($)	# connects to the database and returns the database handle

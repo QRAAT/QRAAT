@@ -61,9 +61,10 @@ sub main()
 		return 1 ;
 	}
 	print "$0: reading sitelist from '$sitelist'\n" ;
-	my @data = readcsv($sitelist) ;
-	shift @data ;	# discard header line
-	if( scalar @data < 1 )
+	my $rmg_csv = `rmg_csv -c name <$sitelist` ;
+	my @sitenames = split(/\n/,$rmg_csv) ;
+	if( $Debug ) { print "debug: main: sitenames=@sitenames\n" ; }
+	if( scalar @sitenames < 1 )
 	{
 		print "ERROR: cannot read sitelist\n" ;
 		return 1 ;
@@ -85,9 +86,9 @@ sub main()
 	}
 	#
 	# Read the data
-	for my $ref_row ( @data )
+	for my $sitename ( @sitenames )
 	{
-		my $sitename = $ref_row->[0] ;
+		if( $Debug ) { print "debug: main: sitename=$sitename\n" ; }
 		if( (not defined $sitename) or ($sitename eq "") ) { next ; }
 		my ( $server_est_count, $site_est_count ) = get_est_count($sitename) ;
 		print "$sitename: $server_est_count at server, $site_est_count at site\n" ;
@@ -113,35 +114,14 @@ sub get_est_count($)
 	if( defined $result ) { $server_est_count = $result ; }
 	# Site
 	my $site_est_count = "" ;
-	my $site_estdir = $ENV{$ENV_NAME_RMG_SITE_EST_DIR} ;
-	$command = "ssh $sitename 'find $site_estdir -type f -iname \"*.est\" | wc -l'" ;
-	if( $Debug ) { print "debug: get_est_count: site command=$command\n" ; }
-	$result = `$command` ;
-	chomp($result) ;
-	if( $Debug ) { print "debug: get_est_count: site result=$result\n" ; }
-	if( defined $result ) { $site_est_count = $result ; }
+	#my $site_estdir = $ENV{$ENV_NAME_RMG_SITE_EST_DIR} ;
+	#$command = "ssh $sitename 'find $site_estdir -type f -iname \"*.est\" | wc -l'" ;
+	#if( $Debug ) { print "debug: get_est_count: site command=$command\n" ; }
+	#$result = `$command` ;
+	#chomp($result) ;
+	#if( $Debug ) { print "debug: get_est_count: site result=$result\n" ; }
+	#if( defined $result ) { $site_est_count = $result ; }
 	return ( $server_est_count, $site_est_count ) ;
-}
-
-sub readcsv($)
-{
-	my ( $filename ) = @_ ;
-	my $fd ;
-	if( not defined open($fd,"<".$filename) )
-	{
-		print "ERROR: cannot open file '$filename'" ;
-		return undef ;
-	}
-	my @data = () ;
-	my $line ;
-	while( $line = <$fd> )
-	{
-		chomp($line) ;
-		my @argv = split(',',$line) ;
-		push @data, [ @argv ] ;	# create an array of references to an array 
-	}
-	close($fd) ;
-	return @data ;
 }
 
 sub opendatabase($)	# connects to the database and returns the database handle
