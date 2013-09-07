@@ -233,9 +233,10 @@ sub main()
 	}
 	my $sitelist = $ARGV[0] ;
 	print "Reading sitelist from '$sitelist'\n" ;
-	my @data = readcsv($sitelist) ;
-	shift @data ;	# discard header line
-	if( scalar @data < 1 )
+	my $rmg_csv = `rmg_csv -c name <$sitelist` ;
+	my @sitenames = split(/\n/,$rmg_csv) ;
+	if( $Debug ) { print "debug: main: sitenames=@sitenames\n" ; }
+	if( scalar @sitenames < 1 )
 	{
 		print "ERROR: cannot read sitelist\n" ;
 		return 1 ;
@@ -248,19 +249,19 @@ sub main()
 		# opendatabase() already explains the error
 		return 1 ;
 	}
-	for my $ref_row ( @data )
+	for my $sitename ( @sitenames )
 	{
-		my $site = $ref_row->[0] ;
-		if( (not defined $site) or ($site eq "") ) { next ; }
+		if( $Debug ) { print "debug: main: sitename=$sitename\n" ; }
+		if( (not defined $sitename) or ($sitename eq "") ) { next ; }
 		for my $product ( @Products )
 		{
 			my $table = $product->{table} ;
 			my $columns = $product->{columns} ;
 			my $timezone = $product->{timezone} ;
 			my $interval = $product->{interval} ;
-			my $result = writecsv($site,$dbh,$table,$columns,$timezone,$interval) ;
+			my $result = writecsv($sitename,$dbh,$table,$columns,$timezone,$interval) ;
 			if( $result ) { next ; }
-			make($site,$dbh,$product) ;
+			make($sitename,$dbh,$product) ;
 		}
 	}	
 	closedatabase($dbh) ;
@@ -420,27 +421,6 @@ sub tzconvert($$$)	# convert datetime string 'YYYY-MM-DD HH:mm:ss' between timez
 	return ( $target_dt, $target_tz ) ;
 }
 
-sub readcsv($)
-{
-	my ( $filename ) = @_ ;
-	my $fd ;
-	if( not defined open($fd,"<".$filename) )
-	{
-		print "ERROR: cannot open file '$filename'" ;
-		return undef ;
-	}
-	my @data = () ;
-	my $line ;
-	while( $line = <$fd> )
-	{
-		chomp($line) ;
-		my @argv = split(',',$line) ;
-		push @data, [ @argv ] ;	# create an array of references to an array 
-	}
-	close($fd) ;
-	return @data ;
-}
-
 my @GnuplotCommands =
 (
 	"set terminal png size 600,300 truecolor nocrop enhanced",
@@ -580,7 +560,7 @@ sub makeplot($$)
 	my ( $site, $filename ) = @_ ;
 	my $gpfilename = "$TmpPath/${site}_$filename.gp" ;
 	my $logfilename = "$TmpPath/${site}_$filename.log" ;
-	my $command = "/usr/bin/gnuplot $gpfilename &>$logfilename" ;
+	my $command = "gnuplot $gpfilename 2>&1 >$logfilename" ;
 	if( $Debug ) { print "debug: makeplot: command=$command\n" ; }
 	my $result = `$command` ;
 	if( $Debug ) { print "debug: makeplot: result=$result\n" ; }
