@@ -145,7 +145,7 @@ class software_backend(gr.hier_block2):
         self.current_bands = bands
         for j in bands:
             print j
-            if (j.tx_type == params.PULSE):
+            if (j.tx_type == params.det_type.PULSE):
                 self.det[j.band_num].rise_factor(j.rise)
                 self.det[j.band_num].fall_factor(j.fall)
                 self.det[j.band_num].alpha_factor(j.alpha)
@@ -156,7 +156,7 @@ class software_backend(gr.hier_block2):
                                             j.cf, 
                                             USE_PSD)
 
-            elif (j.tx_type == params.CONT):
+            elif (j.tx_type == params.det_type.CONT):
                 self.det[j.band_num].enable_cont(str(j.directory + '/' + j.name + '_' + time.strftime('%Y%m%d%H%M%S', time.gmtime()) + '.tdat'))
 
 

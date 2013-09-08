@@ -23,10 +23,13 @@ This is the python qraat module, comprising our application programming
 interface. 
 '''
 
-# import any pure python here
-#import detection
-#import estimation
+#: Create an enumerated type as a Python class. 
+def enum(*sequential, **named):
+  enums = dict(zip(sequential, range(len(sequential))), **named)
+  Enum = type('Enum', (), enums)
+  return Enum
 
 from est import data_arrays, est_data
 from det import det 
 from csv import * 
+

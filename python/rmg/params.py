@@ -55,13 +55,23 @@
 """
 
 import math, sys
-import qraat.csv 
+import qraat 
 
-#: TODO this is a bit messy. 
-PULSE, CONT = range(2)#detector types used in the bands
-det_type_str = ["Pulse Detector", "Raw Baseband Recording"]
-transmitter_types = {"Pulse":PULSE, "Continuous":CONT, "Other":CONT}
+#: Enumerated type for the data type output for a particular band from 
+#: radio. This is used in qraat.rmg.run to decide to use a continuous 
+#: baseband recorder or pulse detector. 
+det_type = qraat.enum('PULSE', 'CONT')
 
+#: String representations of radio output types. 
+det_type_str = { det_type.PULSE : "Pulse Detector", 
+                 det_type.CONT  : "Raw Baseband Recording" }
+
+#: The type of data produced by a transmitter, specified in the 'type' 
+#: column of the configuration file. This dictionary maps the transmitter
+#: type to the detector type. 
+tx_type = { "Pulse"      : det_type.PULSE, 
+            "Continuous" : det_type.CONT, 
+            "Other"      : det_type.CONT }
 
 #: Number of samples processed by the USRP per second. (Usually 64 Ms/sec.)  
 usrp_sampling_rate = 64e6 
@@ -90,7 +100,7 @@ class band:
         self.band_num = band_num # index in pd array 
         self.cf = band_cf # ref upstream
         self.tx_type = tx.type 
-        if (self.tx_type == PULSE):
+        if (self.tx_type == det_type.PULSE):
             self.filter_length = filter_length
             self.rise = tx.rise_trigger
             self.fall = tx.fall_trigger
@@ -125,7 +135,7 @@ class band:
 
     def __str__(self):
         """ Print band paramters to console. """ 
-        if (self.tx_type == PULSE):
+        if (self.tx_type == det_type.PULSE):
             band_str = "Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: {2}\n\tType: {3}\n\tFilter Length: {4:d} samples\n\tRise: {5:.2f}, Fall: {6:.2f}, Alpha: {7:.3f}".format(
                 self.band_num, self.cf/1000000, self.name, det_type_str[self.tx_type], 
                 self.filter_length,self.rise,self.fall,self.alpha)
@@ -282,6 +292,7 @@ class backend:
         tx.rise_trigger = float(tx.rise_trigger) 
         tx.fall_trigger = float(tx.fall_trigger) 
         tx.filter_alpha = float(tx.filter_alpha) 
+        tx.type = tx_type[tx.type]
       
       self.__lo_calc()
       self.__backend_calc()
@@ -453,7 +464,6 @@ class backend:
                 #get transmitter data
                 tx_data = self.transmitters[data_index[tx_index]]
                 print "\t{0} {1:.3f} MHz".format(tx_data.name, tx_data.freq)
-                tx_data.type = transmitter_types[tx_data.type]
                 self.tunings[-1].add_tx(tx_data)
 
 

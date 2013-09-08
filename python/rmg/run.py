@@ -116,7 +116,7 @@ class detector_array:
         self.high_lo       = self.backend_param.high_lo
         self.decim         = self.backend_param.decim
 
-        self.num_be = self.backend_param.num_tunings
+        self.num_be = len(self.backend_param.tunings)
         if self.sc != None:
             if self.high_lo:
                 self.sc.use_high_lo()
