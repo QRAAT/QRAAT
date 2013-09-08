@@ -79,37 +79,42 @@ usrp_sampling_rate = 64e6
 #: Maximum decimation factor for the USRP. 
 usrp_max_decimation = 250
 
+
+
 class band:
     """ Data for a single detector band. 
     
-    :param tx_data: Transmitter configuration(?) 
-    :type tx_data: (?) 
-    :param band_num: (?) 
-    :type band_num: (?) 
-    :param band_cf: (?) 
-    :type band_cf: (?) 
+    :param tx: Transmitter paramters. 
+    :type tx: qraat.csv.Row 
+    :param band_num: Band number, i.e. index in pulse detector array. 
+    :type band_num: int
+    :param band_cf: Band center frequency.
+    :type band_cf: float
     :param filter_length: (?) 
-    :type filter_length: (?) 
-    :param directory: (?)
+    :type filter_length: int 
+    :param directory: Target directory for detector output.  
     :type directory: string
     """
 
     def __init__(self, tx, band_num, band_cf, filter_length, directory):
-        self.name = tx.name
-        self.directory = directory
-        self.band_num = band_num # index in pd array 
-        self.cf = band_cf # ref upstream
-        self.tx_type = tx.type 
+        self.name = tx.name        #: Transmitter name. 
+        self.tx_type = tx.type     #: Transmitter type. 
+        self.band_num = band_num   #: Index of band in pulse detector array. 
+        self.cf = band_cf          #: Band center frequency. 
+        self.directory = directory # ref upstream
+        
         if (self.tx_type == det_type.PULSE):
-            self.filter_length = filter_length
-            self.rise = tx.rise_trigger
-            self.fall = tx.fall_trigger
-            self.alpha = tx.filter_alpha
+            self.filter_length = filter_length #: (?) 
+            self.rise = tx.rise_trigger        #: Rise trigger (pulse detector paramater).
+            self.fall = tx.fall_trigger        #: Fall trigger (pulse detector paramater).
+            self.alpha = tx.filter_alpha       #: Alpha factor (pulse detector paramater).
+        
         else:
             self.filter_length = 0
             self.rise = 0.0
             self.fall = 0.0
             self.alpha = 0.0
+
 
     def combine_tx(self, tx, filter_length): # TODO
         """ Listen to many transmitters on the same frequency in the same band. 
@@ -133,16 +138,21 @@ class band:
                 if (tx.filter_alpha < self.alpha):
                     self.alpha = tx.filter_alpha
 
+
     def __str__(self):
         """ Print band paramters to console. """ 
         if (self.tx_type == det_type.PULSE):
-            band_str = "Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: {2}\n\tType: {3}\n\tFilter Length: {4:d} samples\n\tRise: {5:.2f}, Fall: {6:.2f}, Alpha: {7:.3f}".format(
+            band_str = ("Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: "
+                        "{2}\n\tType: {3}\n\tFilter Length: {4:d} samples"
+                        "\n\tRise: {5:.2f}, Fall: {6:.2f}, Alpha: {7:.3f}").format(
                 self.band_num, self.cf/1000000, self.name, det_type_str[self.tx_type], 
                 self.filter_length,self.rise,self.fall,self.alpha)
         else:
-            band_str = "Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: {2}\n\tType: {3}".format(
+            band_str = ("Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: "
+                        "{2}\n\tType: {3}").format(
                  self.band_num, self.cf/1000000, self.name, det_type_str[self.tx_type])
         return band_str
+
 
 
 class tuning:
@@ -163,14 +173,16 @@ class tuning:
     """ 
     
     def __init__(self, backend, cf = 0.0, lo1 = 0.0):
-      self.cf = cf
-      self.lo1 = lo1 #: PLL frequency (derived from center frequency and RF parameters) [ref].
+      self.cf = cf   #: Center frequency for tuning. 
+      self.lo1 = lo1 #: Actual PLL frequency (derived from center frequency and RF parameters).
+
       self.num_possible_bands = backend.num_bands # ref up stream
       self.bw = backend.bw # ref upstream
       self.directory = backend.directory # ref upstream
 
       #: Detector bands of type :class:`qraat.rmg.params.band`.  
       self.bands = [] 
+
 
     def add_tx(self, tx):
       """ Assign transmitter to a band.
@@ -216,8 +228,9 @@ class tuning:
 
     def __str__(self):
       """ Return string representation of the tuning. """ 
-      be_str = "Center Frequency: {0:.1f} MHz\nPLL Frequency: {1:.1f} MHz\nNumber of Occupied Bands: {2:d}".format(
-               self.cf/1000000.0, self.lo1/1000000.0, len(self.bands))
+      be_str = ("Center Frequency: {0:.1f} MHz\nPLL Frequency: {1:.1f} "
+                "MHz\nNumber of Occupied Bands: {2:d}").format(
+        self.cf/1000000.0, self.lo1/1000000.0, len(self.bands))
       for j in self.bands:
         be_str += '\n' + str(j)
       return be_str
@@ -308,7 +321,8 @@ class backend:
 
     def __str__(self):
       """ Print tuning parameters to console. """ 
-      be_str = "Number of Frequency Bands in Filterbank: {0:d}\nBandwidth: {1:.3f} kHz\nNumber of Tunings: {2:d}".format(
+      be_str = ("Number of Frequency Bands in Filterbank: {0:d}\nBandwidth:"
+                "{1:.3f} kHz\nNumber of Tunings: {2:d}").format(
         self.num_bands, self.bw/1000.0, len(self.tunings))
       for tuning in self.tunings:
         be_str += '\n' + str(tuning)
@@ -350,7 +364,8 @@ class backend:
       #: Width of each band in s/sec. 
       self.bw = usrp_sampling_rate / self.decim / self.num_bands
       
-      print "USRP Rate: {3}\nDecimation Factor: {1}\nNumber of Bands: {2}\nBandwidth: {0}".format(
+      print ("USRP Rate: {3}\nDecimation Factor: {1}\nNumber of Bands:"
+             "{2}\nBandwidth: {0}").format(
         self.bw, self.decim, self.num_bands, usrp_sampling_rate)
         
         
@@ -470,4 +485,3 @@ class backend:
 
 if __name__ == "__main__": # testing, testing ... 
   be = backend("../../build/tx.csv", 32)
-  
