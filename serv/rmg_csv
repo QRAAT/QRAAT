@@ -34,6 +34,7 @@
 #
 
 import sys
+import qraat
 
 usage = """\
 usage: rmg_csv <site> <parameter> [<value>] 
@@ -91,8 +92,7 @@ else:
 
     ## Read header ##
 
-headers = sys.stdin.readline().strip().split(',')
-header = { headers[i] : i for i in range(len(headers)) }
+table = qraat.csv(sys.stdin) 
 
 try:
 
@@ -100,12 +100,12 @@ try:
 
   if (not row and not col): 
     # FIXME not efficient for long files
-    line = sys.stdin.readlines()[-1].strip().split(',')
+    line = table[-1]
     if param_list: 
       for col in param_list:
-         print line[header[col]]
+         print getattr(line, col)
     else:
-      print ','.join(headers)
+      print ','.join(table.headers)
       print ','.join(line)
       
     sys.exit(0)
@@ -113,41 +113,39 @@ try:
     ## Parse line by line ##
 
   if value or (row and not col) and not param_list: 
-    print ','.join(headers)
+    print ','.join(table.headers)
 
-  for line in sys.stdin.readlines(): 
-    line = line.strip().split(',')
+  for line in table: 
 
     if not row and col: # Column
       if not value:
-        if len(line[header[col]]) == 0: 
+        if len(getattr(line, col)) == 0: 
           print "nil"
         else:
-          print line[header[col]]
+          print getattr(line, col)
         
       elif value: 
-        line[header[col]] = value
+        setattr(line, col, value)
         print ','.join(line)
 
     elif row and not col: # Row
-      i = header["name"]
-      if line[i] == row: 
+      if line.name == row: 
         if param_list: 
           for col in param_list:
-            print line[header[col]]
+            print getattr(line, col)
         else: print ','.join(line)
         sys.exit(0)
     
     else: # Cell
-      if not value and line[header["name"]] == row: # Just get value
-        if len(line[header[col]]) == 0: 
+      if not value and line.name == row: # Just get value
+        if len(getattr(line, col)) == 0: 
           print "nil"
         else:
-          print line[header[col]]
+          print getattr(line, col)
         sys.exit(0)
       elif value: 
-        if line[header["name"]] == row:
-          line[header[col]] = value
+        if line.name == row:
+          setattr(line, col, value)
         print ','.join(line)
 
 except IndexError: 
