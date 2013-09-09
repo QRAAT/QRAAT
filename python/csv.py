@@ -44,13 +44,18 @@ class csv:
       :type fn: str
     """
 
-    fd = open(fn, 'r')
+    if type(fn) == str: 
+      fd = open(fn, 'r')
+    elif type(fn) == file: 
+      fd = fn
+    else: raise TypeError # Provide a message. 
+
     lengths = self.__build_header(fd)
 
     # Populate the table.
     for line in map(lambda l: l.strip().split(','), fd.readlines()): 
       self.table.append(self.Row())
-      for i in range(len(self.headers)): # self.headers, line, lengths
+      for i in range(len(self.headers)): 
         if lengths[i] < len(line[i]):
           lengths[i] = len(line[i])
         setattr(self.table[-1], self.headers[i], line[i])
@@ -80,13 +85,15 @@ class csv:
   def __len__(self):
     return len(self.table)
 
+  def __iter__(self):
+    for row in self.table:
+      yield row
+
   def __getitem__(self, i): 
     return self.table[i]
 
-
   def __getslice__(self, i, j):
     return self.table[i:j]
-
 
   def __build_header(self, fd):
     """ 
@@ -96,7 +103,7 @@ class csv:
       template string. 
     """
     
-    #: Column names. 
+    #: Column names, referenced by rows. 
     self.headers = [ h for h in fd.readline().strip().split(',') ]
 
     # Store the maximum row length per column. This value will 
@@ -107,14 +114,12 @@ class csv:
     #: Type for table rows. This allows us to use the column 
     #: names as class attributes. 
     self.Row = type('Row', (object,), {h : None for h in self.headers})
+    self.Row.headers = self.headers
     
-    # Create an object for rows. TODO Row.__str__() should print 
-    # the row in a pretty way. Perhaps some sort of fancy meta 
-    # template string thing? In any case, I don't need to worry 
-    # about this right now. ~cjp 9/5/2013
     def f(self):
-      return "TODO"
-    self.Row.__str__ = f
+      for h in self.headers:
+        yield getattr(self, h) 
+    self.Row.__iter__ = f
 
     return lengths
    
@@ -129,6 +134,6 @@ class csv:
 
 if __name__ == '__main__': 
   tx = csv('../build/tx.csv')
-  print tx
-  print tx[0].name
-  print tx[:]
+  print list(tx[0])
+  for line in tx: 
+    print line

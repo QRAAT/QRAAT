@@ -1,7 +1,7 @@
 # blocks.py 
-# defines the GNU Radio graphs for the software defined detection 
-# backend. (rewrite? TODO) This file is part of QRAAT, an automated
-# animal tracking system based on GNU Radio. 
+# Defines the GNU Radio graphs for the software defined detection 
+# backend. This file is part of QRAAT, an automated animal tracking 
+# system based on GNU Radio. 
 #
 # Copyright (C) 2012 Todd Borrowman, Christopher Patton
 # 
@@ -19,8 +19,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-  This module defines the GNU Radio signal processing graphs for the b
-  ackend detector array and filters. 
+  This module defines the GNU Radio signal processing graphs for the 
+  backend detector array and filters. 
 """
 
 from gnuradio import gr, blks2, uhd, gru
@@ -29,9 +29,9 @@ import params
 
 import sys, time
 
-#: 1 to use pulse_shape_detector in pulse detector, 0 to not use it
-#: **TODO:** this shouldn't be hardcoded here. It should be set 
-#: in a top-level porgram.
+#: 1 to use pulse_shape_discriminator in pulse detector, 0 to not
+#: use it. **TODO:** this shouldn't be hardcoded here. It should be 
+#: set in a top-level porgram.
 USE_PSD = 1 
 
 
@@ -39,11 +39,12 @@ class usrp_top_block(gr.top_block):
     
         """ The USRP interface for GNU Radio. 
         
-        :param fpga_frequency: (?) 
-        :type fpga_frequency: int 
-        :param decim_factor: decimation factor. explanation(?) 
+        :param fpga_frequency: Intermediate frequency to which the 
+                               FPGA should be tuned to. 
+        :type fpga_frequency: float
+        :param decim_factor: USRP decimation factor. 
         :type dcim_factor: int
-        :param channels: number of input channels. 
+        :param channels: Number of input channels. 
         :type channels: int
         """ 
 
@@ -53,7 +54,9 @@ class usrp_top_block(gr.top_block):
 		self.channels = channels
 		
 		#Setup USRP
-		self.u = uhd.usrp_source(device_addr="fpga=usrp1_fpga_4rx.rbf",stream_args=uhd.stream_args('fc32', channels=range(self.channels)))
+		self.u = uhd.usrp_source(device_addr="fpga=usrp1_fpga_4rx.rbf",
+                                         stream_args=uhd.stream_args('fc32', 
+                                         channels=range(self.channels)))
 		self.u.set_subdev_spec("A:A A:B B:A B:B")
 		self.usrp_rate = self.u.get_clock_rate()
 		self.usb_rate = self.usrp_rate / decim_factor
@@ -62,38 +65,51 @@ class usrp_top_block(gr.top_block):
 
                 print "USB Rate: ", self.usb_rate
 
-
 		for j in range(self.channels):
-	                self.u.set_center_freq(fpga_frequency,j)
+	                self.u.set_center_freq(fpga_frequency, j)
                               
-                
+               
+class no_usrp_top_block(gr.top_block):
+        """ A noisy signal source used for testing. 
+              
+          Replaces :class:`qraat. rmg.rmg_graphs.usrp_top_block`. 
+        """
+
+	def __init__(self, fpga_frequency = -10.7e6, decim_factor = 250, channels = 4, variance = 0.0):
+		gr.top_block.__init__(self)
+                noise_src = gr.noise_source_c(gr.GR_GAUSSIAN, variance, int(time.time()))
+                throttle  = gr.throttle(gr.sizeof_gr_complex, 64e6/float(decim_factor)*channels)
+                self.u = gr.deinterleave(gr.sizeof_gr_complex)
+                self.connect(noise_src,throttle,self.u)
+
+
 class software_backend(gr.hier_block2):
   
     """ The software filter and detector array.
 
-      **TODO:** Describe the filtering steps and graph structure.
+      The signal coming from the uhd source block has a fixed bandwidth 
+      based on the decimation factor, typically 256 Khz. This bandwidth is
+      divided into a a fixed number of bands, each of which has its own 
+      pulse detector.  
     
-    :param channels: number of input channels from the USRP. 
+    :param channels: Number of input channels from the USRP. 
     :type channels: int
-    :param be_param: Backend parameters (?) 
+    :param be_param: Backend RF parameters.
     :type be_param: qraat.rmg.params.backend
-    
     """ 
       
     def __init__(self, channels, be_param):
 
         gr.hier_block2.__init__(self, "software_backend",
                                 gr.io_signature(4, 4, gr.sizeof_gr_complex), # Input signature
-                                gr.io_signature(0, 0, 0))             # Output signature
+                                gr.io_signature(0, 0, 0))                    # Output signature
 
         band_rate = be_param.bw
         print "Number of Bands :", be_param.num_bands
 	print "Band sampling rate :",band_rate
 
         if be_param.num_bands > 1:
-            #calculate the filter for the polyphase filter
-
-
+            # Calculate the filter for the polyphase filter.
             taps = gr.firdes.low_pass(1.0, 
                                   band_rate*be_param.num_bands, 
                                   0.4*band_rate , 
@@ -101,18 +117,21 @@ class software_backend(gr.hier_block2):
                                   gr.firdes.WIN_HANN)
             print "Band filter has", len(taps), "taps"
 
-            #build filterbanks for each RF channel
-            self.bank = []
+            #: Polyphase filter bank for each channel. 
+            self.pp_filter = []
 
             for j in range(channels):
-	        self.bank.append(blks2.analysis_filterbank(be_param.num_bands,taps))
-                self.connect((self,j), self.bank[j])
+	        self.pp_filter.append(blks2.analysis_filterbank(be_param.num_bands,taps))
+                self.connect((self,j), self.pp_filter[j])
 
-        # create be_param.num_bands detectors with enable/disable
+        #: Pulse detector bank. The four channels coming from the filter
+        #: are interleaved and connected to each of the detector bands. 
         self.det = []
+
         for j in range(be_param.num_bands):
             
-            #using default parameters for now
+            # Using default parameters for now. Actual parameters are provided 
+            # when the detector bank is enabled. 
             filter_length = 160
             new_det = detect(filter_length,
                              filter_length * 3,
@@ -127,18 +146,21 @@ class software_backend(gr.hier_block2):
 
             for k in range(channels):
                 if be_param.num_bands > 1:
-		    self.connect((self.bank[k],j),(new_det,k))
+		    self.connect((self.pp_filter[k],j),(new_det,k))
                 else:
                     self.connect((self,k),(new_det,k))
 
         self.current_bands = None
-        #enable correct bands
+
+        # Enable the bands in the first tuning set. 
         self.enable(be_param.tunings[0].bands)
-           
+        
+
     def enable(self, bands):
         """ Enable the detector array. 
 
-          **TODO:** not sure what *bands* is, nor the purpose of this function. 
+          :param bands: Band set for the current tuning.
+          :type bands: qraat.rmg.params.band list
         """
         if not self.current_bands is None:
             self.disable()
@@ -176,11 +198,3 @@ class software_backend(gr.hier_block2):
         self.enable(be_param)
 
 
-class no_usrp_top_block(gr.top_block):
-	def __init__(self, fpga_frequency = -10.7e6, decim_factor = 250, channels = 4, variance = 0.0):
-                """ A noisy signal source used for testing. Replaces :class:`qraat.rmg.rmg_graphs.usrp_top_block`. """
-		gr.top_block.__init__(self)
-                noise_src = gr.noise_source_c(gr.GR_GAUSSIAN, variance, int(time.time()))
-                throttle  = gr.throttle(gr.sizeof_gr_complex, 64e6/float(decim_factor)*channels)
-                self.u = gr.deinterleave(gr.sizeof_gr_complex)
-                self.connect(noise_src,throttle,self.u)
