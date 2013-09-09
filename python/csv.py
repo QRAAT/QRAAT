@@ -48,7 +48,7 @@ class csv:
       fd = open(fn, 'r')
     elif type(fn) == file: 
       fd = fn
-    else: raise TypeError
+    else: raise TypeError # Provide a message. 
 
     lengths = self.__build_header(fd)
 
