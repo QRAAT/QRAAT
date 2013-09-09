@@ -27,6 +27,7 @@
 
 use strict ;
 use warnings ;
+use Switch ;
 use POSIX qw(strftime);
 use DBI ;
 use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
@@ -62,8 +63,10 @@ sub main()
 		return 1 ;
 	}
 	print "$0: reading sitelist from '$sitelist'\n" ;
-	my $rmg_csv = `rmg_csv -c name <$sitelist` ;
-	my @sitenames = split(/\n/,$rmg_csv) ;
+	my $command = "rmg_csv -c name <$sitelist" ;
+	if( $Debug ) { print "debug: main: command=$command\n" ; }
+	my $result = `$command` ;
+	my @sitenames = split(/\n/,$result) ;
 	if( $Debug ) { print "debug: main: sitenames=@sitenames\n" ; }
 	if( scalar @sitenames < 1 )
 	{
@@ -90,17 +93,42 @@ sub main()
 	for my $sitename ( @sitenames )
 	{
 		if( $Debug ) { print "debug: main: sitename=$sitename\n" ; }
-		if( (not defined $sitename) or ($sitename eq "") ) { next ; }
 		#name,comp_ip,power_ip,comp_outlet,rx_outlet,powertype,state,auto,schedule
-		my $ip = `rmg_csv $sitename comp_ip <$sitelist` ;
-		my $ps = `rmg_csv $sitename power_ip <$sitelist` ;
-		if( (not defined $ip) or ($ip eq "") ) { next ; }
-		if( (not defined $ps) or ($ps eq "") ) { next ; }
+		$command = "rmg_csv $sitename power_ip <$sitelist" ;
+		if( $Debug ) { print "debug: main: command=$command\n" ; }
+		my $power_ip = `$command` ;
+		chomp($power_ip) ;
+		$command = "rmg_csv $sitename powertype <$sitelist" ;
+		if( $Debug ) { print "debug: main: command=$command\n" ; }
+		my $powertype = `$command` ;
+		chomp($powertype) ;
+		if( (not defined $power_ip) or ($power_ip eq "") )
+		{
+			print "Ignoring '$sitename', power_ip not set\n" ;
+			next ;
+		}
+		if( (not defined $powertype) or ($powertype eq "") )
+		{
+			print "Ignoring '$sitename', powertype not set\n" ;
+			next ;
+		}
 		my ( $ping_power, $ping_computer, $site_status ) = get_rmg_status($sitename) ;
 		my ( $intemp, $extemp, $voltage ) = ( "","","" ) ;
-		if( $ps eq "pingbrother" )
+		switch( $powertype )
 		{
-			( $intemp, $extemp, $voltage ) = get_pingbrother_status($sitename,$ip) ;
+			case 'pingbrother'
+			{
+				print "Reading telemetry from '$sitename' '$powertype'\n" ;
+				( $intemp, $extemp, $voltage ) = get_pingbrother_status($sitename,$power_ip) ;
+			}
+			case 'nil'
+			{
+				print "No telemetry available from '$sitename', no power switch\n" ;
+			}
+			else
+			{
+				print "No telemetry available from '$sitename', unknown power switch '$powertype'\n" ;
+			}
 		}
 		writetable($dbh,$TableNameTelemetry,$sitename,[$intemp,$extemp,$voltage,$ping_power,$ping_computer,$site_status]) ;
 	}	
@@ -144,6 +172,10 @@ sub get_pingbrother_status($$)
 	my $current = $current1 + $current2 ;
 	my $power = $power1 + $power2 ;
 	if( $Debug ) { print "debug: get_pingbrother_status: $sitename at $ip: intemp=$intemp extemp=$extemp voltage=$voltage current1=$current1 power1=$power1 current2=$current2 power2=$power2 current=$current power=$power\n" ; }
+	if( ($intemp eq "") and ($extemp eq "") and ($voltage eq "") )
+	{
+		print "No valid telemetry read from '$sitename' at IP '$ip'\n" ;
+	}
 	#return ( $intemp, $extemp, $voltage, $current1, $power1, $current2, $power2, $current, $power ) ;
 	return ( $intemp, $extemp, $voltage ) ;
 }
