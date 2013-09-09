@@ -79,10 +79,10 @@ usrp_max_decimation = 250
 
 
 class band:
-    """ Data for a single detector band. 
+    """ Data for a single detector band, including the transmitter parameters.  
     
     :param tx: Transmitter paramters. 
-    :type tx: qraat.csv.Row 
+    :type tx: qraat.csv.csv.Row 
     :param band_num: Band number, i.e. index in pulse detector array. 
     :type band_num: int
     :param band_cf: Band center frequency.
@@ -113,7 +113,7 @@ class band:
             self.alpha = 0.0
 
 
-    def combine_tx(self, tx, filter_length): # TODO
+    def combine_tx(self, tx, filter_length):
         """ Listen to many transmitters on the same frequency in the same band. 
 
           It's impossible to avoid false positives in this situation in general, 
@@ -195,7 +195,7 @@ class tuning:
         intelligent way. (See :func:`band.combine_tx`.) 
 
       :param tx: Transmitter configuration.
-      :type tx: qraat.csv.Row
+      :type tx: qraat.csv.csv.Row
       """
 
       tx_freq = tx.freq * 1000000.0

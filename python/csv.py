@@ -33,6 +33,10 @@ class csv:
   #: The CSV table.
   table = []
   
+  #: Type for table rows. In the constructor, attributes corresponding 
+  #: to table columns are assigned. 
+  Row = type('Row', (object,), {})
+  
   def __init__(self, fn=None): 
     if fn: 
       self.read(fn)
