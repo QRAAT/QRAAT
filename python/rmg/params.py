@@ -18,40 +18,37 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """ 
-  The classes in this module encapsulate the various tuning parameters 
-  for the backend detector arrays. **TODO:** an explanation of the 
-  various parameters would be very useful.
+  The classes in this module encapsulate the various RF parameters 
+  for the RMG receiver and calculate the tuning groups for the software
+  detector arrays. We give a brief overview of both the analog and 
+  digital filtering, and the constraints these steps impose on the 
+  software-defined radio down stream.  
 
-  Preamps: 
-
-  Analog filtering (on the quad board): 
+  The following analog filters are applied to each input channel: 
    (1) Amplify by +22 dB. 
-   (2) Mix with tunable oscillator (the PLL), controlled by the PIC 
-       interface, down to 70 Mhz. cf = pll_cf - if1_cf. 
-   (3) Saw filter at 70 Mhz (if1_cf), +/- 250 Khz (if1_bw). 
+   (2) Mix with tunable oscillator (the PLL), 
+       controlled by :mod:`qraat.rmg.pic_interface`, down to 70 Mhz. 
+       (``cf = pll_cf - if1_cf``).
+   (3) Saw filter at 70 Mhz (:data:`backend.if1_cf`), +/- 250 Khz 
+       (:data:`backend.if1_bw`). 
    (4) Amplify by +22 dB. 
-   (5) Mix with oscillator at 80.7 Mhz.
-   (6) Ceramic filter at 10.7 Mhz (if2_cf), +/- 125 Khz (if2_bw).
+   (5) Mix with oscillator at 80.7 Mhz (:data:`backend.lo2`).
+   (6) Ceramic filter at 10.7 Mhz (:data:`backend.if2_cf`), +/- 125 Khz 
+       (:data:`backend.if2_bw`).
    (7) Amplify by +22 dB
-   (8) Output to USRP. 
-   
-  USRP: Sample analog signal at 64 Ms/sec (usrp_sampling_rate). Each 
-  per channel sample has a real part (in-phase) and imaginary part 
-  (quadrature). The quadrature part is mixed to with the NCO
-  by +/- 10.7 Mhz. 
+   (8) Output to USRP for digital sampling. 
 
-  RF paramters: pa_min, pa_max, if1_cf, if1_bw, if2_cf, if2_bw, lo2, 
-                pv_min, pv_max, pv_step, pv_offset
-
-  Decimation: The signal coming from the USRP into software is down-
-  sampled to 256 Ks/sec. We need to maintain the Nyquist-Shannon 
+  The USRP Samples analog signal at 64 Ms/sec (:data:`usrp_sampling_rate`). Each 
+  per channel sample has a real part (*in-phase*) and imaginary part 
+  (*quadrature*). Both of these samples are mixed with the NCO by +/- 
+  10.7 Mhz (see :data:`backend.high_lo`.) The signal 
+  is then down-sampled to 256 Ks/sec. We need to maintain the Nyquist-Shannon 
   theorem criterion in order to avoid aliasing in the resulting 
   digital signal. The process of first passing the signal through a 
   low-pass anti-aliasing filter and then reducing the sampling rate 
   is known as decimation. The low pass filter yields an approximation, 
   since a perfect realtime filter isn't realizable. 
    
-  USRP parameters: usrp_sampling_rate, usrp_max_decimation, decim, high_lo
 """
 
 import math, sys
@@ -275,6 +272,17 @@ class backend:
     #: frequency by a few Khz. ``pv_tune + pv_offset = actual_pv_tune``.
     #: **NOTE**: this should be callibrated per RMG receiver. 
     pv_offset = 0 
+      
+    #: The USRP has a numerically controlled oscillator (NCO)
+    #: which mixes the frequency of the in-phase and quadrature 
+    #: signals. If ``high_lo == True``, then mix by 10.7 Mhz; 
+    #: otherwise, mix by -10.7 Mhz. The intermediate frequency 
+    #: domain is defined by the hardware filters on the quad 
+    #: board. When mixed by the PLL, the frequency domain of the 
+    #: preamp signal should fall in this range. If ``high_lo`` is
+    #: ``False``, then the sign of if domain is switched. (?) 
+    #: (See :func:`backend.lo_calc`.)
+    high_lo = False 
 
     def __init__(self, path, num_bands = 1, directory = "./det_files"):
 
@@ -307,13 +315,13 @@ class backend:
         tx.filter_alpha = float(tx.filter_alpha) 
         tx.type = tx_type[tx.type]
       
-      self.__lo_calc()
-      self.__backend_calc()
+      self.lo_calc()
+      self.backend_calc()
         
     def add_tuning(self, cf = 0.0, lo1 = 0.0):
       """ Add tuning. 
         
-        **TODO**: This is only called once in the code in __backend_calc. 
+        **TODO**: This is only called once in the code in backend_calc. 
         The is only necesary because the for-loops use the variable 
         ``tuning``, which conflicts with the class name.  
       """ 
@@ -329,8 +337,8 @@ class backend:
       return be_str
 
 
-    def __lo_calc(self):
-      """ Decide whether to use high lo or low lo. """ 
+    def lo_calc(self):
+      """ Decide whether to use high lo or low lo. Set :data:`backend.high_lo`. """ 
 
       self.if_min = self.lo2 - (self.if2_cf + self.if2_bw/2.0)
       if self.if_min > self.if1_cf + self.if1_bw/2.0:
@@ -342,14 +350,6 @@ class backend:
       actual_pv_min = self.pv_min + self.pv_offset
       actual_pv_max = self.pv_max + self.pv_offset
 
-      #: The USRP has a numerically controlled oscillator (NCO)
-      #: which mixes the frequency of the in-phase and quadrature 
-      #: signals. If ``high_lo == True``, then mix by 10.7 Mhz; 
-      #: otherwise, mix by -10.7 Mhz. The intermediate frequency 
-      #: domain is defined by the hardware filters on the quad 
-      #: board. When mixed by the PLL, the frequency domain of the 
-      #: preamp signal should fall in this range. If ``high_lo`` is
-      #: ``False``, then the sign of if domain is switched. (?) 
       self.high_lo = False if self.pa_min > self.if_max + actual_pv_min else True
       
       bandwidth = self.if_max - self.if_min 
@@ -370,7 +370,7 @@ class backend:
         
         
 
-    def __backend_calc(self):
+    def backend_calc(self):
         """ Calculate the smallest set of tunings to record all transmitters. 
 
           Instance of the set cover problem (NP-hard). **TODO:** what's the solution(?) 

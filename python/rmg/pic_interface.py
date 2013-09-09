@@ -18,30 +18,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""
-  **TODO:** It'd be good to explain a little bit how the hardware works and 
-  what the various paramters are. 
-"""
-
-
-try:
-    import serial
-except ImportError:
-    print "This module requires the installation of python-serial"
-    print "To do this from the commandline:"
-    print "\tsudo apt-get install python-serial"
-    raise
-
-
+import serial
 import time
 
-#: TODO What is this (?) 
 lo_str = ['No Calc', 'High LO', 'Low LO']
 
 class pic_interface:
         """ Communication with the PIC interface for the RMG, developed at UUIC-ECE. 
 
-          The PIC controls various tuning parameters for the RMG hardware. 
+          The PIC controls various tuning parameters for the RMG hardware, the most 
+          important of these being PLL frequency. See :class:`qraat.rmg.params.backend`.  
 
         :param port: Serial device file, e.g */dev/ttyS0*, */dev/ttyUSB0*.
         :type port: string
@@ -117,18 +103,12 @@ class pic_interface:
                 self.ser.write('%s\r' %(string, ))
 
         def inc_freq(self):
-                """ Increment the frequency.
-                    
-                  **TODO:** some explanation(?)
-                """
+                """ Increment the PLL frequency by one step. """
                 self.ser.write('+')
                 time.sleep(.1)
 
         def dec_freq(self):
-                """ Decrement the frequency.
-                    
-                  **TODO:** some explanation(?) 
-                """
+                """ Decrement the PLL frequency by one step. """
                 self.ser.write('-')
                 time.sleep(.1)
 
@@ -171,9 +151,11 @@ class pic_interface:
 		self.ser.close()
 
 	def check(self, in_freq):
-                """ Determine if the PLL ss at the given frequency. 
-
-                  **TODO:** explanation(?)
+                """ Verify the PLL frequency. 
+          
+                :param in_freq: Expected frequency. 
+                :type in_freq: int(?)
+                :rtype: (?) 
                 """
 		self._read()
 		out = (self.freq == in_freq, self.w, self.lock)
