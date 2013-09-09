@@ -45,7 +45,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'qraat API'
+project = u'qraat'
 copyright = u'2013, Todd Borrowman, Marcel Losekoot, Christopher Patton'
 
 # The version info for the project you're documenting, acts as replacement for

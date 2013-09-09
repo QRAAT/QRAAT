@@ -192,11 +192,9 @@ class tuning:
         deal with this as elegantly as possible, we check to see if 
         there is already a transmitter assigned ot this band on this 
         tuning. If so, then combine the detector parameters in an 
-        intelligent way. (See :func:`band.combine-tx`.) 
+        intelligent way. (See :func:`band.combine_tx`.) 
 
-        **TODO**: structure of detector array w.r.t band frequency. 
-        
-      :param tx: Transmitter configuration
+      :param tx: Transmitter configuration.
       :type tx: qraat.csv.Row
       """
 
@@ -284,6 +282,9 @@ class backend:
     #: (See :func:`backend.lo_calc`.)
     high_lo = False 
 
+    #: Receiver tuning groups of type :class:`qraat.rmg.params.tuning`. 
+    tunings = [] 
+
     def __init__(self, path, num_bands = 1, directory = "./det_files"):
 
       # TODO put this somewhere else? This class should be dedicated 
@@ -296,9 +297,6 @@ class backend:
       #: divided into bands. A pulse detector is instantiated for 
       #: each of these bands. 
       self.num_bands = num_bands
-
-      #: Receiver tuning groups of type :class:`qraat.rmg.params.tunings`. 
-      self.tunings = [] 
       
       self.transmitters = qraat.csv(path) #: Transmitter data.
       print 'Transmitters from {0}'.format(path)

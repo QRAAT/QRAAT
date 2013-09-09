@@ -3,10 +3,13 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-The RMG module 
-==============
+The RMG module (``qraat.rmg``) 
+==============================
 
 .. automodule:: qraat.rmg
+
+.. toctree::
+   :maxdepth: 2 
 
 
 
@@ -49,17 +52,27 @@ Parameters
 
 .. autodata:: qraat.rmg.params.usrp_max_decimation
 
+class ``backend``
+^^^^^^^^^^^^^^^^^
+
 .. autoclass:: qraat.rmg.params.backend
-   :members: high_lo, if1_cf, if1_bw, lo2, if2_cf, if2_bw
+   :members: lo_calc, backend_calc, tunings, pa_min, pa_max, high_lo, if1_cf, if1_bw, lo2, if2_cf, if2_bw, pv_min, pv_max, pv_step, pv_offset
+
+class ``tuning``
+^^^^^^^^^^^^^^^^
+
 .. autoclass:: qraat.rmg.params.tuning
    :members:
+
+class ``band``
+^^^^^^^^^^^^^^
 
 .. autoclass:: qraat.rmg.params.band
    :members:
 
 
-PIC interface
--------------
+The PIC interface
+-----------------
 
 .. automodule:: qraat.rmg.pic_interface
 

@@ -3,21 +3,15 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-qraat API 
-=========
+Miscellaneous 
+=============
 
-Contents:
+Configuration and log files (class ``qraat.csv``)
+-------------------------------------------------
 
-.. toctree::
-   :maxdepth: 3
+.. automodule:: qraat.csv
 
-   qraat.rst
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+.. autoclass:: qraat.csv.csv
+   :members:
+   :show-inheritance: 
 

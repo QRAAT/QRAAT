@@ -3,21 +3,18 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-qraat API 
-=========
+The ``qraat`` module
+====================
 
 Contents:
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 2
 
-   qraat.rst
+   rmg.rst
+   data.rst
+   misc.rst
 
+.. automodule:: qraat 
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
 
