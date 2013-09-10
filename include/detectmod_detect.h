@@ -214,7 +214,8 @@ public:
   /*! 
    * Work function for signal processing block. This is the meat 
    * of any GR block. Read buffered signal run the pulse detector,
-   * and output pulse records (dets). 
+   * and output pulse records (dets). This function makes use of the
+   * peak_detect and accumulator classes. 
    */
   int work (int noutput_items,
             gr_vector_const_void_star &input_items,

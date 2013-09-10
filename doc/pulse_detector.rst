@@ -13,6 +13,7 @@ The pulse detector (``qraat.rmg.detect``)
 .. doxygenclass:: detectmod_detect
    :members:
 
+.. doxygenenum:: module_state_t
 
 Data encapsulation
 ------------------
@@ -39,6 +40,6 @@ require a SWIG Python interface.
 .. doxygenclass:: peak_detect
    :members:
 
-
+.. doxygenenum:: detect_state_t 
 
 
