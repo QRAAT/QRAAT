@@ -64,8 +64,6 @@ RMG_API detectmod_detect_sptr detectmod_make_detect (
     float rate, float c_freq, char psd);
 
 /*!
- * \brief Run a pulse detector on a filtered radio signal. 
- *
  * A pulse detector block for GNU Radio. Input a four channel signal from   
  * a USRP device (uhd_source). Output a .det file when a pulse is detected. 
  */
@@ -171,57 +169,52 @@ private:
  
 public:
 
-  ~detectmod_detect ();	//! public destructor
+  //! Public destructor.
+  ~detectmod_detect ();	
 
-  /*!
-   * \brief Set rise trigger factor.
-   */ 
+  //! Set rise trigger factor.
   void rise_factor(float r);
 
-  /*!
-   * \brief Set fall trigger factor.
-   */
+  //! Set fall trigger factor.
   void fall_factor(float f);
 
-  /*!
-   * \brief Set alpha factor.
-   */ 
+  //! Set alpha factor.
   void alpha_factor(float a);
 
   /*!
-   * \brief Needs explanation. 
+   * Reset the pulse detector. (Explanation)
    */ 
   void reset();
   
   /*!
-   * \brief Needs explanation. 
-   */ 
+   * Enable pulse detector with previous parameters. 
+   */
   void enable();
   
   /*!
-   * \brief Needs explanation. 
+   * Enable pulse detector with new parameters. 
    */ 
   void enable(int pulse_width, 
               int save_width, 
               const char *directory, 
               const char *tx_name, 
-              float,char);
+              float center_freq,
+              char use_pid);
 
   /*!
-   * \brief Needs explanation. 
+   * Enable continuous recording of baseband. 
    */ 
   void enable_cont(char *filename);
   
   /*!
-   * \brief Needs explanation. 
+   * Disable pulse detector or continuous recorder. 
    */ 
   void disable();
 
   /*! 
-   * \brief Work function for signal processing block. 
-   *
-   * This is the meat of any GR block. Read buffered signal 
-   * run the pulse detector, and output pulse records (dets). 
+   * Work function for signal processing block. This is the meat 
+   * of any GR block. Read buffered signal run the pulse detector,
+   * and output pulse records (dets). 
    */
   int work (int noutput_items,
             gr_vector_const_void_star &input_items,

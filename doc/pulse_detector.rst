@@ -10,9 +10,22 @@ The pulse detector (``qraat.rmg.detect``)
 
 .. automodule:: qraat.rmg.rmg_swig
 
-
 .. doxygenclass:: detectmod_detect
    :members:
+
+
+Data encapsulation
+------------------
+
+.. automodule:: qraat.pulse_swig
+
+.. autoclass:: qraat.pulse_swig.pulse_data
+
+.. doxygenclass:: pulse_data
+   :members:
+
+.. doxygenstruct:: param_t
+
 
 Helper classes
 --------------
@@ -27,15 +40,5 @@ require a SWIG Python interface.
    :members:
 
 
-Data encapsulation
-------------------
-
-.. autoclass:: qraat.pulse_swig.pulse_data
-
-
-.. doxygenclass:: pulse_data
-   :members:
-
-.. doxygenstruct:: param_t
 
 
