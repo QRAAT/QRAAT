@@ -6,15 +6,15 @@
 The ``qraat`` module
 ====================
 
-Contents:
+.. automodule:: qraat 
 
 .. toctree::
    :maxdepth: 2
 
    rmg.rst
+   pulse_detector.rst
    data.rst
    misc.rst
 
-.. automodule:: qraat 
 
 

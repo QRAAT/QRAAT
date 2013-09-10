@@ -26,8 +26,8 @@ class csv:
     Each row is a Row object, whose attributes correspond to the CSV 
     columns. 
 
-    :param fn: Input file name. 
-    :type fn: str
+    :param fn: Input file name or file descriptor. 
+    :type fn: str, file
   """
 
   #: The CSV table.

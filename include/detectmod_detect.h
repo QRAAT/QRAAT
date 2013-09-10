@@ -59,9 +59,9 @@ RMG_API detectmod_detect_sptr detectmod_make_detect (
     int pulse_width, 
     int save_width, 
     int channels, 
-    const char *f, 
+    const char *directory, 
     const char *tx_name,
-    float, float, char);
+    float rate, float c_freq, char psd);
 
 /*!
  * \brief Run a pulse detector on a filtered radio signal. 
@@ -79,7 +79,7 @@ private:
      int channels,
      const char *directory,
      const char *tx_name,
-     float, float, char);
+     float rate, float c_freq, char psd);
   
   //! Size of the time-matched signal filter.  
   int acc_length;

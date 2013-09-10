@@ -39,7 +39,7 @@ Signal processing blocks
 
 .. autoclass:: qraat.rmg.blocks.software_backend
    :show-inheritance: 
-   :members:
+   :members: pp_filter, det, enable, disable, reset
 
 
 
@@ -77,26 +77,5 @@ The PIC interface
 .. automodule:: qraat.rmg.pic_interface
 
 .. autoclass:: qraat.rmg.pic_interface.pic_interface
-   :members:
-
-
-
-C++ stuff
----------
-
-I need to organize this, but there you go. 
-
-.. doxygenclass:: detectmod_detect
-   :members:
-
-.. doxygenclass:: pulse_data
-   :members:
-
-.. doxygenstruct:: param_t
-
-.. doxygenclass:: accumulator
-   :members:
-
-.. doxygenclass:: peak_detect
    :members:
 
