@@ -19,8 +19,8 @@
 # The presence of this file turns this directory into a Python package
 
 '''
-This is the python qraat module, comprising our application programming
-interface. 
+This is the Python ``qraat`` module, comprising our application programming
+interface. *This doc string is in python/__init__.py*. 
 '''
 
 #: Create an enumerated type as a Python class. 

@@ -19,7 +19,8 @@
 # The presence of this file turns this directory into a Python package
 
 '''
-This is the RMG module for GNU Radio.
+  This is the RMG module for GNU Radio. *This doc string is in 
+  python/rmg/__init__.py*. 
 '''
 
 # ----------------------------------------------------------------

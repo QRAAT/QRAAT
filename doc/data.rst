@@ -6,6 +6,8 @@
 Data types
 ==========
 
+*A description would be good here. (doc/data.rst)*
+
 Pulses (class ``qraat.det``)
 ----------------------------
 
@@ -17,6 +19,8 @@ Pulses (class ``qraat.det``)
 
 Pulse statistics (class ``qraat.est``)
 --------------------------------------
+
+*This class needs comments (working on this 9/11/13).*
 
 .. autoclass:: qraat.est.est_data 
    :members: 
