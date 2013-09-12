@@ -17,16 +17,101 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import det as fella
-import os,time,errno
+import qraat
+import sys, os, time, errno
 import numpy as np
 import struct
 
+class pulse_signal: 
+  
+  tag_name = None
+  epoch_time = None
+  center_freq = None
+  e_sig = None
+  e_pwr = None
+  confidence = None
+  f_sig = None
+  f_pwr = None
+  f_bw3 = None
+  f_bw10 = None
+  freq = None
+  n_cov = None
+        
+  def __init__(self, det=None): 
+    if det: 
+      det.eig()
+      det.f_signal()
+      det.noise_cov()
+      self.tag_name    = det.tag_name
+      self.epoch_time  = det.time
+      self.center_freq = det.params.ctr_freq
+      self.e_sig       = det.e_sig.transpose()
+      self.e_pwr       = det.e_pwr
+      self.confidence  = det.e_conf
+      self.f_sig       = det.f_sig.transpose()
+      self.f_pwr       = det.f_pwr
+      self.f_bw3       = det.f_bandwidth3
+      self.f_bw10      = det.f_bandwidth10
+      self.freq        = det.freq
+      self.n_cov       = det.n_cov
+
+ 
+class est:
+  """ 
+    usage:
+      * ``e = qraat.est(dets=qraat.det.read_dir(fella))``
+      * ``e += qraat.est(dets=qraat.det.read_dir(guy))``
+      * ``e += qraat.est(dets=qraat.det.read_many(then, now, guy))``
+      * ``e.write_db(db_con)``
+      * ``e.write()``
+  """
+  
+  table = []
+
+  def __init__(self, num_channels, det=None, dets=None, fn=None):
+
+    self.num_channels = num_channels # Do we need this? 
+    
+    if fn: 
+      self.read(fn)
+
+    if det:
+      self.append(det)
+
+    if dets:
+      for det in dets: 
+        self.append(det)
+  
+  def append(self, det):
+    self.table.append(pulse_signal(det))
+
+  def read(self, fn): # read
+    pass
+
+  def write(self, base_dir): # Write, filtering by tag
+    pass
+  
+  def read_db(self): # select db rows
+    pass
+    
+  def write_db(self): # insert db rows
+    pass
+
+  def clear(self): # empty table 
+    pass
+
+
+
+
+  
+
+
 class data_arrays:
 
-    """ class to contain data lists for the det info in numpy arrays. 
+    """ Container class for pulses in signal space. 
     
-      **TODO:** description is needed. 
+      Store pulses in a table with their signal features. Methods 
+      that should be implemented: 
 
     :param num_channels: number of signal channels in .det files. 
     :type num_channels: int
@@ -52,12 +137,11 @@ class data_arrays:
         self.freq        = np.empty((size,))
         self.n_cov       = np.empty((size, num_channels, num_channels), np.complex)
 
-
     def append(self, data):
         """ **TODO:** description required. 
         
-        :param data: (?) 
-        :type data: (?)        
+        :param data:  
+        :type data: data_arrays        
         """
 
         self.num_records += data.num_records
@@ -88,9 +172,9 @@ class data_arrays:
         """
 
         if index >= self.num_records:
-            raise IndexError(
-              'Index: {0} exceeded number of records: {1}'.format(
-                index, self.num_records))
+          raise IndexError(
+            'Index: {0} exceeded number of records: {1}'.format(
+              index, self.num_records))
 
         det.eig()
         det.f_signal()
@@ -179,7 +263,7 @@ class est_data:
     :type num_channels: int
     """
 
-    def __init__(self, fn = None, num_channels = 4):
+    def __init__(self, num_channels = 4, fn = None):
         
         self.tag_names = []
         self.num_tags = 0
@@ -188,6 +272,26 @@ class est_data:
         if fn:
           self.read_est(fn)
 
+    def add_det(self, det):
+        """ Append pulse record to table. 
+
+        :param det: Pulse data record
+        :type det: qraat.det.det
+        """
+
+        det.eig()
+        det.f_signal()
+        det.noise_cov()
+        new_data = data_arrays(self.num_channels, 1)
+        tag_name = det.tag_name
+        try:
+            tag_index  = self.tag_names.index(tag_name)
+        except ValueError:
+            self.tag_names.append(tag_name)
+            tag_index = self.num_tags
+            self.num_tags += 1
+        new_data.add_det(det, tag_index, 0)
+        self.data.append(new_data)
 
     #writes an .est file for each tag
     def write_est(self,dirname = './'):
@@ -407,7 +511,7 @@ class est_data:
             for fstr in dir_list:
               if fstr[-4:] == '.det':
                 try:
-                  det = fella.det(dirname + fstr)
+                  det = qraat.det(dirname + fstr)
                   tag_name = det.tag_name
                   try: tag_index  = self.tag_names.index(tag_name)
                   except ValueError:
@@ -423,37 +527,16 @@ class est_data:
             
             self.data.append(new_data.filter_non_filled())
 
-    def add_det(self, det):
-        """ Append pulse record to table. 
-
-        :param det: Pulse data record
-        :type det: qraat.det.det
-        """
-
-        det.eig()
-        det.f_signal()
-        det.noise_cov()
-        new_data = data_arrays(self.num_channels, 1)
-        tag_name = det.tag_name
-        try:
-            tag_index  = self.tag_names.index(tag_name)
-        except ValueError:
-            self.tag_names.append(tag_name)
-            tag_index = self.num_tags
-            self.num_tags += 1
-        new_data.add_det(det, tag_index, 0)
-        self.data.append(new_data)
 
 
-#main routine for execution with cmdline options
-#est_dict.py det_directory_name est_directory_name
-#used for testing, quick conversion of directories
 if __name__=="__main__":
-    import sys
-    if len(sys.argv) > 2:
-        det_dirname = sys.argv[1]
-        est_dirname = sys.argv[2]
-    #if det_dirname and est_dirname:
-        est = est_data()
-        est.read_dir(det_dirname)
-        est.write_est(est_dirname)
+  a = est_data(4, 0)
+  dets = qraat.det.read_dir('test') 
+  for det in dets:
+    print det
+    a.add_det(det)
+  #a.read_dir('test')
+  #a.write_csv("%s" % sys.argv[-1]) 
+  a.write_csv("guy") 
+  
+  b = est(4, dets=dets)
