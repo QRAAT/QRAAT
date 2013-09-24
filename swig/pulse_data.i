@@ -21,6 +21,12 @@
 
 #define RMG_API
 
+%module(docstring="""
+  ``pulse_data`` is a class used by the pulse detector for data storage and 
+  for writing pulse records out to disk. It's also the parent class :mod:`qraat.det`. 
+""") pulse_swig
+
+
 %include "gnuradio.i" // the common stuff
 
 %{
@@ -28,9 +34,7 @@
 %}
 
 
-
 /* param_t */
-
 typedef struct {
   int channel_ct,
       sample_ct,
@@ -77,6 +81,8 @@ pulse_time      %s",
   } 
 }
 
+
+/* Map gr_complex to a Python tuple, (real, imag) */
 %typemap(out) gr_complex& {
   $result = PyTuple_New(2);
   PyObject *r = PyFloat_FromDouble((double) $1->real()); 
@@ -86,7 +92,6 @@ pulse_time      %s",
 }
 
 /* pulse_data */
-
 class pulse_data {
 friend class detectmod_detect; 
 protected:

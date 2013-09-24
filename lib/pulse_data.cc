@@ -196,9 +196,7 @@ const param_t& pulse_data::param() const {
 } // params() const
 
 
-  /**
-   * Accessors. 
-   */
+ /* Accessors */
 
 gr_complex& pulse_data::operator[] (int i) {
   return sample(i); 
@@ -246,9 +244,7 @@ gr_complex* pulse_data::get()
 } // get()
 
 
-  /**
-   * Circular buffer methods. 
-   */ 
+  /* Circular buffer methods */ 
 
 void pulse_data::add(gr_complex *in)
 {

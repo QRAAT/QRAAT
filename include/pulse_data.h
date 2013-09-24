@@ -111,17 +111,15 @@ public:
   param_t params;   
   
   /*!
-   * \brief Constructor for the Python API. Throws PulseDataErr.
+   * Constructor for the Python interface. Throws PulseDataErr.
    * \param fn Input file name. 
    */ 
   pulse_data (const char *fn=NULL); 
   
   /*! 
-   * \brief Constructor for pulse detector. 
-   *
-   * The parameters provided remain constant for the life of the pulse
-   * detector instance. The missing paramters - pulse_index, t_sec, and 
-   * t_usec - are calcluated on the fly. 
+   * Constructor for detectmod_detect. The parameters provided remain constant 
+   * for the life of the pulse detector instance. The missing paramters - 
+   * pulse_index, t_sec, and t_usec - are calcluated on the fly. 
    */ 
   pulse_data(
    int channel_ct,
@@ -132,63 +130,54 @@ public:
   );
   
   /*! 
-   * \brief Constructor from another pulse_data instance. 
+   * Constructor from another pulse_data instance. 
    */ 
   pulse_data(const pulse_data &det);
 
   /*! 
-   * \brief Destructor.
+   * Destructor.
    */ 
   ~pulse_data ();
   
   /*!
-   * \brief Assignment operator. 
+   * Assignment operator. 
    */ 
   pulse_data& operator=(const pulse_data &det);
 
   /*!
-   * \brief Read pulse data from file. 
-   *
-   * \param fn File name to read.  
+   * Read pulse data from file. 
    * \returns The number of bytes read. -1 if the file doesn't 
    *          exists or is corrupted. 
    */
   int read(const char *fn); 
 
   /*!
-   * \brief Write pulse data to file. 
-   *
-   * Unwrap circular buffer if necessary. 
+   * Write pulse data to file. Unwrap circular buffer if necessary. 
    */
   int write(const char *fn="");
 
-  /* Accessors - throw PulseDataErr */
+
+    /* accessors */ 
 
   /*!
-   * \brief Get metadata.
+   * Get metadata.
    */
   const param_t& param() const; 
 
-
   /*!
-   * \brief Arbitrary access over data array. 
-   *
-   * To get the jth channel of the ith sample, 
-   * do det[(i * det.param().channel_ct) + j].
+   * Arbitrary access over data array. To get the jth channel of the 
+   * ith sample, do "det[(i * det.params.channel_ct) + j]". \b NOTE: in 
+   * Python, \a gr_complex is cast as a tuple (\a real, \a imag).  
    */
   gr_complex& sample(int i); 
 
-  /*! Same as pulse_data::sample(). */
+  //! Same as pulse_data::sample().
   gr_complex& operator[] (int i); 
 
-  /*!
-   * \brief Get the real part of an arbitrary datum. 
-   */
+  //! Get the real part of an arbitrary datum. 
   float real(int i); 
   
-  /*!
-   * \brief Get the imaginary part of an arbitrary datum. 
-   */
+  //! Get the imaginary part of an arbitrary datum. 
   float imag(int i); 
 
   /*!
@@ -202,43 +191,34 @@ public:
   void set_imag(int i, float val);
 
   /*!
-   * Return pointer to the data buffer. 
-   *
-   * Note that the buffer is not unwrapped. 
+   * Return pointer to the data buffer. Note that 
+   * the buffer is not unwrapped. 
    */
   gr_complex *get(); 
 
 
-
-  /* Routines for the circular buffer. */
+    /* Routines for the circular buffer */
 
   /*!
-   * \brief Add sample to circular buffer and increment index. 
-   *
-   * \param in - next sample. 
+   * Add sample to circular buffer and increment index. 
    */ 
   void add(gr_complex *in);
 
-  /*! 
-   * \brief Get current index.
-   *
-   * Obsolete, since pulse_data is a friend of class detectmod_detect.
-   */ 
+  /*! TODO deprecate */
   int get_index();
 
   /*! TODO deprecate */
   gr_complex *get_buffer();
 
   /*!
-   * \brief Return sample at current index (oldest sample.) 
+   * Return sample at current index (oldest sample.) 
    */
   gr_complex *get_sample();
 
   /*!
-   * \brief Return current index. 
+   * \brief Increment index. 
    */
   void inc_index();
-
 
 };
 

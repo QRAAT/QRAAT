@@ -66,7 +66,7 @@ class det (pulse_data):
 
   
   @classmethod
-  def read_many(i, j, base_dir): 
+  def read_dir(cls, base_dir): 
     """ Return a set of det instances over time interval ``(i, j)``. 
 
       :param i: Interval start
@@ -78,7 +78,24 @@ class det (pulse_data):
       :rtype: det list
 
     """
-    return [] #TODO
+    files = os.listdir(base_dir)
+    files.sort()
+    return [ cls(base_dir + '/' + fn) for fn in files ] 
+  
+  @classmethod
+  def read_many(cls, i, j, base_dir): 
+    """ Return a set of det instances over time interval ``(i, j)``. **TODO**
+
+      :param i: Interval start
+      :type i: datetime.datetime
+      :param j: Interval end
+      :type j: datetime.datetime
+      :param base_dir: Root directory for det files. 
+      :type base_dir: str
+      :rtype: det list
+
+    """
+    return [] 
 
 
   def fft(self):
@@ -88,7 +105,7 @@ class det (pulse_data):
 
     :returns: result of fft calculation
     """
-    if not self.f:
+    if self.f is None:
       self.f = np.zeros((self.params.pulse_sample_ct,self.params.channel_ct),np.complex)
       for j in range(self.params.channel_ct):
         self.f[:,j] = np.fft.fft(self.pulse[:,j])
@@ -102,9 +119,9 @@ class det (pulse_data):
     :returns: parameters
     :rtype: (?)
     """
-    if not self.f: self.fft()
+    if self.f is None: self.fft()
     
-    if not self.f_sig: 
+    if self.f_sig is None: 
       bin_width = self.params.sample_rate/self.params.pulse_sample_ct
       f_pwr = np.sum(self.f*self.f.conjugate(),axis = 1)
       freq_index = np.argmax(f_pwr)
@@ -136,7 +153,7 @@ class det (pulse_data):
     :rtype: (?) 
     """
 
-    if not self.e_sig:
+    if self.e_sig is None:
       pulse_ct = self.pulse.conjugate().transpose()
       sq = np.dot(pulse_ct,self.pulse)
       (self.eigenvalues, self.eigenvectors) = np.linalg.eigh(sq)
@@ -158,7 +175,7 @@ class det (pulse_data):
     :rtype: (?) 
     """
 
-    if not self.n_cov:
+    if self.n_cov is None:
       if self.params.sample_ct - self.params.pulse_index >= self.params.pulse_sample_ct:
         noise_start = int(self.params.sample_ct - self.params.pulse_index - self.params.pulse_sample_ct)/2
         noise = self.data[noise_start:noise_start+self.params.pulse_sample_ct,:]

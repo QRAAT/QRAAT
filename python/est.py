@@ -17,16 +17,101 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import det as fella
-import os,time,errno
+import qraat
+import sys, os, time, errno
 import numpy as np
 import struct
 
-class data_arrays():
+class pulse_signal: 
+  
+  tag_name = None
+  epoch_time = None
+  center_freq = None
+  e_sig = None
+  e_pwr = None
+  confidence = None
+  f_sig = None
+  f_pwr = None
+  f_bw3 = None
+  f_bw10 = None
+  freq = None
+  n_cov = None
+        
+  def __init__(self, det=None): 
+    if det: 
+      det.eig()
+      det.f_signal()
+      det.noise_cov()
+      self.tag_name    = det.tag_name
+      self.epoch_time  = det.time
+      self.center_freq = det.params.ctr_freq
+      self.e_sig       = det.e_sig.transpose()
+      self.e_pwr       = det.e_pwr
+      self.confidence  = det.e_conf
+      self.f_sig       = det.f_sig.transpose()
+      self.f_pwr       = det.f_pwr
+      self.f_bw3       = det.f_bandwidth3
+      self.f_bw10      = det.f_bandwidth10
+      self.freq        = det.freq
+      self.n_cov       = det.n_cov
 
-    """ class to contain data lists for the det info in numpy arrays. 
+ 
+class est:
+  """ 
+    usage:
+      * ``e = qraat.est(dets=qraat.det.read_dir(fella))``
+      * ``e += qraat.est(dets=qraat.det.read_dir(guy))``
+      * ``e += qraat.est(dets=qraat.det.read_many(then, now, guy))``
+      * ``e.write_db(db_con)``
+      * ``e.write()``
+  """
+  
+  table = []
+
+  def __init__(self, num_channels, det=None, dets=None, fn=None):
+
+    self.num_channels = num_channels # Do we need this? 
     
-      **TODO:** description is needed. 
+    if fn: 
+      self.read(fn)
+
+    if det:
+      self.append(det)
+
+    if dets:
+      for det in dets: 
+        self.append(det)
+  
+  def append(self, det):
+    self.table.append(pulse_signal(det))
+
+  def read(self, fn): # read
+    pass
+
+  def write(self, base_dir): # Write, filtering by tag
+    pass
+  
+  def read_db(self): # select db rows
+    pass
+    
+  def write_db(self): # insert db rows
+    pass
+
+  def clear(self): # empty table 
+    pass
+
+
+
+
+  
+
+
+class data_arrays:
+
+    """ Container class for pulses in signal space. 
+    
+      Store pulses in a table with their signal features. Methods 
+      that should be implemented: 
 
     :param num_channels: number of signal channels in .det files. 
     :type num_channels: int
@@ -38,52 +123,76 @@ class data_arrays():
 
         self.num_channels = num_channels
         self.num_records = size
-        self.tag_number = np.ones((size,), np.int)*-1
-        self.epoch_time = np.empty((size,))
+
+        self.tag_number  = np.ones((size,), np.int)*-1
+        self.epoch_time  = np.empty((size,))
         self.center_freq = np.empty((size,))
-        self.e_sig = np.empty((size, num_channels), np.complex)
-        self.e_pwr = np.empty((size,))
-        self.confidence = np.empty((size,))
-        self.f_sig = np.empty((size, num_channels), np.complex)
-        self.f_pwr = np.empty((size,))
-        self.f_bw3 = np.empty((size,))
-        self.f_bw10 = np.empty((size,))
-        self.freq = np.empty((size,))
-        self.n_cov = np.empty((size, num_channels, num_channels), np.complex)
+        self.e_sig       = np.empty((size, num_channels), np.complex)
+        self.e_pwr       = np.empty((size,))
+        self.confidence  = np.empty((size,))
+        self.f_sig       = np.empty((size, num_channels), np.complex)
+        self.f_pwr       = np.empty((size,))
+        self.f_bw3       = np.empty((size,))
+        self.f_bw10      = np.empty((size,))
+        self.freq        = np.empty((size,))
+        self.n_cov       = np.empty((size, num_channels, num_channels), np.complex)
 
     def append(self, data):
         """ **TODO:** description required. 
         
-        :param data: (?) 
-        :type data: (?)        
+        :param data:  
+        :type data: data_arrays        
         """
 
         self.num_records += data.num_records
-        self.tag_number = np.hstack((self.tag_number, data.tag_number))
-        self.epoch_time = np.hstack((self.epoch_time, data.epoch_time))
-        self.center_freq = np.hstack((self.center_freq, data.center_freq))
-        self.e_sig = np.vstack((self.e_sig, data.e_sig))
-        self.e_pwr = np.hstack((self.e_pwr, data.e_pwr))
-        self.confidence = np.hstack((self.confidence, data.confidence))
-        self.f_sig = np.vstack((self.f_sig, data.f_sig))
-        self.f_pwr = np.hstack((self.f_pwr, data.f_pwr))
-        self.f_bw3 = np.hstack((self.f_bw3, data.f_bw3))
-        self.f_bw10 = np.hstack((self.f_bw10, data.f_bw10))
-        self.freq = np.hstack((self.freq, data.freq))
-        self.n_cov = np.vstack((self.n_cov, data.n_cov))
 
-    def filter_by_tag_number(self, number):
+        self.tag_number  = np.hstack((self.tag_number, data.tag_number))
+        self.epoch_time  = np.hstack((self.epoch_time, data.epoch_time))
+        self.center_freq = np.hstack((self.center_freq, data.center_freq))
+        self.e_sig       = np.vstack((self.e_sig, data.e_sig))
+        self.e_pwr       = np.hstack((self.e_pwr, data.e_pwr))
+        self.confidence  = np.hstack((self.confidence, data.confidence))
+        self.f_sig       = np.vstack((self.f_sig, data.f_sig))
+        self.f_pwr       = np.hstack((self.f_pwr, data.f_pwr))
+        self.f_bw3       = np.hstack((self.f_bw3, data.f_bw3))
+        self.f_bw10      = np.hstack((self.f_bw10, data.f_bw10))
+        self.freq        = np.hstack((self.freq, data.freq))
+        self.n_cov       = np.vstack((self.n_cov, data.n_cov))
+    
+    
+    def add_det(self, det, tag_index, index):
         """ **TODO:** description required.
 
-        :param number: could this be a string(?)
-        :type number: (?) 
-        :returns: (?)
-        :rtype: (?) 
+        :param det: Pulse data record. 
+        :type det: qraat.det.det
+        :param tag_index: what is this(?) 
+        :type tag_index: (?) 
+        :param index: what is this(?) 
+        :type index: (?) 
         """
 
-        tag_filter = self.tag_number == number
-        new_data = self.filter_by_bool(tag_filter)
-        return new_data
+        if index >= self.num_records:
+          raise IndexError(
+            'Index: {0} exceeded number of records: {1}'.format(
+              index, self.num_records))
+
+        det.eig()
+        det.f_signal()
+        det.noise_cov()
+        self.tag_number[index]  = tag_index
+        self.epoch_time[index]  = det.time
+        self.center_freq[index] = det.params.ctr_freq
+        self.e_sig[index,:]     = det.e_sig.transpose()
+        self.e_pwr[index]       = det.e_pwr
+        self.confidence[index]  = det.e_conf
+        self.f_sig[index,:]     = det.f_sig.transpose()
+        self.f_pwr[index]       = det.f_pwr
+        self.f_bw3[index]       = det.f_bandwidth3
+        self.f_bw10[index]      = det.f_bandwidth10
+        self.freq[index]        = det.freq
+        self.n_cov[index,:,:]   = det.n_cov
+
+
 
     def filter_by_bool(self, tag_filter):
         """ **TODO:** description required. 
@@ -92,62 +201,58 @@ class data_arrays():
         :type tag_filter: (?) 
         :rtype: (?) 
         """
-
         new_data = data_arrays(self.num_channels,np.sum(tag_filter))
-        new_data.tag_number = self.tag_number[tag_filter]
-        new_data.epoch_time = self.epoch_time[tag_filter]
-        new_data.center_freq = self.center_freq[tag_filter]
-        new_data.e_sig = self.e_sig[tag_filter,:]
-        new_data.e_pwr = self.e_pwr[tag_filter]
-        new_data.confidence = self.confidence[tag_filter]
-        new_data.f_sig = self.f_sig[tag_filter,:]
-        new_data.f_pwr = self.f_pwr[tag_filter]
-        new_data.f_bw3 = self.f_bw3[tag_filter]
-        new_data.f_bw10 = self.f_bw10[tag_filter]
-        new_data.freq = self.freq[tag_filter]
-        new_data.n_cov = self.n_cov[tag_filter,:,:]
-        return new_data
 
-    def add_det(self, det, tag_index, index):
+        new_data.tag_number  = self.tag_number[tag_filter]
+        new_data.epoch_time  = self.epoch_time[tag_filter]
+        new_data.center_freq = self.center_freq[tag_filter]
+        new_data.e_sig       = self.e_sig[tag_filter,:]
+        new_data.e_pwr       = self.e_pwr[tag_filter]
+        new_data.confidence  = self.confidence[tag_filter]
+        new_data.f_sig       = self.f_sig[tag_filter,:]
+        new_data.f_pwr       = self.f_pwr[tag_filter]
+        new_data.f_bw3       = self.f_bw3[tag_filter]
+        new_data.f_bw10      = self.f_bw10[tag_filter]
+        new_data.freq        = self.freq[tag_filter]
+        new_data.n_cov       = self.n_cov[tag_filter,:,:]
+
+        return new_data
+    
+
+    def filter_by_tag_number(self, number):
         """ **TODO:** description required.
 
-        :param det: what is this(?) 
-        :type det: (?) 
-        :param tag_index: what is this(?) 
-        :type tag_index: (?) 
-        :param tag_index: what is this(?) 
-        :type tag_index: (?) 
+        :param number: (?)
+        :type number: (?) 
+        :returns: (?)
         """
+        tag_filter = self.tag_number == number
+        return self.filter_by_bool(tag_filter)
 
-        if index >= self.num_records:
-            raise IndexError('Index: {0} exceeded number of records: {1}'.format(index, self.num_records))
-        det.eig()
-        det.f_signal()
-        det.noise_cov()
-        self.tag_number[index] = tag_index
-        self.epoch_time[index] = det.time
-        self.center_freq[index] = det.params.ctr_freq
-        self.e_sig[index,:] = det.e_sig.transpose()
-        self.e_pwr[index] = det.e_pwr
-        self.confidence[index] = det.e_conf
-        self.f_sig[index,:] = det.f_sig.transpose()
-        self.f_pwr[index] = det.f_pwr
-        self.f_bw3[index] = det.f_bandwidth3
-        self.f_bw10[index] = det.f_bandwidth10
-        self.freq[index] = det.freq
-        self.n_cov[index,:,:] = det.n_cov
 
     def filter_non_filled(self):
+        """ **TODO:** description required. 
+
+        :returns: (?) 
+        """
         tag_filter = ((self.tag_number == -1) == False)
         return self.filter_by_bool(tag_filter)
 
+
     def filter_by_bw10(self, threshold = 1000):
+        """ **TODO:** description required.
+
+        :param threshold: (?) 
+        :type threshold: (?)
+        :returns: (?)
+        """
         tag_filter = self.f_bw10 < threshold
         return self.filter_by_bool(tag_filter)
 
 
+
 #est file class
-class est_data():
+class est_data:
     """ Encapsulation of .est files. 
 
       **TODO:** this should be extended to interface with the database.     
@@ -158,15 +263,35 @@ class est_data():
     :type num_channels: int
     """
 
-    def __init__(self, filename = '', num_channels = 4):
+    def __init__(self, num_channels = 4, fn = None):
         
         self.tag_names = []
         self.num_tags = 0
         self.num_channels = num_channels
         self.data = data_arrays(self.num_channels, 0)
-        if not filename == '':
-            self.read_est(filename)
+        if fn:
+          self.read_est(fn)
 
+    def add_det(self, det):
+        """ Append pulse record to table. 
+
+        :param det: Pulse data record
+        :type det: qraat.det.det
+        """
+
+        det.eig()
+        det.f_signal()
+        det.noise_cov()
+        new_data = data_arrays(self.num_channels, 1)
+        tag_name = det.tag_name
+        try:
+            tag_index  = self.tag_names.index(tag_name)
+        except ValueError:
+            self.tag_names.append(tag_name)
+            tag_index = self.num_tags
+            self.num_tags += 1
+        new_data.add_det(det, tag_index, 0)
+        self.data.append(new_data)
 
     #writes an .est file for each tag
     def write_est(self,dirname = './'):
@@ -386,7 +511,7 @@ class est_data():
             for fstr in dir_list:
               if fstr[-4:] == '.det':
                 try:
-                  det = fella.det(dirname + fstr)
+                  det = qraat.det(dirname + fstr)
                   tag_name = det.tag_name
                   try: tag_index  = self.tag_names.index(tag_name)
                   except ValueError:
@@ -395,42 +520,23 @@ class est_data():
                     self.num_tags += 1
                   new_data.add_det(det, tag_index, count)
                   count += 1
-                except RuntimeError: pass # same as null_file check
+                except RuntimeError: pass # same as null_file check. 
+                                          # if file can't be read, then
+                                          # pulse_data class throws a 
+                                          # runtime error. 
             
             self.data.append(new_data.filter_non_filled())
 
-    def add_det(self, det):
-        """ Add det object. 
-
-        :param det: pulse data (?)
-        :type det: qraat.det.det
-        """
-
-        if not det.null_file:
-            det.eig()
-            det.f_signal()
-            det.noise_cov()
-            new_data = data_arrays(self.num_channels, 1)
-            tag_name = det.tag_name
-            try:
-                tag_index  = self.tag_names.index(tag_name)
-            except ValueError:
-                self.tag_names.append(tag_name)
-                tag_index = self.num_tags
-                self.num_tags += 1
-            new_data.add_det(det, tag_index, 0)
-            self.data.append(new_data)
 
 
-#main routine for execution with cmdline options
-#est_dict.py det_directory_name est_directory_name
-#used for testing, quick conversion of directories
 if __name__=="__main__":
-    import sys
-    if len(sys.argv) > 2:
-        det_dirname = sys.argv[1]
-        est_dirname = sys.argv[2]
-    #if det_dirname and est_dirname:
-        est = est_data()
-        est.read_dir(det_dirname)
-        est.write_est(est_dirname)
+  a = est_data(4, 0)
+  dets = qraat.det.read_dir('test') 
+  for det in dets:
+    print det
+    a.add_det(det)
+  #a.read_dir('test')
+  #a.write_csv("%s" % sys.argv[-1]) 
+  a.write_csv("guy") 
+  
+  b = est(4, dets=dets)

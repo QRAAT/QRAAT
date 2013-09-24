@@ -27,28 +27,27 @@ FPGA_FREQ = 10.7e6
 CHANNELS = 4
 
 class detector_array:
+    """
+      A GR signal processing graph comprised of blocks in in :mod:`qraat.rmg.blocks`. 
+      The graph is made up of the USRP source, a polyphase filter bank, and the pulse 
+      detector bank. This class handles time-multiplexing between transmitter tuning
+      groups (see :class:`qraat.rmg.params.tuning`).
+
+    :param filename: CSV-formatted transmitter configuration file. 
+    :type filename: string
+    :param directory: Target directory for .det files produced by the detector array. 
+    :type directory: string
+    :param num_bands: The number of bands to divide the receiver's bandwidth into. (Typically we use
+       32 bands. The USRP bandwidth is 256 Khz, meaning each band is 8 Khz wide.) 
+    :type num_bands: int
+    :param serial_port: serial interface for PIC controller, given as a file name.
+    :type serial_port: string
+    :param no_usrp_flag: Use :class:`qraat.rmg.blocks.no_usrp_top_block` instead of the USRP source block. 
+    :type no_usrp_flag: bool
+    """ 
 
     def __init__(self,filename = "tx.csv",directory = "./det_files", num_bands = 1, serial_port = '/dev/ttyS0', no_usrp = None):
         
-        """ An array of detectors.
-
-          A set of GR signal processing graphs comprised of the blocks defined 
-          in :mod:`qraat.rmg.blocks`. The graph is made up of the USRP source, 
-          some fitlers, and the pulse detector. A graph is created for each 
-          frequency specified by the transmitter configuration file *filename*.
-
-        :param filename: CSV-formatted transmitter configuration file. 
-        :type filename: string
-        :param directory: target directory for .det files produced by the detecto array. 
-        :type directory: string
-        :param num_bands: (?) 
-        :type num_bands: int
-        :param serial_port: serial interface for PIC controller. 
-        :type serial_port: string
-        :no_usrp_flag: use :class:`qraat.rmg.blocks.no_usrp_top_block` instead of the USRP source block. 
-        :type: no_usrp_flag bool
-        """ 
-
         print "Writing RMG status information to " + directory + '/status.txt'
         if not os.path.exists(directory):
             print 'Making directory: {0}'.format(directory)

@@ -395,39 +395,21 @@ bool detectmod_detect::pulse_shape_discriminator(pulse_data *data_holder){
 
 
 void detectmod_detect::rise_factor(float r)
-/** 
- * Public call for gnuradio to set the rise factor in the detector
- */
 {
   pkdet->rise = r;
-
-  return;
 }
 
 void detectmod_detect::fall_factor(float f)
-/**
- * public call for gnuradio to set the fall factor in the detector
- */
 {
   pkdet->fall = f;
-
-  return;
 }
 
 void detectmod_detect::alpha_factor(float a)
-/** 
- * public call for gnuradio to set the noise floor filter coefficient in the detector
- */
 {
   pkdet->alpha = a;
-
-  return;
 }
 
 void detectmod_detect::reset()
-/**
- * Public call for gnuradio to reset the detector
- */
 {
   //write data out if state = FILL_BUFFER or CONFIRM_PEAK
   if (state == CONFIRM_PEAK){
@@ -442,8 +424,6 @@ void detectmod_detect::reset()
 
   state = FILL_ACCUMULATOR;
   fill_counter = -7;
-
-  return;
 }
 
 void detectmod_detect::enable()
@@ -511,20 +491,12 @@ void detectmod_detect::enable_cont(char *filename)
   else{
     printf("Opened file \"%s\" for continuous recording\n",filename);
   }
-
-  return;
 }
 
 void detectmod_detect::disable()
-/** 
- * disable detector and close continuous record
- */
 {
-
   if (enable_detect == 2){
     close();
   }
   enable_detect = 0;
-
-  return;
 }
