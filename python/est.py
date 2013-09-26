@@ -22,41 +22,9 @@ import sys, os, time, errno
 import numpy as np
 import struct
 
-class pulse_signal: 
-  
-  tag_name = None
-  epoch_time = None
-  center_freq = None
-  e_sig = None
-  e_pwr = None
-  confidence = None
-  f_sig = None
-  f_pwr = None
-  f_bw3 = None
-  f_bw10 = None
-  freq = None
-  n_cov = None
-        
-  def __init__(self, det=None): 
-    if det: 
-      det.eig()
-      det.f_signal()
-      det.noise_cov()
-      self.tag_name    = det.tag_name
-      self.epoch_time  = det.time
-      self.center_freq = det.params.ctr_freq
-      self.e_sig       = det.e_sig.transpose()
-      self.e_pwr       = det.e_pwr
-      self.confidence  = det.e_conf
-      self.f_sig       = det.f_sig.transpose()
-      self.f_pwr       = det.f_pwr
-      self.f_bw3       = det.f_bandwidth3
-      self.f_bw10      = det.f_bandwidth10
-      self.freq        = det.freq
-      self.n_cov       = det.n_cov
 
- 
-class est:
+class est (qraat.csv):
+
   """ 
     usage:
       * ``e = qraat.est(dets=qraat.det.read_dir(fella))``
@@ -65,13 +33,39 @@ class est:
       * ``e.write_db(db_con)``
       * ``e.write()``
   """
+
+  def __init__(self, channel_ct, det=None, dets=None, fn=None):
   
-  table = []
-
-  def __init__(self, num_channels, det=None, dets=None, fn=None):
-
-    self.num_channels = num_channels # Do we need this? 
+    self.channel_ct = channel_ct
     
+    # TODO Get headers from DB schema?
+    # TODO ID is surrogate in DB. Don't write to file?
+    # TODO txid is surrogate, ref qraat.txlist.ID. Resolve tag_name in write_db(). 
+    # TODO tag_name is NOT in schema. 
+    # TODO Write csv.write().
+    # TODO Verify this!!
+    self.headers = [ 'ID', 'siteid', 'datetime', 'timestamp', 'frequency', 'center', 'fdsp', 
+                'fd1r', 'fd1i', 'fd2r', 'fd2i', 'fd3r', 'fd3i', 'fd4r', 'fd4i', 
+                'band3', 'band10', 'edsp', 
+                'ed1r', 'ed1i', 'ed2r', 'ed2i', 'ed3r', 'ed3i', 'ed4r', 'ed4i', 
+                'ec', 'tnp', 
+                'nc11r', 'nc11i', 'nc12r', 'nc12i', 'nc13r', 'nc13i', 'nc14r', 'nc14i', 
+                'nc21r', 'nc21i', 'nc22r', 'nc22i', 'nc23r', 'nc23i', 'nc24r', 'nc24i', 
+                'nc31r', 'nc31i', 'nc32r', 'nc32i', 'nc33r', 'nc33i', 'nc34r', 'nc34i', 
+                'nc41r', 'nc41i', 'nc42r', 'nc42i', 'nc43r', 'nc43i', 'nc44r', 'nc44i', 
+                'fdsnr', 'edsnr', 'timezone', 'txid', 
+                'tag_name' ]
+
+    self.Row = type('Row', (object,), { h : None for h in self.headers })
+    self.Row.headers = self.headers
+
+    def f(self):
+      for h in self.headers:
+         yield getattr(self, h)
+    self.Row.__iter__ = f
+
+    self._row_template = "%10s" * len(self.headers)
+
     if fn: 
       self.read(fn)
 
@@ -83,14 +77,47 @@ class est:
         self.append(det)
   
   def append(self, det):
-    self.table.append(pulse_signal(det))
+    new_row = self.Row()
+    new_row.tag_name    = det.tag_name
+    new_row.datetime    = time.gmtime(det.time)
+    new_row.timestamp   = det.time
+    new_row.freq        = det.freq
+    new_row.center_freq = det.params.ctr_freq
 
-  def read(self, fn): # read
-    pass
-
-  def write(self, base_dir): # Write, filtering by tag
-    pass
+    # Fourier decomposistion
+    new_row.fdsp        = det.f_pwr
+    det.f_sig = det.f_sig.transpose()
+    for i in range(self.channel_ct): 
+      setattr(new_row, 'fd%dr' % i, det.f_sig[0,i].real)
+      setattr(new_row, 'fd%di' % i, det.f_sig[0,i].imag)
   
+    new_row.band3  = det.f_bandwidth3
+    new_row.band10 = det.f_bandwidth10
+
+    # Eigenvalue decomposition 
+    new_row.edsp   = det.e_pwr
+    det.e_sig = det.e_sig.transpose()
+    for i in range(self.channel_ct): 
+      setattr(new_row, 'ed%dr' % i, det.e_sig[0,i].real)
+      setattr(new_row, 'ed%di' % i, det.e_sig[0,i].imag)
+  
+    new_row.ec  = det.e_conf
+
+    # Noise Covariance
+    new_row.tnp = np.trace(det.n_cov).real  # ??
+    for i in range(self.channel_ct):
+      for j in range(self.channel_ct): 
+        setattr(new_row, 'nc%d%dr' % (i, j), det.n_cov[i,j].real)
+        setattr(new_row, 'nc%d%di' % (i, j), det.n_cov[i,j].imag)
+
+    # TODO
+    new_row.fdsnr = None
+    new_row.edsnr = None
+    new_row.timezone = None
+    new_row.txid = None
+
+    self.table.append(new_row)
+
   def read_db(self): # select db rows
     pass
     
@@ -417,8 +444,8 @@ class est_data:
                     for ch_iter1 in range(self.num_channels):
                         for ch_iter2 in range(self.num_channels):
                             line_str += ', {0:e}, {1:e}'.format(filtered_data.n_cov[index,ch_iter1,ch_iter2].real, filtered_data.n_cov[index,ch_iter1,ch_iter2].imag)
-                    line_str += ', {0:.3f}'.format(10*np.log10(f/n))
-                    line_str += ', {0:.3f}\n'.format(10*np.log10(e/n))
+                    line_str += ', {0:.3f}'.format(10*np.log10(f/n))   # TODO see est.append()
+                    line_str += ', {0:.3f}\n'.format(10*np.log10(e/n)) # TODO 
                     csvfile.write(line_str)
 
 
@@ -540,3 +567,5 @@ if __name__=="__main__":
   a.write_csv("guy") 
   
   b = est(4, dets=dets)
+  b.write("fella.csv")
+  print b
