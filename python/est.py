@@ -34,14 +34,14 @@ class est (qraat.csv):
       * ``e.write()``
   """
 
-  def __init__(self, channel_ct, det=None, dets=None, fn=None):
+  def __init__(self, det=None, dets=None, fn=None):
   
-    self.channel_ct = channel_ct
-    
-    # TODO Get headers from DB schema?
-    # TODO ID is surrogate in DB. Don't write to file?
-    # TODO txid is surrogate, ref qraat.txlist.ID. Resolve tag_name in write_db(). 
-    # TODO tag_name is NOT in schema. 
+    #: The DB schema is hard-coded to handle four channels. For this 
+    #: reason, this value is also hard-coded here. 
+    self.channel_ct = 4 
+
+    self.table = []
+
     self.headers = [ 'ID', 'siteid', 'datetime', 'timestamp', 'frequency', 'center', 'fdsp', 
                      'fd1r', 'fd1i', 'fd2r', 'fd2i', 'fd3r', 'fd3i', 'fd4r', 'fd4i', 
                      'band3', 'band10', 'edsp', 
@@ -88,7 +88,7 @@ class est (qraat.csv):
       else: raise
       
     headers = [col for col in self.headers if col not in [
-      'ID', 'txid', 'siteid', 'tagname', 'timezone']]
+      'ID', 'txid', 'siteid', 'timezone']]
     fds = {} # tagname -> file descriptor index
 
     for row in self.table:
@@ -101,12 +101,17 @@ class est (qraat.csv):
           fds[row.tagname] = fd = open(fn, 'w')
           fd.write(','.join(headers) + '\n')
           
-      fd.write(  #FIXME
+      fd.write( 
         ','.join(qraat.pretty_printer(getattr(row, col))
           for col in headers) + '\n')
 
   
   def append(self, det):
+    """ Append pulse signal to table. """
+    
+    det.eig()
+    det.f_signal()
+    det.noise_cov()
     new_row = self.Row()
     new_row.tagname   = det.tag_name
     new_row.datetime  = time.gmtime(det.time)
@@ -159,7 +164,7 @@ class est (qraat.csv):
     pass
 
   def clear(self): # empty table 
-    pass
+    self.table = []
 
 
 
@@ -478,8 +483,8 @@ class est_data:
                     for ch_iter1 in range(self.num_channels):
                         for ch_iter2 in range(self.num_channels):
                             line_str += ', {0:e}, {1:e}'.format(filtered_data.n_cov[index,ch_iter1,ch_iter2].real, filtered_data.n_cov[index,ch_iter1,ch_iter2].imag)
-                    line_str += ', {0:.3f}'.format(10*np.log10(f/n))   # TODO see est.append()
-                    line_str += ', {0:.3f}\n'.format(10*np.log10(e/n)) # TODO 
+                    line_str += ', {0:.3f}'.format(10*np.log10(f/n))
+                    line_str += ', {0:.3f}\n'.format(10*np.log10(e/n))
                     csvfile.write(line_str)
 
 
@@ -591,16 +596,8 @@ class est_data:
 
 
 if __name__=="__main__":
-  a = est_data(4, 0)
-  dets = qraat.det.read_dir('test') 
-  dets[1].tag_name = "jim"
-
-  for det in dets:
-    print det
-    a.add_det(det)
-  #a.read_dir('test')
-  #a.write_csv("%s" % sys.argv[-1]) 
-  a.write_csv("guy") 
- 
-  b = est(4, dets=dets)
-  b.write("fella")
+  b = est(dets=qraat.det.read_dir('test'))
+  b.write('fella')
+  
+  a = est(fn='fella/test.csv')
+  a.write('guy')

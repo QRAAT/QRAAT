@@ -31,15 +31,16 @@ class csv:
     :param fn: Input file name or file descriptor. 
     :type fn: str, file
   """
-
-  #: The CSV table.
-  table = []
   
-  #: Type for table rows. In the constructor, attributes corresponding 
-  #: to table columns are assigned. 
-  Row = type('Row', (object,), {})
   
   def __init__(self, fn=None): 
+    #: The CSV table.
+    self.table = []
+  
+    #: Type for table rows. In the constructor, attributes corresponding 
+    #: to table columns are assigned. 
+    self.Row = type('Row', (object,), {})
+
     if fn: 
       self.read(fn)
 
@@ -59,14 +60,13 @@ class csv:
     lengths = self.__build_header(fd)
 
     # Populate the table.
-    for line in map(lambda l: l.strip().split(','), fd.readlines()): 
+    for line in map(lambda l: l.strip().split(','), fd.readlines()):
       self.table.append(self.Row())
       for i in range(len(self.headers)): 
         if lengths[i] < len(line[i]):
           lengths[i] = len(line[i])
         setattr(self.table[-1], self.headers[i], line[i])
     fd.close()
-    
     self.__build_row_template(lengths)
 
 
