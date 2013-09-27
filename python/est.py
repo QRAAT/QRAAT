@@ -2,7 +2,7 @@
 # formats: .csv and .est. This file is part of QRAAT, an automated 
 # animal tracking system based on GNU Radio. 
 #
-# Copyright (C) 2013 Todd Borrowman
+# Copyright (C) 2013 Todd Borrowman, Christopher Patton
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ import qraat
 import sys, os, time, errno
 import numpy as np
 import struct
-
+import MySQLdb as mdb
 
 class est (qraat.csv):
 
@@ -32,6 +32,14 @@ class est (qraat.csv):
       * ``e += qraat.est(dets=qraat.det.read_many(then, now, guy))``
       * ``e.write_db(db_con)``
       * ``e.write()``
+
+    **TODO**: for ``write_db()``, we need the txid and siteid for 
+    each row. The txid can be resolved with det.tag_name, but the 
+    site from which the pulse was produced must be inferred from the
+    directory structure at the moment. When we update the det 
+    metadata, we will have tx_id and site_id be fields, but for the
+    moment this is going to be bit ugly. I'll have to write this code
+    to deal with both versions of metadata. 
   """
 
   def __init__(self, det=None, dets=None, fn=None):
@@ -107,7 +115,10 @@ class est (qraat.csv):
 
   
   def append(self, det):
-    """ Append pulse signal to table. """
+    """ Append pulse signal to table. 
+    
+      **TODO**: timezone? 
+    """
     
     det.eig()
     det.f_signal()
@@ -154,17 +165,44 @@ class est (qraat.csv):
 
     new_row.timezone = None # ??
     new_row.txid = None  
+    new_row.siteid = None
 
     self.table.append(new_row)
-
-  def read_db(self): # select db rows
-    pass
-    
-  def write_db(self): # insert db rows
-    pass
-
+  
   def clear(self): # empty table 
     self.table = []
+
+  def read_db(self, db_con, i, j):
+    """ Read rows from the database over the time interval ``[i, j]``. 
+    
+      :param db_con: DB connector for MySQL. 
+      :type db_con: ?
+      :param i: Time start. 
+      :type i: time.struct_time
+      :param j: Time end.
+      :type j: time.struct_time
+    """
+    cur = db_con.cursor(mdb.cursors.DictCursor)
+    cur.execute('''SELECT * 
+                     FROM est''') # TODO
+    new_row = self.Row()
+    for row in cur.fetchall():
+      for (col, val) in row.iteritems():
+        setattr(new_row, col, val)
+      self.table.append(new_row)      
+    #TODO resolve tagname by txid
+    
+  def write_db(self, db_con):
+    """ Write rows to the database. 
+    
+      :param db_con: DB connector for MySQL. 
+      :type db_con: ?
+    """
+    #TODO resolve txid by tagname 
+    #TODO resolve siteid by site name, passed as argument (for now). 
+    #TODO insert rows. 
+    pass
+
 
 
 
@@ -596,8 +634,12 @@ class est_data:
 
 
 if __name__=="__main__":
-  b = est(dets=qraat.det.read_dir('test'))
-  b.write('fella')
   
-  a = est(fn='fella/test.csv')
-  a.write('guy')
+  try:
+    db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
+    fella = est()
+    fella.read_db(db_con, 1, 2)
+
+  except mdb.Error, e:
+    print sys.stderr, "error (%d): %s" % (e.args[0]. e.args[1])
+    sys.exit(1) 
