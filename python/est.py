@@ -74,18 +74,36 @@ class est (qraat.csv):
       for det in dets: 
         self.append(det)
 
-  def write(self, basedir): 
+  def write(self, basedir='./'): 
     """ Write an est file per for each transmitter. 
       
       :param basedir: Directory for output files. 
       :type basedir: str
     """
-    # TODO create target directory if not exists
-    # TODO build map tag_name -> file descriptor
-    # TODO use super.write(file, exclude=[ ... ]) to write. 
-    pass
+    
+    try: # Create target directory. 
+      os.makedirs(basedir)
+    except OSError as e:
+      if e.errno == errno.EEXIST and os.path.isdir(basedir): pass
+      else: raise
+      
+    headers = [col for col in self.headers if col not in [
+      'ID', 'txid', 'siteid', 'tagname', 'timezone']]
+    fds = {} # tagname -> file descriptor index
 
-
+    for row in self.table:
+      fd = fds.get(row.tagname)
+      if not fd:
+        fn = '%s/%s.csv' % (basedir, row.tagname)
+        if os.path.isfile(fn):
+          fds[row.tagname] = fd = open(fn, 'a')
+        else: 
+          fds[row.tagname] = fd = open(fn, 'w')
+          fd.write(','.join(headers) + '\n')
+          
+      fd.write(  #FIXME
+        ','.join(qraat.pretty_printer(getattr(row, col))
+          for col in headers) + '\n')
 
   
   def append(self, det):
@@ -575,14 +593,14 @@ class est_data:
 if __name__=="__main__":
   a = est_data(4, 0)
   dets = qraat.det.read_dir('test') 
+  dets[1].tag_name = "jim"
+
   for det in dets:
     print det
     a.add_det(det)
   #a.read_dir('test')
   #a.write_csv("%s" % sys.argv[-1]) 
   a.write_csv("guy") 
-  
+ 
   b = est(4, dets=dets)
   b.write("fella")
-  #b.write("fella.csv", exclude=['ID', 'txid', 'siteid', 'tagname', 'timezone'])
-  print b

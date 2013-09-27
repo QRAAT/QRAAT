@@ -27,6 +27,19 @@ def enum(*sequential, **named):
   Enum = type('Enum', (), enums)
   return Enum
 
+#: Convert table cell value to a pretty string suitable for displaying.
+def pretty_printer(val):
+  if type(val) in [float, np.float64]:
+    if len(str(val)) > 6: 
+      return '{0:e}'.format(val)
+    else: return str(val)
+  elif type(val) == time.struct_time: 
+    return time.strftime("%Y-%m-%d %H:%M:%S", val)
+  elif val == None: 
+    return '' 
+  else:
+    return str(val)
+
 from csv import * 
 from det import det 
 from est import est, data_arrays, est_data

@@ -17,21 +17,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sys, time, numpy as np
-
-
-def pretty_printer(val):
-  """ Convert table cell value to a pretty string suitable for a table. """
-  if type(val) in [float, np.float64]:
-    if len(str(val)) > 6: 
-      return '{0:e}'.format(val)
-    else: return str(val)
-  elif type(val) == time.struct_time: 
-    return time.strftime("%Y-%m-%d %H:%M:%S", val)
-  elif val == None: 
-    return '' 
-  else:
-    return str(val)
+import qraat
+import os, sys, time, numpy as np
 
 
 class csv: 
@@ -92,28 +79,31 @@ class csv:
       :type exclude: str list
     """
     
+    headers = [col for col in self.headers if col not in exclude]
+    res = ''
+    
     if type(fn) == str: 
-      fd = open(fn, 'a')
+      if os.path.isfile(fn): # Append if file exists
+        fd = open(fn, 'a')
+      else: # Create file and write headers
+        fd = open(fn, 'w')
+        res += fd.write(','.join(headers) + '\n')
     elif type(fn) == file: 
       fd = fn
     else: raise TypeError # Provide a message. 
 
-    headers = [col for col in self.headers if col not in exclude]
-
-    res = ','.join(headers) + '\n'
     res += '\n'.join(
-      ','.join(pretty_printer(getattr(row, col)) 
+      ','.join(qraat.pretty_printer(getattr(row, col)) 
         for col in headers) 
        for row in self.table)
     fd.write(res)
-    fd.close()
   
   
   def __str__(self):
     res = self._row_template % tuple(self.headers) + '\n'
     res += '\n'.join(
       (self._row_template % tuple(
-        pretty_printer(getattr(row, col)) for col in self.headers)) for row in self.table) 
+        qraat.pretty_printer(getattr(row, col)) for col in self.headers)) for row in self.table) 
     return res
  
   def __len__(self):
