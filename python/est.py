@@ -42,19 +42,17 @@ class est (qraat.csv):
     # TODO ID is surrogate in DB. Don't write to file?
     # TODO txid is surrogate, ref qraat.txlist.ID. Resolve tag_name in write_db(). 
     # TODO tag_name is NOT in schema. 
-    # TODO Write csv.write().
-    # TODO Verify this!!
     self.headers = [ 'ID', 'siteid', 'datetime', 'timestamp', 'frequency', 'center', 'fdsp', 
-                'fd1r', 'fd1i', 'fd2r', 'fd2i', 'fd3r', 'fd3i', 'fd4r', 'fd4i', 
-                'band3', 'band10', 'edsp', 
-                'ed1r', 'ed1i', 'ed2r', 'ed2i', 'ed3r', 'ed3i', 'ed4r', 'ed4i', 
-                'ec', 'tnp', 
-                'nc11r', 'nc11i', 'nc12r', 'nc12i', 'nc13r', 'nc13i', 'nc14r', 'nc14i', 
-                'nc21r', 'nc21i', 'nc22r', 'nc22i', 'nc23r', 'nc23i', 'nc24r', 'nc24i', 
-                'nc31r', 'nc31i', 'nc32r', 'nc32i', 'nc33r', 'nc33i', 'nc34r', 'nc34i', 
-                'nc41r', 'nc41i', 'nc42r', 'nc42i', 'nc43r', 'nc43i', 'nc44r', 'nc44i', 
-                'fdsnr', 'edsnr', 'timezone', 'txid', 
-                'tag_name' ]
+                     'fd1r', 'fd1i', 'fd2r', 'fd2i', 'fd3r', 'fd3i', 'fd4r', 'fd4i', 
+                     'band3', 'band10', 'edsp', 
+                     'ed1r', 'ed1i', 'ed2r', 'ed2i', 'ed3r', 'ed3i', 'ed4r', 'ed4i', 
+                     'ec', 'tnp', 
+                     'nc11r', 'nc11i', 'nc12r', 'nc12i', 'nc13r', 'nc13i', 'nc14r', 'nc14i', 
+                     'nc21r', 'nc21i', 'nc22r', 'nc22i', 'nc23r', 'nc23i', 'nc24r', 'nc24i', 
+                     'nc31r', 'nc31i', 'nc32r', 'nc32i', 'nc33r', 'nc33i', 'nc34r', 'nc34i', 
+                     'nc41r', 'nc41i', 'nc42r', 'nc42i', 'nc43r', 'nc43i', 'nc44r', 'nc44i', 
+                     'fdsnr', 'edsnr', 'timezone', 'txid', 
+                     'tagname' ]
 
     self.Row = type('Row', (object,), { h : None for h in self.headers })
     self.Row.headers = self.headers
@@ -64,7 +62,7 @@ class est (qraat.csv):
          yield getattr(self, h)
     self.Row.__iter__ = f
 
-    self._row_template = "%10s" * len(self.headers)
+    self._row_template = "%10s " * len(self.headers)
 
     if fn: 
       self.read(fn)
@@ -75,21 +73,35 @@ class est (qraat.csv):
     if dets:
       for det in dets: 
         self.append(det)
+
+  def write(self, basedir): 
+    """ Write an est file per for each transmitter. 
+      
+      :param basedir: Directory for output files. 
+      :type basedir: str
+    """
+    # TODO create target directory if not exists
+    # TODO build map tag_name -> file descriptor
+    # TODO use super.write(file, exclude=[ ... ]) to write. 
+    pass
+
+
+
   
   def append(self, det):
     new_row = self.Row()
-    new_row.tag_name    = det.tag_name
-    new_row.datetime    = time.gmtime(det.time)
-    new_row.timestamp   = det.time
-    new_row.freq        = det.freq
-    new_row.center_freq = det.params.ctr_freq
+    new_row.tagname   = det.tag_name
+    new_row.datetime  = time.gmtime(det.time)
+    new_row.timestamp = det.time
+    new_row.frequency = det.freq
+    new_row.center    = det.params.ctr_freq
 
     # Fourier decomposistion
     new_row.fdsp        = det.f_pwr
     det.f_sig = det.f_sig.transpose()
     for i in range(self.channel_ct): 
-      setattr(new_row, 'fd%dr' % i, det.f_sig[0,i].real)
-      setattr(new_row, 'fd%di' % i, det.f_sig[0,i].imag)
+      setattr(new_row, 'fd%dr' % (i+1), det.f_sig[0,i].real)
+      setattr(new_row, 'fd%di' % (i+1), det.f_sig[0,i].imag)
   
     new_row.band3  = det.f_bandwidth3
     new_row.band10 = det.f_bandwidth10
@@ -98,23 +110,27 @@ class est (qraat.csv):
     new_row.edsp   = det.e_pwr
     det.e_sig = det.e_sig.transpose()
     for i in range(self.channel_ct): 
-      setattr(new_row, 'ed%dr' % i, det.e_sig[0,i].real)
-      setattr(new_row, 'ed%di' % i, det.e_sig[0,i].imag)
+      setattr(new_row, 'ed%dr' % (i+1), det.e_sig[0,i].real)
+      setattr(new_row, 'ed%di' % (i+1), det.e_sig[0,i].imag)
   
+    # Eigenvalue confidince
     new_row.ec  = det.e_conf
 
-    # Noise Covariance
+    # Noise covariance
     new_row.tnp = np.trace(det.n_cov).real  # ??
     for i in range(self.channel_ct):
       for j in range(self.channel_ct): 
-        setattr(new_row, 'nc%d%dr' % (i, j), det.n_cov[i,j].real)
-        setattr(new_row, 'nc%d%di' % (i, j), det.n_cov[i,j].imag)
+        setattr(new_row, 'nc%d%dr' % (i+1, j+1), det.n_cov[i,j].real)
+        setattr(new_row, 'nc%d%di' % (i+1, j+1), det.n_cov[i,j].imag)
 
-    # TODO
-    new_row.fdsnr = None
-    new_row.edsnr = None
-    new_row.timezone = None
-    new_row.txid = None
+    # Fourier decomposition signal-noise ratio (SNR)
+    new_row.fdsnr = 10 * np.log10(det.f_pwr / new_row.tnp)
+
+    # Eigenvalue decomposition SNR
+    new_row.edsnr = 10 * np.log10(det.e_pwr / new_row.tnp)
+
+    new_row.timezone = None # ??
+    new_row.txid = None  
 
     self.table.append(new_row)
 
@@ -567,5 +583,6 @@ if __name__=="__main__":
   a.write_csv("guy") 
   
   b = est(4, dets=dets)
-  b.write("fella.csv")
+  b.write("fella")
+  #b.write("fella.csv", exclude=['ID', 'txid', 'siteid', 'tagname', 'timezone'])
   print b
