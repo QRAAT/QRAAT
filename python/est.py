@@ -33,6 +33,8 @@ class est (qraat.csv):
       * ``e.write_db(db_con)``
       * ``e.write()``
 
+    This table doesn't maintain order constraints. 
+
     **TODO**: for ``write_db()``, we need the txid and siteid for 
     each row. The txid can be resolved with det.tag_name, but the 
     site from which the pulse was produced must be inferred from the
@@ -94,7 +96,8 @@ class est (qraat.csv):
     except OSError as e:
       if e.errno == errno.EEXIST and os.path.isdir(basedir): pass
       else: raise
-      
+  
+    # Exclude some headers when writing to file. 
     headers = [col for col in self.headers if col not in [
       'ID', 'txid', 'siteid', 'timezone']]
     fds = {} # tagname -> file descriptor index
@@ -169,34 +172,44 @@ class est (qraat.csv):
 
     self.table.append(new_row)
   
-  def clear(self): # empty table 
+  def clear(self): 
+    """ Clear table. """
     self.table = []
 
   def read_db(self, db_con, i, j):
     """ Read rows from the database over the time interval ``[i, j]``. 
     
       :param db_con: DB connector for MySQL. 
-      :type db_con: ?
-      :param i: Time start. 
-      :type i: time.struct_time
-      :param j: Time end.
-      :type j: time.struct_time
+      :type db_con: MySQLdb.connections.Connection
+      :param i: Time start (Unix). 
+      :type i: float 
+      :param j: Time end (Unix).
+      :type j: float
     """
     cur = db_con.cursor(mdb.cursors.DictCursor)
+
+    # Create tagname index. 
+    cur.execute('''SELECT id, name 
+                     FROM txlist''')
+    tagname_index = { row['id'] : row['name'] for row in cur.fetchall() }
+
+    # Select pulses produced over the specified range and populate table. 
     cur.execute('''SELECT * 
-                     FROM est''') # TODO
-    new_row = self.Row()
+                     FROM est 
+                    WHERE (%f <= timestamp) AND (timestamp <= %f)''' % (i, j))
     for row in cur.fetchall():
+      new_row = self.Row()
       for (col, val) in row.iteritems():
         setattr(new_row, col, val)
-      self.table.append(new_row)      
-    #TODO resolve tagname by txid
+      new_row.tagname = tagname_index[new_row.txid]
+      self.table.append(new_row)
+
     
   def write_db(self, db_con):
     """ Write rows to the database. 
     
       :param db_con: DB connector for MySQL. 
-      :type db_con: ?
+      :type db_con: MySQLdb.connections.Connection
     """
     #TODO resolve txid by tagname 
     #TODO resolve siteid by site name, passed as argument (for now). 
@@ -637,9 +650,11 @@ if __name__=="__main__":
   
   try:
     db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
+    print type(db_con)
     fella = est()
-    fella.read_db(db_con, 1, 2)
+    fella.read_db(db_con, 1380305235.982643, 1380314063.087800)
+    print fella
 
   except mdb.Error, e:
-    print sys.stderr, "error (%d): %s" % (e.args[0]. e.args[1])
+    print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])
     sys.exit(1) 
