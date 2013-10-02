@@ -22,6 +22,52 @@ import sys, os, time, errno
 import numpy as np
 import struct
 import MySQLdb as mdb
+from string import Template
+
+  
+  # TODO find a better home for these queries. It was suggested 
+  # that we move all of our queries to a single, controlled 
+  # file. 
+
+query_insert_est = Template(
+  '''INSERT INTO est 
+       (siteid, datetime, timestamp, frequency, center, fdsp, 
+        fd1r, fd1i, fd2r, fd2i, fd3r, fd3i, fd4r, fd4i, 
+        band3, band10, edsp, 
+        ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, 
+        ec, tnp, 
+        nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+        nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+        nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+        nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i, 
+        fdsnr, edsnr, timezone, txid)
+      VALUE 
+       ($siteid, '$datetime', $timestamp, $frequency, $center, $fdsp, 
+        $fd1r, $fd1i, $fd2r, $fd2i, $fd3r, $fd3i, $fd4r, $fd4i, 
+        $band3, $band10, $edsp, 
+        $ed1r, $ed1i, $ed2r, $ed2i, $ed3r, $ed3i, $ed4r, $ed4i, 
+        $ec, $tnp, 
+        $nc11r, $nc11i, $nc12r, $nc12i, $nc13r, $nc13i, $nc14r, $nc14i, 
+        $nc21r, $nc21i, $nc22r, $nc22i, $nc23r, $nc23i, $nc24r, $nc24i, 
+        $nc31r, $nc31i, $nc32r, $nc32i, $nc33r, $nc33i, $nc34r, $nc34i, 
+        $nc41r, $nc41i, $nc42r, $nc42i, $nc43r, $nc43i, $nc44r, $nc44i, 
+        $fdsnr, $edsnr, '$timezone', $txid)''')
+
+query_update_est = Template( 
+  '''UPDATE est SET
+      siteid=$siteid, datetime='$datetime', timestamp=$timestamp, 
+      frequency=$frequency, center=$center, fdsp=$fdsp,
+      fd1r=$fd1r, fd1i=$fd1i, fd2r=$fd2r, fd2i=$fd2i, fd3r=$fd3r, fd3i=$fd3i, fd4r=$fd4r, fd4i=$fd4i, 
+      band3=$band3, band10=$band10, edsp=$edsp, 
+      ed1r=$ed1r, ed1i=$ed1i, ed2r=$ed2r, ed2i=$ed2i, ed3r=$ed3r, ed3i=$ed3i, ed4r=$ed4r, ed4i=$ed4i, 
+      ec=$ec, tnp=$tnp, 
+      nc11r=$nc11r, nc11i=$nc11i, nc12r=$nc12r, nc12i=$nc12i, nc13r=$nc13r, nc13i=$nc13i, nc14r=$nc14r, nc14i=$nc14i, 
+      nc21r=$nc21r, nc21i=$nc21i, nc22r=$nc22r, nc22i=$nc22i, nc23r=$nc23r, nc23i=$nc23i, nc24r=$nc24r, nc24i=$nc24i, 
+      nc31r=$nc31r, nc31i=$nc31i, nc32r=$nc32r, nc32i=$nc32i, nc33r=$nc33r, nc33i=$nc33i, nc34r=$nc34r, nc34i=$nc34i, 
+      nc41r=$nc41r, nc41i=$nc41i, nc42r=$nc42r, nc42i=$nc42i, nc43r=$nc43r, nc43i=$nc43i, nc44r=$nc44r, nc44i=$nc44i, 
+      fdsnr=$fdsnr, edsnr=$edsnr, timezone='$timezone', txid=$txid
+     WHERE ID=$ID''')
+
 
 class est (qraat.csv):
 
@@ -71,6 +117,9 @@ class est (qraat.csv):
       for h in self.headers:
          yield getattr(self, h)
     self.Row.__iter__ = f
+    def g(self, i):
+      return getattr(self, i)
+    self.Row.__getitem__ = g
 
     self._row_template = "%10s " * len(self.headers)
 
@@ -83,6 +132,7 @@ class est (qraat.csv):
     if dets:
       for det in dets: 
         self.append(det)
+
 
   def write(self, basedir='./'): 
     """ Write an est file per for each transmitter. 
@@ -118,10 +168,7 @@ class est (qraat.csv):
 
   
   def append(self, det):
-    """ Append pulse signal to table. 
-    
-      **TODO**: timezone? 
-    """
+    """ Append pulse signal to table. """
     
     det.eig()
     det.f_signal()
@@ -129,6 +176,7 @@ class est (qraat.csv):
     new_row = self.Row()
     new_row.tagname   = det.tag_name
     new_row.datetime  = time.gmtime(det.time)
+    new_row.timezone  = 'UTC' #TODO Is this value always UTC? 
     new_row.timestamp = det.time
     new_row.frequency = det.freq
     new_row.center    = det.params.ctr_freq
@@ -166,15 +214,16 @@ class est (qraat.csv):
     # Eigenvalue decomposition SNR
     new_row.edsnr = 10 * np.log10(det.e_pwr / new_row.tnp)
 
-    new_row.timezone = None # ??
     new_row.txid = None  
     new_row.siteid = None
 
     self.table.append(new_row)
-  
+
+
   def clear(self): 
     """ Clear table. """
     self.table = []
+
 
   def read_db(self, db_con, i, j):
     """ Read rows from the database over the time interval ``[i, j]``. 
@@ -205,17 +254,41 @@ class est (qraat.csv):
       self.table.append(new_row)
 
     
-  def write_db(self, db_con):
+  def write_db(self, db_con, site=None):
     """ Write rows to the database. 
+     
+       Resolve the transmitter ID by tag name and the site ID by ``site``, 
+       if these values aren't present in the table. This allows us to deal 
+       with legacy pulse sample metadata. 
     
       :param db_con: DB connector for MySQL. 
       :type db_con: MySQLdb.connections.Connection
+      :param site: Name of the site where the signal was recorded. 
+      :type site: str
     """
-    #TODO resolve txid by tagname 
-    #TODO resolve siteid by site name, passed as argument (for now). 
-    #TODO insert rows. 
-    pass
 
+    cur = db_con.cursor()
+    cur.execute('''SELECT id, name 
+                     FROM txlist''')
+    txid_index = { name : id for (id, name) in cur.fetchall() }
+
+    cur.execute('''SELECT id, name 
+                     FROM sitelist''')
+    siteid_index = { name : id for (id, name) in cur.fetchall() }
+
+    for row in self.table: 
+      if row.txid == None: 
+        row.txid = txid_index[row.tagname]
+        
+      if row.siteid == None:
+        row.siteid = siteid_index.get(site)
+        if row.siteid == None: row.siteid = 'NULL'
+
+      query = query_insert_est if row.ID == None else query_update_est
+      row.datetime = qraat.pretty_printer(row.datetime)
+      cur.execute(query.substitute(row))
+
+    cur.execute('COMMIT')
 
 
 
@@ -650,10 +723,9 @@ if __name__=="__main__":
   
   try:
     db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
-    print type(db_con)
-    fella = est()
-    fella.read_db(db_con, 1380305235.982643, 1380314063.087800)
-    print fella
+    fella = est(dets=qraat.det.read_dir('test'))
+    #fella.read_db(db_con, time.time() - 3600, time.time())
+    fella.write_db(db_con, site='site2')
 
   except mdb.Error, e:
     print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])
