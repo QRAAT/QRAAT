@@ -33,16 +33,16 @@ class det (pulse_data):
   :type filename: string
   """
 
-  f = None              #: Result of :func:`det.fft`. 
-  f_sig = None          #: Result of :func:`det.f_signal`.
-  e_sig = None          #: Result of :func:`det.eig`. 
-  eigenvalues = None    #: See :func:`det.eig`. 
-  eigenvectors = None   #: See :func:`det.eig`. 
-  n_cov = None          #: Result of :func:`det.noise_cov`. 
-  tag_name = ""         #: Tag name parsed from input file name. 
- 
+   
   def __init__(self, fn):
     pulse_data.__init__(self, fn)
+    self.f = None              #: Result of :func:`det.fft`. 
+    self.f_sig = None          #: Result of :func:`det.f_signal`.
+    self.e_sig = None          #: Result of :func:`det.eig`. 
+    self.eigenvalues = None    #: See :func:`det.eig`. 
+    self.eigenvectors = None   #: See :func:`det.eig`. 
+    self.n_cov = None          #: Result of :func:`det.noise_cov`. 
+    self.tag_name = ""         #: Tag name parsed from input file name. 
     self.data = np.zeros((self.params.sample_ct,self.params.channel_ct),np.complex)
     for j in range(self.params.sample_ct):
       for k in range(self.params.channel_ct):
