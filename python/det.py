@@ -25,14 +25,20 @@ tag_regex = re.compile("([^/]*)_[0-9]*\.det$")
 
 class det (pulse_data):
   
-  """ Encapsulation of .det files, the output of the pulse detector. 
-
-    This class also does some math on the signal (desc). 
+  """ 
+  
+    Encapsulation of pulse records (.det files), the output of the pulse detector. 
+    In addition to storing the pulse metadata and samples, this class 
+    performs the various calculations that characterize the recorded 
+    samples in signal space. This class is based on 
+    :class:`qraat.pulse_swig.pulse_data`, which is used directly by 
+    the pulse detector (:class:`qraat.rmg.detect`) for storage and 
+    writing to disk. This allows us to handle metadata uniformly 
+    across the API. 
 
   :param filename: The name of the .det file. 
   :type filename: string
   """
-
    
   def __init__(self, fn):
     pulse_data.__init__(self, fn)
@@ -75,7 +81,7 @@ class det (pulse_data):
       :type j: datetime.datetime
       :param base_dir: Root directory for det files. 
       :type base_dir: str
-      :rtype: det list
+      :rtype: :class:`qraat.det.det` list
 
     """
     files = os.listdir(base_dir)
@@ -84,15 +90,15 @@ class det (pulse_data):
   
   @classmethod
   def read_many(cls, i, j, base_dir): 
-    """ Return a set of det instances over time interval ``(i, j)``. **TODO**
+    """ Return a set of det instances over time interval ``(i, j)``. **NOT IMPLMENTED**
 
-      :param i: Interval start
-      :type i: datetime.datetime
-      :param j: Interval end
-      :type j: datetime.datetime
+      :param i: Interval start (Unix time).
+      :type i: float
+      :param j: Interval end (Unix).
+      :type j: float
       :param base_dir: Root directory for det files. 
       :type base_dir: str
-      :rtype: det list
+      :rtype: :class:`qraat.det.det` list
 
     """
     return [] 

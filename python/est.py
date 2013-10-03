@@ -24,6 +24,7 @@ import struct
 import MySQLdb as mdb
 from string import Template
 
+
   
   # TODO find a better home for these queries. It was suggested 
   # that we move all of our queries to a single, controlled 
@@ -72,30 +73,46 @@ query_update_est = Template(
 class est (qraat.csv):
 
   """ 
-    usage:
-      * ``e = qraat.est(dets=qraat.det.read_dir(fella))``
-      * ``e += qraat.est(dets=qraat.det.read_dir(guy))``
-      * ``e += qraat.est(dets=qraat.det.read_many(then, now, guy))``
-      * ``e.write_db(db_con)``
-      * ``e.write()``
+  
+    Encapsulation of pulses in signal space. Store the signal features 
+    calculated by :class:`qraat.det.det` in a table mirroring the database 
+    schema. This class serves as an interface between pulse records (.det 
+    files), the MySQL database, and can read/write its contents from/to file. 
+    Some example usage:  
 
-    This table doesn't maintain order constraints. 
+      * | Read a directory of pulse records from disk and dump into database. 
+        | ``e = qraat.est(dets=qraat.det.read_dir('det_files/site1/1998/12/04/21/34'))``
+        | ``e.write_db(db_con, site='site1')``
+      * | Read the last hour of ests in database and output to file. 
+        | ``f = qraat.est()``
+        | ``f.read_db(db_con, time() - 3600, time())``
+        | ``f.write('est_files')``
 
-    **TODO**: for ``write_db()``, we need the txid and siteid for 
+    **NOTE**: the table doesn't maintain order constraints. 
+
+    **NOTE**: for ``write_db()``, we need the txid and siteid for 
     each row. The txid can be resolved with det.tag_name, but the 
     site from which the pulse was produced must be inferred from the
     directory structure at the moment. When we update the det 
     metadata, we will have tx_id and site_id be fields, but for the
-    moment this is going to be bit ugly. I'll have to write this code
-    to deal with both versions of metadata. 
+    moment it's necessary to specify the name of the site where the 
+    pulse was recorded. See :func:`est.write_db`. 
+
+    :param det: A pulse record.
+    :type det: qraat.det.det
+    :param dets: A set of pulse records.
+    :type dets: qraat.det.det 
+    :param fn: Filename to read est table from. 
+    :type fn: str
+    
   """
+    
+  #: The DB schema is hard-coded to handle four channels. For this 
+  #: reason, this value is also hard-coded here. 
+  channel_ct = 4 
 
   def __init__(self, det=None, dets=None, fn=None):
   
-    #: The DB schema is hard-coded to handle four channels. For this 
-    #: reason, this value is also hard-coded here. 
-    self.channel_ct = 4 
-
     self.table = []
 
     self.headers = [ 'ID', 'siteid', 'datetime', 'timestamp', 'frequency', 'center', 'fdsp', 
@@ -134,17 +151,17 @@ class est (qraat.csv):
         self.append(det)
 
 
-  def write(self, basedir='./'): 
+  def write(self, base_dir='./'): 
     """ Write an est file per for each transmitter. 
       
-      :param basedir: Directory for output files. 
-      :type basedir: str
+      :param base_dir: Directory for output files. 
+      :type base_dir: str
     """
     
     try: # Create target directory. 
-      os.makedirs(basedir)
+      os.makedirs(base_dir)
     except OSError as e:
-      if e.errno == errno.EEXIST and os.path.isdir(basedir): pass
+      if e.errno == errno.EEXIST and os.path.isdir(base_dir): pass
       else: raise
   
     # Exclude some headers when writing to file. 
@@ -155,7 +172,7 @@ class est (qraat.csv):
     for row in self.table:
       fd = fds.get(row.tagname)
       if not fd:
-        fn = '%s/%s.csv' % (basedir, row.tagname)
+        fn = '%s/%s.csv' % (base_dir, row.tagname)
         if os.path.isfile(fn):
           fds[row.tagname] = fd = open(fn, 'a')
         else: 
@@ -168,7 +185,11 @@ class est (qraat.csv):
 
   
   def append(self, det):
-    """ Append pulse signal to table. """
+    """ Append pulse signal to table.
+
+    :param det: Pulse record. 
+    :type det: qraat.det.det
+    """
     
     det.eig()
     det.f_signal()
@@ -298,7 +319,7 @@ class est (qraat.csv):
 
 class data_arrays:
 
-    """ Container class for pulses in signal space. 
+    """ Container class for pulses in signal space. **DEPRECATED**
     
       Store pulses in a table with their signal features. Methods 
       that should be implemented: 
@@ -443,9 +464,7 @@ class data_arrays:
 
 #est file class
 class est_data:
-    """ Encapsulation of .est files. 
-
-      **TODO:** this should be extended to interface with the database.     
+    """ Encapsulation of .est files. **DEPRECATED** 
 
     :param filename: filename of the .est file.
     :type filename: string
@@ -723,9 +742,11 @@ if __name__=="__main__":
   
   try:
     db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
-    fella = est(dets=qraat.det.read_dir('test'))
-    #fella.read_db(db_con, time.time() - 3600, time.time())
-    fella.write_db(db_con, site='site2')
+    #fella = est(dets=qraat.det.read_dir('test'))
+    fella = est()
+    fella.read_db(db_con, time.time() - 3600000, time.time())
+    print fella
+    #fella.write_db(db_con, site='site2')
 
   except mdb.Error, e:
     print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])

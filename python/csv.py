@@ -32,15 +32,18 @@ class csv:
     :type fn: str, file
   """
   
+  #: The CSV table.
+  table = []
+
+  #: Type for table rows. In the constructor, attributes corresponding 
+  #: to table columns are assigned. 
+  Row = type('Row', (object,), {})
   
-  def __init__(self, fn=None): 
+  def __init__(self, fn=None):
+
     #: The CSV table.
     self.table = []
   
-    #: Type for table rows. In the constructor, attributes corresponding 
-    #: to table columns are assigned. 
-    self.Row = type('Row', (object,), {})
-
     if fn: 
       self.read(fn)
 
@@ -159,5 +162,6 @@ class csv:
 if __name__ == '__main__': 
   tx = csv('../build/tx.csv')
   print list(tx[0])
+  print tx
   for line in tx: 
     print line
