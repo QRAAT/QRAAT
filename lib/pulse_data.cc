@@ -140,10 +140,8 @@ int pulse_data::read(const char *fn)
   
   /* Check file integrity. */ 
   struct stat results; 
-  if( stat(filename, &results) == 0 ) 
-    cout << "reading " << results.st_size << " bytes from "
-         << filename << endl;
-  else return -1; 
+  if( stat(filename, &results) != 0 ) 
+    return -1; 
 
   /* Get parameters. */
   fstream file( filename, ios::in | ios::binary ); 

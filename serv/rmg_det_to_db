@@ -1,0 +1,68 @@
+#!/usr/bin/python
+# rmg_det_to_db
+# Batch process det files into the datbase. This script is part of the 
+# QRAAT system. 
+#
+# Copyright (C) 2013 Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import sys, os, commands
+import MySQLdb as mdb
+import qraat 
+
+# TODO check for attempted reentry
+
+# TODO get these from command line (or environment?) 
+RMG_SERVER_DET_DIR =     "/rmg_server/det_files"
+RMG_SERVER_DET_ARCHIVE = "/rmg_server/archive/det_files"
+db_user = "root"
+db_pass = "woodland" 
+db_name = "qraat"
+
+try: 
+
+  db_con = mdb.connect('localhost', db_user, db_pass, db_name)
+  cur = db_con.cursor()
+
+  cur.execute('''SELECT name 
+                   FROM sitelist''')
+
+  for site in map(lambda row: row[0], cur.fetchall()):
+
+    site_dir = '%s/%s' % (RMG_SERVER_DET_DIR, site)
+    
+    # Don't process sites currently being fetched. 
+    if not os.path.isfile('%s/fetching.site' % (site_dir)):
+              
+      (status, output) = commands.getstatusoutput(
+        '/usr/bin/find %s/%s/????/??/??/??/?? -type d' % (
+          RMG_SERVER_DET_DIR, site))
+           
+      if status == 0:
+    
+        # Batch process only the newest 20 directories that were created.
+        # TODO better way to do this? Sort of what like rmg_fetch does? 
+        leaf_dirs = sorted(output.split('\n'), reverse=True)[:20]
+        for leaf_dir in leaf_dirs:
+          print site + ", " + leaf_dir
+          e = qraat.est(dets=qraat.det.read_dir(leaf_dir))
+          e.write_db(db_con, site)
+       
+        # TODO Archive det files and remove leaf_dir.
+        # TODO How does archiving work now? 
+
+except mdb.Error, e: 
+  print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])
+
