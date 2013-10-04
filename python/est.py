@@ -70,6 +70,20 @@ query_update_est = Template(
      WHERE ID=$ID''')
 
 
+
+class ResolveIdError (Exception):
+  """ Exception class for resolving database IDs for est entries. """
+
+  def __init__(self, row):
+    self.fn     = row.fn
+    self.txid   = row.txid
+    self.siteid = row.siteid
+     
+  def __str__(self):
+    return "could not resolve foreign key(s) for est table row (txid='%s', siteid='%s')" % (
+      self.txid, self.siteid)
+
+
 class est (qraat.csv):
 
   """ 
@@ -125,7 +139,7 @@ class est (qraat.csv):
                      'nc31r', 'nc31i', 'nc32r', 'nc32i', 'nc33r', 'nc33i', 'nc34r', 'nc34i', 
                      'nc41r', 'nc41i', 'nc42r', 'nc42i', 'nc43r', 'nc43i', 'nc44r', 'nc44i', 
                      'fdsnr', 'edsnr', 'timezone', 'txid', 
-                     'tagname' ]
+                     'tagname', 'fn' ]
 
     self.Row = type('Row', (object,), { h : None for h in self.headers })
     self.Row.headers = self.headers
@@ -201,6 +215,7 @@ class est (qraat.csv):
     new_row.timestamp = det.time
     new_row.frequency = det.freq
     new_row.center    = det.params.ctr_freq
+    new_row.fn        = det.fn
 
     # Fourier decomposistion
     new_row.fdsp        = det.f_pwr
@@ -299,11 +314,13 @@ class est (qraat.csv):
 
     for row in self.table: 
       if row.txid == None: 
-        row.txid = txid_index[row.tagname]
-        
+        row.txid = txid_index.get(row.tagname)
+
       if row.siteid == None:
         row.siteid = siteid_index.get(site)
-        if row.siteid == None: row.siteid = 'NULL'
+
+      if row.txid == None or row.siteid == None:
+        raise ResolveIdError(row)
 
       query = query_insert_est if row.ID == None else query_update_est
       row.datetime = qraat.pretty_printer(row.datetime)

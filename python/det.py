@@ -49,6 +49,7 @@ class det (pulse_data):
     self.eigenvectors = None   #: See :func:`det.eig`. 
     self.n_cov = None          #: Result of :func:`det.noise_cov`. 
     self.tag_name = ""         #: Tag name parsed from input file name. 
+    self.fn = fn 
     self.data = np.zeros((self.params.sample_ct,self.params.channel_ct),np.complex)
     for j in range(self.params.sample_ct):
       for k in range(self.params.channel_ct):

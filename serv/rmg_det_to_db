@@ -71,31 +71,34 @@ try:
         for leaf_dir in leaf_dirs:
 
           # Process det files, store signals in the databse. 
-          e = qraat.est(dets=qraat.det.read_dir(leaf_dir))
-          e.write_db(db_con, site)                            
-        
+          try:
+            table = qraat.est(dets=qraat.det.read_dir(leaf_dir))
+            table.write_db(db_con)#, site)                            
+          except qraat.ResolveIdError, e:            
+            print >>sys.stderr, "warning (det_to_db): skipping est corresponding to '%s'" % e.fn
+                  
           # Archive processed det files.
           m = leaf_regex.search(leaf_dir) 
-          archive_fn = ("%s/%s/" % (RMG_SERVER_DET_ARCHIVE, site)) +\
+          arch_fn = ("%s/%s/" % (RMG_SERVER_DET_ARCHIVE, site)) +\
                        ("%s/%s/%s/%s/%s/" % m.groups(0))
 
           try:
-            os.makedirs(archive_fn)
+            os.makedirs(arch_fn)
           except OSError, e:  # Catch if directory exists;
             if e.errno != 17: # otherwise, throw exception.  
               raise e
 
-          archive_fn += site + (".%s.%s.%s.%s.%s.tar" % m.groups(0))
-          if os.path.isfile(archive_fn): 
+          arch_fn += site + (".%s.%s.%s.%s.%s.tar" % m.groups(0))
+          if os.path.isfile(arch_fn): 
             (status, output) = commands.getstatusoutput(
-              '/bin/tar -rf %s -C %s .' % (archive_fn, leaf_dir))
+              '/bin/tar -rf %s -C %s .' % (arch_fn, leaf_dir))
           else: 
             (status, output) = commands.getstatusoutput(
-              '/bin/tar -cf %s -C %s .' % (archive_fn, leaf_dir))
+              '/bin/tar -cf %s -C %s .' % (arch_fn, leaf_dir))
           
           # Delete processed det files. 
           # TODO prune empty directories? 
-          if status == 0: 
+          if status != 0: 
             print >>sys.stderr, "error (det_to_db): archiving %s: %s" % (
               site, output)
           else:  
