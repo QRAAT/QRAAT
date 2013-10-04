@@ -65,15 +65,15 @@ try:
         leaf_dirs = sorted(output.split('\n'), reverse=True)
         total = len(leaf_dirs) 
         leaf_dirs = leaf_dirs[:20]
-        print "det_to_db: processing %d out of %d available directories" % ( 
-          len(leaf_dirs), total) 
+        print "det_to_db: %s: processing %d out of %d available directories" % ( 
+          site, len(leaf_dirs), total) 
 
         for leaf_dir in leaf_dirs:
 
           # Process det files, store signals in the databse. 
           try:
             table = qraat.est(dets=qraat.det.read_dir(leaf_dir))
-            table.write_db(db_con)#, site)                            
+            table.write_db(db_con, site)                            
           except qraat.ResolveIdError, e:            
             print >>sys.stderr, "warning (det_to_db): skipping est corresponding to '%s'" % e.fn
                   
