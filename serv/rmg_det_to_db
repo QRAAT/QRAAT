@@ -18,11 +18,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys, os, commands
+import sys, os, commands, time
+import re
 import MySQLdb as mdb
 import qraat 
 
-# TODO check for attempted reentry
+# Check for running instances of this program. 
+(status, output) = commands.getstatusoutput(
+  'pgrep -c `basename %s`' % (sys.argv[0]))
+if int(output) > 1: 
+  print >>sys.stderr, "error (det_to_db): attempted reentry, exiting"
+  sys.exit(1)
 
 # TODO get these from command line (or environment?) 
 RMG_SERVER_DET_DIR =     "/rmg_server/det_files"
@@ -31,7 +37,10 @@ db_user = "root"
 db_pass = "woodland" 
 db_name = "qraat"
 
+leaf_regex = re.compile("([0-9]{4})/([0-9]{2})/([0-9]{2})/([0-9]{2})/([0-9]{2})") 
+
 try: 
+  print "det_to_db: start time:", time.asctime(time.localtime(time.time()))
 
   db_con = mdb.connect('localhost', db_user, db_pass, db_name)
   cur = db_con.cursor()
@@ -53,16 +62,47 @@ try:
       if status == 0:
     
         # Batch process only the newest 20 directories that were created.
-        # TODO better way to do this? Sort of what like rmg_fetch does? 
-        leaf_dirs = sorted(output.split('\n'), reverse=True)[:20]
+        leaf_dirs = sorted(output.split('\n'), reverse=True)
+        total = len(leaf_dirs) 
+        leaf_dirs = leaf_dirs[:20]
+        print "det_to_db: processing %d out of %d available directories" % ( 
+          len(leaf_dirs), total) 
+
         for leaf_dir in leaf_dirs:
-          print site + ", " + leaf_dir
+
+          # Process det files, store signals in the databse. 
           e = qraat.est(dets=qraat.det.read_dir(leaf_dir))
-          e.write_db(db_con, site)
-       
-        # TODO Archive det files and remove leaf_dir.
-        # TODO How does archiving work now? 
+          e.write_db(db_con, site)                            
+        
+          # Archive processed det files.
+          m = leaf_regex.search(leaf_dir) 
+          archive_fn = ("%s/%s/" % (RMG_SERVER_DET_ARCHIVE, site)) +\
+                       ("%s/%s/%s/%s/%s/" % m.groups(0))
+
+          try:
+            os.makedirs(archive_fn)
+          except OSError, e:  # Catch if directory exists;
+            if e.errno != 17: # otherwise, throw exception.  
+              raise e
+
+          archive_fn += site + (".%s.%s.%s.%s.%s.tar" % m.groups(0))
+          if os.path.isfile(archive_fn): 
+            (status, output) = commands.getstatusoutput(
+              '/bin/tar -rf %s -C %s .' % (archive_fn, leaf_dir))
+          else: 
+            (status, output) = commands.getstatusoutput(
+              '/bin/tar -cf %s -C %s .' % (archive_fn, leaf_dir))
+          
+          # Delete processed det files. 
+          # TODO prune empty directories? 
+          if status == 0: 
+            print >>sys.stderr, "error (det_to_db): archiving %s: %s" % (
+              site, output)
+          else:  
+            commands.getstatusoutput('rm -fr %s' % leaf_dir)
 
 except mdb.Error, e: 
-  print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])
+  print >>sys.stderr, "error (det_to_db): [%d] %s" % (e.args[0], e.args[1])
 
+finally: 
+  print "det_to_db: end time:", time.asctime(time.localtime(time.time()))
