@@ -30,19 +30,32 @@ if int(output) > 1:
   print >>sys.stderr, "error (det_to_db): attempted reentry, exiting"
   sys.exit(1)
 
-# TODO get these from command line (or environment?) 
-RMG_SERVER_DET_DIR =     "/rmg_server/det_files"
-RMG_SERVER_DET_ARCHIVE = "/rmg_server/archive/det_files"
-db_user = "root"
-db_pass = "woodland" 
-db_name = "qraat"
+try: # Get some environment variables. 
+  det_dir  = os.environ['RMG_SERVER_DET_DIR']
+  det_arch = os.environ['RMG_SERVER_DET_ARCHIVE']
+except KeyError: 
+  print >>sys.stderr, "error (det_to_db): undefined environment variables " +\
+                      "$RMG_SERVER_DET_DIR and/or $RMG_SERVER_DET_ARCHIVE."
+  sys.exit(1)
+
+try: # Get database credentials. 
+  db_config = qraat.csv("%s/.qraat/db_auth" % os.environ['HOME']).get(view='writer')
+except IOError, e: 
+  print >>sys.stderr, "error (det_to_db): missing DB credential file '%s'." % e.filename
+  sys.exit(1)
+  
+
 
 leaf_regex = re.compile("([0-9]{4})/([0-9]{2})/([0-9]{2})/([0-9]{2})/([0-9]{2})") 
 
 try: 
   print "det_to_db: start time:", time.asctime(time.localtime(time.time()))
 
-  db_con = mdb.connect('localhost', db_user, db_pass, db_name)
+  db_con = mdb.connect(db_config.host, 
+                       db_config.user, 
+                       db_config.password, 
+                       db_config.name)
+
   cur = db_con.cursor()
 
   cur.execute('''SELECT name 
@@ -50,14 +63,14 @@ try:
 
   for site in map(lambda row: row[0], cur.fetchall()):
 
-    site_dir = '%s/%s' % (RMG_SERVER_DET_DIR, site)
+    site_dir = '%s/%s' % (det_dir, site)
     
     # Don't process sites currently being fetched. 
     if not os.path.isfile('%s/fetching.site' % (site_dir)):
               
       (status, output) = commands.getstatusoutput(
         '/usr/bin/find %s/%s/????/??/??/??/?? -type d' % (
-          RMG_SERVER_DET_DIR, site))
+          det_dir, site))
            
       if status == 0:
     
@@ -75,11 +88,11 @@ try:
             table = qraat.est(dets=qraat.det.read_dir(leaf_dir))
             table.write_db(db_con, site)                            
           except qraat.ResolveIdError, e:            
-            print >>sys.stderr, "warning (det_to_db): skipping est corresponding to '%s'" % e.fn
+            print >>sys.stderr, "warning (det_to_db): skipping est corresponding to '%s'" % e.filename
                   
           # Archive processed det files.
           m = leaf_regex.search(leaf_dir) 
-          arch_fn = ("%s/%s/" % (RMG_SERVER_DET_ARCHIVE, site)) +\
+          arch_fn = ("%s/%s/" % (det_arch, site)) +\
                        ("%s/%s/%s/%s/%s/" % m.groups(0))
 
           try:

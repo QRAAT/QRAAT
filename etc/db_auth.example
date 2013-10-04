@@ -1,0 +1,3 @@
+view,host,user,password,name
+reader,localhost,fella,nope,qraat
+writer,localhost,guy,nope,qraat

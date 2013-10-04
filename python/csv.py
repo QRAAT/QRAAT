@@ -100,8 +100,37 @@ class csv:
         for col in headers) 
        for row in self.table)
     fd.write(res)
+    
+  def get(self, **cols):
+    """ Get the first row that matches the given criteria. 
+    
+      Input is a list of *(column, value)* pairs.
+
+    :rtype: qraat.csv.Row
+    """
+    for row in self.table:
+      match = True
+      for (col, val) in cols.iteritems(): 
+        if getattr(row, col) != val:
+          match = False; break 
+      if match: return row
+    return None
   
-  
+  def filter(self, **cols):
+    """ Get an iterator over the rows row that match the given criteria. 
+    
+      Input is a list of *(column, value)* pairs.
+
+    :rtype: qraat.csv.Row iterator
+    """
+    for row in self.table:
+      match = True
+      for (col, val) in cols.iteritems(): 
+        if getattr(row, col) != val:
+          match = False; break 
+      if match: yield row
+    
+
   def __str__(self):
     res = self._row_template % tuple(self.headers) + '\n'
     res += '\n'.join(

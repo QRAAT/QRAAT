@@ -75,9 +75,9 @@ class ResolveIdError (Exception):
   """ Exception class for resolving database IDs for est entries. """
 
   def __init__(self, row):
-    self.fn     = row.fn
-    self.txid   = row.txid
-    self.siteid = row.siteid
+    self.filename = row.fn
+    self.txid     = row.txid
+    self.siteid   = row.siteid
      
   def __str__(self):
     return "could not resolve foreign key(s) for est table row (txid='%s', siteid='%s')" % (
