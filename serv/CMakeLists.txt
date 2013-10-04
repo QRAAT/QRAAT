@@ -1,6 +1,7 @@
 INSTALL(PROGRAMS  
   est_processing
   rmg_det_to_est
+  rmg_det_to_db
   rmg
   rmg-node
   rmg_env
