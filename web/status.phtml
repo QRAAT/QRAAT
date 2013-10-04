@@ -58,8 +58,16 @@ td.nok { background-color: #ffaaaa; }
 	{
 		$sync_status = "synchronized" ;
 	}
-	print "<p>RMG Server date and time: ".date("g:i:s a T, l M d, Y").".&nbsp;" ;
-	print "Server time is $sync_status, offset is $ntpq_offset ms.</p>" ;
+	$uptime_result = `uptime` ;
+	$uptime_words = preg_split("/up/",$uptime_result,2) ;
+	$uptime = "N/A" ;
+	if( $uptime_words[1] )
+	{
+		$uptime = $uptime_words[1] ;
+	}
+	print "<p>RMG Server date and time: ".date("g:i:s a T, l M d, Y")."</p>" ;
+	print "<p>Server time is $sync_status, offset is $ntpq_offset ms</p>" ;
+	print "<p>Server uptime is $uptime</p>" ;
 ?>
 
 <h2>System Monitoring Plots</h2>
