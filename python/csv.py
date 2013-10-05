@@ -106,7 +106,7 @@ class csv:
     
       Input is a list of *(column, value)* pairs.
 
-    :rtype: qraat.csv.Row
+    :returns: qraat.csv.Row.
     """
     for row in self.table:
       match = True
@@ -121,7 +121,7 @@ class csv:
     
       Input is a list of *(column, value)* pairs.
 
-    :rtype: qraat.csv.Row iterator
+    :returns: Iterator over qraat.csv.Row.
     """
     for row in self.table:
       match = True

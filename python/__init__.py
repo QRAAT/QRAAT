@@ -21,14 +21,18 @@ This is the Python ``qraat`` module, comprising our application programming
 interface. *This doc string is in python/__init__.py*. 
 '''
 
-#: Create an enumerated type as a Python class. 
 def enum(*sequential, **named):
+  """ 
+    Create an enumerated type as a Python class. For example, see
+  """
   enums = dict(zip(sequential, range(len(sequential))), **named)
   Enum = type('Enum', (), enums)
   return Enum
 
-#: Convert table cell value to a pretty string suitable for displaying.
 def pretty_printer(val):
+  """ 
+    Convert table cell value to a pretty string suitable for displaying. 
+  """ 
   if type(val) in [float, np.float64]:
     if len(str(val)) > 6: 
       return '{0:e}'.format(val)

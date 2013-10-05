@@ -91,15 +91,18 @@ class det (pulse_data):
   
   @classmethod
   def read_many(cls, i, j, base_dir): 
-    """ Return a set of det instances over time interval ``(i, j)``. **NOT IMPLMENTED**
+    """ Return a set of det instances over time interval ``(i, j)``. 
+      
+       .. warning:: 
+         This function is not implemented. 
 
-      :param i: Interval start (Unix time).
-      :type i: float
-      :param j: Interval end (Unix).
-      :type j: float
-      :param base_dir: Root directory for det files. 
-      :type base_dir: str
-      :rtype: :class:`qraat.det.det` list
+    :param i: Interval start (Unix time).
+    :type i: float
+    :param j: Interval end (Unix).
+    :type j: float
+    :param base_dir: Root directory for det files. 
+    :type base_dir: str
+    :rtype: :class:`qraat.det.det` list
 
     """
     return [] 

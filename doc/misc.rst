@@ -6,10 +6,12 @@
 Miscellaneous 
 =============
 
+.. autofunction:: qraat.enum
+
+.. autofunction:: qraat.pretty_printer
+
 Configuration and log files (class ``qraat.csv``)
 -------------------------------------------------
-
-.. automodule:: qraat.csv
 
 .. autoclass:: qraat.csv.csv
    :members:

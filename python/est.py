@@ -102,15 +102,17 @@ class est (qraat.csv):
         | ``f.read_db(db_con, time() - 3600, time())``
         | ``f.write('est_files')``
 
-    **NOTE**: the table doesn't maintain order constraints. 
+    .. note:: 
+      The table doesn't maintain order constraints. 
 
-    **NOTE**: for ``write_db()``, we need the txid and siteid for 
-    each row. The txid can be resolved with det.tag_name, but the 
-    site from which the pulse was produced must be inferred from the
-    directory structure at the moment. When we update the det 
-    metadata, we will have tx_id and site_id be fields, but for the
-    moment it's necessary to specify the name of the site where the 
-    pulse was recorded. See :func:`est.write_db`. 
+    .. note:: 
+      For ``write_db()``, we need the txid and siteid for 
+      each row. The txid can be resolved with det.tag_name, but the 
+      site from which the pulse was produced must be inferred from the
+      directory structure at the moment. When we update the det 
+      metadata, we will have tx_id and site_id be fields, but for the
+      moment it's necessary to specify the name of the site where the 
+      pulse was recorded. See :func:`est.write_db`. 
 
     :param det: A pulse record.
     :type det: qraat.det.det
