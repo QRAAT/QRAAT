@@ -1,6 +1,4 @@
 INSTALL(PROGRAMS  
-  est_processing
-  rmg_det_to_est
   rmg_det_to_db
   rmg
   rmg-node
@@ -14,8 +12,6 @@ INSTALL(PROGRAMS
   rmg_status
   rmg_timecheck
   rmg_schedule
-  rmg_readest
-  rmg_readestfile
   rmg_detcount
   rmg_estcount
   rmg_dbstats
