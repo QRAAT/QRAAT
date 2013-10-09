@@ -90,6 +90,7 @@ try:
             table.write_db(db_con, site)                            
           except qraat.ResolveIdError, e:            
             print >>sys.stderr, "warning (det_to_db): skipping est corresponding to '%s'" % e.filename
+            # FIXME After emitting warning, we should re-enter the code and try the rest of the rows. 
                   
           # Archive processed det files.
           m = leaf_regex.search(leaf_dir) 
