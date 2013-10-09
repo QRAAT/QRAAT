@@ -1,15 +1,14 @@
 #!/bin/bash
-#rmg_status
+#rmg_process
 #
 # This script is part of the QRAAT system.
 #
 # Copyright (C) 2013 Christopher Patton
 #
-# This script is responsible for processing .det files into the database,
-# archiving them, and filtering the est data into a fest table. In cron:
+# This is a wrapper script for the processing .det files into the 
+# database, archiving them. Eventually, we'll have additional 
+# processing steps, such as filtering the est rows. In cron:
 #	* * * * * rmg_process >>/var/log/rmg/rmg_detest.log 2>&1
-#
-# TODO
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -28,11 +27,9 @@ source rmg_env
 
 echo start `date`
 echo
-echo rmg_det_to_db
+echo det_to_db
 rmg_det_to_db
-echo
-echo rmg_filterest
-rmg_filterest /rmg_server/authfile_readest
+echo 
+# TODO add rmg_filterest stuff. 
 echo end `date`
 echo
-#END

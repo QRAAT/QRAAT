@@ -49,7 +49,8 @@ except IOError, e:
 leaf_regex = re.compile("([0-9]{4})/([0-9]{2})/([0-9]{2})/([0-9]{2})/([0-9]{2})") 
 
 try: 
-  print "det_to_db: start time:", time.asctime(time.localtime(time.time()))
+  start = time.time()
+  print "det_to_db: start time:", time.asctime(time.localtime(start))
 
   db_con = mdb.connect(db_config.host, 
                        db_config.user, 
@@ -121,4 +122,4 @@ except mdb.Error, e:
   print >>sys.stderr, "error (det_to_db): [%d] %s" % (e.args[0], e.args[1])
 
 finally: 
-  print "det_to_db: end time:", time.asctime(time.localtime(time.time()))
+  print "det_to_db: finished in %.2f seconds." % (time.time() - start)
