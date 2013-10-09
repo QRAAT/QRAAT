@@ -55,13 +55,6 @@ Pulse in signal space (class ``qraat.est``)
    :members:
    :show-inheritance:
 
-
-
-**NOTE**: the following classes will be deprecated soon, replaced by ``qraat.est``. 
-
-.. autoclass:: qraat.est.est_data 
-   :members: 
-
-.. autoclass:: qraat.est.data_arrays
-   :members:
+.. todo:: 
+  Document ``qraat.ResolveIdError``. 
 

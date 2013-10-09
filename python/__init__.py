@@ -45,6 +45,6 @@ def pretty_printer(val):
     return str(val)
 
 from csv import * 
-from det import det 
-from est import est, ResolveIdError, data_arrays, est_data
+from det import det
+from est import est, ResolveIdError
 
