@@ -325,6 +325,12 @@ class est (qraat.csv):
         raise ResolveIdError(row)
 
       query = query_insert_est if row.ID == None else query_update_est
+      # When the template string performs the substitution, it casts 
+      # floats to strings with `str(val)`. This rounds the decimal 
+      # value if the string is too long. This screws with our precision 
+      # for the timestamp. The following line turns the timestamp into 
+      # a string with unrounded value. 
+      row.timestamp = repr(row.timestamp) 
       row.datetime = qraat.pretty_printer(row.datetime)
       cur.execute(query.substitute(row))
 
@@ -760,12 +766,13 @@ class est_data:
 if __name__=="__main__":
   
   try:
-    db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
-    #fella = est(dets=qraat.det.read_dir('test'))
-    fella = est()
-    fella.read_db(db_con, time.time() - 3600000, time.time())
-    print fella
+    #db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
+    #fella = est()
+    #fella.read_db(db_con, time.time() - 3600000, time.time())
     #fella.write_db(db_con, site='site2')
+    fella = est(det=qraat.det('test.det'))
+    print repr(fella[0].timestamp)
+    print str(fella[0].timestamp)
 
   except mdb.Error, e:
     print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])

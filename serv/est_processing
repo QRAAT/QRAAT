@@ -21,7 +21,7 @@ import qraat
 
 def process_det_files(det_dirname, est_dirname):
     print "Processing " + det_dirname
-    est = qraat.est.est_data()
+    est = qraat.est_data()
     est.read_dir(det_dirname)
     if est.num_tags > 0:
         #est.write_est(est_dirname)
