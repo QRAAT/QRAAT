@@ -19,6 +19,7 @@
 
 import qraat
 import os, sys, time, numpy as np
+import MySQLdb as mdb
 
 
 class csv: 
@@ -26,10 +27,16 @@ class csv:
   """ 
     Encapsulate a CSV file. The rows are accessed via the [] operator. 
     Each row is a Row object, whose attributes correspond to the CSV 
-    columns. 
+    columns. This class's constructor accepts a file, e.g. 
+    ``txist = csv('tx.list')``, or DB connector class and the name 
+    of a table, e.g. ``txlist = csv(db_con=db_con, table='txlist')``. 
 
-    :param fn: Input file name or file descriptor. 
-    :type fn: str, file
+  :param fn: Input file name or file descriptor. 
+  :type fn: str, file
+  :param db_con: DB connector. 
+  :type db_con: MySQLdb.connections.Conneection
+  :param table: Table name. 
+  :type table: str
   """
   
   #: The CSV table.
@@ -39,13 +46,17 @@ class csv:
   #: to table columns are assigned. 
   Row = type('Row', (object,), {})
   
-  def __init__(self, fn=None):
+  def __init__(self, fn=None, db_con=None, db_table=None):
 
     #: The CSV table.
     self.table = []
   
     if fn: 
       self.read(fn)
+
+    elif db_con and db_table: 
+      self.read_db(db_con, db_table)
+
 
   def read(self, fn): 
     """ Read a CSV file. 
@@ -60,7 +71,7 @@ class csv:
       fd = fn
     else: raise TypeError # Provide a message. 
 
-    lengths = self.__build_header(fd)
+    lengths = self.__build_header(fd.readline().strip().split(','))
 
     # Populate the table.
     for line in map(lambda l: l.strip().split(','), fd.readlines()):
@@ -70,6 +81,32 @@ class csv:
           lengths[i] = len(line[i])
         setattr(self.table[-1], self.headers[i], line[i])
     fd.close()
+    self.__build_row_template(lengths)
+
+
+  def read_db(self, db_con, table): 
+    """ Read a small database table. 
+
+      :param db_con: DB connector. 
+      :type db_con: MySQLdb.connections.Conneection
+      :param table: Table name. 
+      :type table: str
+    """
+    
+    cur = db_con.cursor()
+    cur.execute('''SELECT `COLUMN_NAME`
+                     FROM `INFORMATION_SCHEMA`.`COLUMNS`
+                    wHERE `TABLE_NAME` = '%s' ''' % table)
+    lengths = self.__build_header(map(lambda val: val[0], cur.fetchall()))
+
+    # Populate the table. 
+    cur.execute('SELECT * FROM %s' % table)
+    for row in cur.fetchall(): 
+      self.table.append(self.Row())
+      for i in range(len(self.headers)): 
+        if lengths[i] < len(str(row[i])):
+          lengths[i] = len(str(row[i]))
+        setattr(self.table[-1], self.headers[i], row[i])
     self.__build_row_template(lengths)
 
 
@@ -101,6 +138,7 @@ class csv:
        for row in self.table)
     fd.write(res)
     
+
   def get(self, **cols):
     """ Get the first row that matches the given criteria. 
     
@@ -116,10 +154,14 @@ class csv:
       if match: return row
     return None
   
+
   def filter(self, **cols):
     """ Get an iterator over the rows row that match the given criteria. 
     
       Input is a list of *(column, value)* pairs.
+
+      .. note:: 
+        Should this return a ``csv``-type? 
 
     :returns: Iterator over qraat.csv.Row.
     """
@@ -151,7 +193,7 @@ class csv:
   def __getslice__(self, i, j):
     return self.table[i:j]
 
-  def __build_header(self, fd):
+  def __build_header(self, h):
     """ 
       Read column names from file descriptor and create the Row 
       type. Return a dictionary mapping the names of columns to 
@@ -160,7 +202,7 @@ class csv:
     """
     
     #: Column names, referenced by rows. 
-    self.headers = [ h for h in fd.readline().strip().split(',') ]
+    self.headers = h
 
     # Store the maximum row length per column. This value will 
     # be used to compute a string template for displaying the 
@@ -188,9 +230,14 @@ class csv:
        ['%-{0}s'.format(i) for i in lengths])
 
 
-if __name__ == '__main__': 
-  tx = csv('../build/tx.csv')
-  print list(tx[0])
-  print tx
-  for line in tx: 
-    print line
+
+if __name__ == '__main__': # Testing, testing ... 
+
+  try:
+    db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
+    txlist = csv(db_con=db_con, db_table='txlist')
+    print txlist
+
+  except mdb.Error, e:
+    print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])
+    sys.exit(1) 
