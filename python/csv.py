@@ -111,7 +111,7 @@ class csv:
 
 
   def write(self, fn, exclude=[]): 
-    """ Write data table to CSV file. 
+    """ Write data table to CSV file.
 
       :param fn: Output file name. 
       :type fn: str
@@ -120,23 +120,19 @@ class csv:
     """
     
     headers = [col for col in self.headers if col not in exclude]
-    res = ''
     
     if type(fn) == str: 
-      if os.path.isfile(fn): # Append if file exists
-        fd = open(fn, 'a')
-      else: # Create file and write headers
-        fd = open(fn, 'w')
-        res += fd.write(','.join(headers) + '\n')
+      fd = open(fn, 'w')
     elif type(fn) == file: 
       fd = fn
     else: raise TypeError # Provide a message. 
 
+    res = ','.join(headers) + '\n'
     res += '\n'.join(
       ','.join(qraat.pretty_printer(getattr(row, col)) 
         for col in headers) 
        for row in self.table)
-    fd.write(res)
+    fd.write(res + '\n')
     
 
   def get(self, **cols):
@@ -236,7 +232,7 @@ if __name__ == '__main__': # Testing, testing ...
   try:
     db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
     txlist = csv(db_con=db_con, db_table='txlist')
-    print txlist
+    txlist.write('fella')
 
   except mdb.Error, e:
     print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])

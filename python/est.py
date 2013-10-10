@@ -168,7 +168,10 @@ class est (qraat.csv):
 
 
   def write(self, base_dir='./'): 
-    """ Write an est file per for each transmitter. 
+    """ Write an est file for each transmitter.
+
+      If file exists, than append; otherwise, create a new 
+      file and write the column headers. 
       
       :param base_dir: Directory for output files. 
       :type base_dir: str
