@@ -26,7 +26,7 @@ PATH=/bin:/usr/bin:/usr/local/bin
 */2	*	*	*	*	rmg fetch all >>/var/log/rmg/rmg_fetch.log 2>&1
 
 # Process all det files into est files AND read all est files into the qraat database and filter est data
-*	*	*	*	*	( rmg_det_to_est ; rmg_readest /rmg_server/sitelist.csv /rmg_server/authfile_readest ; rmg_filterest /rmg_server/authfile_readest ) >>/var/log/rmg/rmg_detest.log 2>&1
+*	*	*	*	*	rmg_process >>/var/log/rmg/rmg_process.log 2>&1
 
 # Turn sites on and off automatically, collect site status information, make plots for the web page
 */5	*	*	*	*	rmg_status >>/var/log/rmg/rmg_status.log 2>&1
