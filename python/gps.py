@@ -1,10 +1,36 @@
+# gps.py - A class for encapsulating GPS data produced by the yellow
+# Garmin GPS unit. This file is part of QRAAT, an automated animal 
+# tracking system based on GNU Radio. 
+#
+# Copyright (C) 2013 Todd Borrowman
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import xml.dom.minidom
 import time, calendar
 import math
 import numpy as np
 
-class gps_data:
+class gps:
+    ''' Encapsulate raw GPS data.
+      
+      This was written to parse data produced by the 'yellow Garmin GPS' 
+      unit. It has some information/calculations that we don't need right 
+      now, but may have cause to look at in the future.
+
+      **TODO** Put this in the documentation. 
+    ''' 
 
     def __init__(self, filename='', num_records=0):
         self.num_records = num_records
@@ -293,5 +319,6 @@ if __name__ == "__main__":
 #            for k in j:
 #                bearing = calc_bearing(rmg_loc,k[1:3])
 #                bfile.write("{0}, {1}, {2}, {3}, {4}, {5}\n".format(k[0],k[1],k[2],bearing[1],bearing[0],k[3]))
+
 
 
