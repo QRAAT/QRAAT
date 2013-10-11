@@ -6,9 +6,9 @@
 # Copyright (C) 2013 Christopher Patton
 #
 # This is a wrapper script for the processing .det files into the 
-# database, archiving them. Eventually, we'll have additional 
+# database and archiving them. Eventually, we'll have additional 
 # processing steps, such as filtering the est rows. In cron:
-#	* * * * * rmg_process >>/var/log/rmg/rmg_detest.log 2>&1
+#	* * * * * rmg_process >>/var/log/rmg/rmg_process 2>&1
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,6 +30,8 @@ echo
 echo det_to_db
 rmg_det_to_db
 echo 
-# TODO add rmg_filterest stuff. 
+echo rmg_filterest
+rmg_filterest
+echo
 echo end `date`
 echo
