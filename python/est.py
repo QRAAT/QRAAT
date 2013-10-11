@@ -21,9 +21,11 @@ import qraat
 import sys, os, time, errno
 import numpy as np
 import struct
-import MySQLdb as mdb
 from string import Template
 
+try:
+  import MySQLdb as mdb
+except ImportError: pass
 
   
   # TODO find a better home for these queries. It was suggested 

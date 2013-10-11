@@ -19,8 +19,9 @@
 
 import qraat
 import os, sys, time, numpy as np
-import MySQLdb as mdb
-
+try:
+  import MySQLdb as mdb
+except ImportError: pass
 
 class csv: 
   
