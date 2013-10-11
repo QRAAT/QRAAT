@@ -131,6 +131,7 @@ class est (qraat.csv):
 
   def __init__(self, det=None, dets=None, fn=None):
   
+    self.txid_index = self.siteid_index = None
     self.table = []
 
     self.headers = [ 'ID', 'siteid', 'datetime', 'timestamp', 'frequency', 'center', 'fdsp', 
@@ -298,12 +299,8 @@ class est (qraat.csv):
 
     
   def write_db(self, db_con, site=None):
-    """ Write rows to the database. 
+    """ Write rows to the database and commit. 
      
-       Resolve the transmitter ID by tag name and the site ID by ``site``, 
-       if these values aren't present in the table. This allows us to deal 
-       with legacy pulse sample metadata. 
-    
       :param db_con: DB connector for MySQL. 
       :type db_con: MySQLdb.connections.Connection
       :param site: Name of the site where the signal was recorded. 
@@ -311,35 +308,51 @@ class est (qraat.csv):
     """
 
     cur = db_con.cursor()
-    cur.execute('''SELECT id, name 
-                     FROM txlist''')
-    txid_index = { name : id for (id, name) in cur.fetchall() }
-
-    cur.execute('''SELECT id, name 
-                     FROM sitelist''')
-    siteid_index = { name : id for (id, name) in cur.fetchall() }
-
     for row in self.table: 
-      if row.txid == None: 
-        row.txid = txid_index.get(row.tagname)
-
-      if row.siteid == None:
-        row.siteid = siteid_index.get(site)
-
-      if row.txid == None or row.siteid == None:
-        raise ResolveIdError(row)
-
-      query = query_insert_est if row.ID == None else query_update_est
-      # When the template string performs the substitution, it casts 
-      # floats to strings with `str(val)`. This rounds the decimal 
-      # value if the string is too long. This screws with our precision 
-      # for the timestamp. The following line turns the timestamp into 
-      # a string with unrounded value. 
-      row.timestamp = repr(row.timestamp) 
-      row.datetime = qraat.pretty_printer(row.datetime)
-      cur.execute(query.substitute(row))
-
+      self.write_db_row(cur, row, site) 
     cur.execute('COMMIT')
+
+  def write_db_row(self, cur, row, site=None):
+    """ Write a row to the database. 
+       
+      Resolve the transmitter ID by tag name and the site ID by ``site``, 
+      if these values aren't present in the table. This allows us to deal 
+      with legacy pulse sample metadata. 
+         
+      :param cur: DB cursor for MySQL. 
+      :type cur: MySQLdb.cursors.Cursor
+      :param row: The row.  
+      :type row: est.Row
+    """
+
+    if self.txid_index == None: 
+      cur.execute('SELECT id, name FROM txlist')
+      self.txid_index = { name : id for (id, name) in cur.fetchall() }
+
+    if self.siteid_index == None: 
+      cur.execute('SELECT id, name FROM sitelist')
+      self.siteid_index = { name : id for (id, name) in cur.fetchall() }
+
+    if row.txid == None: 
+      row.txid = self.txid_index.get(row.tagname)
+
+    if row.siteid == None:
+      row.siteid = self.siteid_index.get(site)
+
+    if row.txid == None or row.siteid == None:
+      raise ResolveIdError(row)
+
+    query = query_insert_est if row.ID == None else query_update_est
+    # When the template string performs the substitution, it casts 
+    # floats to strings with `str(val)`. This rounds the decimal 
+    # value if the string is too long. This screws with our precision 
+    # for the timestamp. The following line turns the timestamp into 
+    # a string with unrounded value. 
+    row.timestamp = repr(row.timestamp) 
+    row.datetime = qraat.pretty_printer(row.datetime)
+    cur.execute(query.substitute(row))
+  
+
 
 
 if __name__=="__main__":
