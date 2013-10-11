@@ -4,7 +4,6 @@
 # Uses gps_data.py. Correlate GPS with est records from cal run
 
 
-import gps_data
 import qraat
 import time, os
 import numpy as np
@@ -33,15 +32,14 @@ db_con    = mdb.connect(db_config.host,
 cur = db_con.cursor()
 
 # Import gpx data - get time, easting, northing
-gps = gps_data.gps_data(gpx_track_filename)
+gps = qraat.gps(gpx_track_filename)
 
 # Insert gps data into database. 
-
 cur.executemany('''INSERT INTO GPS_Calibration_Data 
                               (Cal_InfoID, timestamp, latitude, 
                                longitutde, elevation, 
                                easting, northing, zone) 
-                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ;''', 
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ;''', 
   [ ( cal_id, gps.time[j], gps.latitude[j], 
       gps.longitude[j], gps.elevation[j], 
       gps.easting[j], gps.northing[j], 
