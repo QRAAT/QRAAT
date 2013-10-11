@@ -1,9 +1,8 @@
 
 # Input : data from a callibration run (join on 
 #         qraat.True_Position and qraat.est). 
-# Output : steering vectors for bearing estimation.
-#          (Doesn't actually generate output, just 
-#           shows a plot of bearing per time.) 
+# Output : steering vectors for bearing estimation
+#          (qraat.Steering_Vectors).
 
 import qraat
 import MySQLdb as mdb
