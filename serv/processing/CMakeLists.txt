@@ -1,0 +1,16 @@
+INSTALL(PROGRAMS  
+  rmg_det_to_db
+  rmg_process
+  rmg
+  rmg-node
+  rmg_runretry
+  rmg_csv
+  rmg_fetch
+  rmg_powerswitch
+  rmg_schedule
+  rmg_filterest
+  rmg_backup
+  rmg_clean
+  DESTINATION bin)
+
+
