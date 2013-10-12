@@ -1,7 +1,7 @@
 
 # Input : GPS data per time, est's from calibration run
 # Output : qraat.True_Position 
-# Uses gps_data.py. Correlate GPS with est records from cal run
+# Uses gps_data.py. Interpolate GPS with est records from cal run
 
 
 import qraat
