@@ -25,7 +25,7 @@ use strict ;
 use warnings ;
 use DBI ;
 #use DBD::mysql ;
-use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
+#use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
 use POSIX qw(strftime) ;
 
 my $Debug = 0 ;					# Set to 1 for debug output, 0 to silence
@@ -326,7 +326,8 @@ sub opendatabase($)	# connects to the database and returns the database handle
 	my $port = 3306 ;
 	my $timeout = 10 ;
 	#my $dsn = "dbi:mysql:$database" ;
-	my $dsn = "DBI:Wire10:database=$database;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
+	#my $dsn = "DBI:Wire10:database=$database;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
+	my $dsn = "DBI:mysql:database=$database;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
 	my $dbh = DBI->connect($dsn,$user,$pass) ;
 	if( not $dbh )
 	{
