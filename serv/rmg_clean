@@ -55,7 +55,7 @@ do
 done
 
 echo Found $badcount files that are not backed up
-echo Fount $rmcount files for deletion
+echo Found $rmcount files for deletion
 
 echo Finished $0 at `date`
 

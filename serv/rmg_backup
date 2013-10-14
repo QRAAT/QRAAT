@@ -35,41 +35,53 @@ fi
 echo
 echo Starting $0 at `date`
 # Set RMG environment variables
-rmg_env
+source rmg_env
 
-# Check destination directories
-if [ ! -e $BACKUP_DRIVE ]
+# Check environment variables (yes, necessary, trust me)
+echo Checking environment variables are set
+if [ -z "$BACKUP_DRIVE" ]
 then
-	echo ERROR: backup drive '$BACKUP_DRIVE' not found
+	echo ERROR: environment variable BACKUP_DRIVE is not set, bailing out
 	exit 1
 fi
+
+# Check destination directories
+echo Checking for backup drive: $BACKUP_DRIVE
+if [ ! -e $BACKUP_DRIVE ]
+then
+	echo ERROR: backup drive $BACKUP_DRIVE not found
+	exit 1
+fi
+echo Checking for backup directory: $BACKUP_DIR
 if [ ! -e $BACKUP_DIR ]
 then
-	echo WARNING: creating backup directory '$BACKUP_DIR'
+	echo WARNING: creating backup directory $BACKUP_DIR
 	mkdir -p $BACKUP_DIR	# create all necessary subdirectories
 	if [ ! -e $BACKUP_DIR ]
 	then
-		echo ERROR: cannot create backup directory '$BACKUP_DIR'
+		echo ERROR: cannot create backup directory $BACKUP_DIR
 		exit 1
 	fi
 fi
+echo Checking for backup archive directory: $BACKUP_ARCHIVE_DIR
 if [ ! -e $BACKUP_ARCHIVE_DIR ]
 then
-	echo WARNING: creating backup archive directory '$BACKUP_ARCHIVE_DIR'
+	echo WARNING: creating backup archive directory $BACKUP_ARCHIVE_DIR
 	mkdir $BACKUP_ARCHIVE_DIR
 	if [ ! -e $BACKUP_ARCHIVE_DIR]
 	then
-		echo ERROR: cannot create backup archive directory '$BACKUP_ARCHIVE_DIR'
+		echo ERROR: cannot create backup archive directory $BACKUP_ARCHIVE_DIR
 		exit 1
 	fi
 fi
+echo Checking for backup database directory: $BACKUP_DIR/database
 if [ ! -e $BACKUP_DIR/database ]
 then
-	echo WARNING: creating backup directory '$BACKUP_DIR/database'
+	echo WARNING: creating backup directory $BACKUP_DIR/database
 	mkdir $BACKUP_DIR/database
 	if [ ! -e $BACKUP_DIR/database ]
 	then
-		echo ERROR: cannot create backup directory '$BACKUP_DIR/database'
+		echo ERROR: cannot create backup directory $BACKUP_DIR/database
 		exit 1
 	fi
 fi
@@ -99,6 +111,7 @@ fi
 
 # Extract tables from the qraat database to $BACKUP_DIR/database
 echo Dumping database tables
+mysql -B -e 'select * from txlist' >$BACKUP_DIR/database/txlist
 mysql -B -e 'select * from sitelist' >$BACKUP_DIR/database/sitelist.txt
 mysql -B -e 'select * from telemetry' >$BACKUP_DIR/database/telemetry.txt
 mysql -B -e 'select * from timecheck' >$BACKUP_DIR/database/timecheck.txt
