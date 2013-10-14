@@ -1,0 +1,216 @@
+#!/usr/bin/perl
+#rmg_dbcheck
+#
+# This script is part of the QRAAT system.
+#
+# Copyright (C) 2013 Marcel Losekoot
+#
+# This script tests whether it can connect to the database given in the auth file
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict ;
+use warnings ;
+use DBI ;
+#use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
+
+my $Debug = 0 ;					# Enable verbose output
+
+sub usage()
+{
+	print "$0: authfile [debug]\n" ;
+	print "Checks the connection to the database given in the athfile\n" ;
+}
+
+sub main()
+{
+	my $argc = scalar @ARGV ;
+	if( $argc < 1 )
+	{
+		usage() ;
+		return 1 ;
+	}
+	if( ($argc > 1) && ($ARGV[1] eq "debug") )
+	{
+		$Debug = 1 ;
+	}
+	my $authfile = $ARGV[0] ;
+	my $dbh = opendatabase($authfile) ;
+	if( not defined $dbh )
+	{
+		#print "ERROR: cannot open database defined in authfile '$authfile'\n" ;
+		# opendatabase() already explains the error
+		return 1 ;
+	}
+	print "Tables:\n" ;
+	my $query = "show tables" ;
+	my @dbdata = dbdata($dbh,$query) ;
+	foreach my $refarray ( @dbdata )
+	{
+		print "@$refarray\n" ;
+	}
+	closedatabase($dbh) ;
+	return 0 ;
+}
+
+sub opendatabase($)	# connects to the database and returns the database handle
+{
+	my ( $authfile ) = @_ ;
+	my $fd ;
+	if( not defined open($fd,"<".$authfile) )
+	{
+		print "ERROR: cannot open authfile '$authfile'\n" ;
+		return undef ;
+	}
+	my $host = <$fd> ;
+	chomp($host) ;
+	my $user = <$fd> ;
+	chomp($user) ;
+	my $pass = <$fd> ;
+	chomp($pass) ;
+	my $database = <$fd> ;
+	chomp($database) ;
+	if( not defined $user or $user eq "" )
+	{
+		print "ERROR: cannot read user from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $pass or $pass eq "")
+	{
+		print "ERROR: cannot read pass from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $host or $host eq "" )
+	{
+		print "ERROR: cannot read host from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $database or $database eq "" )
+	{
+		print "ERROR: cannot read database from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	close($fd) ;
+	my $port = 3306 ;
+	my $timeout = 10 ;
+	#my $dsn = "dbi:mysql:$database" ;
+	#my $dsn = "DBI:Wire10:database=$database;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
+	my $dsn = "DBI:mysql:database=$database;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
+	if( $Debug ) { print "debug: dsn=$dsn\n" ; }
+	my $dbh = DBI->connect($dsn,$user,$pass) ;
+	if( not $dbh )
+	{
+		print "ERROR: cannot connect to database host: $DBI::errstr\n" ;
+		return undef ;
+	}
+	return $dbh ;
+}
+
+sub dblookup($$)
+{
+	#
+	# Executes the given query to return one value, or undef
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	my $matches = $sth->rows() ;
+	if( not $matches )
+	{
+		return undef ;
+	}
+	my $ref_row = $sth->fetchrow_arrayref ;
+	if( not defined($ref_row) )
+	{
+		return undef ;
+	}
+	return $ref_row->[0] ;
+}
+
+sub dbexecute($$)		# executes a given query, returns 0 for OK, 1 for error
+{
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	return 0 ;
+}
+
+sub dbdata($$)		# generic database read function, returns an array of data resulting from the given query
+{
+	my ( $dbh, $query ) = @_ ;
+	if( $Debug ) { print "debug: dbdata\n" ; }
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	my $matches = $sth->rows() ;
+	if( $matches == 0 )
+	{
+		if( $Debug ) { print "debug: dbdata: no matches\n" ; }
+		$sth->finish() ;
+		return 1 ;
+	}
+	my $ref_row ;
+	my @data = () ;
+	while( my $ref_row = $sth->fetchrow_arrayref() )
+	{
+		if( defined($ref_row) )
+		{
+			if( defined($ref_row->[0]) )
+			{
+				push @data, [ @$ref_row ] ;
+			}
+		}
+	}
+	$sth->finish() ;
+	return @data ;
+}
+
+sub closedatabase($)
+{
+	my ( $dbh ) = @_ ;
+	if( not $dbh->disconnect() )
+	{
+		print "ERROR: cannot close database: $DBI::errstr\n" ;
+	}
+}
+
+exit main() ;
+
+#END
