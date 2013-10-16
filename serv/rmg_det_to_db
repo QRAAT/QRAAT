@@ -18,8 +18,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys, os, commands, time
-import re
+import sys, os, commands, errno
+import re, time
 import MySQLdb as mdb
 import qraat 
 
@@ -27,21 +27,21 @@ import qraat
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
 if int(output) > 1: 
-  print >>sys.stderr, "error (det_to_db): attempted reentry, exiting"
+  print >>sys.stderr, "det_to_db: error: attempted reentry, exiting"
   sys.exit(1)
 
 try: # Get some environment variables. 
   det_dir  = os.environ['RMG_SERVER_DET_DIR']
   det_arch = os.environ['RMG_SERVER_DET_ARCHIVE']
+  est_arch = os.environ['RMG_SERVER_EST_ARCHIVE']
 except KeyError: 
-  print >>sys.stderr, "error (det_to_db): undefined environment variables " +\
-                      "$RMG_SERVER_DET_DIR and/or $RMG_SERVER_DET_ARCHIVE."
+  print >>sys.stderr, "det_to_db: error: undefined environment variables. Try `source rmg_env.`"
   sys.exit(1)
 
 try: # Get database credentials. 
   db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='writer')
 except IOError, e: 
-  print >>sys.stderr, "error (det_to_db): missing DB credential file '%s'." % e.filename
+  print >>sys.stderr, "det_to_db: error: missing DB credential file '%s'." % e.filename
   sys.exit(1)
   
 
@@ -91,18 +91,21 @@ try:
             try:
               table.write_db_row(cur, row, site)
             except qraat.ResolveIdError, e:
-              print >>sys.stderr, "warning (det_to_db): skipping est corresponding to '%s'" % e.filename
+              print >>sys.stderr, "det_to_db: warning: skipping est corresponding to '%s'" % e.filename
           cur.execute('COMMIT')
                   
-          # Archive processed det files.
+          # Archive table as est file. 
           m = leaf_regex.search(leaf_dir) 
+          table.write(("%s/%s" % (est_arch, site)) +\
+                       ("%s/%s/%s/%s/%s/" % m.groups(0)))
+          
+          # Archive processed det files.
           arch_fn = ("%s/%s/" % (det_arch, site)) +\
-                       ("%s/%s/%s/%s/%s/" % m.groups(0))
-
+                     ("%s/%s/%s/%s/%s/" % m.groups(0))
           try:
             os.makedirs(arch_fn)
-          except OSError, e:  # Catch if directory exists;
-            if e.errno != 17: # otherwise, throw exception.  
+          except OSError, e:            # Catch if directory exists;
+            if e.errno != errno.EEXIST: # otherwise, throw exception.  
               raise e
 
           arch_fn += site + (".%s.%s.%s.%s.%s.tar" % m.groups(0))
@@ -112,17 +115,17 @@ try:
           else: 
             (status, output) = commands.getstatusoutput(
               '/bin/tar -cf %s -C %s .' % (arch_fn, leaf_dir))
-          
+
           # Delete processed det files. 
           # TODO prune empty directories? 
           if status != 0: 
-            print >>sys.stderr, "error (det_to_db): archiving %s: %s" % (
+            print >>sys.stderr, "det_to_db: error: archiving %s: %s" % (
               site, output)
           else:  
             commands.getstatusoutput('rm -fr %s' % leaf_dir)
 
 except mdb.Error, e: 
-  print >>sys.stderr, "error (det_to_db): [%d] %s" % (e.args[0], e.args[1])
+  print >>sys.stderr, "det_to_db: error: [%d] %s" % (e.args[0], e.args[1])
 
 finally: 
   print "det_to_db: finished in %.2f seconds." % (time.time() - start)

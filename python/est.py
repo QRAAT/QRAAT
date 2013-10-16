@@ -182,9 +182,9 @@ class est (qraat.csv):
     
     try: # Create target directory. 
       os.makedirs(base_dir)
-    except OSError as e:
-      if e.errno == errno.EEXIST and os.path.isdir(base_dir): pass
-      else: raise
+    except OSError, e:
+      if e.errno != errno.EEXIST: 
+        raise e
   
     # Exclude some headers when writing to file. 
     headers = [col for col in self.headers if col not in [
