@@ -114,10 +114,14 @@ echo Dumping database tables
 mysql -B -e 'select * from txlist' >$BACKUP_DIR/database/txlist
 mysql -B -e 'select * from sitelist' >$BACKUP_DIR/database/sitelist.txt
 mysql -B -e 'select * from telemetry' >$BACKUP_DIR/database/telemetry.txt
-mysql -B -e 'select * from timecheck' >$BACKUP_DIR/database/timecheck.txt
-mysql -B -e 'select * from detcount' >$BACKUP_DIR/database/detcount.txt
-mysql -B -e 'select * from estcount' >$BACKUP_DIR/database/estcount.txt
-mysql -B -e 'select * from procount' >$BACKUP_DIR/database/procount.txt
+mysql -B -e 'select * from Calibration_Information' >$BACKUP_DIR/database/Calibration_Information.txt
+mysql -B -e 'select * from GPS_Calibration_Data' >$BACKUP_DIR/database/GPS_Calibration_Data.txt
+mysql -B -e 'select * from Steering_Vectors' >$BACKUP_DIR/database/Steering_Vectors.txt
+mysql -B -e 'select * from True_Position' >$BACKUP_DIR/database/True_Position.txt
+#mysql -B -e 'select * from timecheck' >$BACKUP_DIR/database/timecheck.txt
+#mysql -B -e 'select * from detcount' >$BACKUP_DIR/database/detcount.txt
+#mysql -B -e 'select * from estcount' >$BACKUP_DIR/database/estcount.txt
+#mysql -B -e 'select * from procount' >$BACKUP_DIR/database/procount.txt
 #mysql -B -e 'select * from est where datetime between date_add(now(),interval -25 hour) and now();' >$BACKUP_DIR/database/est_`date +"%Y-%m-%d"`.txt
 
 # Synchronize second backup drive
