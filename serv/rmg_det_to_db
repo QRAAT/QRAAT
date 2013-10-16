@@ -96,7 +96,7 @@ try:
                   
           # Archive table as est file. 
           m = leaf_regex.search(leaf_dir) 
-          table.write(("%s/%s" % (est_arch, site)) +\
+          table.write(("%s/%s/" % (est_arch, site)) +\
                        ("%s/%s/%s/%s/%s/" % m.groups(0)))
           
           # Archive processed det files.
