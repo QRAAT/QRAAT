@@ -54,6 +54,9 @@ do
 	fi
 done
 
+# Remove empty directories
+find . -type d -depth -empty -delete
+
 echo Found $badcount files that are not backed up
 echo Found $rmcount files for deletion
 
