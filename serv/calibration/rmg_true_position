@@ -6,23 +6,6 @@
 # qraat.True_Position. This program is part of QRAAT, an automated 
 # animal tracking system based on GNU Radio. 
 #
-# TODO the data produced by this program differs from the True_Position 
-# table in the live database. It seems the cal data I'm using differs by 
-# 3708 rows from what was used originally. Apart from the extra rows, 
-# the only difference seems to be a little error in the northing and 
-# easting columns. What accounts for this? 
-#
-#   - Could it be from interpolation? (Using a subset of the rows used 
-#     in the original calculation?)
-#
-#   - Different implementation of numpy, different architecture performing
-#     calculation?
-#   
-#   - Something off in the code? 
-#
-#   - Rounding error from first loading GPS data into database and then
-#     using it here? 
-# 
 # In any case, the resulting bearing seems to be consistent. 
 #
 # Copyright (C) 2013 Todd Borrowman, Christopher Patton

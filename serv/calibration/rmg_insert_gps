@@ -98,6 +98,7 @@ try:
   gps = qraat.gps(options.gpx_file)
   
   # Insert gps data into database. 
+  # NOTE lose precision here. 
   cur.executemany('''INSERT INTO GPS_Calibration_Data 
                                 (Cal_InfoID, timestamp, latitude, 
                                  longitutde, elevation, 
