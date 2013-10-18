@@ -92,6 +92,7 @@ cur.executemany('''INSERT INTO Steering_Vectors
     for j in range(bearings.shape[0]) ]
 )
 
+# Plot 
 true_bearing = np.array(cal_data[:,0],dtype=float)
 true_bearing += 360*(true_bearing < 0)
 pp.plot(cal_data[:,12],sv_bearing,'.')

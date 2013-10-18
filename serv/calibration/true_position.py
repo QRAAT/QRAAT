@@ -22,8 +22,7 @@ start_time = time.mktime(time.strptime(start_time_str,'%Y%m%d%H%M%S'))
 stop_time = time.mktime(time.strptime(stop_time_str,'%Y%m%d%H%M%S'))
 
 
-
-# Connect to database. 
+# Connect to database.
 db_config = qraat.csv('%s/.qraat/db_auth' % os.environ['HOME']).get(view='chris')
 db_con    = mdb.connect(db_config.host, 
                         db_config.user,
