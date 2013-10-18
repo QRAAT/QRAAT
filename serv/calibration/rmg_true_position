@@ -1,0 +1,143 @@
+#!/usr/bin/python
+# rmg_true_position
+# Interpolate GPS and pulse data for a calibration run and calculate 
+# a bearing for each time indexed pulse per site. Inputs from 
+# qraat.GPS_Calibration_Data and qraat.est, outputs to 
+# qraat.True_Position. This program is part of QRAAT, an automated 
+# animal tracking system based on GNU Radio. 
+#
+# TODO the data produced by this program differs from the True_Position 
+# table in the live database. It seems the cal data I'm using differs by 
+# 3708 rows from what was used originally. Apart from the extra rows, 
+# the only difference seems to be a little error in the northing and 
+# easting columns. What accounts for this? 
+#
+#   - Could it be from interpolation? (Using a subset of the rows used 
+#     in the original calculation?)
+#
+#   - Different implementation of numpy, different architecture performing
+#     calculation?
+#   
+#   - Something off in the code? 
+#
+#   - Rounding error from first loading GPS data into database and then
+#     using it here? 
+# 
+# In any case, the resulting bearing seems to be consistent. 
+#
+# Copyright (C) 2013 Todd Borrowman, Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import qraat
+import time, os, sys
+import numpy as np
+import MySQLdb as mdb
+from optparse import OptionParser
+
+parser = OptionParser()
+
+parser.description = '''\
+Interpolate GPS and pulse data and calculate a bearing for each 
+time indexed pulse per site for a calibration run. This program is part of
+QRAAT, an automated animal tracking system based on GNU Radio.   
+'''
+
+parser.add_option('-i', '--cal-id', type='int', metavar='INT',
+                  help="Calibration ID, the serial identifier in the database "
+                       "context identifying a calibration run.")
+
+(options, args) = parser.parse_args()
+
+if options.cal_id == None:
+  print >>sys.stderr, "true_position: erorr: need to provide a calibration ID via `--cal-id`."
+  sys.exit(1)
+
+# Get database credentials.
+try: 
+  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='writer')
+
+except KeyError: 
+  print >>sys.stderr, "true_position: error: undefined environment variables. Try `source rmg_env.`" 
+  sys.exit(1) 
+
+except IOError, e: 
+  print >>sys.stderr, "true_position: error: missing DB credential file '%s'." % e.filename
+  sys.exit(1)
+
+try:
+  
+  # Connect to the database. 
+  db_con = mdb.connect(db_config.host, 
+                       db_config.user,
+                       db_config.password,
+                       db_config.name)
+
+  cur = db_con.cursor()
+
+  # Get GPS data for calibration run. 
+  cur.execute('''SELECT timestamp, easting, northing 
+                   FROM GPS_Calibration_Data
+                  WHERE cal_infoID = %d''' % options.cal_id)
+
+  # gps_data[:,0] -- timestamp
+  # gps_data[:,1] -- easting
+  # gps_data[:,2] -- northing
+  gps_data = np.array(cur.fetchall(), dtype=float)
+  if gps_data.shape[0] == 0: 
+    print >>sys.stderr, "true_position: error: no GPS data found for specified cal run."
+    sys.exit(1)
+
+  # Get start and end times. 
+  (t_start, t_end) = min(gps_data[:,0]), max(gps_data[:,0])
+
+  for site in qraat.csv(db_con=db_con, db_table='sitelist'):
+
+    # TODO(?) import good pulse data from site - bw10<1000 - time, fdsp, fd*[r,i]
+    # NOTE This query is hefty. Selecting all the pulses over the time range of 
+    #  the calibration run (39,170 rows) took about a half hour. Inserting the 
+    #  same number of rows takes a matter of seconds. This leads me to believe
+    #  that if the est's were indexed by time and stored in a tree structure, 
+    #  this would go way faster. ~ Chris 10/18/2013
+    print "true_position: %s: getting data ..." % site.name,
+    cur.execute('''SELECT timestamp, ID 
+                     FROM est 
+                    WHERE siteid=%s 
+                      AND timestamp >= %s 
+                      AND timestamp <= %s''',(site.ID, t_start, t_end))
+
+    est_data = np.array(cur.fetchall(), dtype=float)
+    ct = est_data.shape[0]
+    print "processing %d records." % ct
+   
+    if ct > 0: 
+
+      # calculate pulse position from time, linear interpolation 
+      est_easting = np.interp(est_data[:,0], gps_data[:,0], gps_data[:,1])
+      est_northing = np.interp(est_data[:,0], gps_data[:,0], gps_data[:,2])
+
+      # Calculate pulse bearing
+      est_bearing = np.arctan2(est_easting - float(site.easting), 
+                               est_northing - float(site.northing))*180/np.pi
+
+      # Insert into databse. 
+      cur.executemany('''INSERT INTO True_Position 
+                                (estID, Cal_InfoID, easting, northing, bearing) 
+                         VALUES (%s, %s, %s, %s, %s)''', 
+             [ (est_data[j,1], options.cal_id, est_easting[j], 
+                est_northing[j], est_bearing[j]) for j in range(ct) ])
+
+except mdb.Error, e:
+  print >>sys.stderr, "true_position: error: [%d] %s" % (e.args[0], e.args[1])
+  sys.exit(1)

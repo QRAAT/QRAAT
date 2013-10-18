@@ -1,8 +1,8 @@
 #!/usr/bin/python
 # rmg_insert_gps
-# Insert GPS data for a calibration run into the database. This 
-# program is part of QRAAT, an automated animal tracking system based 
-# on GNU Radio. 
+# Insert GPS data for a calibration run into the database. Outputs to
+# qraat.GPS_Calibration_Data. This program is part of QRAAT, an 
+# utomated animal tracking system based on GNU Radio. 
 #
 # Copyright (C) 2013 Todd Borrowman, Christopher Patton
 # 
@@ -21,7 +21,6 @@
 
 import qraat
 import time, os, sys
-import numpy as np
 import MySQLdb as mdb
 from optparse import OptionParser
 
