@@ -1,4 +1,7 @@
-
+# TODO somehow, the data on my machine differs 
+# from the server such that the resulting plot 
+# is totally wrong. Try reloading the databse 
+# from scratch. 
 # Input : data from a callibration run (join on 
 #         qraat.True_Position and qraat.est). 
 # Output : steering vectors for bearing estimation
@@ -6,24 +9,31 @@
 
 import qraat
 import MySQLdb as mdb
-import time, os
+import time, os, sys
 import numpy as np
 import matplotlib.pyplot as pp
-
 
 # TODO parameters
 avg_span = 5 #size of averaging window, in degrees
 cal_id = 1
-site_id = 1
+site_id = 2
 
+# Get database credentials.
+try: 
+  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='writer')
 
+except KeyError: 
+  print >>sys.stderr, "insert_gps: error: undefined environment variables. Try `source rmg_env.`" 
+  sys.exit(1) 
 
-# Connect to database.
-db_config = qraat.csv('%s/.qraat/db_auth' % os.environ['HOME']).get(view='chris')
-db_con    = mdb.connect(db_config.host, 
-                        db_config.user,
-                        db_config.password,
-                        db_config.name)
+except IOError, e: 
+  print >>sys.stderr, "insert_gps: error: missing DB credential file '%s'." % e.filename
+  sys.exit(1)
+
+db_con = mdb.connect(db_config.host, 
+                     db_config.user,
+                     db_config.password,
+                     db_config.name)
 cur = db_con.cursor()
 
 # get cal data per site from the database. 
@@ -36,12 +46,10 @@ cur.execute('''SELECT True_Position.bearing,
                  FROM True_Position, est 
                 WHERE True_Position.estID = est.ID 
                   AND est.siteid=%s 
-                  AND True_Position.Cal_InfoID=%s
-             ORDER BY est.id DESC 
-                LIMIT 1000''' % (site_id, cal_id))
+                  AND True_Position.Cal_InfoID=%s''' % (site_id, cal_id))
 
 cal_data = np.array(cur.fetchall())
-db_con.close()
+#np.savetxt('guy', cal_data) 
 
 # calculate pulse values
 cal_real_signals = np.array(cal_data[:,2:10],dtype=float)
@@ -91,6 +99,8 @@ cur.executemany('''INSERT INTO Steering_Vectors
       steering_vectors[j,3].real, steering_vectors[j,3].imag ) 
     for j in range(bearings.shape[0]) ]
 )
+
+db_con.close()
 
 # Plot 
 true_bearing = np.array(cal_data[:,0],dtype=float)

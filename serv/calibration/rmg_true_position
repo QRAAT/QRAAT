@@ -121,6 +121,8 @@ try:
              [ (est_data[j,1], options.cal_id, est_easting[j], 
                 est_northing[j], est_bearing[j]) for j in range(ct) ])
 
+  cur.execute("COMMIT")
+
 except mdb.Error, e:
   print >>sys.stderr, "true_position: error: [%d] %s" % (e.args[0], e.args[1])
   sys.exit(1)
