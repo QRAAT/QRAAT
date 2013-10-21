@@ -101,7 +101,7 @@ try:
   # NOTE lose precision here. 
   cur.executemany('''INSERT INTO GPS_Calibration_Data 
                                 (Cal_InfoID, timestamp, latitude, 
-                                 longitutde, elevation, 
+                                 longitude, elevation, 
                                  easting, northing, zone) 
                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ;''', 
     [ ( options.cal_id, gps.time[j], gps.latitude[j], 
