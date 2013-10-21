@@ -36,7 +36,7 @@ QRAAT, an automated animal tracking system based on GNU Radio.
 parser.add_option('-f', '--gpx-file', type='string', metavar='FILE',
                   help="GPS data, typically with extension `.gpx`.")
 
-parser.add_option('-i', '--cal-id', type='int', metavar='INT',
+parser.add_option('--cal-id', type='int', metavar='INT',
                   help="Calibration ID, the serial identifier in the database "
                        "context identifying a calibration run.")
 
