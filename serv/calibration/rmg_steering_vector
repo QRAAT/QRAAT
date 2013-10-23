@@ -73,6 +73,8 @@ except IOError, e:
   sys.exit(1)
 
 try: 
+  start = time.time()
+  print "steering_vector: start time:", time.asctime(time.localtime(start))
 
   db_con = mdb.connect(db_config.host, 
                        db_config.user,
@@ -188,3 +190,6 @@ try:
 except mdb.Error, e:
   print >>sys.stderr, "steering_vector: error: [%d] %s" % (e.args[0], e.args[1])
   sys.exit(1)
+
+finally: 
+  print "steering_vector: finished in %.2f seconds." % (time.time() - start)

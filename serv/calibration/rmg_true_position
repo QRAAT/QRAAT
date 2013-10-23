@@ -60,6 +60,8 @@ except IOError, e:
   sys.exit(1)
 
 try:
+  start = time.time()
+  print "true_position: start time:", time.asctime(time.localtime(start))
   
   # Connect to the database. 
   db_con = mdb.connect(db_config.host, 
@@ -126,3 +128,6 @@ try:
 except mdb.Error, e:
   print >>sys.stderr, "true_position: error: [%d] %s" % (e.args[0], e.args[1])
   sys.exit(1)
+
+finally: 
+  print "true_position: finished in %.2f seconds." % (time.time() - start)

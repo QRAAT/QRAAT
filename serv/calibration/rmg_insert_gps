@@ -64,6 +64,8 @@ except IOError, e:
 
 
 try: 
+  start = time.time()
+  print "insert_gps: start time:", time.asctime(time.localtime(start))
 
   # Connect to database. 
   db_con = mdb.connect(db_config.host, 
@@ -120,3 +122,6 @@ except mdb.Error, e:
 except IOError, e: 
   print >>sys.stderr, "insert_gps: error: specified GPX file '%s' doesn't exists." % options.gpx_file 
   sys.exit(1)
+
+finally: 
+  print "insert_gps: finished in %.2f seconds." % (time.time() - start)
