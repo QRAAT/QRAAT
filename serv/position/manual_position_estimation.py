@@ -1,27 +1,37 @@
-import MySQLdb
-import getpass
+import MySQLdb as mdb
 import numpy as np
-import time
+import time, os, sys
+import qraat
 
-mysql_host = "169.237.92.155"
-#mysql_host = "10.253.1.55"
-mysql_user = "todd"
-mysql_db = "qraat"
+# TODO parameters
 cal_id=1
-
-start_time_str = "201308131200"#1376420400.0
-stop_time_str = "201308131800"#1376442000.0
+start_time_str = "201310140800"
+stop_time_str =  "201310141400"
 start_time = time.mktime(time.strptime(start_time_str,'%Y%m%d%H%M%S'))
 stop_time = time.mktime(time.strptime(stop_time_str,'%Y%m%d%H%M%S'))
 
-#open database
-password = getpass.getpass("Enter password for user: {0} for db: {1} at {2}\nPassword: ".format(mysql_user,mysql_db,mysql_host))
-db = MySQLdb.connect(mysql_host, mysql_user, password, mysql_db)
-db_cursor = db.cursor()
+# Get database credentials. 
+try: 
+  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='reader')
+
+except KeyError: 
+  print >>sys.stderr, "position: error: undefined environment variables. Try `source rmg_env.`" 
+  sys.exit(1) 
+
+except IOError, e: 
+  print >>sys.stderr, "position: error: missing DB credential file '%s'." % e.filename
+  sys.exit(1)
+
+# Connect to the database. 
+db_con = mdb.connect(db_config.host, 
+                     db_config.user,
+                     db_config.password,
+                     db_config.name)
+cur = db_con.cursor()
 
 #get site locations
-db_cursor.execute("SELECT ID, easting, northing from sitelist;")
-site_data = np.array(db_cursor.fetchall(),dtype=float)
+cur.execute("SELECT ID, easting, northing from sitelist;")
+site_data = np.array(cur.fetchall(),dtype=float)
 
 #get steering vector data
 sv_siteID = []
@@ -30,8 +40,12 @@ sv_bearing = []
 
 for j in site_data[:,0]:
   print "Getting Steering Vectors for Site ID #{}".format(j)
-  db_cursor.execute("select Bearing, sv1r, sv1i, sv2r, sv2i, sv3r, sv3i, sv4r, sv4i from Steering_Vectors where SiteID=%s and Cal_InfoID=%s", (j, cal_id))
-  sv_data = np.array(db_cursor.fetchall(),dtype=float)
+  cur.execute('''SELECT Bearing, 
+                        sv1r, sv1i, sv2r, sv2i, 
+                        sv3r, sv3i, sv4r, sv4i 
+                   FROM Steering_Vectors 
+                  WHERE SiteID=%s and Cal_InfoID=%s''', (j, cal_id))
+  sv_data = np.array(cur.fetchall(),dtype=float)
   if sv_data.shape[0] > 0:
     sv_siteID.append(j)
     sv_bearing.append(np.array(sv_data[:,0]))
@@ -39,8 +53,15 @@ for j in site_data[:,0]:
 
 #get pulse groups
 print "Getting EST data from {0} to {1}".format(start_time_str, stop_time_str)
-db_cursor.execute("select ID, siteid, timestamp, ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i from est where timestamp >= %s and timestamp <= %s;",(start_time, stop_time))
-signal_data = np.array(db_cursor.fetchall(),dtype=float)
+cur.execute('''SELECT ID, siteid, timestamp, 
+                      ed1r, ed1i, ed2r, ed2i, 
+                      ed3r, ed3i, ed4r, ed4i 
+                 FROM est 
+                WHERE timestamp >= %s 
+                  AND timestamp <= %s''',(start_time, stop_time))
+signal_data = np.array(cur.fetchall(),dtype=float)
+print "position: processing %d records" % signal_data.shape[0]
+# TODO if signal_data.shape[0] == 0, exit
 sig_id = signal_data[:,0]
 site_id = signal_data[:,1]
 est_time = signal_data[:,2]
@@ -63,11 +84,10 @@ if False:
 
 #get position data
 print "Getting Position data"
-db_cursor.execute("select estID, easting, northing, bearing from True_Position")
-position_data = np.array(db_cursor.fetchall(),dtype=float)
+cur.execute("select estID, easting, northing, bearing from True_Position")
+position_data = np.array(cur.fetchall(),dtype=float)
 
 
-db.close()
 
 
 likelihoods = np.zeros((len(sort_index),360))
