@@ -6,6 +6,7 @@
 # Copyright (C) 2013 Marcel Losekoot
 #
 # This script determines whether each site should be on or off and makes it happen.
+# It also forces an update of the tx.csv file on each site that it turns on.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,19 +30,20 @@ my $Debug = 0 ;			# Set to 1 to generate debug output
 
 sub usage()
 {
-	print "$0: path_to_sitelist [debug]\n" ;
+	print "$0: path_to_sitelist path_to_txlist [debug]\n" ;
 	print "Turns sites on and off according to the schedule defined in the sitelist file\n" ;
+	print "Updates the tx.csv file on each site.\n" ;
 }
 
 sub main()
 {
 	my $argc = scalar @ARGV ;
-	if( $argc < 1 )
+	if( $argc < 2 )
 	{
 		usage() ;
 		return 1 ;
 	}
-	if( ($argc > 1) && ($ARGV[1] eq "debug") )
+	if( ($argc > 2) && ($ARGV[2] eq "debug") )
 	{
 		$Debug = 1 ;
 	}
@@ -60,6 +62,13 @@ sub main()
 		print "ERROR: cannot read sitelist\n" ;
 		return 1 ;
 	}
+	my $txlist = $ARGV[1] ;
+	if( (not defined $txlist) or ($txlist eq "") )
+	{
+		print "ERROR: missing parameter for txlist\n" ;
+		return 1 ;
+	}
+	print "$0: reading txlist from '$txlist'\n" ;
 	#
 	# Loop through each site in the sitenames array
 	my $linecount = 0 ;
@@ -88,7 +97,7 @@ sub main()
 			print "Automatic schedule is disabled for site $sitename, set auto column to 'auto' to enable it\n" ;
 			next ;
 		}
-		onoff($sitename,$schedule) ;
+		onoff($sitename,$schedule,$txlist) ;
 	}	
 	#
 	return 0 ;
@@ -157,10 +166,10 @@ sub get_rmg_status($)
 	return ( $ping_power, $ping_computer, $site_status ) ;
 }
 
-sub onoff($$)
+sub onoff($$$)
 {
-	my ( $sitename, $schedule ) = @_ ;
-	if( $Debug ) { print "debug: onoff: $sitename $schedule\n" ; }
+	my ( $sitename, $schedule, $txlist ) = @_ ;
+	if( $Debug ) { print "debug: onoff: $sitename $schedule $txlist\n" ; }
 	if( (not defined $schedule) || ($schedule eq ""))
 	{
 		print "$sitename has no schedule\n " ;
@@ -222,7 +231,7 @@ sub onoff($$)
 	{
 		print "$sitename schedule is '$schedule', timenow is $nowtime, site should be off\n" ;
 	}
-	my $err = nudge($sitename,$action) ;
+	my $err = nudge($sitename,$action,$txlist) ;
 	if( $Debug ) { print "debug: onoff: nudge $sitename $action returned $err\n" ; }
 	if( $err )
 	{
@@ -230,10 +239,10 @@ sub onoff($$)
 	}
 }
 
-sub nudge($$)	# nudges the site from its current state towards action. returns 0 for OK 1 for error
+sub nudge($$$)	# nudges the site from its current state towards action. returns 0 for OK 1 for error
 {
-	my ( $sitename, $action ) = @_ ;
-	if( $Debug ) { print "debug: nudge: $sitename action=$action\n" ; }
+	my ( $sitename, $action, $txlist ) = @_ ;
+	if( $Debug ) { print "debug: nudge: $sitename action=$action txlist=$txlist\n" ; }
 	my ( $ping_power, $ping_computer, $site_status ) = get_rmg_status($sitename) ;
 	# Quick sanity check to make sure this is going to work
 	if( $Debug ) { print "debug: nudge: ping_power=$ping_power ping_computer=$ping_computer site_status=$site_status\n" ; }
@@ -249,6 +258,12 @@ sub nudge($$)	# nudges the site from its current state towards action. returns 0
         {
 		if( $ping_computer )#computer is up and responding
 		{
+			# transfer the tx.csv file every time
+			if( $Debug ) { print "debug: nudge: updating $txlist for $sitename\n" ; }
+			if( do_rmg_updatetx($sitename,$txlist) )
+			{
+				print "ERROR: cannot update tx list for $sitename\n" ;
+			}
 			# computer up, rmg running: do nothing
 			if( ($site_status == 5) )
 			{
@@ -397,6 +412,12 @@ sub do_rmg_off($)
 {
 	my ( $sitename ) = @_ ;
 	return do_rmg($sitename,"off") ;
+}
+
+sub do_rmg_updatetx($$)
+{
+	my ( $sitename, $txlist ) = @_ ;
+	return do_rmg($sitename,"updatetx --file $txlist") ;
 }
 
 sub do_rmg($$)
