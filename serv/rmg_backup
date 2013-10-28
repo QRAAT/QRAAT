@@ -125,6 +125,24 @@ mysql -B -e 'select * from True_Position' >$BACKUP_DIR/database/True_Position.tx
 #mysql -B -e 'select * from est where datetime between date_add(now(),interval -25 hour) and now();' >$BACKUP_DIR/database/est_`date +"%Y-%m-%d"`.txt
 
 # Synchronize second backup drive
+# Check destination directories
+echo Checking for backup drive: $BACKUP_DRIVE2
+if [ ! -e $BACKUP_DRIVE2 ]
+then
+	echo ERROR: backup drive $BACKUP_DRIVE2 not found
+	exit 1
+fi
+echo Checking for backup directory: $BACKUP_DIR2
+if [ ! -e $BACKUP_DIR2 ]
+then
+	echo WARNING: creating backup directory $BACKUP_DIR2
+	mkdir -p $BACKUP_DIR2	# create all necessary subdirectories
+	if [ ! -e $BACKUP_DIR2 ]
+	then
+		echo ERROR: cannot create backup directory $BACKUP_DIR2
+		exit 1
+	fi
+fi
 echo Synchronizing $BACKUP_DRIVE and $BACKUP_DRIVE2
 BACKUP_DRIVE_SYNCLOG=/var/log/rmg/rmg_backup_drive_synclog
 rsync -av $BACKUP_DIR/ $BACKUP_DIR2 >$BACKUP_DRIVE_SYNCLOG
