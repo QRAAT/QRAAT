@@ -204,7 +204,7 @@ db_config = qraat.csv('$RMG_SERVER_DIR/db_auth').get(view='reader')
 db_con = mdb.connect(db_config.host, db_config.user,
                      db_config.password, db_config.name)
 txlist = qraat.csv(db_con=db_con, db_table='txlist')
-txlist.write('$TX_FILE', exclude=['start', 'stop', 'programid', 
+txlist.write('$TX_FILE', exclude=['ID', 'start', 'stop', 'programid', 
                                   'alias', 'serial', 'model', 'hertz'])
 "
 }
