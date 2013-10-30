@@ -63,6 +63,7 @@ cur.execute('''SELECT ID, siteid, timestamp,
                  FROM est
                 WHERE timestamp >= %s 
                   AND timestamp <= %s
+                  AND txid = 55
                 ORDER BY timestamp ASC''', (start_time, stop_time))
 signal_data = np.array(cur.fetchall(), dtype=float)
 
@@ -155,5 +156,12 @@ while index < est_ct:
 
 print pos_est
 
-pp.plot(np.imag(pos_est), np.real(pos_est), '.')
+pp.plot(
+ [s.easting for s in sites], 
+ [s.northing for s in sites], 'ro')
+
+pp.plot( 
+ np.imag(pos_est), 
+ np.real(pos_est), '.', alpha=0.3)
+
 pp.show()

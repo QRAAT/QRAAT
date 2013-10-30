@@ -1,0 +1,109 @@
+#!/usr/bin/python
+import matplotlib.pyplot as pp
+import MySQLdb as mdb
+import numpy as np
+import time, os, sys
+import qraat
+
+# TODO parameters
+cal_id=1
+start_time_str = "201310140800"
+stop_time_str =  "201310141200"
+start_time = time.mktime(time.strptime(start_time_str,'%Y%m%d%H%M%S'))
+stop_time = time.mktime(time.strptime(stop_time_str,'%Y%m%d%H%M%S'))
+#start_time = 1376420400.0 # Cal run
+#stop_time =  1376442000.0
+# Get database credentials. 
+try: 
+  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='reader')
+
+except KeyError: 
+  print >>sys.stderr, "position: error: undefined environment variables. Try `source rmg_env.`" 
+  sys.exit(1) 
+
+except IOError, e: 
+  print >>sys.stderr, "position: error: missing DB credential file '%s'." % e.filename
+  sys.exit(1)
+
+# Connect to the database. 
+db_con = mdb.connect(db_config.host, 
+                     db_config.user,
+                     db_config.password,
+                     db_config.name)
+cur = db_con.cursor()
+
+print "position_est: fetching site and cal data"
+
+# get site locations
+sites = qraat.csv(db_con=db_con, db_table='sitelist')
+
+# get steering vector data
+# sv : site.ID -> (sv, bearing)
+steering_vectors = {} # site.ID -> sv
+bearings = {}         # site.ID -> bearing
+
+for site in sites:
+  cur.execute('''SELECT Bearing, 
+                        sv1r, sv1i, sv2r, sv2i, 
+                        sv3r, sv3i, sv4r, sv4i 
+                   FROM Steering_Vectors 
+                  WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, cal_id))
+  sv_data = np.array(cur.fetchall(),dtype=float)
+  if sv_data.shape[0] > 0:
+    steering_vectors[site.ID] = np.array(sv_data[:,1::2] + np.complex(0,1) * sv_data[:,2::2])
+    bearings[site.ID] = np.array(sv_data[:,0])
+
+print "position_est: fetching pulses for transmitter and time range"
+
+#get pulses
+cur.execute('''SELECT ID, siteid, timestamp,
+                      ed1r, ed1i, ed2r, ed2i,
+                      ed3r, ed3i, ed4r, ed4i
+                 FROM est
+                WHERE timestamp >= %s 
+                  AND timestamp <= %s
+                  AND txid = 55
+                ORDER BY timestamp ASC''', (start_time, stop_time))
+signal_data = np.array(cur.fetchall(), dtype=float)
+
+est_ct = signal_data.shape[0]
+if est_ct == 0:
+  print >>sys.stderr, "position_est: fatal: no est records for selected time range."
+  sys.exit(1)
+else: print "position: processing %d records" % est_ct
+
+sig_id =   np.array(signal_data[:,0], dtype=int)
+site_id =  np.array(signal_data[:,1], dtype=int)
+est_time = signal_data[:,2]
+signal =   signal_data[:,3::2]+np.complex(0,-1)*signal_data[:,4::2]
+
+pos_est = np.zeros(2, dtype=np.complex)
+
+t_delta = 5
+t_window = 30
+i = 24 # For the particular test query, we start to get enough samples 
+       # per window for a meaninguful calculation for i=24. NOTE
+while i < est_ct - 1:
+  j = i + 1
+  while j < est_ct - 1 and (est_time[j + 1] - est_time[i]) <= t_window: 
+    j += 1
+  
+  print (i,j), (est_time[j] - est_time[i]), j - i
+
+  # testing, testing ... 
+
+  break # NOTE stop-gap for working on the meat of the algorithm. 
+
+  j = i + 1
+  while i < est_ct - 1 and (est_time[i + 1] - est_time[j]) <= t_delta: 
+    i += 1
+
+pp.plot(
+ [s.easting for s in sites], 
+ [s.northing for s in sites], 'ro')
+
+pp.plot( 
+ np.imag(pos_est), 
+ np.real(pos_est), '.', alpha=0.3)
+
+#pp.show()
