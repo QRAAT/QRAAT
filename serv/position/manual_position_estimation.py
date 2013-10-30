@@ -10,8 +10,8 @@ start_time_str = "201310140800"
 stop_time_str =  "201310141400"
 start_time = time.mktime(time.strptime(start_time_str,'%Y%m%d%H%M%S'))
 stop_time = time.mktime(time.strptime(stop_time_str,'%Y%m%d%H%M%S'))
-start_time = 1376420400.0
-stop_time =  1376442000.0
+#start_time = 1376420400.0 # Cal run
+#stop_time =  1376442000.0
 # Get database credentials. 
 try: 
   db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='reader')
@@ -32,7 +32,6 @@ db_con = mdb.connect(db_config.host,
 cur = db_con.cursor()
 
 #get site locations
-cur.execute("SELECT ID, easting, northing from sitelist;")
 sites = qraat.csv(db_con=db_con, db_table='sitelist')
 print sites
 
@@ -47,12 +46,14 @@ for site in sites:
                         sv1r, sv1i, sv2r, sv2i, 
                         sv3r, sv3i, sv4r, sv4i 
                    FROM Steering_Vectors 
-                  WHERE SiteID=%s and Cal_InfoID=%s''', (site.ID, cal_id))
+                  WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, cal_id))
   sv_data = np.array(cur.fetchall(),dtype=float)
   if sv_data.shape[0] > 0:
     sv_siteID.append(site.ID)
     sv_bearing.append(np.array(sv_data[:,0]))
     sv.append(np.array(sv_data[:,1::2]+np.complex(0,1)*sv_data[:,2::2]))
+
+print sv_siteID
 
 #get pulse groups
 print "Getting EST data from {0} to {1}".format(start_time_str, stop_time_str)
@@ -61,30 +62,32 @@ cur.execute('''SELECT ID, siteid, timestamp,
                       ed3r, ed3i, ed4r, ed4i
                  FROM est
                 WHERE timestamp >= %s 
-                  AND timestamp <= %s''', (start_time, stop_time))
-signal_data = np.array(cur.fetchall(),dtype=float)
-print "position: processing %d records" % signal_data.shape[0]
-# TODO if signal_data.shape[0] == 0, exit
-if signal_data.shape[0] == 0:
+                  AND timestamp <= %s
+                ORDER BY timestamp ASC''', (start_time, stop_time))
+signal_data = np.array(cur.fetchall(), dtype=float)
+
+est_ct = signal_data.shape[0]
+if est_ct == 0:
   print >>sys.stderr, "position_est: fatal: no est records for selected time range."
   sys.exit(1)
+else: print "position: processing %d records" % est_ct
 
 sig_id =     np.array(signal_data[:,0], dtype=int)
 site_id =    np.array(signal_data[:,1], dtype=int)
 est_time =   signal_data[:,2]
 signal =     signal_data[:,3::2]+np.complex(0,-1)*signal_data[:,4::2]
-sort_index = np.argsort(est_time)
 
 # Calculate bearing likelihood per est record
-likelihoods = np.zeros((len(sort_index),360))
+likelihoods = np.zeros((est_ct,360))
 bearings = []
-for iter_index in range(len(sort_index)):
+for iter_index in range(est_ct):
   sv_index = sv_siteID.index(site_id[iter_index])
+  # TODO error: no steering_vectors for site_id
   steering_vectors = sv[sv_index]
   sig = signal[iter_index,np.newaxis,:]
-  left_half = np.dot(sig,np.conj(np.transpose(steering_vectors)))
-  bearing_likelihood = (left_half*np.conj(left_half)).real
-  bearings.append(sv_bearing[sv_index][np.argmax(bearing_likelihood)])
+  left_half = np.dot(sig, np.conj(np.transpose(steering_vectors)))
+  bearing_likelihood = (left_half * np.conj(left_half)).real
+  bearings.append( sv_bearing[sv_index][np.argmax(bearing_likelihood)] )
   for index, value in enumerate(sv_bearing[sv_index]):
     likelihoods[iter_index,value] = bearing_likelihood[0,index]
 
@@ -136,18 +139,18 @@ def position_estimation(index_list):
     count += 1
   return grid_center
 
-# Calculate position estimate in a 30 second window centered
-# around each est. Store in 1D array indexed by time. 
+# Calculate position estimate in a 30 second window ahead 
+# of each est. Store in 1D array indexed by time. 
 avg_win = 30
-pos_est = np.zeros(sort_index.shape, dtype = np.complex)
+pos_est = np.zeros(est_ct, dtype = np.complex)
 index=0
-while index < sort_index.shape[0]:
-  t = est_time[sort_index[index]]
+while index < est_ct:
+  t = est_time[index]
   stop_index = index
-  while stop_index < sort_index.shape[0] and est_time[sort_index[stop_index]] - t < avg_win:
+  while stop_index < est_ct and est_time[stop_index] - t < avg_win:
     stop_index += 1
-  index_list = sort_index[range(index, stop_index)]
-  pos_est[sort_index[index]] = position_estimation(index_list)
+  index_list = range(index, stop_index)
+  pos_est[index] = position_estimation(index_list)
   index += 1
 
 print pos_est
