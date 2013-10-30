@@ -77,21 +77,58 @@ site_id =  np.array(signal_data[:,1], dtype=int)
 est_time = signal_data[:,2]
 signal =   signal_data[:,3::2]+np.complex(0,-1)*signal_data[:,4::2]
 
-pos_est = np.zeros(2, dtype=np.complex)
 
+
+def position_estimation(i, j, center):
+  '''
+    (i, j) - interval over EST data 
+    center - Center point for generating a grid of candidate points
+    returns estimated point
+    for each candidate point n+(j)e do 
+      l_max = 0 
+      point_max = 0+(j)0
+     
+      l_sum = 0
+      for each est do 
+        l = "Given the est signal and its source tower, 
+             what is the likelihood of bearing from n+(j)e 
+             to the tower?" 
+        l_sum = l_sum + l
+      done
+
+      if l_sum > l_max then
+        point_max = n+(j)e 
+        l_max = l_sum
+      fi
+    done
+    return point_max
+  '''
+
+  return np.complex(4260500, 574500)
+
+
+pos_est = [] # TODO time index 
 t_delta = 5
 t_window = 30
 i = 24 # For the particular test query, we start to get enough samples 
        # per window for a meaninguful calculation for i=24. NOTE
+
+center = np.complex(4260500, 574500)
+
 while i < est_ct - 1:
   j = i + 1
   while j < est_ct - 1 and (est_time[j + 1] - est_time[i]) <= t_window: 
     j += 1
   
   print (i,j), (est_time[j] - est_time[i]), j - i
-
-  # testing, testing ... 
-
+  
+  pos = position_estimation(i, j, center)
+  #scale = 100
+  #pos = center
+  #while scale >= 1: # 100, 10, 1 meters ...  
+  #  pos = position_estimation(i, j, pos)
+  #  scale /= 10
+  pos_est.append(pos)
   break # NOTE stop-gap for working on the meat of the algorithm. 
 
   j = i + 1
@@ -103,7 +140,7 @@ pp.plot(
  [s.northing for s in sites], 'ro')
 
 pp.plot( 
- np.imag(pos_est), 
- np.real(pos_est), '.', alpha=0.3)
+ map(lambda x: x.imag, pos_est), 
+ map(lambda x: x.real, pos_est), '.', alpha=0.3)
 
 #pp.show()
