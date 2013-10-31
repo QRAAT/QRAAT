@@ -77,34 +77,36 @@ site_id =  np.array(signal_data[:,1], dtype=int)
 est_time = signal_data[:,2]
 signal =   signal_data[:,3::2]+np.complex(0,-1)*signal_data[:,4::2]
 
+def candidate_points(center, scale, half_span=15): 
+  ''' Generate candidate points for position estimation. 
 
-
-def position_estimation(i, j, center):
+    .. TODO: More intelligent bounds on grid size? 
   '''
+  for east_index in range(-half_span, half_span+1): 
+    for north_index in range(-half_span, half_span+1): 
+      yield center + np.complex(north_index * scale, east_index * scale)
+
+def position_estimation(i, j, center, scale):
+  ''' Estimate the position of a transmitter over time interval ``[i, j]``. 
+
     (i, j) - interval over EST data 
     center - Center point for generating a grid of candidate points
     returns estimated point
-    for each candidate point n+(j)e do 
-      l_max = 0 
-      point_max = 0+(j)0
-     
-      l_sum = 0
-      for each est do 
-        l = "Given the est signal and its source tower, 
-             what is the likelihood of bearing from n+(j)e 
-             to the tower?" 
-        l_sum = l_sum + l
-      done
-
-      if l_sum > l_max then
-        point_max = n+(j)e 
-        l_max = l_sum
-      fi
-    done
-    return point_max
   '''
-
-  return np.complex(4260500, 574500)
+  ll_max = 0
+  point_max = center
+  for point in candidate_points(center, scale):
+    ll_sum = 0
+    for k in range(i, j): 
+      # ll = "Given the est signal and its source tower, 
+      #       what is the likelihood of bearing from n+(j)e 
+      #       to the tower?" 
+      # ll_sum += ll
+      pass # TODO
+    if ll_sum > ll_max:
+      point_max = point
+      ll_max = ll_sum
+  return point_max
 
 
 pos_est = [] # TODO time index 
@@ -113,7 +115,7 @@ t_window = 30
 i = 24 # For the particular test query, we start to get enough samples 
        # per window for a meaninguful calculation for i=24. NOTE
 
-center = np.complex(4260500, 574500)
+center = np.complex(4260500, 574500) # Center of Quail Ridge reserve. 
 
 while i < est_ct - 1:
   j = i + 1
@@ -122,11 +124,11 @@ while i < est_ct - 1:
   
   print (i,j), (est_time[j] - est_time[i]), j - i
   
-  pos = position_estimation(i, j, center)
+  pos = position_estimation(i, j, center, 100)
   #scale = 100
   #pos = center
   #while scale >= 1: # 100, 10, 1 meters ...  
-  #  pos = position_estimation(i, j, pos)
+  #  pos = position_estimation(i, j, pos, scale)
   #  scale /= 10
   pos_est.append(pos)
   break # NOTE stop-gap for working on the meat of the algorithm. 
