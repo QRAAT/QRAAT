@@ -7,7 +7,7 @@ import qraat
 # TODO parameters
 cal_id=1
 start_time_str = "201310140800"
-stop_time_str =  "201310141400"
+stop_time_str =  "201310141200"
 start_time = time.mktime(time.strptime(start_time_str,'%Y%m%d%H%M%S'))
 stop_time = time.mktime(time.strptime(stop_time_str,'%Y%m%d%H%M%S'))
 #start_time = 1376420400.0 # Cal run
