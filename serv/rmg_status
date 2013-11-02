@@ -32,7 +32,7 @@ source rmg_env
 echo `date`
 echo
 echo rmg_schedule
-rmg_schedule $RMG_SERVER_SITELIST
+rmg_schedule $RMG_SERVER_SITELIST $RMG_SERVER_TXLIST
 echo
 echo rmg_readstatus
 rmg_readstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
