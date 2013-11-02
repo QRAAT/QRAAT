@@ -32,13 +32,12 @@ db_con = mdb.connect(db_config.host,
                      db_config.name)
 cur = db_con.cursor()
 
-print "position_est: fetching site and cal data"
+print "position: fetching site and cal data"
 
-# get site locations
+# Get site locations.
 sites = qraat.csv(db_con=db_con, db_table='sitelist')
 
-# get steering vector data
-# sv : site.ID -> (sv, bearing)
+# Get steering vector data.
 steering_vectors = {} # site.ID -> sv
 bearings = {}         # site.ID -> bearing
 
@@ -54,8 +53,6 @@ for site in sites:
     bearings[site.ID] = np.array(sv_data[:,0])
 
 print "position: fetching pulses for transmitter and time range"
-
-#get pulses
 cur.execute('''SELECT ID, siteid, timestamp,
                       ed1r, ed1i, ed2r, ed2i,
                       ed3r, ed3i, ed4r, ed4i
@@ -64,8 +61,8 @@ cur.execute('''SELECT ID, siteid, timestamp,
                   AND timestamp <= %s
                   AND txid = 55
                 ORDER BY timestamp ASC''', (start_time, stop_time))
-signal_data = np.array(cur.fetchall(), dtype=float)
 
+signal_data = np.array(cur.fetchall(), dtype=float)
 est_ct = signal_data.shape[0]
 if est_ct == 0:
   print >>sys.stderr, "position: fatal: no est records for selected time range."
@@ -77,7 +74,7 @@ site_id =  np.array(signal_data[:,1], dtype=int)
 est_time = signal_data[:,2]
 signal =   signal_data[:,3::2]+np.complex(0,-1)*signal_data[:,4::2]
 
-# Calculate bearing likelihood per est record
+print "position: calculating pulse bearing likelihoods"
 likelihoods = np.zeros((est_ct,360))
 for i in range(est_ct):
   # TODO error: no steering vectors for site_id
@@ -88,53 +85,40 @@ for i in range(est_ct):
   for j, value in enumerate(bearings[site_id[i]]):
     likelihoods[i, value] = bearing_likelihood[0, j]
 
+# "Format location of sites"
+site_pos = np.zeros((len(sites),),np.complex)
+site_pos_id = []
+for j in range(len(sites)):
+  site_pos[j] = np.complex(sites[j].northing, sites[j].easting)
+  site_pos_id.append(sites[j].ID)
 
-def candidate_points(center, scale, half_span=15):
-  ''' Generate candidate points for position estimation. 
-
-    .. TODO: More intelligent bounds on grid size? 
-  '''
-  for east_index in range(-half_span, half_span+1): 
-    for north_index in range(-half_span, half_span+1): 
-      yield center + np.complex(north_index * scale, east_index * scale)
-
-def position_estimation(i, j, center, scale):
+def position_estimation(i, j, center, scale, half_span=15):
   ''' Estimate the position of a transmitter over time interval ``[i, j]``. 
 
     (i, j) - interval over EST data 
     center - Center point for generating a grid of candidate points
     returns estimated point
   '''
-  ll_max = 0.0
-  point_max = center
-  for pos in candidate_points(center, scale):
-    ll_sum = 0.0
-    bearings = {}
-    for k in range(i, j):  
-      # Bearing from receiver site to candidate point.
-      # Memioizing prevents recalculation. 
-      bearing = bearings.get(site_id[k])
-      if not bearing:
-        site = sites.get(ID=site_id[k])
-        site_pos = np.complex(site.northing, site.easting)
-        bearing = np.angle(pos - site_pos) * 180 / np.pi
-        bearings[site_id[k]] = bearing
+  grid = np.zeros((half_span*2+1, half_span*2+1),np.complex)
+  for e in range(-half_span,half_span+1):
+    for n in range(-half_span,half_span+1):
+      grid[e + half_span, n + half_span] = center + np.complex(n * scale, e * scale)
 
-      # Look up the likelihood of the bearing. 
-      # "Given the est signal and its source tower, 
-      #  what is the likelihood of bearing from n+(j)e 
-      #  to the tower?" 
-      ll_sum += likelihoods[k, int(bearing + 0.5)]
-     
-    # See if averaged likelihood has improved our guess. 
-    # NOTE by making an assumption about the rate at 
-    # which the target moves, we can avoid choosing a 
-    # bad candidate. 
-    if ll_sum > ll_max:
-      pos_max = pos
-      ll_max = ll_sum
+  site_bearings = np.zeros(np.hstack((grid.shape,len(steering_vectors.keys()))))
+  for sv_index, id_index in enumerate(steering_vectors.keys()):
+    site_bearings[:,:,sv_index] = np.angle(
+      grid - site_pos[site_pos_id.index(id_index)]) * 180 / np.pi
+  pos_likelihood = np.zeros(site_bearings.shape[0:2])
 
-  return pos_max
+  for est_index in range(i, j): 
+    sv_index = steering_vectors.keys().index(site_id[est_index])
+    pos_likelihood += np.interp(site_bearings[:,:,sv_index], 
+                                range(-360, 360), 
+                                np.hstack((likelihoods[est_index,:], 
+                                likelihoods[est_index,:])) )
+
+  return grid.flat[np.argmax(pos_likelihood)]
+
 
 #: Calculated positions (time, pos). 
 pos_est = [] 
@@ -144,7 +128,7 @@ pos_est = []
 t_delta = 1.0
 
 #: Time averaging window (in seconds). 
-t_window = 30.0
+t_window = 30
 
 #: Center of Quail Ridge reserve (northing, easting). This is the first
 #: "candidate point" used to construct the search space grid. 
@@ -160,7 +144,7 @@ try:
     while j < est_ct - 1 and (est_time[j + 1] - est_time[i]) <= t_window: 
       j += 1
     
-    print (i,j), (est_time[j] - est_time[i]), j - i
+    #print (i,j), (est_time[j] - est_time[i]), j - i
     
     scale = 100
     pos = center
