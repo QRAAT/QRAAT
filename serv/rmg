@@ -118,6 +118,10 @@ usage: rmg task [-options] {sites}/all
 
     cyclerx      Power off the RMG receiver and power it back on.
 
+    auto_on      Turn automatic scheduler on
+
+    auto_off     Turn automatic scheduler off
+
     help         Print this. 
 !EOF!
 }
@@ -256,7 +260,7 @@ case $TASK in
     exit 0
   ;;
     
-  status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing|die|down_now)
+  status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing|die|down_now|auto_off|auto_on)
   ;; 
     
   *)
@@ -282,6 +286,21 @@ if [[ "$SITES" = "all" ]]
   then
     SITES=`rmg_csv -c name < $SITELIST`
 fi
+
+if [[ "$TASK" = "auto_o"* ]]
+then
+  for SITE in $SITES
+  do
+    if [[ "$TASK" = "auto_on" ]]
+    then
+      rmg_csv $SITE auto auto < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+    else
+      rmg_csv $SITE auto off < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+    fi
+  done
+  exit 0
+fi
+
 count=0
 for SITE in $SITES
 do
