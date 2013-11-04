@@ -66,9 +66,9 @@ det_type_str = { det_type.PULSE : "Pulse Detector",
 #: The type of data produced by a transmitter, specified in the 'type' 
 #: column of the configuration file. This dictionary maps the transmitter
 #: type to the detector type. 
-tx_type = { "Pulse"      : det_type.PULSE, 
-            "Continuous" : det_type.CONT, 
-            "Other"      : det_type.CONT }
+tx_type = { "pulse"      : det_type.PULSE, 
+            "continuous" : det_type.CONT, 
+            "other"      : det_type.CONT }
 
 #: Number of samples processed by the USRP per second. (Usually 64 Ms/sec.)  
 usrp_sampling_rate = 64e6 
@@ -198,7 +198,7 @@ class tuning:
       :type tx: qraat.csv.csv.Row
       """
 
-      tx_freq = tx.freq * 1000000.0
+      tx_freq = tx.frequency * 1000000.0
       baseband_freq = tx_freq - self.cf
       baseband_band_num = round(baseband_freq / self.bw)
 
@@ -306,12 +306,12 @@ class backend:
           tx.use = True
         else:
           tx.use = False 
-        tx.freq = float(tx.freq) 
+        tx.frequency = float(tx.frequency) 
         tx.pulse_width = float(tx.pulse_width) 
         tx.rise_trigger = float(tx.rise_trigger) 
         tx.fall_trigger = float(tx.fall_trigger) 
         tx.filter_alpha = float(tx.filter_alpha) 
-        tx.type = tx_type[tx.type]
+        tx.type = tx_type[tx.type.lower()]
       
       self.lo_calc()
       self.backend_calc()
@@ -382,7 +382,7 @@ class backend:
         data_index = []
         for j in range(num_freqs):
             if self.transmitters[j].use:
-                curr_freq = int(self.transmitters[j].freq*1000000)
+                curr_freq = int(self.transmitters[j].frequency*1000000)
                 list_of_tx_freqs.append(curr_freq)
                 data_index.append(j)
 
@@ -476,7 +476,7 @@ class backend:
 
                 #get transmitter data
                 tx_data = self.transmitters[data_index[tx_index]]
-                print "\t{0} {1:.3f} MHz".format(tx_data.name, tx_data.freq)
+                print "\t{0} {1:.3f} MHz".format(tx_data.name, tx_data.frequency)
                 self.tunings[-1].add_tx(tx_data)
 
 
