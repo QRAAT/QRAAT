@@ -1,4 +1,25 @@
 #!/usr/bin/python
+# rmg_position
+# Calculate the position of a target transmitter over a given
+# time range. The function position_estimation() represents 
+# our first iteration of this algorithm. This program 
+# is part of QRAAT, an utomated animal tracking system 
+# based on GNU Radio. 
+#
+# Copyright (C) 2013 Todd Borrowman, Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import matplotlib.pyplot as pp
 import MySQLdb as mdb
@@ -11,7 +32,11 @@ parser = OptionParser()
 
 parser.description = '''\
 Calculate the position of a target transmitter of a specified time 
-range. This program is part of QRAAT, an automated animal tracking 
+range. Times are given as seconds as floating points. For example,
+to calculate the position of transmitter ID=12 from 1:30PM on
+June 14, 1999 to now, do "rmg_position --tx-id=12 
+--t-start=$(date --date='19990614 1330' +%s) --t-end=$(date +%s) 
+--plot". This program is part of QRAAT, an automated animal tracking 
 system based on GNU Radio.   
 '''
 
@@ -116,8 +141,12 @@ print "position: calculating pulse bearing likelihoods"
 # Calculate the likelihood of each bearing for each pulse. 
 likelihoods = np.zeros((est_ct,360))
 for i in range(est_ct):
-  # TODO error: no steering vectors for site_id
-  sv =  steering_vectors[site_id[i]]
+  try: 
+    sv =  steering_vectors[site_id[i]]
+  except KeyError:
+    print >>sys.stderr, "position: error: no steering vectors for site ID=%d" % site_id[i]
+    sys.exit(1)
+
   sig = signal[i,np.newaxis,:]
   left_half = np.dot(sig, np.conj(np.transpose(sv)))
   bearing_likelihood = (left_half * np.conj(left_half)).real
@@ -132,11 +161,14 @@ for j in range(len(sites)):
   site_pos_id.append(sites[j].ID)
 
 def position_estimation(i, j, center, scale, half_span=15):
-  ''' Estimate the position of a transmitter over time interval ``[i, j]``. 
+  ''' Estimate the position of a transmitter over time interval ``[i, j]``.
 
-    (i, j) - interval over EST data 
-    center - Center point for generating a grid of candidate points
-    returns estimated point
+    Generate a set of candidate points centered around ``center``. 
+    Calculate the bearing to the receiver sites from each of this points. 
+    The log likelihood of a candidate corresponding to the actual location
+    of the target transmitter over the time window is equal to the sum of
+    the likelihoods of each of these bearings given the signal characteristics
+    of the ESTs in the window. 
   '''
   
   #: Generate candidate points centered around ``center``. 
