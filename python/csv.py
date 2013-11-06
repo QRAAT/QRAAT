@@ -154,14 +154,13 @@ class csv:
   
 
   def filter(self, **cols):
-    """ Get an iterator over the rows row that match the given criteria. 
-    
-      Input is a list of *(column, value)* pairs.
+    """ Filter a table. 
+       
+      Accept (col, val) pairs and returns a qraat.csv type.
+      This is equivelant to "SELECT table WHERE col1 = val1 AND ...
+      colN = valN;" in SQL terms. 
 
-      .. note:: 
-        Should this return a ``csv``-type? 
-
-    :returns: Iterator over qraat.csv.Row.
+    :returns: qraat.csv
     """
     filtered = copy.deepcopy(self)
     filtered.table = []
