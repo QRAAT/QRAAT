@@ -19,6 +19,7 @@
 
 import qraat
 import os, sys, time, numpy as np
+import copy
 try:
   import MySQLdb as mdb
 except ImportError: pass
@@ -162,12 +163,16 @@ class csv:
 
     :returns: Iterator over qraat.csv.Row.
     """
+    filtered = copy.deepcopy(self)
+    filtered.table = []
     for row in self.table:
       match = True
       for (col, val) in cols.iteritems(): 
         if getattr(row, col) != val:
-          match = False; break 
-      if match: yield row
+          match = False; break
+      if match: filtered.table.append(row)
+    return filtered
+
     
 
   def __str__(self):
