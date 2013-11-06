@@ -34,6 +34,7 @@ GR_PYTHON_INSTALL(
     det.py
     est.py
     csv.py
+    gps.py
     DESTINATION ${GR_PYTHON_DIR}/qraat
 )
 

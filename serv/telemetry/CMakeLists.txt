@@ -3,7 +3,6 @@ INSTALL(PROGRAMS
   rmg_plotstatus
   rmg_status
   rmg_timecheck
-  rmg_schedule
   rmg_detcount
   rmg_estcount
   rmg_dbstats

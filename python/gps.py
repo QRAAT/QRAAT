@@ -45,19 +45,18 @@ class gps:
           self.read_gpx(filename)
 
     def read_gpx(self, filename):
-        if filename.endswith('.gpx'):
-            self.filename = filename
-            gt = gpx_track(filename)
-            for j in range(len(gt.track_points)):
-                data = np.array(gt.track_points[j])
-                self.num_records += data.shape[0]
-                self.time = np.hstack((self.time,data[:,0]))
-                self.latitude = np.hstack((self.latitude,data[:,1]))
-                self.longitude = np.hstack((self.longitude,data[:,2]))
-                self.elevation = np.hstack((self.elevation,data[:,3]))
-                self.northing = np.hstack((self.northing,data[:,5]))
-                self.easting = np.hstack((self.easting,data[:,4]))
-                self.zone = np.hstack((self.zone,data[:,6]))
+        self.filename = filename
+        gt = gpx_track(filename)
+        for j in range(len(gt.track_points)):
+            data = np.array(gt.track_points[j])
+            self.num_records += data.shape[0]
+            self.time = np.hstack((self.time,data[:,0]))
+            self.latitude = np.hstack((self.latitude,data[:,1]))
+            self.longitude = np.hstack((self.longitude,data[:,2]))
+            self.elevation = np.hstack((self.elevation,data[:,3]))
+            self.northing = np.hstack((self.northing,data[:,5]))
+            self.easting = np.hstack((self.easting,data[:,4]))
+            self.zone = np.hstack((self.zone,data[:,6]))
 
     def filter_by_bool(self, mask):
         new_gps_data = gps_data(np.sum(mask))
