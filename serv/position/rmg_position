@@ -1,18 +1,51 @@
 #!/usr/bin/python
+
 import matplotlib.pyplot as pp
 import MySQLdb as mdb
 import numpy as np
 import time, os, sys
 import qraat
+from optparse import OptionParser
 
-# TODO parameters
-cal_id=1
-start_time_str = "201310140800"
-stop_time_str =  "201310141200"
-start_time = time.mktime(time.strptime(start_time_str,'%Y%m%d%H%M%S'))
-stop_time = time.mktime(time.strptime(stop_time_str,'%Y%m%d%H%M%S'))
-#start_time = 1376420800.0 # Cal run
-#stop_time =  1376442000.0
+parser = OptionParser()
+
+parser.description = '''\
+Calculate the position of a target transmitter of a specified time 
+range. This program is part of QRAAT, an automated animal tracking 
+system based on GNU Radio.   
+'''
+
+parser.add_option('--cal-id', type='int', metavar='INT', default=1,
+                  help="Calibration ID, the serial identifier in the database "
+                       "context identifying a calibration run. (Default is 1.)")
+
+parser.add_option('--tx-id', type='int', metavar='INT', default=0,
+                  help="Serial ID of the target transmitter in the database "
+                       "context.")
+
+parser.add_option('--t-delta', type='float', metavar='SEC', default=1.0,
+                  help="Time step for each position calculation. (Default "
+                       "is 1.0 seconds.) ")
+
+parser.add_option('--t-window', type='float', metavar='SEC', default=30.0,
+                  help="Time window to use for the position likelihood "
+                       "calculation at each time step. (Default is 30.0 "
+                       "seconds.)")
+
+parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800.0, 
+                  help="Start time in secondes after the epoch (UNIX time).")
+
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0, 
+                  help="End time in secondes after the epoch (UNIX time).")
+
+parser.add_option('--plot', action='store_true', default=False, 
+                  help="Show positions and receiver sites.")
+
+parser.add_option('-v', '--verbose', action='store_true', default=False, 
+                  help="Print the progression of the algorithm to the terminal.")
+
+(options, args) = parser.parse_args()
+
 # Get database credentials. 
 try: 
   db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='reader')
@@ -46,21 +79,25 @@ for site in sites:
                         sv1r, sv1i, sv2r, sv2i, 
                         sv3r, sv3i, sv4r, sv4i 
                    FROM Steering_Vectors 
-                  WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, cal_id))
+                  WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, options.cal_id))
   sv_data = np.array(cur.fetchall(),dtype=float)
   if sv_data.shape[0] > 0:
     steering_vectors[site.ID] = np.array(sv_data[:,1::2] + np.complex(0,1) * sv_data[:,2::2])
     bearings[site.ID] = np.array(sv_data[:,0])
 
 print "position: fetching pulses for transmitter and time range"
+
+# Get pulses in time range.  
 cur.execute('''SELECT ID, siteid, timestamp,
                       ed1r, ed1i, ed2r, ed2i,
                       ed3r, ed3i, ed4r, ed4i
                  FROM est
-                WHERE timestamp >= %s 
+                WHERE timestamp >= %s
                   AND timestamp <= %s
-                  AND txid = 55
-                ORDER BY timestamp ASC''', (start_time, stop_time))
+                  AND txid = %s
+                ORDER BY timestamp ASC''', (options.t_start, 
+                                            options.t_end, 
+                                            options.tx_id))
 
 signal_data = np.array(cur.fetchall(), dtype=float)
 est_ct = signal_data.shape[0]
@@ -75,6 +112,8 @@ est_time = signal_data[:,2]
 signal =   signal_data[:,3::2]+np.complex(0,-1)*signal_data[:,4::2]
 
 print "position: calculating pulse bearing likelihoods"
+
+# Calculate the likelihood of each bearing for each pulse. 
 likelihoods = np.zeros((est_ct,360))
 for i in range(est_ct):
   # TODO error: no steering vectors for site_id
@@ -85,7 +124,7 @@ for i in range(est_ct):
   for j, value in enumerate(bearings[site_id[i]]):
     likelihoods[i, value] = bearing_likelihood[0, j]
 
-# "Format location of sites"
+# Format site locations as np.complex's. 
 site_pos = np.zeros((len(sites),),np.complex)
 site_pos_id = []
 for j in range(len(sites)):
@@ -99,19 +138,25 @@ def position_estimation(i, j, center, scale, half_span=15):
     center - Center point for generating a grid of candidate points
     returns estimated point
   '''
+  
+  #: Generate candidate points centered around ``center``. 
   grid = np.zeros((half_span*2+1, half_span*2+1),np.complex)
   for e in range(-half_span,half_span+1):
     for n in range(-half_span,half_span+1):
       grid[e + half_span, n + half_span] = center + np.complex(n * scale, e * scale)
 
-  site_bearings = np.zeros(np.hstack((grid.shape,len(steering_vectors.keys()))))
-  for sv_index, id_index in enumerate(steering_vectors.keys()):
+  #: The third dimension of the search space: bearings from each 
+  #: candidate point to each receiver site. 
+  site_bearings = np.zeros(np.hstack((grid.shape,len(site_pos_id))))
+  for sv_index, id_index in enumerate(site_pos_id):
     site_bearings[:,:,sv_index] = np.angle(
       grid - site_pos[site_pos_id.index(id_index)]) * 180 / np.pi
-  pos_likelihood = np.zeros(site_bearings.shape[0:2])
 
+  #: Based on bearing likelihoods for EST's in time range, calculate
+  #: the log likelihood of each candidate point. 
+  pos_likelihood = np.zeros(site_bearings.shape[0:2])
   for est_index in range(i, j): 
-    sv_index = steering_vectors.keys().index(site_id[est_index])
+    sv_index = site_pos_id.index(site_id[est_index])
     pos_likelihood += np.interp(site_bearings[:,:,sv_index], 
                                 range(-360, 360), 
                                 np.hstack((likelihoods[est_index,:], 
@@ -125,14 +170,19 @@ pos_est = []
 
 #: The time step (in seconds) for the position estimation
 #: calculation.
-t_delta = 1.0
+t_delta = options.t_delta
 
 #: Time averaging window (in seconds). 
-t_window = 30
+t_window = options.t_window
 
 #: Center of Quail Ridge reserve (northing, easting). This is the first
 #: "candidate point" used to construct the search space grid. 
 center = np.complex(4260500, 574500) 
+
+print "position: calculating position"
+if options.verbose:
+  print "%15s %-19s %-19s %-19s" % ('time window', 
+              '100 meters', '10 meters', '1 meter')
 
 i = 0
 
@@ -143,15 +193,20 @@ try:
     j = i + 1
     while j < est_ct - 1 and (est_time[j + 1] - est_time[i]) <= t_window: 
       j += 1
-    
-    #print (i,j), (est_time[j] - est_time[i]), j - i
+
+    if options.verbose: 
+      print "%7d %7d" % (i, j), 
     
     scale = 100
     pos = center
     while scale >= 1: # 100, 10, 1 meters ...  
       pos = position_estimation(i, j, pos, scale)
+      if options.verbose:
+        print "%8dn,%de" % (pos.real, pos.imag),
       scale /= 10
     pos_est.append((est_time[(i + j) / 2], pos))
+
+    if options.verbose: print
 
     # Step index i forward t_delta seconds. 
     j = i + 1
@@ -161,14 +216,16 @@ try:
 except KeyboardInterrupt: pass
 
 finally:
-  # Plot sites.
-  pp.plot(
-   [s.easting for s in sites], 
-   [s.northing for s in sites], 'ro')
 
-  # Plot locations. 
-  pp.plot( 
-   map(lambda (t,x): x.imag, pos_est), 
-   map(lambda (t,x): x.real, pos_est), '.', alpha=0.3)
+  if options.plot: 
+    # Plot sites.
+    pp.plot(
+     [s.easting for s in sites], 
+     [s.northing for s in sites], 'ro')
 
-  pp.show()
+    # Plot locations. 
+    pp.plot( 
+     map(lambda (t,x): x.imag, pos_est), 
+     map(lambda (t,x): x.real, pos_est), '.', alpha=0.3)
+
+    pp.show()
