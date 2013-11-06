@@ -73,7 +73,7 @@ parser.add_option('-v', '--verbose', action='store_true', default=False,
 
 # Get database credentials. 
 try: 
-  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='reader')
+  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='writer')
 
 except KeyError: 
   print >>sys.stderr, "position: error: undefined environment variables. Try `source rmg_env.`" 
@@ -236,7 +236,10 @@ try:
       if options.verbose:
         print "%8dn,%de" % (pos.real, pos.imag),
       scale /= 10
-    pos_est.append((est_time[(i + j) / 2], pos))
+    pos_est.append((options.tx_id, 
+                    est_time[(i + j) / 2], 
+                    pos.imag,  # easting 
+                    pos.real)) # northing
 
     if options.verbose: print
 
@@ -248,6 +251,12 @@ try:
 except KeyboardInterrupt: pass
 
 finally:
+
+  # Insert results into database. 
+  cur.executemany('''INSERT INTO Position 
+                      (txid, timestamp, easting, northing)
+                     VALUES (%s, %s, %s, %s)''', pos_est)
+  cur.execute('COMMIT')
 
   if options.plot: 
     # Plot sites.
