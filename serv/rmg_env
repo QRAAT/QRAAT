@@ -109,7 +109,7 @@ export BACKUP_ARCHIVE_DIR=$BACKUP_DIR/archive
 
 # The number of days that files stay in RMG_SERVER_ARCHIVE_DIR
 # Used in rmg_clean
-export RMG_ARCHIVE_DAYS=7
+export RMG_ARCHIVE_DAYS=3
 
 #END
 
