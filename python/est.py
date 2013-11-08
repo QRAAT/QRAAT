@@ -17,10 +17,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import qraat
-import sys, os, time, errno
+import csv
+import os, time, errno
 import numpy as np
-import struct
 from string import Template
 
 try:
@@ -86,7 +85,7 @@ class ResolveIdError (Exception):
       self.txid, self.siteid)
 
 
-class est (qraat.csv):
+class est (csv.csv):
 
   """ 
   
@@ -202,7 +201,7 @@ class est (qraat.csv):
           fd.write(','.join(headers) + '\n')
           
       fd.write( 
-        ','.join(qraat.pretty_printer(getattr(row, col))
+        ','.join(csv.pretty_printer(getattr(row, col))
           for col in headers) + '\n')
 
   
@@ -349,20 +348,22 @@ class est (qraat.csv):
     # for the timestamp. The following line turns the timestamp into 
     # a string with unrounded value. 
     row.timestamp = repr(row.timestamp) 
-    row.datetime = qraat.pretty_printer(row.datetime)
+    row.datetime = csv.pretty_printer(row.datetime)
     cur.execute(query.substitute(row))
   
 
 
 
 if __name__=="__main__":
-  
+
+  import det as qraat_det
+  import sys
   try:
     #db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
     #fella = est()
     #fella.read_db(db_con, time.time() - 3600000, time.time())
     #fella.write_db(db_con, site='site2')
-    fella = est(det=qraat.det('test.det'))
+    fella = est(det=qraat_det('test.det'))
     print repr(fella[0].timestamp)
     print str(fella[0].timestamp)
 
