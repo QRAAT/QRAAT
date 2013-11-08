@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from .csv import csv, pretty_printer
+from csv import csv, pretty_printer
+from det import det
 import os, time, errno
 import numpy as np
 from string import Template
@@ -348,7 +349,7 @@ class est (csv):
     # for the timestamp. The following line turns the timestamp into 
     # a string with unrounded value. 
     row.timestamp = repr(row.timestamp) 
-    row.datetime = csv.pretty_printer(row.datetime)
+    row.datetime = pretty_printer(row.datetime)
     cur.execute(query.substitute(row))
   
 
@@ -356,14 +357,12 @@ class est (csv):
 
 if __name__=="__main__":
 
-  from .det import det as qraat_det
-  import sys
   try:
     #db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
     #fella = est()
     #fella.read_db(db_con, time.time() - 3600000, time.time())
     #fella.write_db(db_con, site='site2')
-    fella = est(det=qraat_det('test.det'))
+    fella = est(det=det('test.det'))
     print repr(fella[0].timestamp)
     print str(fella[0].timestamp)
 
