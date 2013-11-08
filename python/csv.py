@@ -17,14 +17,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sys, time, numpy.float64
+import sys, time, numpy as np
 import copy
 
 def pretty_printer(val):
   """ 
     Convert table cell value to a pretty string suitable for displaying. 
   """ 
-  if type(val) in [float, numpy.float64]:
+  if np.issubdtype(type(val),float):
     if len(str(val)) > 6: 
       return '{0:e}'.format(val)
     else: return str(val)
