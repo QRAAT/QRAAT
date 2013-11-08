@@ -17,12 +17,23 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import qraat
-import os, sys, time, numpy as np
+import sys, time, numpy as np
 import copy
-try:
-  import MySQLdb as mdb
-except ImportError: pass
+
+def pretty_printer(val):
+  """ 
+    Convert table cell value to a pretty string suitable for displaying. 
+  """ 
+  if np.issubdtype(type(val),float):
+    if len(str(val)) > 6: 
+      return '{0:e}'.format(val)
+    else: return str(val)
+  elif type(val) == time.struct_time: 
+    return time.strftime("%Y-%m-%d %H:%M:%S", val)
+  elif val == None: 
+    return '' 
+  else:
+    return str(val)
 
 class csv: 
   
@@ -131,7 +142,7 @@ class csv:
 
     res = ','.join(headers) + '\n'
     res += '\n'.join(
-      ','.join(qraat.pretty_printer(getattr(row, col)) 
+      ','.join(pretty_printer(getattr(row, col)) 
         for col in headers) 
        for row in self.table)
     fd.write(res + '\n')
@@ -178,7 +189,7 @@ class csv:
     res = self._row_template % tuple(self.headers) + '\n'
     res += '\n'.join(
       (self._row_template % tuple(
-        qraat.pretty_printer(getattr(row, col)) for col in self.headers)) for row in self.table) 
+        pretty_printer(getattr(row, col)) for col in self.headers)) for row in self.table) 
     return res
  
   def __len__(self):
@@ -234,6 +245,7 @@ class csv:
 
 if __name__ == '__main__': # Testing, testing ... 
 
+  import MySQLdb as mdb
   try:
     db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
     txlist = csv(db_con=db_con, db_table='txlist')

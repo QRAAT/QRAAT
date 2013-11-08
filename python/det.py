@@ -19,7 +19,7 @@
 import numpy as np
 import os, time, re
 
-from pulse_swig import pulse_data, param_t
+from qraat.pulse_swig import pulse_data, param_t
 
 tag_regex = re.compile("([^/]*)_[0-9]*\.det$")
 
