@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import csv
+from .csv import csv, pretty_printer
 import os, time, errno
 import numpy as np
 from string import Template
@@ -85,7 +85,7 @@ class ResolveIdError (Exception):
       self.txid, self.siteid)
 
 
-class est (csv.csv):
+class est (csv):
 
   """ 
   
@@ -201,7 +201,7 @@ class est (csv.csv):
           fd.write(','.join(headers) + '\n')
           
       fd.write( 
-        ','.join(csv.pretty_printer(getattr(row, col))
+        ','.join(pretty_printer(getattr(row, col))
           for col in headers) + '\n')
 
   
@@ -356,7 +356,7 @@ class est (csv.csv):
 
 if __name__=="__main__":
 
-  import det.det as qraat_det
+  from .det import det as qraat_det
   import sys
   try:
     #db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
