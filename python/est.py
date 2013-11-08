@@ -356,7 +356,7 @@ class est (csv.csv):
 
 if __name__=="__main__":
 
-  import det as qraat_det
+  import det.det as qraat_det
   import sys
   try:
     #db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')

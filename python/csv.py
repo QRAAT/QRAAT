@@ -19,9 +19,6 @@
 
 import sys, time, numpy.float64
 import copy
-try:
-  import MySQLdb as mdb
-except ImportError: pass
 
 def pretty_printer(val):
   """ 
@@ -248,6 +245,7 @@ class csv:
 
 if __name__ == '__main__': # Testing, testing ... 
 
+  import MySQLdb as mdb
   try:
     db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
     txlist = csv(db_con=db_con, db_table='txlist')
