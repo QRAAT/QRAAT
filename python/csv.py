@@ -116,7 +116,7 @@ class csv:
     cur.execute('SELECT * FROM %s' % table)
     for row in cur.fetchall(): 
       self.table.append(self.Row())
-      for i in range(len(self.headers)): 
+      for i in range(len(row)): 
         if lengths[i] < len(str(row[i])):
           lengths[i] = len(str(row[i]))
         setattr(self.table[-1], self.headers[i], row[i])
