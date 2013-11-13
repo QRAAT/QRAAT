@@ -32,13 +32,8 @@ from optparse import OptionParser
 parser = OptionParser()
 
 parser.description = '''\
-Calculate the position of a target transmitter of a specified time 
-range. Times are given as seconds as floating points. For example,
-to calculate the position of transmitter ID=12 from 1:30PM on
-June 14, 1999 to now, do "rmg_position --tx-id=12 
---t-start=$(date --date='19990614 1330' +%s) --t-end=$(date +%s) 
---plot". This program is part of QRAAT, an automated animal tracking 
-system based on GNU Radio.   
+Plot the search space for position estimation. This program is 
+part of QRAAT, an automated animal tracking system based on GNU Radio.   
 '''
 
 parser.add_option('--cal-id', type='int', metavar='INT', default=1,
@@ -158,7 +153,7 @@ for j in range(len(sites)):
   site_pos_id.append(sites[j].ID)
 
 def plot_search_space(i, j, center, scale, half_span=15):
-  ''' Plot search space, output to file. ''' 
+  ''' Plot search space, return point of maximum likelihood. '''
   
   #: Generate candidate points centered around ``center``. 
   grid = np.zeros((half_span*2+1, half_span*2+1),np.complex)
@@ -182,9 +177,6 @@ def plot_search_space(i, j, center, scale, half_span=15):
                                 range(-360, 360), 
                                 np.hstack((likelihoods[est_index,:], 
                                 likelihoods[est_index,:])) )
-
-  #: Plot result. 
-
   fig = pp.figure()
   ax = fig.gca(projection='3d')
   X = grid.real
@@ -201,11 +193,12 @@ def plot_search_space(i, j, center, scale, half_span=15):
   fig.colorbar(surf, shrink=0.5, aspect=5)
 
   t = time.localtime((est_time[i] + est_time[j]) / 2)
-  pp.savefig('tx%d_%04d.%02d.%02d_%02d.%02d.%02d.png' % (options.tx_id, 
+  pp.savefig('tx%d_%04d.%02d.%02d_%02d.%02d.%02d_%03dm.png' % (options.tx_id, 
      t.tm_year, t.tm_mon, t.tm_mday,
-     t.tm_hour, t.tm_min, t.tm_sec))
+     t.tm_hour, t.tm_min, t.tm_sec, scale))
   pp.clf()
 
+  return grid.flat[np.argmax(pos_likelihood)]
 
 
 
@@ -234,8 +227,13 @@ try:
     j = i + 1
     while j < est_ct - 1 and (est_time[j + 1] - est_time[i]) <= t_window: 
       j += 1
+    
+    scale = 100
+    pos = center
+    while scale >= 1: # 100, 10, 1 meters ...  
+      pos = plot_search_space(i, j, pos, scale)
+      scale /= 10
 
-    plot_search_space(i, j, center, 10, 150)
 
     # Step index i forward t_delta seconds. 
     j = i + 1
