@@ -68,7 +68,7 @@ if [ ! -e $BACKUP_ARCHIVE_DIR ]
 then
 	echo WARNING: creating backup archive directory $BACKUP_ARCHIVE_DIR
 	mkdir $BACKUP_ARCHIVE_DIR
-	if [ ! -e $BACKUP_ARCHIVE_DIR]
+	if [ ! -e $BACKUP_ARCHIVE_DIR ]
 	then
 		echo ERROR: cannot create backup archive directory $BACKUP_ARCHIVE_DIR
 		exit 1
