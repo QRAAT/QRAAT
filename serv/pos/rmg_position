@@ -21,7 +21,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import matplotlib.pyplot as pp
 import MySQLdb as mdb
 import numpy as np
 import time, os, sys
@@ -44,7 +43,7 @@ parser.add_option('--cal-id', type='int', metavar='INT', default=1,
                   help="Calibration ID, the serial identifier in the database "
                        "context identifying a calibration run. (Default is 1.)")
 
-parser.add_option('--tx-id', type='int', metavar='INT', default=0,
+parser.add_option('--tx-id', type='int', metavar='INT', default=51,
                   help="Serial ID of the target transmitter in the database "
                        "context.")
 
@@ -259,6 +258,9 @@ finally:
   cur.execute('COMMIT')
 
   if options.plot: 
+
+    import matplotlib.pyplot as pp
+
     # Plot sites.
     pp.plot(
      [s.easting for s in sites], 
