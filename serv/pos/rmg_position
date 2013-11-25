@@ -266,7 +266,7 @@ finally:
 
     # Plot locations. 
     pp.plot( 
-     map(lambda (t,x): x.imag, pos_est), 
-     map(lambda (t,x): x.real, pos_est), '.', alpha=0.3)
+     map(lambda (tx, t, e, n): e, pos_est), 
+     map(lambda (tx, t, e, n): n, pos_est), '.', alpha=0.3)
 
     pp.show()
