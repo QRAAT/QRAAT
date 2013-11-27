@@ -2,6 +2,13 @@
 # plot_search_space.py. This script is part of QRAAT, an automated 
 # animal tracking system based on GNU Radio. 
 #
+# Wood rat data: 
+# python plot_search_space.py --t-start=1381756000 --t-end=1381768575 --tx-id=52
+#
+# Mice: 
+# python plot_search_space.py --t-start=0 --t-end=1381768575 --tx-id=35
+#  Modified EST select to 'mice' instead of 'est'. 
+#
 # Copyright (C) 2013 Christopher Patton, Todd Borrowman
 # 
 # This program is free software: you can redistribute it and/or modify
@@ -28,7 +35,6 @@ import time, os, sys
 import qraat
 from optparse import OptionParser
 
-
 parser = OptionParser()
 
 parser.description = '''\
@@ -40,7 +46,7 @@ parser.add_option('--cal-id', type='int', metavar='INT', default=1,
                   help="Calibration ID, the serial identifier in the database "
                        "context identifying a calibration run. (Default is 1.)")
 
-parser.add_option('--tx-id', type='int', metavar='INT', default=0,
+parser.add_option('--tx-id', type='int', metavar='INT', default=51,
                   help="Serial ID of the target transmitter in the database "
                        "context.")
 
@@ -56,14 +62,14 @@ parser.add_option('--t-window', type='float', metavar='SEC', default=30.0,
 parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800.0, 
                   help="Start time in secondes after the epoch (UNIX time).")
 
-parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0, 
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0,#1376427800 yields 302 rows
                   help="End time in secondes after the epoch (UNIX time).")
 
 (options, args) = parser.parse_args()
 
 # Get database credentials. 
 try: 
-  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='writer')
+  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='reader')
 
 except KeyError: 
   print >>sys.stderr, "position: error: undefined environment variables. Try `source rmg_env.`" 
@@ -152,6 +158,8 @@ for j in range(len(sites)):
   site_pos[j] = np.complex(sites[j].northing, sites[j].easting)
   site_pos_id.append(sites[j].ID)
 
+
+
 def plot_search_space(i, j, center, scale, half_span=15):
   ''' Plot search space, return point of maximum likelihood. '''
   
@@ -168,7 +176,7 @@ def plot_search_space(i, j, center, scale, half_span=15):
     site_bearings[:,:,sv_index] = np.angle(
       grid - site_pos[site_pos_id.index(id_index)]) * 180 / np.pi
 
-  #: Based on bearing likelihoods for EST's in time range, calculate
+  #: Based on bearing likeli hoods for EST's in time range, calculate
   #: the log likelihood of each candidate point. 
   pos_likelihood = np.zeros(site_bearings.shape[0:2])
   for est_index in range(i, j): 
@@ -177,29 +185,37 @@ def plot_search_space(i, j, center, scale, half_span=15):
                                 range(-360, 360), 
                                 np.hstack((likelihoods[est_index,:], 
                                 likelihoods[est_index,:])) )
-  fig = pp.figure()
-  ax = fig.gca(projection='3d')
-  X = grid.real
-  Y = grid.imag
-  #X, Y = np.meshgrid(X, Y)
-  Z = pos_likelihood
-  surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm,
-          linewidth=0, antialiased=False)
-  #ax.set_zlim(0, 20)
-
-  ax.zaxis.set_major_locator(LinearLocator(10))
-  ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
-
-  fig.colorbar(surf, shrink=0.5, aspect=5)
+  pos = grid.flat[np.argmax(pos_likelihood)]
 
   t = time.localtime((est_time[i] + est_time[j]) / 2)
+  
+  fig = pp.gcf()
+  p = pp.imshow(pos_likelihood.transpose(), 
+      origin='lowerleft', 
+      extent=(0, half_span * 2, 0, half_span * 2)) # search space
+
+  pp.scatter(
+    [((float(s.easting) - center.imag) / scale) + half_span for s in sites],
+    [((float(s.northing) - center.real) / scale) + half_span for s in sites],
+     s=15, facecolor='0.5', label='sites') # sites
+ 
+  #pp.plot( # sites 
+  #  [grid[s.easting,] for s in sites], 
+  #  [grid[,s.northing] for s in sites], 'ro')
+  
+  pp.clim()   # clamp the color limits
+  pp.legend()
+  pp.title('%04d-%02d-%02d %02d%02d:%02d txID=%d' % (
+       t.tm_year, t.tm_mon, t.tm_mday,
+       t.tm_hour, t.tm_min, t.tm_sec,
+       options.tx_id))
+  
   pp.savefig('tx%d_%04d.%02d.%02d_%02d.%02d.%02d_%03dm.png' % (options.tx_id, 
      t.tm_year, t.tm_mon, t.tm_mday,
      t.tm_hour, t.tm_min, t.tm_sec, scale))
   pp.clf()
 
-  return grid.flat[np.argmax(pos_likelihood)]
-
+  return pos
 
 
 #: Calculated positions (time, pos). 
@@ -228,12 +244,27 @@ try:
     while j < est_ct - 1 and (est_time[j + 1] - est_time[i]) <= t_window: 
       j += 1
     
-    scale = 100
-    pos = center
-    while scale >= 1: # 100, 10, 1 meters ...  
-      pos = plot_search_space(i, j, pos, scale)
-      scale /= 10
+    #scale = 100
+    #pos = center
+    #while scale >= 1: 
+    #  pos = plot_search_space(i, j, pos, scale)
+    #  scale /= 10
 
+    t = time.localtime((est_time[i] + est_time[j]) / 2)
+    w_sites = set(site_id[i:j])
+
+    if len(w_sites) > 1: 
+      pos = plot_search_space(i, j, center, 10, 150)
+      print '%04d-%02d-%02d %02d%02d:%02d %-8d %.2fN %.2fE %s' % (
+       t.tm_year, t.tm_mon, t.tm_mday,
+       t.tm_hour, t.tm_min, t.tm_sec,
+       j - i, pos.real, pos.imag, set(site_id[i:j]))
+
+    else: 
+      print '%04d-%02d-%02d %02d%02d:%02d %-8d %s not enough data' % (
+       t.tm_year, t.tm_mon, t.tm_mday,
+       t.tm_hour, t.tm_min, t.tm_sec,
+       j - i, set(site_id[i:j]))
 
     # Step index i forward t_delta seconds. 
     j = i + 1
