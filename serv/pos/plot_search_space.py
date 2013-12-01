@@ -159,54 +159,85 @@ for j in range(len(sites)):
   site_pos_id.append(sites[j].ID)
 
 
-# TODO use boolean ``pos`` to calculate x_range
-# TODO create a class for a half-plane constraint.
 # TODO calculate a set of constraints for each 
 #   pair of bearings (Theta_i, Theta_j) computed in
 #   get_constraints(). 
-def get_line(p, theta):
-  ''' 
+
+class halfplane: 
+  ''' A half-plane constraint in two dimensions. 
+
     Compute the slope and y-intercept of the line defined by point ``p`` 
     and bearing ``theta``. Format is np.complex(real=northing, imag=easting). 
   ''' 
-  p_theta = p
+  
+  #: The types of plane constrains:
+  #: greater than, less than, greater than
+  #: or equal to, less than or equal to. 
+  plane_t = qraat.enum('GT', 'LT', 'GE', 'LE')
+  plane_string = { plane_t.GT : '>', 
+                   plane_t.LT : '<', 
+                   plane_t.GE : '>=', 
+                   plane_t.LE : '<=' }
 
-  if theta == 0 or theta == 360: 
-    p_theta += np.complex(0,1)
-    pos = True
+  def __init__ (self, p, theta, plane):
+    p_theta = p
 
-  elif 0 < theta and theta < 90: 
-    p_theta += np.complex(np.tan(theta), 1)
-    pos = True
+    if theta == 0 or theta == 360: 
+      p_theta += np.complex(0,1)
+      pos = True
 
-  elif theta == 90: 
-    p_theta += np.complex(1, 0)
-    pos = True
+    elif 0 < theta and theta < 90: 
+      p_theta += np.complex(np.tan(theta), 1)
+      pos = True
 
-  elif 90 < theta and theta < 180: 
-    p_theta += np.complex(np.tan(theta), -1)
-    pos = False 
+    elif theta == 90: 
+      p_theta += np.complex(1, 0)
+      pos = True
 
-  elif theta == 180:
-    p_theta += np.complex(0, -1)
-    pos = False
+    elif 90 < theta and theta < 180: 
+      p_theta += np.complex(np.tan(theta), -1)
+      pos = False 
 
-  elif 180 < theta  and theta < 270: 
-    p_theta += np.complex(-np.tan(theta), -1)
-    pos = False
+    elif theta == 180:
+      p_theta += np.complex(0, -1)
+      pos = False
 
-  elif theta == 270: 
-    p_theta += np.complex(-1, 0)
-    pos = False
+    elif 180 < theta  and theta < 270: 
+      p_theta += np.complex(-np.tan(theta), -1)
+      pos = False
 
-  else: # 270 < theta < 0
-    p_theta += np.complex(-np.tan(theta), 1)
-    pos = True
+    elif theta == 270: 
+      p_theta += np.complex(-1, 0)
+      pos = False
 
-  m = float(p.real - p_theta.real) / (p.imag - p_theta.imag)
-  b = p.real - (m * p.imag)
+    else: # 270 < theta < 0
+      p_theta += np.complex(-np.tan(theta), 1)
+      pos = True
 
-  return (m, b)
+    #: Slope
+    self.m = float(p.real - p_theta.real) / (p.imag - p_theta.imag)
+
+    #: Y-intercept 
+    self.b = p.real - (self.m * p.imag)
+
+    #: The feasible plane for the constraint. 
+    self.plane = plane
+    
+    if pos: # plot x-axis starting at Xp to positive infinity TODO
+      self.x_range = (p.imag, 0) 
+    else: 
+      self.x_range = (0, p.imag)
+      
+  def __repr__ (self): 
+    s = 'Y %s %.03fX + %.03f' % (self.plane_string[self.plane], 
+                                 self.m, self.b)
+    return '%-30s' % s
+
+  @classmethod
+  def from_bearings(cls, p, theta_i, theta_j):
+    # TODO get plane constraints right. 
+    return (cls(p, theta_i, cls.plane_t.GT), 
+            cls(p, theta_j, cls.plane_t.GT))
 
 
 
@@ -248,9 +279,9 @@ def get_constraints(i, j, threshold=1.0):
   for (e, ranges) in r.iteritems():
     constraints[e] = []
     p = site_pos[site_pos_id.index(e)]
-    for (i, j) in ranges: 
-      constraints[e].append((get_line(p, i), 
-                             get_line(p, j))) 
+    for (theta_i, theta_j) in ranges: 
+      constraints[e].append(
+        halfplane.from_bearings(p, theta_i, theta_j)) 
 
   return constraints
 
