@@ -62,7 +62,7 @@ parser.add_option('--t-window', type='float', metavar='SEC', default=30.0,
 parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800.0, 
                   help="Start time in secondes after the epoch (UNIX time).")
 
-parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0,#1376427800 yields 302 rows
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376427800,#1376442000.0,#1376427800 yields 302 rows
                   help="End time in secondes after the epoch (UNIX time).")
 
 (options, args) = parser.parse_args()
@@ -140,7 +140,7 @@ for i in range(est_ct):
   try: 
     sv =  steering_vectors[site_id[i]]
   except KeyError:
-    print >>sys.stderr, "position: error: no steering vectors for site ID=%d" % site_id[i]
+    print >>sys.stderr, "position: error: no steering vectors for siteID=%d" % site_id[i]
     sys.exit(1)
 
   sig = signal[i,np.newaxis,:]
@@ -159,8 +159,105 @@ for j in range(len(sites)):
   site_pos_id.append(sites[j].ID)
 
 
+# TODO use boolean ``pos`` to calculate x_range
+# TODO create a class for a half-plane constraint.
+# TODO calculate a set of constraints for each 
+#   pair of bearings (Theta_i, Theta_j) computed in
+#   get_constraints(). 
+def get_line(p, theta):
+  ''' 
+    Compute the slope and y-intercept of the line defined by point ``p`` 
+    and bearing ``theta``. Format is np.complex(real=northing, imag=easting). 
+  ''' 
+  p_theta = p
 
-def plot_search_space(i, j, center, scale, half_span=15):
+  if theta == 0 or theta == 360: 
+    p_theta += np.complex(0,1)
+    pos = True
+
+  elif 0 < theta and theta < 90: 
+    p_theta += np.complex(np.tan(theta), 1)
+    pos = True
+
+  elif theta == 90: 
+    p_theta += np.complex(1, 0)
+    pos = True
+
+  elif 90 < theta and theta < 180: 
+    p_theta += np.complex(np.tan(theta), -1)
+    pos = False 
+
+  elif theta == 180:
+    p_theta += np.complex(0, -1)
+    pos = False
+
+  elif 180 < theta  and theta < 270: 
+    p_theta += np.complex(-np.tan(theta), -1)
+    pos = False
+
+  elif theta == 270: 
+    p_theta += np.complex(-1, 0)
+    pos = False
+
+  else: # 270 < theta < 0
+    p_theta += np.complex(-np.tan(theta), 1)
+    pos = True
+
+  m = float(p.real - p_theta.real) / (p.imag - p_theta.imag)
+  b = p.real - (m * p.imag)
+
+  return (m, b)
+
+
+
+
+
+def get_constraints(i, j, threshold=1.0): 
+  ''' Get linear constraints on search space. '''
+  constraints = {}
+
+  # Add up bearing likelihoods for each site. 
+  for e in range(i, j): 
+    if constraints.get(site_id[e]) == None:
+      constraints[site_id[e]] = likelihoods[e,]
+    else: 
+      constraints[site_id[e]] += likelihoods[e,]
+
+  # Get bearing ranges of log likelihoods above threshold.  
+  r = {}
+  for (e, ll) in constraints.iteritems():
+    r[e] = []
+    above = False
+    for j in range(ll.shape[0]):
+      if ll[j] >= threshold and not above: 
+        i = j
+        above = True
+    
+      elif ll[j] < threshold and above: 
+        r[e].append((i, j-1))
+        above = False 
+
+    if above: # Fix wrap around  
+      r[e][0] = (i, r[e][0][1])
+
+    #print e, r[e]
+    #print ll > threshold
+    #print ' ---------- '
+
+  constraints = {}
+  for (e, ranges) in r.iteritems():
+    constraints[e] = []
+    p = site_pos[site_pos_id.index(e)]
+    for (i, j) in ranges: 
+      constraints[e].append((get_line(p, i), 
+                             get_line(p, j))) 
+
+  return constraints
+
+
+
+
+def calculate_search_space(i, j, center, scale, half_span=15):
   ''' Plot search space, return point of maximum likelihood. '''
   
   #: Generate candidate points centered around ``center``. 
@@ -185,10 +282,13 @@ def plot_search_space(i, j, center, scale, half_span=15):
                                 range(-360, 360), 
                                 np.hstack((likelihoods[est_index,:], 
                                 likelihoods[est_index,:])) )
-  pos = grid.flat[np.argmax(pos_likelihood)]
-
-  t = time.localtime((est_time[i] + est_time[j]) / 2)
   
+  return (grid.flat[np.argmax(pos_likelihood)], pos_likelihood)
+
+def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
+  ''' Plot search space, return point of maximum likelihood. '''
+
+
   fig = pp.gcf()
   p = pp.imshow(pos_likelihood.transpose(), 
       origin='lowerleft', 
@@ -198,13 +298,17 @@ def plot_search_space(i, j, center, scale, half_span=15):
     [((float(s.easting) - center.imag) / scale) + half_span for s in sites],
     [((float(s.northing) - center.real) / scale) + half_span for s in sites],
      s=15, facecolor='0.5', label='sites') # sites
- 
-  #pp.plot( # sites 
-  #  [grid[s.easting,] for s in sites], 
-  #  [grid[,s.northing] for s in sites], 'ro')
+  
+  for (e, constraints) in get_constraints(i, j).iteritems():
+    p = site_pos[site_pos_id.index(e)]
+    for (Li, Lj) in constraints: 
+      print (Li, Lj) # TODO    
+    
   
   pp.clim()   # clamp the color limits
   pp.legend()
+  
+  t = time.localtime((est_time[i] + est_time[j]) / 2)
   pp.title('%04d-%02d-%02d %02d%02d:%02d txID=%d' % (
        t.tm_year, t.tm_mon, t.tm_mday,
        t.tm_hour, t.tm_min, t.tm_sec,
@@ -215,7 +319,9 @@ def plot_search_space(i, j, center, scale, half_span=15):
      t.tm_hour, t.tm_min, t.tm_sec, scale))
   pp.clf()
 
-  return pos
+
+
+
 
 
 #: Calculated positions (time, pos). 
@@ -254,7 +360,8 @@ try:
     w_sites = set(site_id[i:j])
 
     if len(w_sites) > 1: 
-      pos = plot_search_space(i, j, center, 10, 150)
+      (pos, pos_likelihood) = calculate_search_space(i, j, center, 10, 150)
+      plot_search_space(pos_likelihood, i, j, center, 10, 150)
       print '%04d-%02d-%02d %02d%02d:%02d %-8d %.2fN %.2fE %s' % (
        t.tm_year, t.tm_mon, t.tm_mday,
        t.tm_hour, t.tm_min, t.tm_sec,
