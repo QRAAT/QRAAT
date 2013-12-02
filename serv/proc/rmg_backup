@@ -74,17 +74,6 @@ then
 		exit 1
 	fi
 fi
-echo Checking for backup database directory: $BACKUP_DIR/database
-if [ ! -e $BACKUP_DIR/database ]
-then
-	echo WARNING: creating backup directory $BACKUP_DIR/database
-	mkdir $BACKUP_DIR/database
-	if [ ! -e $BACKUP_DIR/database ]
-	then
-		echo ERROR: cannot create backup directory $BACKUP_DIR/database
-		exit 1
-	fi
-fi
 
 # Backup $RMG_SERVER_ARCHIVE_DIR to $BACKUP_ARCHIVE_DIR
 BACKUP_ARCHIVE_FILELIST=/var/log/rmg/rmg_backup_archive_synclog
@@ -108,6 +97,18 @@ fi
 
 # Copy log files
 #TODO
+
+echo Checking for backup database directory: $BACKUP_DIR/database
+if [ ! -e $BACKUP_DIR/database ]
+then
+	echo WARNING: creating backup directory $BACKUP_DIR/database
+	mkdir $BACKUP_DIR/database
+	if [ ! -e $BACKUP_DIR/database ]
+	then
+		echo ERROR: cannot create backup directory $BACKUP_DIR/database
+		exit 1
+	fi
+fi
 
 # Extract tables from the qraat database to $BACKUP_DIR/database
 echo Dumping database tables
