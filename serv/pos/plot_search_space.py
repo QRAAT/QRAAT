@@ -9,7 +9,7 @@
 # python plot_search_space.py --t-start=0 --t-end=1381768575 --tx-id=35
 #  Modified EST select to 'mice' instead of 'est'. 
 #
-# Copyright (C) 2013 Christopher Patton, Todd Borrowman
+# Copyright (C) 2013 Christopher Patton, Joe Webster
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -164,10 +164,12 @@ for j in range(len(sites)):
 #   get_constraints(). 
 
 class halfplane: 
-  ''' A half-plane constraint in two dimensions. 
+  ''' A two-dimensional linear inequality. 
 
     Compute the slope and y-intercept of the line defined by point ``p`` 
-    and bearing ``theta``. Format is np.complex(real=northing, imag=easting). 
+    and bearing ``theta``. Format of ``p`` is np.complex(real=northing, 
+    imag=easting). Also, ``pos`` is set to True if the vector theta goes 
+    in a positive direction along the x-axis. 
   ''' 
   
   #: The types of plane constrains:
@@ -179,65 +181,35 @@ class halfplane:
                    plane_t.GE : '>=', 
                    plane_t.LE : '<=' }
 
-  def __init__ (self, p, theta, plane):
-    p_theta = p
+  def __init__ (self, p, theta):
 
-    if theta == 0 or theta == 360: 
-      p_theta += np.complex(0,1)
-      pos = True
+    self.x_p = p.imag
+    self.y_p = p.real
+    self.m = np.tan(np.pi * theta / 180) 
+    self.plane = None
 
-    elif 0 < theta and theta < 90: 
-      p_theta += np.complex(np.tan(theta), 1)
-      pos = True
+    if (0 <= theta and theta <= 90) or (270 <= theta and theta <= 360):
+      self.pos = True
+    else: self.pos = False 
 
-    elif theta == 90: 
-      p_theta += np.complex(1, 0)
-      pos = True
-
-    elif 90 < theta and theta < 180: 
-      p_theta += np.complex(np.tan(theta), -1)
-      pos = False 
-
-    elif theta == 180:
-      p_theta += np.complex(0, -1)
-      pos = False
-
-    elif 180 < theta  and theta < 270: 
-      p_theta += np.complex(-np.tan(theta), -1)
-      pos = False
-
-    elif theta == 270: 
-      p_theta += np.complex(-1, 0)
-      pos = False
-
-    else: # 270 < theta < 0
-      p_theta += np.complex(-np.tan(theta), 1)
-      pos = True
-
-    #: Slope
-    self.m = float(p.real - p_theta.real) / (p.imag - p_theta.imag)
-
-    #: Y-intercept 
-    self.b = p.real - (self.m * p.imag)
-
-    #: The feasible plane for the constraint. 
-    self.plane = plane
-    
-    if pos: # plot x-axis starting at Xp to positive infinity TODO
-      self.x_range = (p.imag, 0) 
+    if self.pos: # plot x-axis starting at Xp to positive infinity TODO
+      self.x_range = (p.imag, None) 
     else: 
-      self.x_range = (0, p.imag)
+      self.x_range = (None, p.imag)
       
   def __repr__ (self): 
-    s = 'Y %s %.03fX + %.03f' % (self.plane_string[self.plane], 
-                                 self.m, self.b)
-    return '%-30s' % s
+    s = 'y %s %.02f(x - %.02f) + %.02f' % (self.plane_string[self.plane], 
+                                           self.m, self.x_p, self.y_p)
+    return '%-38s' % s
 
   @classmethod
   def from_bearings(cls, p, theta_i, theta_j):
-    # TODO get plane constraints right. 
-    return (cls(p, theta_i, cls.plane_t.GT), 
-            cls(p, theta_j, cls.plane_t.GT))
+    # TODO get plane constraints right.
+    Ti = cls(p, theta_i)
+    Ti.plane = cls.plane_t.GT
+    Tj = cls(p, theta_j) 
+    Tj.plane = cls.plane_t.GT
+    return (Ti, Tj)    
 
 
 
