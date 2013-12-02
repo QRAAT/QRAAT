@@ -159,10 +159,6 @@ for j in range(len(sites)):
   site_pos_id.append(sites[j].ID)
 
 
-# TODO calculate a set of constraints for each 
-#   pair of bearings (Theta_i, Theta_j) computed in
-#   get_constraints(). 
-
 class halfplane: 
   ''' A two-dimensional linear inequality. 
 
@@ -200,7 +196,7 @@ class halfplane:
   def __repr__ (self): 
     s = 'y %s %.02f(x - %.02f) + %.02f' % (self.plane_string[self.plane], 
                                            self.m, self.x_p, self.y_p)
-    return '%-38s' % s
+    return '%-37s' % s
 
   @classmethod
   def from_bearings(cls, p, theta_i, theta_j):
@@ -226,7 +222,11 @@ def get_constraints(i, j, threshold=1.0):
     else: 
       constraints[site_id[e]] += likelihoods[e,]
 
-  # Get bearing ranges of log likelihoods above threshold.  
+  # Get bearing ranges of log likelihoods above threshold. 
+  # TODO this could be done more statistically soundly. 
+  #   How to decide if a dip between two curves is wide and 
+  #   deep enough to treat the two curves as separate bearing
+  #   arcs or as one? 
   r = {}
   for (e, ll) in constraints.iteritems():
     r[e] = []
