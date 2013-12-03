@@ -188,15 +188,13 @@ class halfplane:
       self.pos = True
     else: self.pos = False 
 
-    if self.pos: # plot x-axis starting at Xp to positive infinity TODO
-      self.x_range = (p.imag, None) 
-    else: 
-      self.x_range = (None, p.imag)
-      
   def __repr__ (self): 
     s = 'y %s %.02f(x - %.02f) + %.02f' % (self.plane_string[self.plane], 
                                            self.m, self.x_p, self.y_p)
     return '%-37s' % s
+
+  def __call__ (self, x): 
+    return self.m * (x - self.x_p) + self.y_p
 
   @classmethod
   def from_bearings(cls, p, theta_i, theta_j):
@@ -247,13 +245,20 @@ def get_constraints(i, j, threshold=1.0):
     #print ll > threshold
     #print ' ---------- '
 
-  constraints = {}
+  #constraints = {}
+  #for (e, ranges) in r.iteritems():
+  #  constraints[e] = []
+  #  p = site_pos[site_pos_id.index(e)]
+  #  for (theta_i, theta_j) in ranges: 
+  #    constraints[e].append(
+  #      halfplane.from_bearings(p, theta_i, theta_j)) 
+  constraints = []
   for (e, ranges) in r.iteritems():
-    constraints[e] = []
     p = site_pos[site_pos_id.index(e)]
     for (theta_i, theta_j) in ranges: 
-      constraints[e].append(
-        halfplane.from_bearings(p, theta_i, theta_j)) 
+      (Li, Lj) = halfplane.from_bearings(p, theta_i, theta_j)
+      constraints.append(Li)
+      constraints.append(Lj)
 
   return constraints
 
@@ -297,15 +302,36 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
       origin='lowerleft', 
       extent=(0, half_span * 2, 0, half_span * 2)) # search space
 
+  e = lambda(x) : ((x - center.imag) / scale) + half_span
+  n = lambda(y) : max(
+                   min(((y - center.real) / scale) + half_span, 
+                    half_span * 2), 0)
+
   pp.scatter(
     [((float(s.easting) - center.imag) / scale) + half_span for s in sites],
     [((float(s.northing) - center.real) / scale) + half_span for s in sites],
      s=15, facecolor='0.5', label='sites') # sites
   
-  for (e, constraints) in get_constraints(i, j).iteritems():
-    p = site_pos[site_pos_id.index(e)]
-    for (Li, Lj) in constraints: 
-      print (Li, Lj) # TODO    
+  #for (e, constraints) in get_constraints(i, j).iteritems():
+  #  p = site_pos[site_pos_id.index(e)]
+  #  for (Li, Lj) in constraints: 
+  #    print (Li, Lj)
+  
+  x_left =  center.imag - (half_span * scale)
+  x_right = center.imag + (half_span * scale)
+  
+  for L in get_constraints(i, j, 6.0):
+    print L
+    if L.pos:  # --->
+      x = [L.x_p, x_right]
+    else:      # <---
+      x = [x_left, L.x_p]
+    #print f(x)
+    pp.plot(map(e, x), map(n, map(L, x)), 'k-')
+  
+    
+
+      
     
   
   pp.clim()   # clamp the color limits
