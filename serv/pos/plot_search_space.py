@@ -188,6 +188,10 @@ class halfplane:
       self.pos = True
     else: self.pos = False 
 
+    if (0 <= theta and theta <= 180):
+      self.y_pos = True
+    else: self.y_pos = False
+
   def __repr__ (self): 
     s = 'y %s %.02f(x - %.02f) + %.02f' % (self.plane_string[self.plane], 
                                            self.m, self.x_p, self.y_p)
@@ -308,14 +312,10 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
       origin='lower',
       extent=(0, half_span * 2, 0, half_span * 2)) # search space
 
-  e = lambda(x) : max(
-                   min(((x - center.imag) / scale) + half_span, 
-                    half_span * 2), 0)
+  e = lambda(x) : ((x - center.imag) / scale) + half_span
 
-  n = lambda(y) : max(
-                   min(((y - center.real) / scale) + half_span, 
-                    half_span * 2), 0)
-
+  n = lambda(y) : ((y - center.real) / scale) + half_span 
+  
   
   #for (e, constraints) in get_constraints(i, j).iteritems():
   #  p = site_pos[site_pos_id.index(e)]
@@ -324,13 +324,27 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
   
   x_left =  center.imag - (half_span * scale)
   x_right = center.imag + (half_span * scale)
-  
+  y_top = center.real + (half_span * scale)
+  y_bottom = center.real - (half_span * scale)
+
   for L in get_constraints(i, j, 6.0):
     if L.pos:  # --->
-      x = [L.x_p, x_right]
+      x_range = (L.x_p, x_right)
     else:      # <---
-      x = [x_left, L.x_p]
-    pp.plot(map(e, x), map(n, L(x)), 'k-')
+      x_range = (x_left, L.x_p)
+    
+    # Reflect line over 'y = x' and transform to 
+    # image's coordinate space. 
+    x = [n(L(x_range[0])) - n(L.y_p) + e(L.x_p), 
+         n(L(x_range[1])) - n(L.y_p) + e(L.x_p)]
+
+    y = [e(x_range[0]) - e(L.x_p) + n(L.y_p), 
+         e(x_range[1]) - e(L.x_p) + n(L.y_p)]
+
+    # TODO fix ranges of (x[0], y[0]) and (x[1], y[1])
+
+    # Plot constraints. 
+    pp.plot(x, y, 'k-')
     
    
 
