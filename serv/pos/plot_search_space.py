@@ -196,6 +196,9 @@ class halfplane:
   def __call__ (self, x): 
     return self.m * (x - self.x_p) + self.y_p
 
+  def inverse(self, y): 
+    return ((y - self.y_p) + (self.m * self.x_p)) / self.m
+
   @classmethod
   def from_bearings(cls, p, theta_i, theta_j):
     # TODO get plane constraints right.
@@ -255,10 +258,13 @@ def get_constraints(i, j, threshold=1.0):
   constraints = []
   for (e, ranges) in r.iteritems():
     p = site_pos[site_pos_id.index(e)]
+    print "SiteID=%d" % e
     for (theta_i, theta_j) in ranges: 
       (Li, Lj) = halfplane.from_bearings(p, theta_i, theta_j)
       constraints.append(Li)
       constraints.append(Lj)
+      print 'i', theta_i, Li
+      print 'j', theta_j, Lj
 
   return constraints
 
@@ -299,18 +305,17 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
 
   fig = pp.gcf()
   p = pp.imshow(pos_likelihood.transpose(), 
-      origin='lowerleft', 
+      origin='lower',
       extent=(0, half_span * 2, 0, half_span * 2)) # search space
 
-  e = lambda(x) : ((x - center.imag) / scale) + half_span
+  e = lambda(x) : max(
+                   min(((x - center.imag) / scale) + half_span, 
+                    half_span * 2), 0)
+
   n = lambda(y) : max(
                    min(((y - center.real) / scale) + half_span, 
                     half_span * 2), 0)
 
-  pp.scatter(
-    [((float(s.easting) - center.imag) / scale) + half_span for s in sites],
-    [((float(s.northing) - center.real) / scale) + half_span for s in sites],
-     s=15, facecolor='0.5', label='sites') # sites
   
   #for (e, constraints) in get_constraints(i, j).iteritems():
   #  p = site_pos[site_pos_id.index(e)]
@@ -321,17 +326,18 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
   x_right = center.imag + (half_span * scale)
   
   for L in get_constraints(i, j, 6.0):
-    print L
     if L.pos:  # --->
       x = [L.x_p, x_right]
     else:      # <---
       x = [x_left, L.x_p]
-    #print f(x)
-    pp.plot(map(e, x), map(n, map(L, x)), 'k-')
-  
+    pp.plot(map(e, x), map(n, L(x)), 'k-')
     
+   
 
-      
+  pp.scatter(
+    [e(float(s.easting)) for s in sites],
+    [n(float(s.northing)) for s in sites],
+     s=15, facecolor='0.5', label='sites') # sites
     
   
   pp.clim()   # clamp the color limits
