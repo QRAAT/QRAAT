@@ -22,7 +22,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from optparse import OptionParser
-import rmg_position_lib
+import qraat.rmg_position_lib
 
 parser = OptionParser()
 
@@ -69,7 +69,7 @@ parser.add_option('-v', '--verbose', action='store_true', default=False,
 
 #TODO source rmg_env
 
-(pos_est, sites) = rmg_position_lib.calc_positions(options.cal_id, options.tx_id, options.t_start, options.t_end, options.t_delta, options.t_window, options.verbose)  
+(pos_est, sites) = qraat.rmg_position_lib.calc_positions(options.cal_id, options.tx_id, options.t_start, options.t_end, options.t_delta, options.t_window, options.verbose)  
 
 if options.plot: 
 

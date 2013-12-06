@@ -1,10 +1,10 @@
 #!/usr/bin/python
 
-import rmg_position_lib
+import qraat.rmg_position_lib as rpl
 import numpy as np
 import os
 
-db_con = rmg_position_lib.get_db()
+db_con = rpl.get_db()
 cursor = db_con.cursor()
 
 #get id of last processed record
@@ -19,7 +19,7 @@ print "{} transmitters found in new records".format(len(tx_list))
 print tx_list
 if len(tx_list) > 0:
   cal_id = int(os.environ['RMG_POS_CAL_ID'])
-  (sites, bearings, steering_vectors) = rmg_position_lib.get_site_data(db_con, cal_id)
+  (sites, bearings, steering_vectors) = rpl.get_site_data(db_con, cal_id)
 
 time_window = float(os.environ['RMG_POS_TIME_WINDOW'])
 time_delta = float(os.environ['RMG_POS_TIME_STEP'])
@@ -51,10 +51,10 @@ for tx in tx_list:
   #process time ranges
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
-    (sig_id, site_id, est_time, signal) = rmg_position_lib.get_est_data(cursor, time_range[0]-time_window, time_range[1]+time_window, tx_id)
-    likelihoods = rmg_position_lib.calc_likelihoods(signal, site_id, bearings, steering_vectors)
-    pos_est = rmg_position_lib.estimate_positions(est_time, time_window, time_delta, sites, likelihoods, site_id)
-    rmg_position_lib.insert_positions(cursor, pos_est, tx_id)
+    (sig_id, site_id, est_time, signal) = rpl.get_est_data(cursor, time_range[0]-time_window, time_range[1]+time_window, tx_id)
+    likelihoods = rpl.calc_likelihoods(signal, site_id, bearings, steering_vectors)
+    pos_est = rpl.estimate_positions(est_time, time_window, time_delta, sites, likelihoods, site_id)
+    rpl.insert_positions(cursor, pos_est, tx_id)
 
   temp_max_id = np.max(times[:,0])
   if temp_max_id > max_id:

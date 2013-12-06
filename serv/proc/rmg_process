@@ -30,6 +30,9 @@ echo
 echo det_to_db
 rmg_det_to_db
 echo 
+echo rmg_position_auto
+rmg_position_auto
+echo
 echo rmg_filterest
 rmg_filterest
 echo
