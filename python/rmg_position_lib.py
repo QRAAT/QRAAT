@@ -191,7 +191,7 @@ def estimate_positions(est_time, t_window, t_delta, sites, likelihoods, site_id,
       # Find the indexes corresponding to the time window. 
       est_index_list = np.where(np.abs(est_time - time_step*t_delta - t_window / 2.0) <= t_window / 2.0)[0]#where returns a tuple for some reason
 
-      if len(est_index_list) > 0:
+      if len(est_index_list) > 0 and len(set(site_id[est_index_list])) > 1:
         if verbose: print "Time window {0} - {1}".format(time_step*t_delta - t_window / 2.0, time_step*t_delta + t_window)
         scale = 100
         pos = center
