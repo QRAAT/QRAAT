@@ -52,7 +52,7 @@ def get_site_data(db_con, cal_id):
 
   # Format site locations as np.complex's. 
   for site in sites:
-    setattr(site, 'pos', np.complex(sites[j].northing, sites[j].easting))
+    setattr(site, 'pos', np.complex(site.northing, site.easting))
 
   return (sites, bearings, steering_vectors)
 
@@ -88,7 +88,7 @@ def get_est_data(cur, t_start, t_end, tx_id):
 def calc_likelihoods(signal, site_id, bearings, steering_vectors):
   print "position: calculating pulse bearing likelihoods"
 
-  likelihoods = np.zeros((est_ct,360))
+  likelihoods = np.zeros((signal.shape[0],360))
   for i in range(signal.shape[0]):
     try: 
       sv =  steering_vectors[site_id[i]]
@@ -105,7 +105,7 @@ def calc_likelihoods(signal, site_id, bearings, steering_vectors):
 
 
 
-def position_estimation(index_list, center, scale, sites, likelihoods, half_span=15):
+def position_estimation(index_list, center, scale, sites, likelihoods, site_id, half_span=15):
   ''' Estimate the position of a transmitter over time interval ``[i, j]``.
 
     Generate a set of candidate points centered around ``center``. 
@@ -128,11 +128,11 @@ def position_estimation(index_list, center, scale, sites, likelihoods, half_span
   site_bearings = {}
   for site in sites:
     #site_bearings[:,:,sv_index] = np.angle(grid - site.pos) * 180 / np.pi
-    site_bearings[site.id] = np.angle(grid - site.pos) * 180 / np.pi
+    site_bearings[site.ID] = np.angle(grid - site.pos) * 180 / np.pi
 
   #: Based on bearing likelihoods for EST's in time range, calculate
   #: the log likelihood of each candidate point. 
-  pos_likelihood = np.zeros(site_bearings.shape[0:2])
+  pos_likelihood = np.zeros(site_bearings[sites[0].ID].shape[0:2])
   for est_index in index_list: 
     sv_index = site_id[est_index]
     try:
@@ -151,11 +151,11 @@ def calc_positions(cal_id, tx_id, t_start, t_end, t_delta, t_window, verbose = F
   cur = con.cursor()
   (sig_id, site_id, est_time, signal) = get_est_data(cur, t_start, t_end, tx_id)
   likelihoods = calc_likelihoods(signal, site_id, bearings, steering_vectors)
-  pos_est = estimate_positions(est_time, t_window, t_delta, sites, likelihoods)
+  pos_est = estimate_positions(est_time, t_window, t_delta, sites, likelihoods, site_id, verbose)
   insert_positions(cur, pos_est, tx_id)
   return pos_est, sites
 
-def estimate_positions(est_time, t_window, t_delta, sites, likelihoods):
+def estimate_positions(est_time, t_window, t_delta, sites, likelihoods, site_id, verbose=False):
   #: Calculated positions (time, pos). 
   pos_est = [] 
   est_ct = likelihoods.shape[0]
@@ -191,7 +191,7 @@ def estimate_positions(est_time, t_window, t_delta, sites, likelihoods):
       scale = 100
       pos = center
       while scale >= 1: # 100, 10, 1 meters ...  
-        pos = position_estimation(range(i,j), pos, scale, sites, likelihoods)
+        pos = position_estimation(range(i,j), pos, scale, sites, likelihoods, site_id)
         if verbose:
           print "%8dn,%de" % (pos.real, pos.imag),
         scale /= 10

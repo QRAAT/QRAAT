@@ -16,11 +16,13 @@ print "Last EST record processed: {}".format(last_processed)
 cursor.execute("select distinct(txid) from est where ID > %s;", (last_processed,))
 tx_list = cursor.fetchall()
 print "{} transmitters found in new records".format(len(tx_list))
-
+print tx_list
 if len(tx_list) > 0:
   cal_id = int(os.environ['RMG_POS_CAL_ID'])
   (sites, bearings, steering_vectors) = rmg_position_lib.get_site_data(db_con, cal_id)
 
+time_window = float(os.environ['RMG_POS_TIME_WINDOW'])
+time_delta = float(os.environ['RMG_POS_TIME_STEP'])
 max_id = last_processed
 for tx in tx_list:
   tx_id = tx[0]
@@ -28,11 +30,10 @@ for tx in tx_list:
   #get times of to-be-processed records
   cursor.execute("select ID, timestamp from est where ID > %s and txid = %s order by timestamp ASC;", (last_processed,tx_id))
   times = np.array(cursor.fetchall(),dtype=float)
-
+  print "Found {} records".format(times.shape[0])
   print "Calculating time range"
   #determine time range needed to be processed
   #TODO source rmg_env
-  time_window = float(os.environ['RMG_POS_TIME_WINDOW'])
   time_ranges = []
   if times.shape[0] > 0:
     temp_range = [times[0,1] - time_window, times[0,1] + time_window]
@@ -41,21 +42,21 @@ for tx in tx_list:
         temp_range[1] = times[j,1] + time_window
       else:
         time_ranges.append(temp_range)
-        temp_range = [times[j,1] - time_window, times[j,1]]
+        temp_range = [times[j,1] - time_window, times[j,1] + time_window]
+    time_ranges.append(temp_range)
   #TODO combine close ranges?
 
-  time_delta = float(os.environ['RMG_POS_TIME_STEP'])
   
 
   #process time ranges
   for time_range in time_ranges:
-    print "Processing {0} - {1}".format(time_range)
+    print "Processing {0} - {1}".format(time_range[0],time_range[1])
     (sig_id, site_id, est_time, signal) = rmg_position_lib.get_est_data(cursor, time_range[0], time_range[1], tx_id)
     likelihoods = rmg_position_lib.calc_likelihoods(signal, site_id, bearings, steering_vectors)
-    pos_est = rmg_position_lib.estimate_positions(est_time, time_window, time_delta, sites, likelihoods)
+    pos_est = rmg_position_lib.estimate_positions(est_time, time_window, time_delta, sites, likelihoods, site_id)
     rmg_position_lib.insert_positions(cursor, pos_est, tx_id)
 
-  temp_max_id = np.max(times[0,:])
+  temp_max_id = np.max(times[:,0])
   if temp_max_id > max_id:
     max_id = temp_max_id
 
