@@ -151,7 +151,7 @@ def calc_positions(cal_id, tx_id, t_start, t_end, t_delta, t_window, verbose = F
   cur = con.cursor()
   (sig_id, site_id, est_time, signal) = get_est_data(cur, t_start, t_end, tx_id)
   likelihoods = calc_likelihoods(signal, site_id, bearings, steering_vectors)
-  pos_est = estimate_positions(est_time, t_window, t_delta, sites, likelihoods):
+  pos_est = estimate_positions(est_time, t_window, t_delta, sites, likelihoods)
   insert_positions(cur, pos_est, tx_id)
   return pos_est, sites
 
@@ -195,7 +195,7 @@ def estimate_positions(est_time, t_window, t_delta, sites, likelihoods):
         if verbose:
           print "%8dn,%de" % (pos.real, pos.imag),
         scale /= 10
-      pos_est.append((est_time[i] + est_time[j]) / 2], 
+      pos_est.append(((est_time[i] + est_time[j]) / 2, 
                       pos.imag,  # easting 
                       pos.real)) # northing
 

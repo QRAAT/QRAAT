@@ -4,7 +4,7 @@ import rmg_position_lib
 import numpy as np
 import os
 
-db_con = rmg_position.get_db()
+db_con = rmg_position_lib.get_db()
 cursor = db_con.cursor()
 
 #get id of last processed record
@@ -21,6 +21,7 @@ if len(tx_list) > 0:
   cal_id = int(os.environ['RMG_POS_CAL_ID'])
   (sites, bearings, steering_vectors) = rmg_position_lib.get_site_data(db_con, cal_id)
 
+max_id = last_processed
 for tx in tx_list:
   tx_id = tx[0]
   print "Processing transmitter: {}".format(tx_id)
@@ -31,7 +32,7 @@ for tx in tx_list:
   print "Calculating time range"
   #determine time range needed to be processed
   #TODO source rmg_env
-  time_window = os.environ['RMG_POS_TIME_WINDOW']
+  time_window = float(os.environ['RMG_POS_TIME_WINDOW'])
   time_ranges = []
   if times.shape[0] > 0:
     temp_range = [times[0,1] - time_window, times[0,1] + time_window]
@@ -43,7 +44,7 @@ for tx in tx_list:
         temp_range = [times[j,1] - time_window, times[j,1]]
   #TODO combine close ranges?
 
-  time_delta = os.environ['RMG_POS_TIME_STEP']
+  time_delta = float(os.environ['RMG_POS_TIME_STEP'])
   
 
   #process time ranges
@@ -51,10 +52,13 @@ for tx in tx_list:
     print "Processing {0} - {1}".format(time_range)
     (sig_id, site_id, est_time, signal) = rmg_position_lib.get_est_data(cursor, time_range[0], time_range[1], tx_id)
     likelihoods = rmg_position_lib.calc_likelihoods(signal, site_id, bearings, steering_vectors)
-    pos_est = rmg_position_lib.estimate_positions(est_time, time_window, time_delta, sites, likelihoods):
+    pos_est = rmg_position_lib.estimate_positions(est_time, time_window, time_delta, sites, likelihoods)
     rmg_position_lib.insert_positions(cursor, pos_est, tx_id)
 
-    #rmg_position.calc_positions(cal_id, txid, time_range[0], time_range[1], time_delta, time_window, cur = cursor)
+  temp_max_id = np.max(times[0,:])
+  if temp_max_id > max_id:
+    max_id = temp_max_id
 
 #store id of last processed record
-cursor.execute("update position_processing set last_processed=%s;", (np.max(times[0,:]),))
+if not max_id == last_processed:
+  cursor.execute("update position_processing set last_processed=%s;", (max_id,))
