@@ -2,7 +2,13 @@
 
 import qraat.rmg_position_lib as rpl
 import numpy as np
-import os
+import os, commands, sys
+
+(status, output) = commands.getstatusoutput(
+  'pgrep -c `basename %s`' % (sys.argv[0]))
+if int(output) > 1: 
+  print >>sys.stderr, "det_to_db: error: attempted reentry, exiting"
+  sys.exit(1)
 
 db_con = rpl.get_db()
 cursor = db_con.cursor()

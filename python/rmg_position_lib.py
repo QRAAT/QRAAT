@@ -186,10 +186,10 @@ def estimate_positions(est_time, t_window, t_delta, sites, likelihoods, site_id,
   
 
   try: 
-    for time_step in range(start_step,end_step):
+    for time_step in range(int(start_step),int(end_step)):
 
       # Find the indexes corresponding to the time window. 
-      est_index_list = np.where(np.abs(est_time - time_step*t_delta - t_window / 2.0) <= t_window / 2.0)
+      est_index_list = np.where(np.abs(est_time - time_step*t_delta - t_window / 2.0) <= t_window / 2.0)[0]#where returns a tuple for some reason
 
       if len(est_index_list) > 0:
         if verbose: print "Time window {0} - {1}".format(time_step*t_delta - t_window / 2.0, time_step*t_delta + t_window)
@@ -200,7 +200,7 @@ def estimate_positions(est_time, t_window, t_delta, sites, likelihoods, site_id,
           if verbose:
             print "%8dn,%de" % (pos.real, pos.imag),
           scale /= 10
-        pos_est.append(((est_time[i] + est_time[j]) / 2, 
+        pos_est.append((time_step*t_delta, 
                         pos.imag,  # easting 
                         pos.real)) # northing
 
