@@ -36,13 +36,13 @@ for tx in tx_list:
   #TODO source rmg_env
   time_ranges = []
   if times.shape[0] > 0:
-    temp_range = [times[0,1] - time_window, times[0,1] + time_window]
+    temp_range = [times[0,1], times[0,1]]
     for j in range(1,times.shape[0]):
-      if times[j,1] - time_window < temp_range[1]:
-        temp_range[1] = times[j,1] + time_window
+      if times[j,1] - time_window < temp_range[1] + time_window:
+        temp_range[1] = times[j,1]
       else:
         time_ranges.append(temp_range)
-        temp_range = [times[j,1] - time_window, times[j,1] + time_window]
+        temp_range = [times[j,1], times[j,1]]
     time_ranges.append(temp_range)
   #TODO combine close ranges?
 
@@ -51,7 +51,7 @@ for tx in tx_list:
   #process time ranges
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
-    (sig_id, site_id, est_time, signal) = rmg_position_lib.get_est_data(cursor, time_range[0], time_range[1], tx_id)
+    (sig_id, site_id, est_time, signal) = rmg_position_lib.get_est_data(cursor, time_range[0]-time_window, time_range[1]+time_window, tx_id)
     likelihoods = rmg_position_lib.calc_likelihoods(signal, site_id, bearings, steering_vectors)
     pos_est = rmg_position_lib.estimate_positions(est_time, time_window, time_delta, sites, likelihoods, site_id)
     rmg_position_lib.insert_positions(cursor, pos_est, tx_id)

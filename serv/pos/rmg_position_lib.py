@@ -174,37 +174,37 @@ def estimate_positions(est_time, t_window, t_delta, sites, likelihoods, site_id,
   if verbose:
     print "%15s %-19s %-19s %-19s" % ('time window', 
                 '100 meters', '10 meters', '1 meter')
+  start_step = np.ceil(est_time[0] / t_delta)
+  while start_step*t_delta - (t_window / 2.0) < est_time[0]:
+    start_step += 1
+  start_step -= 1
 
-  i = 0
+  end_step = np.floor(est_time[-1] / t_delta)
+  while end_step*t_delta + (t_window / 2.0) > est_time[-1]:
+    end_step -= 1
+  end_step += 1
+  
 
   try: 
-    while i < est_ct - 1:
+    for time_step in range(start_step,end_step):
 
-      # Find the index j corresponding to the end of the time window. 
-      j = i + 1
-      while j < est_ct - 1 and (est_time[j + 1] - est_time[i]) <= t_window: 
-        j += 1
+      # Find the indexes corresponding to the time window. 
+      est_index_list = np.where(np.abs(est_time - time_step*t_delta - t_window / 2.0) <= t_window / 2.0)
 
-      if verbose: 
-        print "%7d %7d" % (i, j), 
-      
-      scale = 100
-      pos = center
-      while scale >= 1: # 100, 10, 1 meters ...  
-        pos = position_estimation(range(i,j), pos, scale, sites, likelihoods, site_id)
-        if verbose:
-          print "%8dn,%de" % (pos.real, pos.imag),
-        scale /= 10
-      pos_est.append(((est_time[i] + est_time[j]) / 2, 
-                      pos.imag,  # easting 
-                      pos.real)) # northing
+      if len(est_index_list) > 0:
+        if verbose: print "Time window {0} - {1}".format(time_step*t_delta - t_window / 2.0, time_step*t_delta + t_window)
+        scale = 100
+        pos = center
+        while scale >= 1: # 100, 10, 1 meters ...  
+          pos = position_estimation(est_index_list, pos, scale, sites, likelihoods, site_id)
+          if verbose:
+            print "%8dn,%de" % (pos.real, pos.imag),
+          scale /= 10
+        pos_est.append(((est_time[i] + est_time[j]) / 2, 
+                        pos.imag,  # easting 
+                        pos.real)) # northing
 
-      if verbose: print
-
-      # Step index i forward t_delta seconds. 
-      j = i + 1
-      while i < est_ct - 1 and (est_time[i + 1] - est_time[j]) <= t_delta: 
-        i += 1
+        if verbose: print
 
   except KeyboardInterrupt: pass
 
