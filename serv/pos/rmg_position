@@ -167,8 +167,9 @@ def position_estimation(i, j, center, scale, half_span=15):
 
   return grid.flat[np.argmax(pos_likelihood)]
 
-def calc_positions(cal_id, tx_id, t_start, t_end, t_delta, t_window, verbose = False):
-  cur = get_db_cursor()
+def calc_positions(cal_id, tx_id, t_start, t_end, t_delta, t_window, verbose = False, cur = None):
+  if cur is None:
+    cur = get_db_cursor()
   (sites, bearings, steering_vectors) = get_site_data(cur, cal_id)
   (sig_id, site_id, est_time, signal) = get_est_data(cur, t_start, t_end, tx_id)
   likelihoods = calc_likelihoods(signal, site_id, bearings, steering_vectors)
