@@ -111,5 +111,14 @@ export BACKUP_ARCHIVE_DIR=$BACKUP_DIR/archive
 # Used in rmg_clean
 export RMG_ARCHIVE_DAYS=3
 
+# Averaging window used for auto position calculation
+export RMG_POS_TIME_WINDOW=30
+
+# Time step for auto position calculation
+export RMG_POS_TIME_STEP=15
+
+# Calibration data to use in auto position calculation
+export RMG_POS_CAL_ID=1
+
 #END
 
