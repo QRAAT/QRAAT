@@ -1,10 +1,11 @@
 #!/usr/bin/python
 
-import rmg_position
+import rmg_position_lib
 import numpy as np
 import os
 
-cursor = rmg_position.get_db_cursor()
+db_con = rmg_position.get_db()
+cursor = db_con.cursor()
 
 #get id of last processed record
 cursor.execute("select last_processed from position_processing;")
@@ -16,11 +17,15 @@ cursor.execute("select distinct(txid) from est where ID > %s;", (last_processed,
 tx_list = cursor.fetchall()
 print "{} transmitters found in new records".format(len(tx_list))
 
+if len(tx_list) > 0:
+  cal_id = int(os.environ['RMG_POS_CAL_ID'])
+  (sites, bearings, steering_vectors) = rmg_position_lib.get_site_data(db_con, cal_id)
+
 for tx in tx_list:
-  txid = tx[0]
-  print "Processing transmitter: {}".format(txid)
+  tx_id = tx[0]
+  print "Processing transmitter: {}".format(tx_id)
   #get times of to-be-processed records
-  cursor.execute("select ID, timestamp from est where ID > %s and txid = %s order by timestamp ASC;", (last_processed,txid))
+  cursor.execute("select ID, timestamp from est where ID > %s and txid = %s order by timestamp ASC;", (last_processed,tx_id))
   times = np.array(cursor.fetchall(),dtype=float)
 
   print "Calculating time range"
@@ -39,12 +44,17 @@ for tx in tx_list:
   #TODO combine close ranges?
 
   time_delta = os.environ['RMG_POS_TIME_STEP']
-  cal_id = os.environ['RMG_POS_CAL_ID']
+  
 
   #process time ranges
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range)
-    rmg_position.calc_positions(cal_id, txid, time_range[0], time_range[1], time_delta, time_window, cur = cursor)
+    (sig_id, site_id, est_time, signal) = rmg_position_lib.get_est_data(cursor, time_range[0], time_range[1], tx_id)
+    likelihoods = rmg_position_lib.calc_likelihoods(signal, site_id, bearings, steering_vectors)
+    pos_est = rmg_position_lib.estimate_positions(est_time, time_window, time_delta, sites, likelihoods):
+    rmg_position_lib.insert_positions(cursor, pos_est, tx_id)
+
+    #rmg_position.calc_positions(cal_id, txid, time_range[0], time_range[1], time_delta, time_window, cur = cursor)
 
 #store id of last processed record
 cursor.execute("update position_processing set last_processed=%s;", (np.max(times[0,:]),))
