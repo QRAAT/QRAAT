@@ -62,7 +62,7 @@ parser.add_option('--t-window', type='float', metavar='SEC', default=30.0,
 parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800.0, 
                   help="Start time in secondes after the epoch (UNIX time).")
 
-parser.add_option('--t-end', type='float', metavar='SEC', default=1376427800,#1376442000.0,#1376427800 yields 302 rows
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0,#1376427800 yields 302 rows
                   help="End time in secondes after the epoch (UNIX time).")
 
 (options, args) = parser.parse_args()
@@ -241,9 +241,9 @@ def get_constraints(i, j, threshold=1.0):
     if above: # Fix wrap around  
       r[e][0] = (i, r[e][0][1])
 
-    #print e, r[e]
-    #print ll > threshold
-    #print ' ---------- '
+    print e, r[e]
+    print ll
+    print ' ---------- '
 
   #constraints = {}
   #for (e, ranges) in r.iteritems():
