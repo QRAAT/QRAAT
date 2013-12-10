@@ -111,5 +111,20 @@ export BACKUP_ARCHIVE_DIR=$BACKUP_DIR/archive
 # Used in rmg_clean
 export RMG_ARCHIVE_DAYS=3
 
+# Averaging window used for auto position calculation
+export RMG_POS_TIME_WINDOW=30
+
+# Time step for auto position calculation
+export RMG_POS_TIME_STEP=15
+
+# Calibration data to use in auto position calculation
+export RMG_POS_CAL_ID=1
+
+# Quarantine directory for bad files
+export RMG_QUARANTINE_DIR=/rmg_server/quarantine
+
+# Quarantine directory for bad det files
+export RMG_SERVER_DET_QUARANTINE=$RMG_QUARANTINE_DIR/det_files
+
 #END
 

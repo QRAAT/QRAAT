@@ -85,14 +85,23 @@ try:
         for leaf_dir in leaf_dirs:
 
           # Process det files, store signals in the databse. 
-          table = qraat.est(dets=qraat.det.read_dir(leaf_dir))
+          try:
+            table = qraat.est(dets=qraat.det.read_dir(leaf_dir))
+          except IOError:
+            m = leaf_regex.search(leaf_dir)
+            det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
+            q_dir = ("%s/%s_" % (det_q, site)) +\
+                       ("%s.%s.%s.%s.%s/" % m.groups(0))
+            commands.getstatusoutput("mv {0} {1}".format(leaf_dir,q_dir))
+            continue
+            
           cur = db_con.cursor()
           for row in table: 
             try:
               table.write_db_row(cur, row, site)
             except qraat.ResolveIdError, e:
               print >>sys.stderr, "det_to_db: warning: skipping est corresponding to '%s'" % e.filename
-          cur.execute('COMMIT')
+#          cur.execute('COMMIT')
                   
           # Archive table as est file. 
           m = leaf_regex.search(leaf_dir) 
