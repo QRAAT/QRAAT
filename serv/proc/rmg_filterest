@@ -32,12 +32,17 @@ fi
 echo
 echo Starting `date`
 # Set RMG environment variables
-rmg_env
+. rmg_env
+
+# Get DB credentials
+read user password name <<< $(rmg_csv --row view=writer user password name \
+                                      < $RMG_SERVER_DIR/db_auth)
 
 echo -n "Number of est entries to process: "
-mysql -B --skip-column-names -e 'select count(id) from est where id > (select max(id) from fest);'
-mysql -B -e 'insert into fest select * from est where id > (select max(id) from fest) and band10 < 1000;'
-
+mysql -B --skip-column-names -e 'select count(id) from est where id > (select max(id) from fest);' $name
+mysql --user=$user --password=$password \
+      -B -e 'insert into fest select * from est where id > (select max(id) from fest) and band10 < 1000;' \
+      $name
 
 echo Finished `date`
 
