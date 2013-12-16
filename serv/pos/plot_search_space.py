@@ -188,6 +188,10 @@ class halfplane:
       self.pos = True
     else: self.pos = False 
 
+    if (0 <= theta and theta <= 180):
+      self.y_pos = True
+    else: self.y_pos = False
+
   def __repr__ (self): 
     s = 'y %s %.02f(x - %.02f) + %.02f' % (self.plane_string[self.plane], 
                                            self.m, self.x_p, self.y_p)
@@ -195,6 +199,9 @@ class halfplane:
 
   def __call__ (self, x): 
     return self.m * (x - self.x_p) + self.y_p
+
+  def inverse(self, y): 
+    return ((y - self.y_p) + (self.m * self.x_p)) / self.m
 
   @classmethod
   def from_bearings(cls, p, theta_i, theta_j):
@@ -245,20 +252,13 @@ def get_constraints(i, j, threshold=1.0):
     #print ll
     #print ' ---------- '
 
-  #constraints = {}
-  #for (e, ranges) in r.iteritems():
-  #  constraints[e] = []
-  #  p = site_pos[site_pos_id.index(e)]
-  #  for (theta_i, theta_j) in ranges: 
-  #    constraints[e].append(
-  #      halfplane.from_bearings(p, theta_i, theta_j)) 
-  constraints = []
+  constraints = {}
   for (e, ranges) in r.iteritems():
+    constraints[e] = []
     p = site_pos[site_pos_id.index(e)]
     for (theta_i, theta_j) in ranges: 
-      (Li, Lj) = halfplane.from_bearings(p, theta_i, theta_j)
-      constraints.append(Li)
-      constraints.append(Lj)
+      constraints[e].append(
+        halfplane.from_bearings(p, theta_i, theta_j)) 
 
   return constraints
 
@@ -296,46 +296,49 @@ def calculate_search_space(i, j, center, scale, half_span=15):
 def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
   ''' Plot search space, return point of maximum likelihood. '''
 
-
   fig = pp.gcf()
-  p = pp.imshow(pos_likelihood.transpose(), 
-      origin='lowerleft', 
-      extent=(0, half_span * 2, 0, half_span * 2)) # search space
-
-  e = lambda(x) : ((x - center.imag) / scale) + half_span
-  n = lambda(y) : max(
-                   min(((y - center.real) / scale) + half_span, 
-                    half_span * 2), 0)
-
-  pp.scatter(
-    [((float(s.easting) - center.imag) / scale) + half_span for s in sites],
-    [((float(s.northing) - center.real) / scale) + half_span for s in sites],
-     s=15, facecolor='0.5', label='sites') # sites
   
-  #for (e, constraints) in get_constraints(i, j).iteritems():
-  #  p = site_pos[site_pos_id.index(e)]
-  #  for (Li, Lj) in constraints: 
-  #    print (Li, Lj)
+  # Search space
+  p = pp.imshow(pos_likelihood.transpose(), 
+      origin='lower',
+      extent=(0, half_span * 2, 0, half_span * 2))
+
+  # Transform to plot's coordinate system.
+  e = lambda(x) : ((x - center.imag) / scale) + half_span
+  n = lambda(y) : ((y - center.real) / scale) + half_span 
   
   x_left =  center.imag - (half_span * scale)
   x_right = center.imag + (half_span * scale)
-  
-  for L in get_constraints(i, j, 6.0):
-    print L
-    if L.pos:  # --->
-      x = [L.x_p, x_right]
-    else:      # <---
-      x = [x_left, L.x_p]
-    #print f(x)
-    pp.plot(map(e, x), map(n, map(L, x)), 'k-')
-  
-    
 
-      
+  # Constraints
+  for (s, constraints) in get_constraints(i, j, 6).iteritems():
+    for constraint in constraints: 
+      for L in constraint: 
+        if L.pos:  # --->
+          x_range = (L.x_p, x_right)
+        else:      # <---
+          x_range = (x_left, L.x_p)
+        
+        # Reflect line over 'y = x' and transform to 
+        # image's coordinate space. 
+        x = [n(L(x_range[0])) - n(L.y_p) + e(L.x_p), 
+             n(L(x_range[1])) - n(L.y_p) + e(L.x_p)]
+
+        y = [e(x_range[0]) - e(L.x_p) + n(L.y_p), 
+             e(x_range[1]) - e(L.x_p) + n(L.y_p)]
+        
+        # Plot constraints. 
+        pp.plot(x, y, 'k-')
     
+  # Sites
+  pp.scatter(
+    [e(float(s.easting)) for s in sites],
+    [n(float(s.northing)) for s in sites],
+     s=15, facecolor='0.5', label='sites', zorder=10)
   
   pp.clim()   # clamp the color limits
   pp.legend()
+  pp.axis([0, half_span * 2, 0, half_span * 2])
   
   t = time.localtime((est_time[i] + est_time[j]) / 2)
   pp.title('%04d-%02d-%02d %02d%02d:%02d txID=%d' % (

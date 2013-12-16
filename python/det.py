@@ -87,7 +87,15 @@ class det (pulse_data):
     """
     files = os.listdir(base_dir)
     files.sort()
-    return [ cls(base_dir + '/' + fn) for fn in files ] 
+    det_list = []
+    for fn in files:
+      try:
+        det_list.append(cls(base_dir + '/' + fn))
+      except:
+        import sys
+	print >>sys.stderr, "Couldn't read det file: {}".format(base_dir + '/' + fn)
+        raise IOError
+    return det_list 
   
   @classmethod
   def read_many(cls, i, j, base_dir): 

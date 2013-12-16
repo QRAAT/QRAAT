@@ -16,6 +16,8 @@
 #       of parameter values for all sites, e.g. statuses. 
 # rmg_csv --row site10 power_ip comp_ip <sitelist.csv ... Emit columns
 #       per row.
+# rmg_csv --row view=reader user password <$RMG_SERVER_DIR/db_auth 
+#       ... get user/password for DB view. 
 #
 # Copyright (C) 2013 Christopher Patton
 # 
@@ -40,6 +42,7 @@ usage = """\
 usage: rmg_csv <site> <parameter> [<value>] 
           -c,--column <parameter> [<value>] 
           -r,--row <site> [{parameter list}]
+          -r,--row <col=value> [{paramter list}]
           -l,--last-row   [{parameter list}]
  < path/to/original.csv [> path/to/new.csv]
 
@@ -116,7 +119,6 @@ try:
     print ','.join(table.headers)
 
   for line in table: 
-
     if not row and col: # Column
       if not value:
         if len(getattr(line, col)) == 0: 
@@ -129,7 +131,9 @@ try:
         print ','.join(line)
 
     elif row and not col: # Row
-      if line.name == row: 
+      tok = row.split('=')
+      if len(tok) == 1 and line.name == tok[0] or \
+         getattr(line, tok[0]) == tok[1]: 
         if param_list: 
           for col in param_list:
             print getattr(line, col)

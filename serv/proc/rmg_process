@@ -23,18 +23,28 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+# Check for attempted reentry
+name=`basename $0`
+count=`pgrep -c $name`
+if [ "$count" -gt "1" ]
+then
+	echo $name already running, bye!
+	exit 1
+fi
+
 source rmg_env
 
-echo start `date`
+echo Starting `date`
 echo
 echo det_to_db
 rmg_det_to_db
 echo 
 echo rmg_position_auto
 rmg_position_auto
+#echo
+#echo rmg_filterest
+#rmg_filterest
 echo
-echo rmg_filterest
-rmg_filterest
-echo
-echo end `date`
+echo Finished `date`
 echo
