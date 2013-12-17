@@ -132,8 +132,8 @@ try:
 
     elif row and not col: # Row
       tok = row.split('=')
-      if len(tok) == 1 and line.name == tok[0] or \
-         getattr(line, tok[0]) == tok[1]: 
+      if (len(tok) == 1 and line.name == tok[0]) or \
+         (len(tok) == 2 and getattr(line, tok[0]) == tok[1]): 
         if param_list: 
           for col in param_list:
             print getattr(line, col)
