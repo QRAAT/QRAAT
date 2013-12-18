@@ -177,7 +177,6 @@ def position_estimation(index_list, center, scale, sites, likelihoods, likelihoo
 def calc_positions(cal_id, tx_id, t_start, t_end, t_delta, t_window, verbose = False):
   con = get_db()
 
-  cur = con.cursor()
   (sites, bearings, steering_vectors, sv_ids, sitelist_deps, sv_deps_by_site) = get_site_data(con, cal_id)
   cur = con.cursor()
   (sig_id, site_id, est_time, signal, est_ids) = get_est_data(cur, t_start, t_end, tx_id)
