@@ -135,6 +135,7 @@ int pulse_data::read(const char *fn)
   if( data ) 
     delete [] data;
 
+  int res = -1;
   filename = new char [strlen(fn)+1];
   strcpy(filename, fn); 
   
@@ -146,17 +147,20 @@ int pulse_data::read(const char *fn)
   /* Get parameters. */
   fstream file( filename, ios::in | ios::binary ); 
   file.read((char*)&params, sizeof(param_t)); 
-  size = params.sample_ct * params.channel_ct; 
+  if (file.eof()) {
+    file.close();
+    res = -1;
+  }
+  else {
+    size = params.sample_ct * params.channel_ct; 
   
-  /* Get data. */
-  data = new gr_complex [params.channel_ct * params.sample_ct]; 
-  file.read((char*)data, sizeof(gr_complex) * params.sample_ct * params.channel_ct);
+    /* Get data. */
+    data = new gr_complex [params.channel_ct * params.sample_ct]; 
+    file.read((char*)data, sizeof(gr_complex) * params.sample_ct * params.channel_ct);
+  }
 
-  int res; 
   if (file)
     res = results.st_size; 
-  else 
-    res = -1; 
 
   file.close(); 
   return res; 
