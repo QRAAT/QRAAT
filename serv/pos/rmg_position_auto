@@ -60,7 +60,7 @@ for tx in tx_list:
     (sig_id, site_id, est_time, signal, est_id) = rpl.get_est_data(cursor, time_range[0]-time_window, time_range[1]+time_window, tx_id)
     likelihoods, likelihood_deps = rpl.calc_likelihoods(signal, site_id, bearings, steering_vectors, sv_id, est_id, sv_deps_by_site)
     pos_est, pos_est_deps = rpl.estimate_positions(est_time, time_window, time_delta, sites, likelihoods, likelihood_deps, site_id, est_id)
-    rpl.insert_positions(cur, pos_est, pos_est_deps, tx_id)
+    rpl.insert_positions(cursor, pos_est, pos_est_deps, tx_id)
 
   temp_max_id = np.max(times[:,0])
   if temp_max_id > max_id:
