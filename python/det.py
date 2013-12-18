@@ -93,7 +93,7 @@ class det (pulse_data):
         det_list.append(cls(base_dir + '/' + fn))
       except:
         import sys
-	print >>sys.stderr, "Couldn't read det file: {}".format(base_dir + '/' + fn)
+        print >>sys.stderr, "Couldn't read det file: {}".format(base_dir + '/' + fn)
         raise IOError
     return det_list 
   

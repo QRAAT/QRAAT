@@ -25,7 +25,7 @@ print "{} transmitters found in new records".format(len(tx_list))
 print tx_list
 if len(tx_list) > 0:
   cal_id = int(os.environ['RMG_POS_CAL_ID'])
-  (sites, bearings, steering_vectors) = rpl.get_site_data(db_con, cal_id)
+  (sites, bearings, steering_vectors, sv_id, sitelist_deps, sv_deps_by_site) = rpl.get_site_data(db_con, cal_id)
 
 time_window = float(os.environ['RMG_POS_TIME_WINDOW'])
 time_delta = float(os.environ['RMG_POS_TIME_STEP'])
@@ -57,10 +57,10 @@ for tx in tx_list:
   #process time ranges
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
-    (sig_id, site_id, est_time, signal) = rpl.get_est_data(cursor, time_range[0]-time_window, time_range[1]+time_window, tx_id)
-    likelihoods = rpl.calc_likelihoods(signal, site_id, bearings, steering_vectors)
-    pos_est = rpl.estimate_positions(est_time, time_window, time_delta, sites, likelihoods, site_id)
-    rpl.insert_positions(cursor, pos_est, tx_id)
+    (sig_id, site_id, est_time, signal, est_id) = rpl.get_est_data(cursor, time_range[0]-time_window, time_range[1]+time_window, tx_id)
+    likelihoods, likelihood_deps = rpl.calc_likelihoods(signal, site_id, bearings, steering_vectors, sv_id, est_id, sv_deps_by_site)
+    pos_est, pos_est_deps = rpl.estimate_positions(est_time, time_window, time_delta, sites, likelihoods, likelihood_deps, site_id, est_id)
+    rpl.insert_positions(cursor, pos_est, pos_est_deps, tx_id)
 
   temp_max_id = np.max(times[:,0])
   if temp_max_id > max_id:
