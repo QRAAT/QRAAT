@@ -1,85 +1,258 @@
+#!/usr/bin/python
+# plot_search_space.py. This script is part of QRAAT, an automated 
+# animal tracking system based on GNU Radio. 
+#
+# Wood rat data: 
+# python plot_search_space.py --t-start=1381756000 --t-end=1381768575 --tx-id=52
+#
+# Mice: 
+# python plot_search_space.py --t-start=0 --t-end=1381768575 --tx-id=35
+#  Modified EST select to 'mice' instead of 'est'. 
+#
+# Copyright (C) 2013 Christopher Patton, Joe Webster
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import matplotlib.pyplot as pp
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
+
+import MySQLdb as mdb
 import numpy as np
+import time, os, sys
+import qraat
+from optparse import OptionParser
 
-ll = np.array(
-[1.42085322,1.35285993,1.18830269,1.18331967,1.2539594,
-1.14629566,1.26103603,1.31740614,1.43424418,1.5681383,
-1.68285517,1.77786335,1.94239073,1.85991538,1.84684639,
-1.92689057,1.84848388,1.82714279,1.8340232,2.10766299,
-2.10049191,2.3334456,2.52921488,2.75435864,2.80308071,
-2.77025317,2.64043282,2.53971767,2.431595,2.26811926,
-2.60220089,2.54506017,2.56741635,2.67036791,2.8363702,
-2.56239404,2.73033644,2.68594506,2.60296885,2.50590471,
-2.59168578,2.01459077,1.66340607,1.95167252,1.88557522,
-2.34257014,2.07629265,2.07629265,1.55122727,1.52265882,
-1.52265882,1.18562057,1.10143528,0.99590812,0.88447481,
-0.80281091,0.84869958,1.07608606,1.28957983,1.37274796,
-1.80177824,1.66130443,1.766591,1.99749587,2.47432673,
-3.16668124,3.5324315,4.49856121,4.54236257,4.75885878,
-4.99724189,5.3829304,5.54296404,5.73068744,5.36006045,
-5.47033564,6.01917744,6.48662618,6.84280576,7.30446801,
-7.57755932,7.37785583,7.7256427,8.40213043,9.32427439,
-10.33314679,10.44341479,10.4456747,10.02059605,9.44087681,
-9.39892858,9.81048187,9.84650344,9.95704007,9.97410347,
-9.78692234,9.24804714,8.69368874,7.6020262,7.24597763,
-7.17545225,6.97729585,6.86282533,6.82522856,6.45145464,
-5.8890365,5.40211242,4.9356055,4.63304153,4.36810037,
-4.16736339,3.85247784,3.61724461,3.37581578,3.29457663,
-3.12553727,3.03986764,2.85162339,2.07084469,1.80210036,
-1.58576171,1.3825189,1.23282325,1.16588396,1.11640877,
-1.09467461,1.08070711,1.05859675,1.07333376,1.14646045,
-1.22775175,1.36994894,1.45410118,1.58760806,1.61539101,
-2.01147176,1.97345574,2.07696536,1.98859177,2.36099856,
-2.71388417,3.07900137,3.84718879,4.42028854,4.90003706,
-5.46696947,6.41187378,6.86588678,7.33916868,7.62160668,
-8.00776564,8.25975522,8.25943134,8.52785776,8.86731614,
-9.32451228,9.99755649,11.04674856,12.27969778,13.07868141,
-13.10148852,13.52915837,13.82987658,13.97318636,14.58583373,
-15.20068651,15.79484613,16.31265405,17.03341549,17.76771577,
-18.69758074,18.99180054,19.0931561,19.436315,19.6036795,
-19.77180467,20.04180387,20.65700458,21.68698447,22.23670298,
-23.2391252,24.28119112,24.77823347,24.69072103,25.06540729,
-24.98568913,25.0329275,25.2435202,25.66793669,26.0407556,
-26.47062844,26.82178189,27.02321421,27.06201736,27.11041108,
-27.14868674,27.16208886,27.16737774,27.2037518,27.18280484,
-27.15035827,27.1962143,27.21587699,27.04933674,26.81131487,
-26.67592484,26.38886478,26.14070121,26.02662676,25.93365229,
-25.60175945,25.2437336,24.76710291,25.06459016,24.42232896,
-25.03823864,24.363874,25.20686456,24.34475736,24.85263812,
-24.58881956,25.24637087,25.3521147,25.20262916,25.39520765,
-25.9400985,24.216794,22.80454504,22.67039742,22.59284591,
-20.01381235,20.71948685,21.16326943,21.86379343,22.80027553,
-25.32184173,24.92745193,26.33854958,26.50577445,22.35518401,
-14.24740669,11.76569495,11.34076963,10.96775349,9.37777305,
-8.55577117,8.16636561,7.96226728,7.79523045,7.21841155,
-6.4379987,6.42531781,6.31772344,5.94785789,5.75100684,
-5.52168572,4.62002575,3.76172853,3.55805953,3.42847367,
-2.88682982,2.76357317,2.78037008,2.66181396,2.55485639,
-2.3984411,2.32226239,2.27077265,2.21851097,2.31525,2.43457784,
-2.67228837,2.63524532,2.89517243,4.31671471,7.92828997,
-8.74199164,10.04297484,10.51622709,9.27723618,5.28286311,
-3.44935004,2.21859843,2.52867303,4.32317368,5.91003788,
-6.2192514,7.43210769,7.14852292,6.34828665,5.69460486,
-7.19927671,9.17778928,9.75231093,10.06796635,11.66226356,
-11.6480473,11.34993753,11.27139325,11.05540077,10.83676561,
-10.50739434,12.44708245,12.36146359,12.9190121,13.33682798,
-14.03698066,12.99546817,13.45873352,11.79023328,11.71969334,
-10.85002248,11.22110598,10.40247315,10.19493863,7.77903829,
-9.05777708,7.29687673,9.48110806,9.51534516,9.16173981,
-9.10235845,10.38718463,10.55981958,11.94692843,12.91875216,
-11.51787119,11.84614574,10.59316031,9.288531,8.98208584,
-8.97109178,6.97859092,6.0932138,6.6429342,6.94804566,
-5.81995147,6.71422977,8.12680477,5.72839566,5.29623185,
-6.82837489,4.95410738,3.19814741,3.47209599,3.54579797,
-3.26574731,2.70001497,2.58589049,2.5457589,2.17789079,
-2.01833925,1.83891686,1.59609036,1.53750929,1.29786757,
-1.25619743,1.40951654,1.63203151,1.55580947])
+parser = OptionParser()
 
-pp.axis([0,360,0,30])
-pp.plot(range(0,360),ll)
-pp.xlabel("Bearing to site k")
-pp.ylabel("Log likelihood")
-pp.show()
+parser.description = '''\
+Plot the search space for position estimation. This program is 
+part of QRAAT, an automated animal tracking system based on GNU Radio.   
+'''
+
+parser.add_option('--cal-id', type='int', metavar='INT', default=1,
+                  help="Calibration ID, the serial identifier in the database "
+                       "context identifying a calibration run. (Default is 1.)")
+
+parser.add_option('--tx-id', type='int', metavar='INT', default=51,
+                  help="Serial ID of the target transmitter in the database "
+                       "context.")
+
+parser.add_option('--t-delta', type='float', metavar='SEC', default=1.0,
+                  help="Time step for each position calculation. (Default "
+                       "is 1.0 seconds.) ")
+
+parser.add_option('--t-window', type='float', metavar='SEC', default=30.0,
+                  help="Time window to use for the position likelihood "
+                       "calculation at each time step. (Default is 30.0 "
+                       "seconds.)")
+
+parser.add_option('--t-start', type='float', metavar='SEC', default=1376432040,#1376420800.0, 
+                  help="Start time in secondes after the epoch (UNIX time).")
+
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376432160,#1376442000.0,#1376427800 yields 302 rows
+                  help="End time in secondes after the epoch (UNIX time).")
+
+(options, args) = parser.parse_args()
+
+# Get database credentials. 
+try: 
+  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='reader')
+
+except KeyError: 
+  print >>sys.stderr, "position: error: undefined environment variables. Try `source rmg_env.`" 
+  sys.exit(1) 
+
+except IOError, e: 
+  print >>sys.stderr, "position: error: missing DB credential file '%s'." % e.filename
+  sys.exit(1)
+
+# Connect to the database. 
+db_con = mdb.connect(db_config.host, 
+                     db_config.user,
+                     db_config.password,
+                     db_config.name)
+cur = db_con.cursor()
+
+print "position: fetching site and cal data"
+
+# Get site locations.
+sites = qraat.csv(db_con=db_con, db_table='sitelist')
+
+# Get steering vector data.
+steering_vectors = {} # site.ID -> sv
+bearings = {}         # site.ID -> bearing
+
+for site in sites:
+  cur.execute('''SELECT Bearing, 
+                        sv1r, sv1i, sv2r, sv2i, 
+                        sv3r, sv3i, sv4r, sv4i 
+                   FROM Steering_Vectors 
+                  WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, options.cal_id))
+  sv_data = np.array(cur.fetchall(),dtype=float)
+  if sv_data.shape[0] > 0:
+    steering_vectors[site.ID] = np.array(sv_data[:,1::2] + np.complex(0,1) * sv_data[:,2::2])
+    bearings[site.ID] = np.array(sv_data[:,0])
+
+print "position: fetching pulses for transmitter and time range"
+
+# Get pulses in time range.  
+cur.execute('''SELECT ID, siteid, timestamp,
+                      ed1r, ed1i, ed2r, ed2i,
+                      ed3r, ed3i, ed4r, ed4i
+                 FROM est
+                WHERE timestamp >= %s
+                  AND timestamp <= %s
+                  AND txid = %s
+                ORDER BY timestamp''', (options.t_start, 
+                                        options.t_end, 
+                                        options.tx_id))
+
+signal_data = np.array(cur.fetchall(), dtype=float)
+est_ct = signal_data.shape[0]
+if est_ct == 0:
+  print >>sys.stderr, "position: fatal: no est records for selected time range."
+  sys.exit(1)
+else: print "position: processing %d records" % est_ct
+
+sig_id =   np.array(signal_data[:,0], dtype=int)
+site_id =  np.array(signal_data[:,1], dtype=int)
+est_time = signal_data[:,2]
+signal =   signal_data[:,3::2]+np.complex(0,-1)*signal_data[:,4::2]
+
+print "position: calculating pulse bearing likelihoods"
+
+# Calculate the likelihood of each bearing for each pulse. 
+likelihoods = np.zeros((est_ct,360))
+for i in range(est_ct):
+  try: 
+    sv =  steering_vectors[site_id[i]]
+  except KeyError:
+    print >>sys.stderr, "position: error: no steering vectors for siteID=%d" % site_id[i]
+    sys.exit(1)
+
+  sig = signal[i,np.newaxis,:]
+  left_half = np.dot(sig, np.conj(np.transpose(sv)))
+  bearing_likelihood = (left_half * np.conj(left_half)).real
+  for j, value in enumerate(bearings[site_id[i]]):
+    likelihoods[i, value] = bearing_likelihood[0, j]
+
+
+
+# Format site locations as np.complex's. 
+site_pos = np.zeros((len(sites),),np.complex)
+site_pos_id = []
+for j in range(len(sites)):
+  site_pos[j] = np.complex(sites[j].northing, sites[j].easting)
+  site_pos_id.append(sites[j].ID)
+
+
+
+def plot_ll(i, j):
+  ''' Plot search space, return point of maximum likelihood. '''
+
+  fig = pp.gcf()
+  
+  constraints = {}
+  # Add up bearing likelihoods for each site. 
+  for e in range(i, j): 
+    if constraints.get(site_id[e]) == None:
+      constraints[site_id[e]] = likelihoods[e,]
+    else: 
+      constraints[site_id[e]] += likelihoods[e,]
+
+  for (s, ll) in constraints.iteritems(): 
+    
+    indexMax = np.argmax(ll) 
+    x = map(lambda x0 : x0 % 360, 
+             range(indexMax - 180, indexMax + 180))
+    
+    fig = pp.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.axis([0, 360, 0, ll[indexMax] + (0.15 * ll[indexMax])])
+
+    ax.plot(range(0,360), [ll[x0] for x0 in x])
+    ax.plot([180, 180], [0, ll[indexMax]], '-', color='0.10', 
+      zorder=0, label='max likelihood')
+    ax.text(185, (0.03 * ll[indexMax]), '%d$^\circ$' % indexMax)
+    if indexMax > 30: 
+      ax.text(x.index(0) + 5, (0.03 * ll[indexMax]), '0$^\circ$')
+    if abs(indexMax - 90) > 30: 
+      ax.text(x.index(90) + 5, (0.03 * ll[indexMax]), '90$^\circ$')
+    if abs(indexMax - 180) > 30: 
+      ax.text(x.index(180) + 5, (0.03 * ll[indexMax]), '180$^\circ$')
+    if abs(indexMax - 270) > 30: 
+      ax.text(x.index(270) + 5, (0.03 * ll[indexMax]), '270$^\circ$')
+    
+    pp.legend()
+    pp.setp(ax.get_xticklabels(), visible=False)
+    pp.xlabel("Bearing to SiteID=%d" % s)
+    pp.ylabel("Likelihood")
+
+    t = time.localtime((est_time[i] + est_time[j]) / 2)
+    pp.title('%04d-%02d-%02d %02d%02d:%02d txID=%d' % (
+       t.tm_year, t.tm_mon, t.tm_mday,
+       t.tm_hour, t.tm_min, t.tm_sec,
+       options.tx_id))
+  
+    pp.savefig('tx%d_%04d.%02d.%02d_%02d.%02d.%02d_%d.png' % (options.tx_id, 
+      t.tm_year, t.tm_mon, t.tm_mday,
+      t.tm_hour, t.tm_min, t.tm_sec, s))
+
+    pp.clf()
+
+
+
+
+
+
+#: The time step (in seconds) for the position estimation
+#: calculation.
+t_delta = options.t_delta
+
+#: Time averaging window (in seconds). 
+t_window = options.t_window
+
+print "position: calculating position"
+
+i = 0
+
+try: 
+  while i < est_ct - 1:
+
+    # Find the index j corresponding to the end of the time window. 
+    j = i + 1
+    while j < est_ct - 1 and (est_time[j + 1] - est_time[i]) <= t_window: 
+      j += 1
+    
+    t = time.localtime((est_time[i] + est_time[j]) / 2)
+    w_sites = set(site_id[i:j])
+    
+    plot_ll(i, j)
+
+    print '%04d-%02d-%02d %02d%02d:%02d %d' % (
+     t.tm_year, t.tm_mon, t.tm_mday,
+     t.tm_hour, t.tm_min, t.tm_sec,
+     j - i)
+
+    # Step index i forward t_delta seconds. 
+    j = i + 1
+    while i < est_ct - 1 and (est_time[i + 1] - est_time[j]) <= t_delta: 
+      i += 1
+
+except KeyboardInterrupt: pass
+
+finally:
+  pass
