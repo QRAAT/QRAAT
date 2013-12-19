@@ -183,10 +183,14 @@ def plot_ll(i, j):
     ax = fig.add_subplot(1,1,1)
     ax.axis([0, 360, 0, ll[indexMax] + (0.15 * ll[indexMax])])
 
-    ax.plot(range(0,360), [ll[x0] for x0 in x])
-    ax.plot([180, 180], [0, ll[indexMax]], '-', color='0.10', 
-      zorder=0, label='max likelihood')
+    ax.fill_between(range(0,360), [ll[x0] for x0 in x], 0, color='b', 
+      alpha='0.20', label='Data window')
+
+    ax.plot([180, 180], [0, ll[indexMax]], '-', color='0.30', 
+      label='Max likelihood')
+
     ax.text(185, (0.03 * ll[indexMax]), '%d$^\circ$' % indexMax)
+
     if indexMax > 30: 
       ax.text(x.index(0) + 5, (0.03 * ll[indexMax]), '0$^\circ$')
     if abs(indexMax - 90) > 30: 
