@@ -27,7 +27,7 @@ use warnings ;
 use POSIX qw(strftime);
 
 my $Debug = 0 ;			# Set to 1 to generate debug output
-
+my $low_voltage = 11.5 ;        # Voltage below which system should be off
 sub usage()
 {
 	print "$0: path_to_sitelist path_to_txlist [debug]\n" ;
@@ -99,9 +99,9 @@ sub main()
 			print "Automatic schedule is disabled for site $sitename, set auto column to 'auto' to enable it\n" ;
 			next ;
 		}
-    if ( $power_type <> "pingbrother" )
+    if ( $power_type ne "pingbrother" )
     {
-      $power_ip = ""
+      $power_ip = "" ;
     }
 		onoff($sitename,$schedule,$txlist,$power_ip) ;
 	}	
@@ -299,9 +299,11 @@ sub nudge($$$$)	# nudges the site from its current state towards action. returns
 		if( $Debug ) { print "debug: nudge: abandon $sitename\n" ; }
 		return 1 ;
 	}
-  if ( $power_ip <> "") 
+  my ( $intemp, $extemp, $voltage ) ;
+  if ( $power_ip ne "") 
   {
-    my ( $intemp, $extemp, $voltage ) = get_pingbrother_status($sitename,$power_ip) ;
+    ( $intemp, $extemp, $voltage ) = get_pingbrother_status($sitename,$power_ip) ;
+    if ( $Debug ) { print "debug: nudge: $sitename; intemp=$intemp, extemp=$extemp, voltage=$voltage\n" ; }
   }
 	#
 	# Here's all the ways you can try to turn ON a site
@@ -310,10 +312,18 @@ sub nudge($$$$)	# nudges the site from its current state towards action. returns
   {
 		if( $ping_computer )#computer is up and responding
 		{
-      if ( ($power_ip <> "") and ($voltage < 11.5) )#low voltage condition
+      if ( ($power_ip ne "") and ($voltage < $low_voltage) )#low voltage condition
       {
         if ( $Debug ) { print "debug: nudge: low power at $sitename\n" ; }
-        return do_rmg_down_now($sitename) ;
+        if ( ! do_rmg_down_now($sitename) )
+        {
+          sleep(5) ;
+          return do_rmg_off($sitename) ;
+        }
+        else
+        {
+          return 1 ;
+        }
       }
       else
       {
@@ -349,7 +359,7 @@ sub nudge($$$$)	# nudges the site from its current state towards action. returns
     elsif( $ping_power )#computer down, powerswitch responding
 		{
 			# computer off, power switch present, turn on the computer
-			if( ($site_status == 1) and ($power_ip <> "") and ($voltage > 11.5) )
+			if( ($site_status == 1) and ($power_ip ne "") and ($voltage > $low_voltage) )
 			{
 				print "$sitename is off\n" ;
 				if( $Debug ) { print "debug: nudge: rmg on $sitename\n" ; }
@@ -365,6 +375,12 @@ sub nudge($$$$)	# nudges the site from its current state towards action. returns
 				}
 			}
 			# abnormal state, power switch present: turn off the computer
+			elsif ( ($power_ip ne "") and ($voltage < $low_voltage) )
+			{
+				print "$sitename is off but has low voltage\n" ;
+				if ( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
+				return 0 ;
+			}
 			else
 			{
 				print "$sitename is in an abnormal state\n" ;
