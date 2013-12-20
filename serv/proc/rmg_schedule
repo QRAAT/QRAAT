@@ -28,6 +28,8 @@ use POSIX qw(strftime);
 
 my $Debug = 0 ;			# Set to 1 to generate debug output
 my $low_voltage = 11.5 ;        # Voltage below which system should be off
+my $operational_voltage = 12.5 ; # Voltage above which system can be turned on
+
 sub usage()
 {
 	print "$0: path_to_sitelist path_to_txlist [debug]\n" ;
@@ -359,7 +361,7 @@ sub nudge($$$$)	# nudges the site from its current state towards action. returns
     elsif( $ping_power )#computer down, powerswitch responding
 		{
 			# computer off, power switch present, turn on the computer
-			if( ($site_status == 1) and ($power_ip ne "") and ($voltage > $low_voltage) )
+			if( ($site_status == 1) and ($power_ip ne "") and ($voltage > $operational_voltage) )
 			{
 				print "$sitename is off\n" ;
 				if( $Debug ) { print "debug: nudge: rmg on $sitename\n" ; }
@@ -375,7 +377,7 @@ sub nudge($$$$)	# nudges the site from its current state towards action. returns
 				}
 			}
 			# abnormal state, power switch present: turn off the computer
-			elsif ( ($power_ip ne "") and ($voltage < $low_voltage) )
+			elsif ( ($power_ip ne "") and ($voltage < $operational_voltage) )
 			{
 				print "$sitename is off but has low voltage\n" ;
 				if ( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
