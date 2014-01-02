@@ -142,7 +142,7 @@ function get_status() {
     #Ping computer
   read comp_ip power_ip comp_outlet rx_outlet powertype serv_state <<< \
    $(rmg_csv --row $SITE comp_ip power_ip comp_outlet rx_outlet powertype state <$SITELIST)
-  ping $comp_ip -c 1 -w 2 &> /dev/null
+  ping $comp_ip -c 3 -w 2 &> /dev/null
   if [ $? -eq 0 ]
     then
       ping_computer="success"
@@ -157,7 +157,7 @@ function get_status() {
     #Ping router
   if [[ "$powertype" != "nil" ]]
     then
-      ping $power_ip -c 1 -w 2 &> /dev/null
+      ping $power_ip -c 3 -w 2 &> /dev/null
       if [ $? -eq 0 ]
         then
           ping_router="success"
@@ -165,7 +165,7 @@ function get_status() {
           if [[ $ping_computer == "failure" ]]  && [ $power_status -eq 1 ]
             then
                 #Try pinging computer again
-              ping $comp_ip -c 1 -w 2 &> /dev/null
+              ping $comp_ip -c 3 -w 2 &> /dev/null
               if [ $? -eq 0 ]
                 then
                   ping_computer="success"
