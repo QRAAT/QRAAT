@@ -27,6 +27,8 @@ use warnings ;
 use POSIX qw(strftime);
 
 my $Debug = 0 ;			# Set to 1 to generate debug output
+my $low_voltage = 11.5 ;        # Voltage below which system should be off
+my $operational_voltage = 12.5 ; # Voltage above which system can be turned on
 
 sub usage()
 {
@@ -82,6 +84,8 @@ sub main()
 		chomp($comp_ip) ;
 		my $power_ip = `rmg_csv $sitename power_ip <$sitelist` ;
 		chomp($power_ip) ;
+    my $power_type = `rmg_csv $sitename powertype <$sitelist` ;
+    chomp($power_type) ;
 		my $automatic = `rmg_csv $sitename auto <$sitelist` ;
 		chomp($automatic) ;
 		my $schedule = `rmg_csv $sitename schedule <$sitelist` ;
@@ -97,7 +101,11 @@ sub main()
 			print "Automatic schedule is disabled for site $sitename, set auto column to 'auto' to enable it\n" ;
 			next ;
 		}
-		onoff($sitename,$schedule,$txlist) ;
+    if ( $power_type ne "pingbrother" )
+    {
+      $power_ip = "" ;
+    }
+		onoff($sitename,$schedule,$txlist,$power_ip) ;
 	}	
 	#
 	return 0 ;
@@ -166,9 +174,51 @@ sub get_rmg_status($)
 	return ( $ping_power, $ping_computer, $site_status ) ;
 }
 
-sub onoff($$$)
+sub get_pingbrother_status($$)
 {
-	my ( $sitename, $schedule, $txlist ) = @_ ;
+	my ( $sitename, $ip ) = @_ ;
+	my $command = "curl --connect-timeout 10 -s -u admin:admin http://$ip" ;
+	#my $result = `cat pbtest` ;	# test
+	my $result = `$command` ;
+	$result =~ s/\r//g ;
+	$result =~ s/\n//g ;
+	#<tr><td><b>Input Voltage:</b></td><td></td><td>13.69V</td></tr>
+	my ( $intemp ) = ( $result =~ /.*Internal Temp.+?>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
+	#<tr><td><b>Internal Temp:</b></td><td></td><td>39.8°C</td></tr>
+	my ( $extemp ) = ( $result =~ /.*External Temp.+?>(\d{1,2}\.\d{1,2}).C<.*/ ) ;
+	#<tr><td><b>External Temp:</b></td><td></td><td>35.7°C</td></tr>
+	my ( $voltage ) = ( $result =~ /.*Input Voltage.+?>(\d{1,2}\.\d{1,2})V<.*/ ) ;
+	#<td><b>&nbsp;&nbsp;&nbsp;&nbsp;Channel 1:</b></td>
+	#<td>ON,&nbsp;&nbsp;&nbsp;&nbsp;Current:0.0A, Power:0.0W</td>
+	my ( $current1 ) = ( $result =~ /.*Channel 1.+?Current:(\d{1,2}\.\d{1,2})A.*/ ) ;
+	my ( $power1 ) = ( $result =~ /.*Channel 1.+?Power:(\d{1,2}\.\d{0,2})W.*/ ) ;
+	my ( $current2 ) = ( $result =~ /.*Channel 2.+?Current:(\d{1,2}\.\d{0,2})A.*/ ) ;
+	my ( $power2 ) = ( $result =~ /.*Channel 2.+?Power:(\d{1,2}\.\d{0,2})W.*/ ) ;
+	if( not defined $intemp ) { $intemp = "" ; }
+	if( not defined $extemp ) { $extemp = "" ; }
+	if( not defined $voltage ) { $voltage = "" ; }
+	if( not defined $current1 ) { $current1 = "" ; }
+	if( $current1 eq "" ) { $current1 = "0" ; }
+	if( not defined $power1 ) { $power1 = "" ; }
+	if( $power1 eq "" ) { $power1 = "0" ; }
+	if( not defined $current2 ) { $current2 = "" ; }
+	if( $current2 eq "" ) { $current2 = "0" ; }
+	if( not defined $power2 ) { $power2 = "" ; }
+	if( $power2 eq "" ) { $power2 = "0" ; }
+	my $current = $current1 + $current2 ;
+	my $power = $power1 + $power2 ;
+	if( $Debug ) { print "debug: get_pingbrother_status: $sitename at $ip: intemp=$intemp extemp=$extemp voltage=$voltage current1=$current1 power1=$power1 current2=$current2 power2=$power2 current=$current power=$power\n" ; }
+	if( ($intemp eq "") and ($extemp eq "") and ($voltage eq "") )
+	{
+		print "No valid telemetry read from '$sitename' at IP '$ip'\n" ;
+	}
+	#return ( $intemp, $extemp, $voltage, $current1, $power1, $current2, $power2, $current, $power ) ;
+	return ( $intemp, $extemp, $voltage ) ;
+}
+
+sub onoff($$$$)
+{
+	my ( $sitename, $schedule, $txlist, $power_ip ) = @_ ;
 	if( $Debug ) { print "debug: onoff: $sitename $schedule $txlist\n" ; }
 	if( (not defined $schedule) || ($schedule eq ""))
 	{
@@ -231,7 +281,7 @@ sub onoff($$$)
 	{
 		print "$sitename schedule is '$schedule', timenow is $nowtime, site should be off\n" ;
 	}
-	my $err = nudge($sitename,$action,$txlist) ;
+	my $err = nudge($sitename,$action,$txlist,$power_ip) ;
 	if( $Debug ) { print "debug: onoff: nudge $sitename $action returned $err\n" ; }
 	if( $err )
 	{
@@ -239,9 +289,9 @@ sub onoff($$$)
 	}
 }
 
-sub nudge($$$)	# nudges the site from its current state towards action. returns 0 for OK 1 for error
+sub nudge($$$$)	# nudges the site from its current state towards action. returns 0 for OK 1 for error
 {
-	my ( $sitename, $action, $txlist ) = @_ ;
+	my ( $sitename, $action, $txlist, $power_ip ) = @_ ;
 	if( $Debug ) { print "debug: nudge: $sitename action=$action txlist=$txlist\n" ; }
 	my ( $ping_power, $ping_computer, $site_status ) = get_rmg_status($sitename) ;
 	# Quick sanity check to make sure this is going to work
@@ -251,45 +301,67 @@ sub nudge($$$)	# nudges the site from its current state towards action. returns 
 		if( $Debug ) { print "debug: nudge: abandon $sitename\n" ; }
 		return 1 ;
 	}
+  my ( $intemp, $extemp, $voltage ) ;
+  if ( $power_ip ne "") 
+  {
+    ( $intemp, $extemp, $voltage ) = get_pingbrother_status($sitename,$power_ip) ;
+    if ( $Debug ) { print "debug: nudge: $sitename; intemp=$intemp, extemp=$extemp, voltage=$voltage\n" ; }
+  }
 	#
 	# Here's all the ways you can try to turn ON a site
 	#
 	if( $action )#Want to turn site ON
-        {
+  {
 		if( $ping_computer )#computer is up and responding
 		{
-			# transfer the tx.csv file every time
-			if( $Debug ) { print "debug: nudge: updating $txlist for $sitename\n" ; }
-			if( do_rmg_updatetx($sitename,$txlist) )
-			{
-				print "ERROR: cannot update tx list for $sitename\n" ;
-			}
-			# computer up, rmg running: do nothing
-			if( ($site_status == 5) )
-			{
-				print "$sitename is active\n" ;
-				if( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
-				return 0 ;
-			}
-			# computer up, rmg stopped: start the rmg
-			elsif( ($site_status == 4) )
-			{
-				print "$sitename is up\n" ;
-				if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
-				return do_rmg_start($sitename) ;
-			}
-			# computer up, other state: start the rmg
-			else
-			{
-				print "$sitename is up\n" ;
-				if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
-				return do_rmg_start($sitename) ;
-			}
-                }
-                elsif( $ping_power )#computer down, powerswitch responding
+      if ( ($power_ip ne "") and ($voltage < $low_voltage) )#low voltage condition
+      {
+        if ( $Debug ) { print "debug: nudge: low power at $sitename\n" ; }
+        if ( ! do_rmg_down_now($sitename) )
+        {
+          sleep(5) ;
+          return do_rmg_off($sitename) ;
+        }
+        else
+        {
+          return 1 ;
+        }
+      }
+      else
+      {
+			  # transfer the tx.csv file every time
+			  if( $Debug ) { print "debug: nudge: updating $txlist for $sitename\n" ; }
+			  if( do_rmg_updatetx($sitename,$txlist) )
+			  {
+				  print "ERROR: cannot update tx list for $sitename\n" ;
+			  }
+			  # computer up, rmg running: do nothing
+			  if( ($site_status == 5) )
+			  {
+				  print "$sitename is active\n" ;
+				  if( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
+				  return 0 ;
+			  }
+			  # computer up, rmg stopped: start the rmg
+			  elsif( ($site_status == 4) )
+			  {
+				  print "$sitename is up\n" ;
+				  if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
+				  return do_rmg_start($sitename) ;
+			  }
+			  # computer up, other state: start the rmg
+			  else
+			  {
+				  print "$sitename is up\n" ;
+				  if( $Debug ) { print "debug: nudge: rmg start $sitename\n" ; }
+				  return do_rmg_start($sitename) ;
+			  }
+      }
+    }
+    elsif( $ping_power )#computer down, powerswitch responding
 		{
 			# computer off, power switch present, turn on the computer
-			if( ($site_status == 1) )
+			if( ($site_status == 1) and ($power_ip ne "") and ($voltage > $operational_voltage) )
 			{
 				print "$sitename is off\n" ;
 				if( $Debug ) { print "debug: nudge: rmg on $sitename\n" ; }
@@ -305,6 +377,12 @@ sub nudge($$$)	# nudges the site from its current state towards action. returns 
 				}
 			}
 			# abnormal state, power switch present: turn off the computer
+			elsif ( ($power_ip ne "") and ($voltage < $operational_voltage) )
+			{
+				print "$sitename is off but has low voltage\n" ;
+				if ( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
+				return 0 ;
+			}
 			else
 			{
 				print "$sitename is in an abnormal state\n" ;
@@ -316,8 +394,8 @@ sub nudge($$$)	# nudges the site from its current state towards action. returns 
 	#
 	# Here's all the ways you can try to turn OFF a site
 	#
-        else#Want to turn site OFF
-        {
+    else#Want to turn site OFF
+    {
 		# computer off: do nothing
 		if( ($site_status == 1) )
 		{
