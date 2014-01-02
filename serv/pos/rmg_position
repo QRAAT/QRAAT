@@ -22,7 +22,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from optparse import OptionParser
-import qraat.rmg_position_lib
+import qraat
 
 parser = OptionParser()
 
@@ -56,7 +56,7 @@ parser.add_option('--t-window', type='float', metavar='SEC', default=30.0,
 parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800.0, 
                   help="Start time in secondes after the epoch (UNIX time).")
 
-parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0, 
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376427800.0,#1376442000.0, 
                   help="End time in secondes after the epoch (UNIX time).")
 
 parser.add_option('--plot', action='store_true', default=False, 
@@ -69,7 +69,7 @@ parser.add_option('-v', '--verbose', action='store_true', default=False,
 
 #TODO source rmg_env
 
-(pos_est, sites) = qraat.rmg_position_lib.calc_positions(options.cal_id, options.tx_id, options.t_start, options.t_end, options.t_delta, options.t_window, options.verbose)  
+(pos_est, sites) = qraat.position.calc_positions(options.cal_id, options.tx_id, options.t_start, options.t_end, options.t_delta, options.t_window, options.verbose)  
 
 if options.plot: 
 
