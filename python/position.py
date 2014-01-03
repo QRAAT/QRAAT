@@ -32,14 +32,16 @@ center = np.complex(4260500, 574500)
 
 class bearing_likelihoods:
   
-  def __init__(self, db_con, cal_id, tx_id, t_start, t_end):
+  def __init__(self, db_con, cal_id, tx_id=None, t_start=None, t_end=None):
     ''' Encapsulate bearings and their likelihoods for a range of ESTs. 
 
       *TODO*
     ''' 
     self.get_site_data(db_con, cal_id)
-    self.get_est_data(db_con, t_start, t_end, tx_id)
-    self.calc_likelihoods()
+    if tx_id: 
+      self.get_est_data(db_con, t_start, t_end, tx_id)
+      self.calc_likelihoods()
+    else: self.likelihoods = None
 
   def get_site_data(self, db_con, cal_id):
     ''' Get steering vectors for likelihood calculations. ''' 

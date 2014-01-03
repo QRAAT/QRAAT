@@ -1,16 +1,17 @@
 #!/usr/bin/python
+# TODO add timers for logging (e.g. see serv/proc/rmg_det_to_db) 
 
-import qraat.rmg_position_lib as rpl
+import qraat
 import numpy as np
 import os, commands, sys
 
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
 if int(output) > 1: 
-  print >>sys.stderr, "det_to_db: error: attempted reentry, exiting"
+  print >>sys.stderr, "position: error: attempted reentry, exiting"
   sys.exit(1)
 
-db_con = rpl.get_db()
+db_con = qraat.util.get_db('writer')
 cursor = db_con.cursor()
 
 #get id of last processed record
@@ -25,7 +26,7 @@ print "{} transmitters found in new records".format(len(tx_list))
 print tx_list
 if len(tx_list) > 0:
   cal_id = int(os.environ['RMG_POS_CAL_ID'])
-  (sites, bearings, steering_vectors, sv_id, sitelist_deps, sv_deps_by_site) = rpl.get_site_data(db_con, cal_id)
+  site_data = qraat.position.bearing_likelihoods(db_con, cal_id)
 
 time_window = float(os.environ['RMG_POS_TIME_WINDOW'])
 time_delta = float(os.environ['RMG_POS_TIME_STEP'])
@@ -53,14 +54,17 @@ for tx in tx_list:
   #TODO combine close ranges?
 
   
-
-  #process time ranges
+ #process time ranges
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
-    (sig_id, site_id, est_time, signal, est_id) = rpl.get_est_data(cursor, time_range[0]-time_window, time_range[1]+time_window, tx_id)
-    likelihoods, likelihood_deps = rpl.calc_likelihoods(signal, site_id, bearings, steering_vectors, sv_id, est_id, sv_deps_by_site)
-    pos_est, pos_est_deps = rpl.estimate_positions(est_time, time_window, time_delta, sites, likelihoods, likelihood_deps, site_id, est_id)
-    rpl.insert_positions(cursor, pos_est, pos_est_deps, tx_id)
+
+    site_data.get_est_data(db_con, tx_id, 
+                           time_range[0]-time_window, 
+                           time_range[1]+time_window)
+
+    site_data.calc_likelihoods()
+    (pos_est, pos_est_deps) = site_data.calc_positions(time_window, time_delta)
+    site_data.insert_positions(db_con, pos_est, pos_est_deps, tx_id)
 
   temp_max_id = np.max(times[:,0])
   if temp_max_id > max_id:

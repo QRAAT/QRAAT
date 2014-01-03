@@ -20,6 +20,8 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# TODO add timers for logging (e.g. see serv/proc/rmg_det_to_db) 
 
 from optparse import OptionParser
 import qraat
