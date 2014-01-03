@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # TODO add timers for logging (e.g. see serv/proc/rmg_det_to_db) 
+# TODO clean up output, as well as error handling in position.py.  
 
 import qraat
 import numpy as np
