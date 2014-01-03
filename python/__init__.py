@@ -34,3 +34,4 @@ from gps import gps
 from det import det
 from est import est, ResolveIdError
 import position
+import rmg_position_lib

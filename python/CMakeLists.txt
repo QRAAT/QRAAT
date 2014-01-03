@@ -36,6 +36,7 @@ GR_PYTHON_INSTALL(
     csv.py
     gps.py
     position.py
+    rmg_position_lib.py
     util.py
     DESTINATION ${GR_PYTHON_DIR}/qraat
 )

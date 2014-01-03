@@ -67,9 +67,20 @@ parser.add_option('-v', '--verbose', action='store_true', default=False,
 
 (options, args) = parser.parse_args()
 
-#TODO source rmg_env
+db_con = qraat.util.get_db('writer')
 
-(pos_est, sites) = qraat.position.calc_positions(options.cal_id, options.tx_id, options.t_start, options.t_end, options.t_delta, options.t_window, options.verbose)  
+bl = qraat.position.bearing_likelihoods(db_con, 
+                                        options.cal_id, 
+                                        options.tx_id, 
+                                        options.t_start, 
+                                        options.t_end)
+
+(pos_est, pos_est_deps) = qraat.position.calc_positions(bl, 
+                                                        options.t_window, 
+                                                        options.t_delta, 
+                                                        options.verbose) 
+
+qraat.position.insert_positions(db_con, pos_est, pos_est_deps, options.tx_id)
 
 if options.plot: 
 
@@ -77,8 +88,8 @@ if options.plot:
 
   # Plot sites.
   pp.plot(
-   [s.easting for s in sites], 
-   [s.northing for s in sites], 'ro')
+   [s.easting for s in bl.sites], 
+   [s.northing for s in bl.sites], 'ro')
 
   # Plot locations. 
   pp.plot( 

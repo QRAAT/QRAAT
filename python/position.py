@@ -21,32 +21,8 @@ import MySQLdb as mdb
 import numpy as np
 import time, os, sys
 
+import util
 from csv import csv
-from util import get_field, remove_field
-
-
-
-# Get database credentials.
-def get_db(view):
-  try:
-    db_config = csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view=view)
-
-  except KeyError:
-    print >>sys.stderr, "position: error: undefined environment variables. Try `source rmg_env.`"
-    sys.exit(1)
-
-  except IOError, e:
-    print >>sys.stderr, "position: error: missing DB credential file '%s'." % e.filename
-    sys.exit(1)
-
-  # Connect to the database.
-  db_con = mdb.connect(db_config.host,
-                       db_config.user,
-                       db_config.password,
-                       db_config.name)
-  return db_con
-  
-
 
 #: Center of Quail Ridge reserve (northing, easting). This is the first
 #: "candidate point" used to construct the search space grid. TODO: 
@@ -54,21 +30,20 @@ def get_db(view):
 #:  ~ Chris 1/2/14
 center = np.complex(4260500, 574500)
 
-
-
-
-class fella:  # TODO better name.
+class bearing_likelihoods:
   
   def __init__(self, db_con, cal_id, tx_id, t_start, t_end):
-    ''' TODO 
+    ''' Encapsulate bearings and their likelihoods for a range of ESTs. 
 
-      This class contains the data structures for doing positiion estimation. 
+      *TODO*
     ''' 
     self.get_site_data(db_con, cal_id)
     self.get_est_data(db_con, t_start, t_end, tx_id)
     self.calc_likelihoods()
 
   def get_site_data(self, db_con, cal_id):
+    ''' Get steering vectors for likelihood calculations. ''' 
+
     print "position: fetching site and cal data"
 
     deps = []
@@ -93,8 +68,8 @@ class fella:  # TODO better name.
                        FROM Steering_Vectors
                       WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, cal_id))
       raw_data = cur.fetchall()
-      prov_sv_ids = get_field(raw_data, 0)
-      data_no_ids = remove_field(raw_data, 0)
+      prov_sv_ids = util.get_field(raw_data, 0)
+      data_no_ids = util.remove_field(raw_data, 0)
       sv_data = np.array(data_no_ids,dtype=float)
       if sv_data.shape[0] > 0:
         steering_vectors[site.ID] = np.array(sv_data[:,1::2] + np.complex(0,1) * sv_data[:,2::2])
@@ -114,7 +89,10 @@ class fella:  # TODO better name.
      self.prov_sv_ids, self.deps, self.sv_deps_by_site) = (sites, bearings, steering_vectors, 
                                                            prov_sv_ids, deps, sv_deps_by_site)
 
+
   def get_est_data(self, db_con, t_start, t_end, tx_id):
+    ''' Get signals for transmitter in time range. ''' 
+    
     print "position: fetching pulses for transmitter and time range"
     
     cur = db_con.cursor()
@@ -132,7 +110,7 @@ class fella:  # TODO better name.
                                                 tx_id))
 
     raw_data = cur.fetchall()
-    prov_est_ids = get_field(raw_data, 0)
+    prov_est_ids = util.get_field(raw_data, 0)
     signal_data = np.array(raw_data, dtype=float)
     est_ct = signal_data.shape[0]
     if est_ct == 0:
@@ -151,8 +129,8 @@ class fella:  # TODO better name.
                                         signal, prov_est_ids)
 
 
-  # Calculate the likelihood of each bearing for each pulse.
   def calc_likelihoods(self): 
+    ''' Calculate the likelihood of each bearing for each pulse. ''' 
 
     record_provenance_from_site_data = False
 
@@ -196,7 +174,7 @@ class fella:  # TODO better name.
       The log likelihood of a candidate corresponding to the actual location
       of the target transmitter over the time window is equal to the sum of
       the likelihoods of each of these bearings given the signal characteristics
-      of the ESTs in the window.
+      of the ESTs in the window. This method uses Bartlet's estimator. 
     '''
 
     #: Generate candidate points centered around ``center``.
@@ -207,11 +185,11 @@ class fella:  # TODO better name.
 
     #: The third dimension of the search space: bearings from each
     #: candidate point to each receiver site.
-    #site_bearings = np.zeros(np.hstack((grid.shape,len(self.sites))))
     site_bearings = {}
     for site in self.sites:
       #site_bearings[:,:,sv_index] = np.angle(grid - site.pos) * 180 / np.pi
       site_bearings[site.ID] = np.angle(grid - site.pos) * 180 / np.pi
+    #site_bearings = np.zeros(np.hstack((grid.shape,len(self.sites))))
 
     #: Based on bearing self.likelihoods for EST's in time range, calculate
     #: the log likelihood of each candidate point.
@@ -234,67 +212,56 @@ class fella:  # TODO better name.
 
 
 
-
-
-
-def calc_positions(cal_id, tx_id, t_start, t_end, t_delta, t_window, verbose = False):
-  db_con = get_db('writer')
-
-  stuff = fella(db_con, cal_id, tx_id, t_start, t_end)
-
-  pos_est, pos_est_deps = estimate_positions(stuff, t_window, t_delta, verbose) 
-
-  insert_positions(db_con, pos_est, pos_est_deps, tx_id)
-  return pos_est, stuff.sites
-
-
-def estimate_positions(stuff, t_window, t_delta, verbose=False):
-  #: Calculated positions (time, pos).
+def calc_positions(bearing_likelihoods, t_window, t_delta, verbose=False):
+  ''' Calculate positions of a transmitter over a time interval. 
+  
+    The calculation is based on Bartlet's estimator. '''
   pos_est = []
   pos_est_deps = []
-  est_ct = stuff.likelihoods.shape[0]
-  #: The time step (in seconds) for the position estimation
-  #: calculation.
-  #t_delta = options.t_delta
-
-  #: Time averaging window (in seconds).
-  #t_window = options.t_window
-
+  est_ct = bearing_likelihoods.likelihoods.shape[0]
 
   print "position: calculating position"
   if verbose:
     print "%15s %-19s %-19s %-19s" % ('time window',
               '100 meters', '10 meters', '1 meter')
-  start_step = np.ceil(stuff.est_time[0] / t_delta)
-  while start_step*t_delta - (t_window / 2.0) < stuff.est_time[0]:
+
+  start_step = np.ceil(bearing_likelihoods.est_time[0] / t_delta)
+  while start_step*t_delta - (t_window / 2.0) < bearing_likelihoods.est_time[0]:
     start_step += 1
   start_step -= 1
 
-  end_step = np.floor(stuff.est_time[-1] / t_delta)
-  while end_step*t_delta + (t_window / 2.0) > stuff.est_time[-1]:
+  end_step = np.floor(bearing_likelihoods.est_time[-1] / t_delta)
+  while end_step*t_delta + (t_window / 2.0) > bearing_likelihoods.est_time[-1]:
     end_step -= 1
   end_step += 1
-
 
   try:
     for time_step in range(int(start_step),int(end_step)):
 
       # Find the indexes corresponding to the time window.
-      est_index_list = np.where(np.abs(stuff.est_time - time_step*t_delta - t_window / 2.0) <= t_window / 2.0)[0]#where returns a tuple for some reason
+      est_index_list = np.where(
+        np.abs(bearing_likelihoods.est_time - time_step*t_delta - t_window / 2.0) 
+          <= t_window / 2.0)[0]
 
-      if len(est_index_list) > 0 and len(set(stuff.site_id[est_index_list])) > 1:
-        if verbose: print "Time window {0} - {1}".format(time_step*t_delta - t_window / 2.0, time_step*t_delta + t_window)
+      if len(est_index_list) > 0 and len(set(bearing_likelihoods.site_id[est_index_list])) > 1:
+
+        if verbose: 
+          print "Time window {0} - {1}".format(
+            time_step*t_delta - t_window / 2.0, time_step*t_delta + t_window)
+
         scale = 100
         pos = center
         while scale >= 1: # 100, 10, 1 meters ...
-          pos = stuff.position_estimation(est_index_list, pos, scale)
+          pos = bearing_likelihoods.position_estimation(est_index_list, pos, scale)
           if verbose:
             print "%8dn,%de" % (pos.real, pos.imag),
           scale /= 10
+
         pos_deps = []
+
         # Determine components of est that contribute to the computed position.
         for est_index in est_index_list:
-          pos_deps.append(stuff.est_ids[est_index])
+          pos_deps.append(bearing_likelihoods.est_ids[est_index])
         pos_est.append((time_step*t_delta,
                         pos.imag,  # easting
                         pos.real)) # northing
@@ -302,30 +269,36 @@ def estimate_positions(stuff, t_window, t_delta, verbose=False):
         pos_est_deps.append({'est':tuple(pos_deps)})
         if verbose: print
 
-  except KeyboardInterrupt: pass
+  except KeyboardInterrupt: 
+    pass
 
   return pos_est, pos_est_deps
 
+
+
 def insert_positions(db_con, pos_est, pos_est_deps, tx_id):
+    ''' Insert positions into database with provenance. ''' 
     cur = db_con.cursor()
 
-    insert_statement = '''INSERT INTO Position
-                        (txid, timestamp, easting, northing)
-                       VALUES (%s, %s, %s, %s)'''
-    # Insert results into database.
+    query = '''INSERT INTO Position
+                (txid, timestamp, easting, northing)
+               VALUES (%s, %s, %s, %s)'''
     #cur.executemany(, [(tx_id, pe[0], pe[1], pe[2]) for pe in pos_est])
 
+    # Insert results into database.
     all_insertions = []
     for pos_est_index in range(len(pos_est)):
       this_pos_est = pos_est[pos_est_index]
       this_pos_est_deps = pos_est_deps[pos_est_index]
-      cur.execute(insert_statement, (tx_id, this_pos_est[0], this_pos_est[1], this_pos_est[2]))
+      cur.execute(query, (tx_id, this_pos_est[0], this_pos_est[1], this_pos_est[2]))
       pos_est_insertion_id = cur.lastrowid
       all_insertions.append(pos_est_insertion_id)
       handle_provenance_insertion(cur, this_pos_est_deps, {'Position':(pos_est_insertion_id,)})
 
-def compress(s):
 
+
+def compress(s):
+  ''' What's this for? *TODO* ''' 
   strings = []
   ss = sorted(s, reverse=True)
 
@@ -355,10 +328,11 @@ def compress(s):
   else:
     strings.append('%d-%d' % (sequence_start, last_num))
 
-
   return ','.join(strings)
 
+
 def handle_provenance_insertion(cur, depends_on, obj):
+  ''' *TODO* add doc string ''' 
   query = 'insert into provenance (obj_table, obj_id, dep_table, dep_id) values (%s, %s, %s, %s);'
   prov_args = []
   for dep_k in depends_on.keys():
@@ -367,6 +341,5 @@ def handle_provenance_insertion(cur, depends_on, obj):
         for obj_v in obj[obj_k]:
           args = (obj_k, obj_v, dep_k, dep_v)
           prov_args.append(args)
-  # FIXME temporarily commented this out until I have the prov schema.
-  #cur.executemany(query, prov_args) 
+  cur.executemany(query, prov_args) 
 
