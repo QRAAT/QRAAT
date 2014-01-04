@@ -27,7 +27,7 @@ print "{} transmitters found in new records".format(len(tx_list))
 print tx_list
 if len(tx_list) > 0:
   cal_id = int(os.environ['RMG_POS_CAL_ID'])
-  site_data = qraat.position.bearing_likelihoods(db_con, cal_id)
+  bl = qraat.position.bearing_likelihoods(db_con, cal_id)
 
 time_window = float(os.environ['RMG_POS_TIME_WINDOW'])
 time_delta = float(os.environ['RMG_POS_TIME_STEP'])
@@ -59,13 +59,13 @@ for tx in tx_list:
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
 
-    site_data.get_est_data(db_con, tx_id, 
+    bl.get_est_data(db_con, tx_id, 
                            time_range[0]-time_window, 
                            time_range[1]+time_window)
 
-    site_data.calc_likelihoods()
-    (pos_est, pos_est_deps) = site_data.calc_positions(time_window, time_delta)
-    site_data.insert_positions(db_con, pos_est, pos_est_deps, tx_id)
+    bl.calc_likelihoods()
+    (pos_est, pos_est_deps) = qraat.position.calc_positions(bl, time_window, time_delta)
+    qraat.position.insert_positions(db_con, pos_est, pos_est_deps, tx_id)
 
   temp_max_id = np.max(times[:,0])
   if temp_max_id > max_id:

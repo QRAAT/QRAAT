@@ -38,7 +38,7 @@ class bearing_likelihoods:
       *TODO*
     ''' 
     self.get_site_data(db_con, cal_id)
-    if tx_id: 
+    if tx_id != None: 
       self.get_est_data(db_con, t_start, t_end, tx_id)
       self.calc_likelihoods()
     else: self.likelihoods = None
