@@ -43,6 +43,11 @@ class bearing_likelihoods:
       self.calc_likelihoods()
     else: self.likelihoods = None
 
+  def __len__(self): 
+    if self.likelihoods != None: 
+      return self.likelihoods.shape[0]
+    else: return 0
+
   def get_site_data(self, db_con, cal_id):
     ''' Get steering vectors for likelihood calculations. ''' 
 
@@ -345,3 +350,57 @@ def handle_provenance_insertion(cur, depends_on, obj):
           prov_args.append(args)
   cur.executemany(query, prov_args) 
 
+
+
+class halfplane: 
+  ''' A two-dimensional linear inequality. 
+
+    Compute the slope and y-intercept of the line defined by point ``p`` 
+    and bearing ``theta``. Format of ``p`` is np.complex(real=northing, 
+    imag=easting). Also, ``pos`` is set to True if the vector theta goes 
+    in a positive direction along the x-axis. 
+  ''' 
+  
+  #: The types of plane constrains:
+  #: greater than, less than, greater than
+  #: or equal to, less than or equal to. 
+  plane_t = util.enum('GT', 'LT', 'GE', 'LE')
+  plane_string = { plane_t.GT : '>', 
+                   plane_t.LT : '<', 
+                   plane_t.GE : '>=', 
+                   plane_t.LE : '<=' }
+
+  def __init__ (self, p, theta):
+
+    self.x_p = p.imag
+    self.y_p = p.real
+    self.m = np.tan(np.pi * theta / 180) 
+    self.plane = None
+
+    if (0 <= theta and theta <= 90) or (270 <= theta and theta <= 360):
+      self.pos = True
+    else: self.pos = False 
+
+    if (0 <= theta and theta <= 180):
+      self.y_pos = True
+    else: self.y_pos = False
+
+  def __repr__ (self): 
+    s = 'y %s %.02f(x - %.02f) + %.02f' % (self.plane_string[self.plane], 
+                                           self.m, self.x_p, self.y_p)
+    return '%-37s' % s
+
+  def __call__ (self, x): 
+    return self.m * (x - self.x_p) + self.y_p
+
+  def inverse(self, y): 
+    return ((y - self.y_p) + (self.m * self.x_p)) / self.m
+
+  @classmethod
+  def from_bearings(cls, p, theta_i, theta_j):
+    # TODO get plane constraints right.
+    Ti = cls(p, theta_i)
+    Ti.plane = cls.plane_t.GT
+    Tj = cls(p, theta_j) 
+    Tj.plane = cls.plane_t.GT
+    return (Ti, Tj)    

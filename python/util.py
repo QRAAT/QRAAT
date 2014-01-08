@@ -30,6 +30,15 @@ def get_field(l, i):
   return tuple([x[i] for x in l])
 
 
+def enum(*sequential, **named):
+  """ 
+    Create an enumerated type as a Python class. For example, see
+  """
+  enums = dict(zip(sequential, range(len(sequential))), **named)
+  Enum = type('Enum', (), enums)
+  return Enum
+
+
 def get_db(view):
   ''' Get database credentials. ''' 
   try:
