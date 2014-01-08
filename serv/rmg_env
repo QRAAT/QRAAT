@@ -88,36 +88,28 @@ export RMG_SITE_LOG_DIR="$RMG_SITE_METADATA_DIR/log"
 # Log directory for server
 export RMG_SERVER_LOG_DIR="/var/log/rmg"
 
-# Path for mount point of archive backup drive
+# Path for mount point of backup drive
 # Used in rmg_backup
-export BACKUP_DRIVE=/mnt/external
+# Comment this out to disable backups (e.g. when drive is not mounted)
+export RMG_BACKUP_DRIVE=/mnt/external
 
-# Path for mount point of archive backup drive2
+# Paths for subdirectories of rmg_server directory on backup drive
+if [ ! -z ${RMG_BACKUP_DRIVE} ]
+then
+	export RMG_BACKUP_DIR=${RMG_BACKUP_DRIVE}/backup${RMG_SERVER_DIR}
+	export RMG_BACKUP_ARCHIVE_DIR=$RMG_BACKUP_DIR/archive
+fi
+
+# Path for mount point of secondary backup drive2
 # Used in rmg_backup
-export BACKUP_DRIVE2=/mnt/external2
+# Comment this out to disable secondary backups (e.g. when drive is not mounted)
+#export RMG_BACKUP_DRIVE2=/mnt/backup_windows_server/QRAAT
 
-# Path for mount point of archive backup server
-# Used in rmg_backup
-export BACKUP_DRIVES=/mnt/backup_windows_server/QRAAT
-
-# Path for rmg_server directory on archive backup drive
-export BACKUP_DIR=${BACKUP_DRIVE}/backup${RMG_SERVER_DIR}
-
-# Path for rmg_server directory on archive backup drive2
-# Used in rmg_backup
-export BACKUP_DIR2=${BACKUP_DRIVE2}/backup${RMG_SERVER_DIR}
-
-# Path for rmg_server directory on archive backup drive2
-# Used in rmg_backup
-export BACKUP_DIRS=${BACKUP_DRIVES}/backup${RMG_SERVER_DIR}
-
-# Path for archive directory on backup drive
-# Used in rmg_backup and rmg_clean
-export BACKUP_ARCHIVE_DIR=$BACKUP_DIR/archive
-
-# Path for archive directory on backup drive
-# Used in rmg_backup and rmg_clean
-export BACKUP_ARCHIVE_DIRS=$BACKUP_DIRS/archive
+# Paths for subdirectories of rmg_server directory on secondary backup drive
+if [ ! -z ${RMG_BACKUP_DRIVE2} ]
+then
+	export RMG_BACKUP_DIR2=${RMG_BACKUP_DRIVE2}/backup${RMG_SERVER_DIR}
+fi
 
 # The number of days that files stay in RMG_SERVER_ARCHIVE_DIR
 # Used in rmg_clean
