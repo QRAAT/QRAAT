@@ -96,6 +96,10 @@ export BACKUP_DRIVE=/mnt/external
 # Used in rmg_backup
 export BACKUP_DRIVE2=/mnt/external2
 
+# Path for mount point of archive backup server
+# Used in rmg_backup
+export BACKUP_DRIVES=/mnt/backup_windows_server/QRAAT
+
 # Path for rmg_server directory on archive backup drive
 export BACKUP_DIR=${BACKUP_DRIVE}/backup${RMG_SERVER_DIR}
 
@@ -103,9 +107,17 @@ export BACKUP_DIR=${BACKUP_DRIVE}/backup${RMG_SERVER_DIR}
 # Used in rmg_backup
 export BACKUP_DIR2=${BACKUP_DRIVE2}/backup${RMG_SERVER_DIR}
 
+# Path for rmg_server directory on archive backup drive2
+# Used in rmg_backup
+export BACKUP_DIRS=${BACKUP_DRIVES}/backup${RMG_SERVER_DIR}
+
 # Path for archive directory on backup drive
 # Used in rmg_backup and rmg_clean
 export BACKUP_ARCHIVE_DIR=$BACKUP_DIR/archive
+
+# Path for archive directory on backup drive
+# Used in rmg_backup and rmg_clean
+export BACKUP_ARCHIVE_DIRS=$BACKUP_DIRS/archive
 
 # The number of days that files stay in RMG_SERVER_ARCHIVE_DIR
 # Used in rmg_clean
