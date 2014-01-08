@@ -43,7 +43,7 @@ rmcount=0
 cd $RMG_SERVER_ARCHIVE_DIR
 for filename in `find . -type f -mtime +$RMG_ARCHIVE_DAYS`
 do
-	destination=$BACKUP_ARCHIVE_DIR/$filename
+	destination=$RMG_BACKUP_ARCHIVE_DIR/$filename
 	if [[ -e $destination ]]
 	then
 		let rmcount=$rmcount+1

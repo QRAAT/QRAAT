@@ -39,47 +39,47 @@ source rmg_env
 
 # Check environment variables (yes, necessary, trust me)
 echo Checking environment variables are set
-if [ -z "$BACKUP_DRIVE" ]
+if [ -z "$RMG_BACKUP_DRIVE" ]
 then
-	echo ERROR: environment variable BACKUP_DRIVE is not set, bailing out
+	echo ERROR: environment variable RMG_BACKUP_DRIVE is not set, bailing out
 	exit 1
 fi
 
 # Check destination directories
-echo Checking for backup drive: $BACKUP_DRIVE
-if [ ! -e $BACKUP_DRIVE ]
+echo Checking for backup drive: $RMG_BACKUP_DRIVE
+if [ ! -e $RMG_BACKUP_DRIVE ]
 then
-	echo ERROR: backup drive $BACKUP_DRIVE not found
+	echo ERROR: backup drive $RMG_BACKUP_DRIVE not found
 	exit 1
 fi
-echo Checking for backup directory: $BACKUP_DIR
-if [ ! -e $BACKUP_DIR ]
+echo Checking for backup directory: $RMG_BACKUP_DIR
+if [ ! -e $RMG_BACKUP_DIR ]
 then
-	echo WARNING: creating backup directory $BACKUP_DIR
-	mkdir -p $BACKUP_DIR	# create all necessary subdirectories
-	if [ ! -e $BACKUP_DIR ]
+	echo WARNING: creating backup directory $RMG_BACKUP_DIR
+	mkdir -p $RMG_BACKUP_DIR	# create all necessary subdirectories
+	if [ ! -e $RMG_BACKUP_DIR ]
 	then
-		echo ERROR: cannot create backup directory $BACKUP_DIR
+		echo ERROR: cannot create backup directory $RMG_BACKUP_DIR
 		exit 1
 	fi
 fi
-echo Checking for backup archive directory: $BACKUP_ARCHIVE_DIR
-if [ ! -e $BACKUP_ARCHIVE_DIR ]
+echo Checking for backup archive directory: $RMG_BACKUP_ARCHIVE_DIR
+if [ ! -e $RMG_BACKUP_ARCHIVE_DIR ]
 then
-	echo WARNING: creating backup archive directory $BACKUP_ARCHIVE_DIR
-	mkdir $BACKUP_ARCHIVE_DIR
-	if [ ! -e $BACKUP_ARCHIVE_DIR ]
+	echo WARNING: creating backup archive directory $RMG_BACKUP_ARCHIVE_DIR
+	mkdir $RMG_BACKUP_ARCHIVE_DIR
+	if [ ! -e $RMG_BACKUP_ARCHIVE_DIR ]
 	then
-		echo ERROR: cannot create backup archive directory $BACKUP_ARCHIVE_DIR
+		echo ERROR: cannot create backup archive directory $RMG_BACKUP_ARCHIVE_DIR
 		exit 1
 	fi
 fi
 
-# Backup $RMG_SERVER_ARCHIVE_DIR to $BACKUP_ARCHIVE_DIR
+# Backup $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_ARCHIVE_DIR
 BACKUP_ARCHIVE_FILELIST=/var/log/rmg/rmg_backup_archive_synclog
-echo Copying files from $RMG_SERVER_ARCHIVE_DIR to $BACKUP_ARCHIVE_DIR
+echo Copying files from $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_ARCHIVE_DIR
 rm -f $BACKUP_ARCHIVE_FILELIST
-rsync -av --out-format='%n' $RMG_SERVER_ARCHIVE_DIR/  $BACKUP_ARCHIVE_DIR >$BACKUP_ARCHIVE_FILELIST
+rsync -av --out-format='%n' $RMG_SERVER_ARCHIVE_DIR/  $RMG_BACKUP_ARCHIVE_DIR >$BACKUP_ARCHIVE_FILELIST
 # MUST have trailing / on the rsync source directory, to avoid spurious destination subdirectory
 if [ $? -ne 0 ]
 then
@@ -98,60 +98,60 @@ fi
 # Copy log files
 #TODO
 
-echo Checking for backup database directory: $BACKUP_DIR/database
-if [ ! -e $BACKUP_DIR/database ]
+echo Checking for backup database directory: $RMG_BACKUP_DIR/database
+if [ ! -e $RMG_BACKUP_DIR/database ]
 then
-	echo WARNING: creating backup directory $BACKUP_DIR/database
-	mkdir $BACKUP_DIR/database
-	if [ ! -e $BACKUP_DIR/database ]
+	echo WARNING: creating backup directory $RMG_BACKUP_DIR/database
+	mkdir $RMG_BACKUP_DIR/database
+	if [ ! -e $RMG_BACKUP_DIR/database ]
 	then
-		echo ERROR: cannot create backup directory $BACKUP_DIR/database
+		echo ERROR: cannot create backup directory $RMG_BACKUP_DIR/database
 		exit 1
 	fi
 fi
 
-# Extract tables from the qraat database to $BACKUP_DIR/database
+# Extract tables from the qraat database to $RMG_BACKUP_DIR/database
 echo Dumping database tables
-mysql -B -e 'select * from txlist' >$BACKUP_DIR/database/txlist
-mysql -B -e 'select * from sitelist' >$BACKUP_DIR/database/sitelist.txt
-mysql -B -e 'select * from telemetry' >$BACKUP_DIR/database/telemetry.txt
-mysql -B -e 'select * from Calibration_Information' >$BACKUP_DIR/database/Calibration_Information.txt
-mysql -B -e 'select * from GPS_Calibration_Data' >$BACKUP_DIR/database/GPS_Calibration_Data.txt
-mysql -B -e 'select * from Steering_Vectors' >$BACKUP_DIR/database/Steering_Vectors.txt
-mysql -B -e 'select * from True_Position' >$BACKUP_DIR/database/True_Position.txt
-#mysql -B -e 'select * from timecheck' >$BACKUP_DIR/database/timecheck.txt
-#mysql -B -e 'select * from detcount' >$BACKUP_DIR/database/detcount.txt
-#mysql -B -e 'select * from estcount' >$BACKUP_DIR/database/estcount.txt
-#mysql -B -e 'select * from procount' >$BACKUP_DIR/database/procount.txt
-#mysql -B -e 'select * from est where datetime between date_add(now(),interval -25 hour) and now();' >$BACKUP_DIR/database/est_`date +"%Y-%m-%d"`.txt
+mysql -B -e 'select * from txlist' >$RMG_BACKUP_DIR/database/txlist
+mysql -B -e 'select * from sitelist' >$RMG_BACKUP_DIR/database/sitelist.txt
+mysql -B -e 'select * from telemetry' >$RMG_BACKUP_DIR/database/telemetry.txt
+mysql -B -e 'select * from Calibration_Information' >$RMG_BACKUP_DIR/database/Calibration_Information.txt
+mysql -B -e 'select * from GPS_Calibration_Data' >$RMG_BACKUP_DIR/database/GPS_Calibration_Data.txt
+mysql -B -e 'select * from Steering_Vectors' >$RMG_BACKUP_DIR/database/Steering_Vectors.txt
+mysql -B -e 'select * from True_Position' >$RMG_BACKUP_DIR/database/True_Position.txt
+#mysql -B -e 'select * from timecheck' >$RMG_BACKUP_DIR/database/timecheck.txt
+#mysql -B -e 'select * from detcount' >$RMG_BACKUP_DIR/database/detcount.txt
+#mysql -B -e 'select * from estcount' >$RMG_BACKUP_DIR/database/estcount.txt
+#mysql -B -e 'select * from procount' >$RMG_BACKUP_DIR/database/procount.txt
+#mysql -B -e 'select * from est where datetime between date_add(now(),interval -25 hour) and now();' >$RMG_BACKUP_DIR/database/est_`date +"%Y-%m-%d"`.txt
 
 # Synchronize second backup drive
 # Check destination directories
-echo Checking for backup drive: $BACKUP_DRIVE2
-if [ ! -e $BACKUP_DRIVE2 ]
+echo Checking for backup drive: $RMG_BACKUP_DRIVE2
+if [ ! -e $RMG_BACKUP_DRIVE2 ]
 then
-	echo ERROR: backup drive $BACKUP_DRIVE2 not found
+	echo ERROR: backup drive $RMG_BACKUP_DRIVE2 not found
 	exit 1
 fi
-echo Checking for backup directory: $BACKUP_DIR2
-if [ ! -e $BACKUP_DIR2 ]
+echo Checking for backup directory: $RMG_BACKUP_DIR2
+if [ ! -e $RMG_BACKUP_DIR2 ]
 then
-	echo WARNING: creating backup directory $BACKUP_DIR2
-	mkdir -p $BACKUP_DIR2	# create all necessary subdirectories
-	if [ ! -e $BACKUP_DIR2 ]
+	echo WARNING: creating backup directory $RMG_BACKUP_DIR2
+	mkdir -p $RMG_BACKUP_DIR2	# create all necessary subdirectories
+	if [ ! -e $RMG_BACKUP_DIR2 ]
 	then
-		echo ERROR: cannot create backup directory $BACKUP_DIR2
+		echo ERROR: cannot create backup directory $RMG_BACKUP_DIR2
 		exit 1
 	fi
 fi
-echo Synchronizing $BACKUP_DRIVE and $BACKUP_DRIVE2
+echo Synchronizing $RMG_BACKUP_DRIVE and $RMG_BACKUP_DRIVE2
 BACKUP_DRIVE_SYNCLOG=/var/log/rmg/rmg_backup_drive_synclog
-rsync -av $BACKUP_DIR/ $BACKUP_DIR2 >$BACKUP_DRIVE_SYNCLOG
+rsync -av $RMG_BACKUP_DIR/ $RMG_BACKUP_DIR2 >$BACKUP_DRIVE_SYNCLOG
 if [ $? -ne 0 ]
 then
 	echo Error in rsync, bailing out
 fi
-df $BACKUP_DRIVE $BACKUP_DRIVE2
+df -l $RMG_BACKUP_DRIVE $RMG_BACKUP_DRIVE2
 
 echo Finished $0 at `date`
 
