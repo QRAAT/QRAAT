@@ -94,7 +94,7 @@ export RMG_SERVER_LOG_DIR="/var/log/rmg"
 export RMG_BACKUP_DRIVE=/mnt/external
 
 # Paths for subdirectories of rmg_server directory on backup drive
-if [ ! -z ${RMG_BACKUP_DRIVE} ]
+if [ ! -z "${RMG_BACKUP_DRIVE}" ]
 then
 	export RMG_BACKUP_DIR=${RMG_BACKUP_DRIVE}/backup${RMG_SERVER_DIR}
 	export RMG_BACKUP_ARCHIVE_DIR=$RMG_BACKUP_DIR/archive
@@ -106,7 +106,7 @@ fi
 #export RMG_BACKUP_DRIVE2=/mnt/backup_windows_server/QRAAT
 
 # Paths for subdirectories of rmg_server directory on secondary backup drive
-if [ ! -z ${RMG_BACKUP_DRIVE2} ]
+if [ ! -z "${RMG_BACKUP_DRIVE2}" ]
 then
 	export RMG_BACKUP_DIR2=${RMG_BACKUP_DRIVE2}/backup${RMG_SERVER_DIR}
 fi

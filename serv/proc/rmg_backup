@@ -125,33 +125,39 @@ mysql -B -e 'select * from True_Position' >$RMG_BACKUP_DIR/database/True_Positio
 #mysql -B -e 'select * from procount' >$RMG_BACKUP_DIR/database/procount.txt
 #mysql -B -e 'select * from est where datetime between date_add(now(),interval -25 hour) and now();' >$RMG_BACKUP_DIR/database/est_`date +"%Y-%m-%d"`.txt
 
-# Synchronize second backup drive
-# Check destination directories
-echo Checking for backup drive: $RMG_BACKUP_DRIVE2
-if [ ! -e $RMG_BACKUP_DRIVE2 ]
+# Check for secondary backup
+if [ -z "$RMG_BACKUP_DRIVE2" ]
 then
-	echo ERROR: backup drive $RMG_BACKUP_DRIVE2 not found
-	exit 1
-fi
-echo Checking for backup directory: $RMG_BACKUP_DIR2
-if [ ! -e $RMG_BACKUP_DIR2 ]
-then
-	echo WARNING: creating backup directory $RMG_BACKUP_DIR2
-	mkdir -p $RMG_BACKUP_DIR2	# create all necessary subdirectories
-	if [ ! -e $RMG_BACKUP_DIR2 ]
+	echo RMG_BACKUP_DRIVE2 is not set, skipping secondary backup
+else
+	# Synchronize second backup drive
+	# Check destination directories
+	echo Checking for backup drive: $RMG_BACKUP_DRIVE2
+	if [ ! -e $RMG_BACKUP_DRIVE2 ]
 	then
-		echo ERROR: cannot create backup directory $RMG_BACKUP_DIR2
+		echo ERROR: backup drive $RMG_BACKUP_DRIVE2 not found
 		exit 1
 	fi
+	echo Checking for backup directory: $RMG_BACKUP_DIR2
+	if [ ! -e $RMG_BACKUP_DIR2 ]
+	then
+		echo WARNING: creating backup directory $RMG_BACKUP_DIR2
+		mkdir -p $RMG_BACKUP_DIR2	# create all necessary subdirectories
+		if [ ! -e $RMG_BACKUP_DIR2 ]
+		then
+			echo ERROR: cannot create backup directory $RMG_BACKUP_DIR2
+			exit 1
+		fi
+	fi
+	echo Synchronizing $RMG_BACKUP_DRIVE and $RMG_BACKUP_DRIVE2
+	BACKUP_DRIVE_SYNCLOG=/var/log/rmg/rmg_backup_drive_synclog
+	rsync -av $RMG_BACKUP_DIR/ $RMG_BACKUP_DIR2 >$BACKUP_DRIVE_SYNCLOG
+	if [ $? -ne 0 ]
+	then
+		echo Error in rsync, bailing out
+	fi
+	df -l $RMG_BACKUP_DRIVE $RMG_BACKUP_DRIVE2
 fi
-echo Synchronizing $RMG_BACKUP_DRIVE and $RMG_BACKUP_DRIVE2
-BACKUP_DRIVE_SYNCLOG=/var/log/rmg/rmg_backup_drive_synclog
-rsync -av $RMG_BACKUP_DIR/ $RMG_BACKUP_DIR2 >$BACKUP_DRIVE_SYNCLOG
-if [ $? -ne 0 ]
-then
-	echo Error in rsync, bailing out
-fi
-df -l $RMG_BACKUP_DRIVE $RMG_BACKUP_DRIVE2
 
 echo Finished $0 at `date`
 
