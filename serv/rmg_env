@@ -103,7 +103,7 @@ fi
 # Path for mount point of secondary backup drive2
 # Used in rmg_backup
 # Comment this out to disable secondary backups (e.g. when drive is not mounted)
-#export RMG_BACKUP_DRIVE2=/mnt/backup_windows_server/QRAAT
+export RMG_BACKUP_DRIVE2=/mnt/backup_windows_server/QRAAT
 
 # Paths for subdirectories of rmg_server directory on secondary backup drive
 if [ ! -z "${RMG_BACKUP_DRIVE2}" ]
