@@ -67,100 +67,7 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=1376432160,#13
 
 (options, args) = parser.parse_args()
 
-# Get database credentials. 
-try: 
-  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='reader')
-
-except KeyError: 
-  print >>sys.stderr, "position: error: undefined environment variables. Try `source rmg_env.`" 
-  sys.exit(1) 
-
-except IOError, e: 
-  print >>sys.stderr, "position: error: missing DB credential file '%s'." % e.filename
-  sys.exit(1)
-
-# Connect to the database. 
-db_con = mdb.connect(db_config.host, 
-                     db_config.user,
-                     db_config.password,
-                     db_config.name)
-cur = db_con.cursor()
-
-print "position: fetching site and cal data"
-
-# Get site locations.
-sites = qraat.csv(db_con=db_con, db_table='sitelist')
-
-# Get steering vector data.
-steering_vectors = {} # site.ID -> sv
-bearings = {}         # site.ID -> bearing
-
-for site in sites:
-  cur.execute('''SELECT Bearing, 
-                        sv1r, sv1i, sv2r, sv2i, 
-                        sv3r, sv3i, sv4r, sv4i 
-                   FROM Steering_Vectors 
-                  WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, options.cal_id))
-  sv_data = np.array(cur.fetchall(),dtype=float)
-  if sv_data.shape[0] > 0:
-    steering_vectors[site.ID] = np.array(sv_data[:,1::2] + np.complex(0,1) * sv_data[:,2::2])
-    bearings[site.ID] = np.array(sv_data[:,0])
-
-print "position: fetching pulses for transmitter and time range"
-
-# Get pulses in time range.  
-cur.execute('''SELECT ID, siteid, timestamp,
-                      ed1r, ed1i, ed2r, ed2i,
-                      ed3r, ed3i, ed4r, ed4i
-                 FROM est
-                WHERE timestamp >= %s
-                  AND timestamp <= %s
-                  AND txid = %s
-                ORDER BY timestamp''', (options.t_start, 
-                                        options.t_end, 
-                                        options.tx_id))
-
-signal_data = np.array(cur.fetchall(), dtype=float)
-est_ct = signal_data.shape[0]
-if est_ct == 0:
-  print >>sys.stderr, "position: fatal: no est records for selected time range."
-  sys.exit(1)
-else: print "position: processing %d records" % est_ct
-
-sig_id =   np.array(signal_data[:,0], dtype=int)
-site_id =  np.array(signal_data[:,1], dtype=int)
-est_time = signal_data[:,2]
-signal =   signal_data[:,3::2]+np.complex(0,-1)*signal_data[:,4::2]
-
-print "position: calculating pulse bearing likelihoods"
-
-# Calculate the likelihood of each bearing for each pulse. 
-likelihoods = np.zeros((est_ct,360))
-for i in range(est_ct):
-  try: 
-    sv =  steering_vectors[site_id[i]]
-  except KeyError:
-    print >>sys.stderr, "position: error: no steering vectors for siteID=%d" % site_id[i]
-    sys.exit(1)
-
-  sig = signal[i,np.newaxis,:]
-  left_half = np.dot(sig, np.conj(np.transpose(sv)))
-  bearing_likelihood = (left_half * np.conj(left_half)).real
-  for j, value in enumerate(bearings[site_id[i]]):
-    likelihoods[i, value] = bearing_likelihood[0, j]
-
-
-
-# Format site locations as np.complex's. 
-site_pos = np.zeros((len(sites),),np.complex)
-site_pos_id = []
-for j in range(len(sites)):
-  site_pos[j] = np.complex(sites[j].northing, sites[j].easting)
-  site_pos_id.append(sites[j].ID)
-
-
-
-def plot_ll(i, j):
+def plot_ll(bl, i, j):
   ''' Plot search space, return point of maximum likelihood. '''
 
   fig = pp.gcf()
@@ -168,10 +75,10 @@ def plot_ll(i, j):
   constraints = {}
   # Add up bearing likelihoods for each site. 
   for e in range(i, j): 
-    if constraints.get(site_id[e]) == None:
-      constraints[site_id[e]] = likelihoods[e,]
+    if constraints.get(bl.site_id[e]) == None:
+      constraints[bl.site_id[e]] = bl.likelihoods[e,]
     else: 
-      constraints[site_id[e]] += likelihoods[e,]
+      constraints[bl.site_id[e]] += bl.likelihoods[e,]
 
   for (s, ll) in constraints.iteritems(): 
     
@@ -205,7 +112,7 @@ def plot_ll(i, j):
     pp.xlabel("Bearing to SiteID=%d" % s)
     pp.ylabel("Likelihood")
 
-    t = time.localtime((est_time[i] + est_time[j]) / 2)
+    t = time.localtime((bl.est_time[i] + bl.est_time[j]) / 2)
     pp.title('%04d-%02d-%02d %02d%02d:%02d txID=%d' % (
        t.tm_year, t.tm_mon, t.tm_mday,
        t.tm_hour, t.tm_min, t.tm_sec,
@@ -219,7 +126,13 @@ def plot_ll(i, j):
 
 
 
+db_con = qraat.util.get_db('reader')
 
+bl = qraat.position.bearing_likelihoods(db_con, 
+                                        options.cal_id, 
+                                        options.tx_id, 
+                                        options.t_start, 
+                                        options.t_end)
 
 
 #: The time step (in seconds) for the position estimation
@@ -234,17 +147,17 @@ print "position: calculating position"
 i = 0
 
 try: 
-  while i < est_ct - 1:
+  while i < len(bl) - 1:
 
     # Find the index j corresponding to the end of the time window. 
     j = i + 1
-    while j < est_ct - 1 and (est_time[j + 1] - est_time[i]) <= t_window: 
+    while j < len(bl) - 1 and (bl.est_time[j + 1] - bl.est_time[i]) <= t_window: 
       j += 1
     
-    t = time.localtime((est_time[i] + est_time[j]) / 2)
-    w_sites = set(site_id[i:j])
+    t = time.localtime((bl.est_time[i] + bl.est_time[j]) / 2)
+    w_sites = set(bl.site_id[i:j])
     
-    plot_ll(i, j)
+    plot_ll(bl, i, j)
 
     print '%04d-%02d-%02d %02d%02d:%02d %d' % (
      t.tm_year, t.tm_mon, t.tm_mday,
@@ -253,7 +166,7 @@ try:
 
     # Step index i forward t_delta seconds. 
     j = i + 1
-    while i < est_ct - 1 and (est_time[i + 1] - est_time[j]) <= t_delta: 
+    while i < len(bl) - 1 and (bl.est_time[i + 1] - bl.est_time[j]) <= t_delta: 
       i += 1
 
 except KeyboardInterrupt: pass

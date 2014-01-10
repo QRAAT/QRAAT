@@ -21,14 +21,6 @@
   interface. *This doc string is in python/__init__.py*. 
 '''
 
-def enum(*sequential, **named):
-  """ 
-    Create an enumerated type as a Python class. For example, see
-  """
-  enums = dict(zip(sequential, range(len(sequential))), **named)
-  Enum = type('Enum', (), enums)
-  return Enum
-
 from csv import csv, pretty_printer 
 from gps import gps
 from det import det

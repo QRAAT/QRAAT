@@ -57,7 +57,7 @@ import qraat
 #: Enumerated type for the data type output for a particular band from 
 #: radio. This is used in qraat.rmg.run to decide to use a continuous 
 #: baseband recorder or pulse detector. 
-det_type = qraat.enum('PULSE', 'CONT')
+det_type = qraat.util.enum('PULSE', 'CONT')
 
 #: String representations of radio output types. 
 det_type_str = { det_type.PULSE : "Pulse Detector", 
