@@ -17,12 +17,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import MySQLdb as mdb
 import numpy as np
 import time, os, sys
 
 import util
 from csv import csv
+
+try:
+  import MySQLdb as mdb
+except ImportError: pass
 
 #: Center of Quail Ridge reserve (northing, easting). This is the first
 #: "candidate point" used to construct the search space grid. TODO: 
