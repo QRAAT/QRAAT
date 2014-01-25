@@ -16,7 +16,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import MySQLdb as mdb
+try: 
+  import MySQLdb as mdb
+except ImportError: pass
+
 import os 
 from csv import csv
 
