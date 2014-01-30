@@ -16,6 +16,13 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# TODO
+# Store all signal data (eigenvalue decomposition and fourier decomposition
+# vectors and noise covariance matrices) in NumPy arrays in the class 
+# instead of in table columns. (Currently the eigenval. decomp. and noise
+# cov. matrices are stored in NumPy arrays, but also in the table columns.) 
+# This will require overloading read() and modifying append() and write(). 
 
 from csv import csv, pretty_printer
 from det import det
@@ -27,10 +34,7 @@ try:
   import MySQLdb as mdb
 except ImportError: pass
 
-  
-  # TODO find a better home for these queries. It was suggested 
-  # that we move all of our queries to a single, controlled 
-  # file. 
+# Some SQL queries. 
 
 query_insert_est = Template(
   '''INSERT INTO est 
@@ -287,7 +291,7 @@ class est (csv):
     tagname_index = { row['id'] : row['name'] for row in cur.fetchall() }
 
     # Select pulses produced over the specified range and populate table. 
-    cur.execute('''SELECT * 
+    cur.execute('''SELECT *
                      FROM est 
                     WHERE (%f <= timestamp) AND (timestamp <= %f)''' % (i, j))
     for row in cur.fetchall():
@@ -296,6 +300,27 @@ class est (csv):
         setattr(new_row, col, val)
       new_row.tagname = tagname_index[new_row.txid]
       self.table.append(new_row)
+
+    # Store eigenvalue decomposition vectors and noise covariance
+    # matrices in NumPy arrays. 
+    cur = db_con.cursor()
+    cur.execute('''SELECT ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, 
+                          nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+                          nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+                          nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+                          nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
+                     FROM est
+                    WHERE (%f <= timestamp) AND (timestamp <= %f)''' % (i, j))
+
+    raw = np.array(cur.fetchall(), dtype=float)
+
+    # Signal vector, 4 x 1.
+    self.signal = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
+    raw = raw[:,8:]
+
+    # Noise covariance matrix, 4 x 4. 
+    self.noise_cov = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
+    self.noise_cov = self.noise_cov.reshape(raw.shape[0], 4, 4)
 
     
   def write_db(self, db_con, site=None):
@@ -351,20 +376,16 @@ class est (csv):
     row.timestamp = repr(row.timestamp) 
     row.datetime = pretty_printer(row.datetime)
     cur.execute(query.substitute(row))
-  
+
 
 
 
 if __name__=="__main__":
 
   try:
-    #db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
-    #fella = est()
-    #fella.read_db(db_con, time.time() - 3600000, time.time())
-    #fella.write_db(db_con, site='site2')
-    fella = est(det=det('test.det'))
-    print repr(fella[0].timestamp)
-    print str(fella[0].timestamp)
+    db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
+    fella = est()
+    fella.read_db(db_con, 1376420800.0, 1376427800.0)
 
   except mdb.Error, e:
     print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])

@@ -91,7 +91,6 @@ class bearing_likelihoods:
     for site in sites:
       setattr(site, 'pos', np.complex(site.northing, site.easting))
 
-    # FIXME Minimizing code changes until I can verify prov workflow. 
     (self.sites, self.bearings, self.steering_vectors, 
      self.prov_sv_ids, self.deps, self.sv_deps_by_site) = (sites, bearings, steering_vectors, 
                                                            prov_sv_ids, deps, sv_deps_by_site)
@@ -130,7 +129,6 @@ class bearing_likelihoods:
     est_time = signal_data[:,2]
     signal =   signal_data[:,3::2]+np.complex(0,-1)*signal_data[:,4::2]
 
-    # FIXME
     (self.sig_id, self.site_id, self.est_time, 
      self.signal, self.est_ids) = (sig_id, site_id, est_time, 
                                         signal, prov_est_ids)
@@ -164,7 +162,6 @@ class bearing_likelihoods:
         likelihoods[i, value] = bearing_likelihood[0, j]
         likelihood_deps[i, value] = bearing_likelihood_deps
 
-    # FIXME
     self.likelihoods = likelihoods
     if record_provenance_from_site_data:
       self.likelihood_deps = likelihood_deps
@@ -404,3 +401,5 @@ class halfplane:
     Tj = cls(p, theta_j) 
     Tj.plane = cls.plane_t.GT
     return (Ti, Tj)    
+
+  

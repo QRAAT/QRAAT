@@ -9,7 +9,7 @@
 # python plot_search_space.py --t-start=0 --t-end=1381768575 --tx-id=35
 #  Modified EST select to 'mice' instead of 'est'. 
 #
-# Copyright (C) 2013 Christopher Patton, Joe Webster
+# Copyright (C) 2013 Christopher Patton
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

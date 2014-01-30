@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# plot_ll.py. This script is part of QRAAT, an automated 
+# plot_pdist.py. This script is part of QRAAT, an automated 
 # animal tracking system based on GNU Radio. 
 #
 # Wood rat data: 
@@ -73,12 +73,7 @@ def plot_ll(bl, i, j):
   fig = pp.gcf()
   
   constraints = {}
-  # Add up bearing likelihoods for each site. 
-  for e in range(i, j): 
-    if constraints.get(bl.site_id[e]) == None:
-      constraints[bl.site_id[e]] = bl.likelihoods[e,]
-    else: 
-      constraints[bl.site_id[e]] += bl.likelihoods[e,]
+  # TODO 
 
   for (s, ll) in constraints.iteritems(): 
     
@@ -145,6 +140,8 @@ t_window = options.t_window
 print "position: calculating position"
 
 i = 0
+
+# TODO Fix window such that Tstart = 0 mod Tstep.
 
 try: 
   while i < len(bl) - 1:
