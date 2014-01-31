@@ -16,13 +16,6 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-# TODO
-# Store all signal data (eigenvalue decomposition and fourier decomposition
-# vectors and noise covariance matrices) in NumPy arrays in the class 
-# instead of in table columns. (Currently the eigenval. decomp. and noise
-# cov. matrices are stored in NumPy arrays, but also in the table columns.) 
-# This will require overloading read() and modifying append() and write(). 
 
 from csv import csv, pretty_printer
 from det import det
@@ -300,28 +293,6 @@ class est (csv):
         setattr(new_row, col, val)
       new_row.tagname = tagname_index[new_row.txid]
       self.table.append(new_row)
-
-    # Store eigenvalue decomposition vectors and noise covariance
-    # matrices in NumPy arrays. 
-    cur = db_con.cursor()
-    cur.execute('''SELECT ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, 
-                          nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
-                          nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
-                          nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
-                          nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
-                     FROM est
-                    WHERE (%f <= timestamp) AND (timestamp <= %f)''' % (i, j))
-
-    raw = np.array(cur.fetchall(), dtype=float)
-
-    # Signal vector, 4 x 1.
-    self.signal = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
-    raw = raw[:,8:]
-
-    # Noise covariance matrix, 4 x 4. 
-    self.noise_cov = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
-    self.noise_cov = self.noise_cov.reshape(raw.shape[0], 4, 4)
-
     
   def write_db(self, db_con, site=None):
     """ Write rows to the database and commit. 
@@ -376,6 +347,40 @@ class est (csv):
     row.timestamp = repr(row.timestamp) 
     row.datetime = pretty_printer(row.datetime)
     cur.execute(query.substitute(row))
+
+
+class est2:
+  ''' Encapsulate pulse signal data. 
+  
+    I'm evaluating what functionality I want from the est object so 
+    that the data is more chewable in bearing and position calculation.
+    My thinking now is that this could replace est entirely and be 
+    the interface between det's, DB, and file. For now, it will serve
+    useful for exploring. 
+  ''' 
+
+  def __init__(self, db_con, t_start, t_end):
+
+    # Store eigenvalue decomposition vectors and noise covariance
+    # matrices in NumPy arrays. 
+    cur = db_con.cursor()
+    cur.execute('''SELECT ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, 
+                          nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+                          nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+                          nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+                          nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
+                     FROM est
+                    WHERE (%f <= timestamp) AND (timestamp <= %f)''' % (t_start, t_end))
+
+    raw = np.array(cur.fetchall(), dtype=float)
+
+    # Signal vector, 4 x 1.
+    self.signal = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
+    raw = raw[:,8:]
+
+    # Noise covariance matrix, 4 x 4. 
+    self.noise_cov = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
+    self.noise_cov = self.noise_cov.reshape(raw.shape[0], 4, 4)
 
 
 
