@@ -24,6 +24,6 @@
 from csv import csv, pretty_printer 
 from gps import gps
 from det import det
-from est import est, ResolveIdError
+from est import est, est2, ResolveIdError
 import position
 import rmg_position_lib

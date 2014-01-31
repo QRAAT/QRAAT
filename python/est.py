@@ -19,7 +19,7 @@
 
 from csv import csv, pretty_printer
 from det import det
-import os, time, errno
+import sys, os, time, errno
 import numpy as np
 from string import Template
 
@@ -359,28 +359,45 @@ class est2:
     useful for exploring. 
   ''' 
 
-  def __init__(self, db_con, t_start, t_end):
+  #: Number of channels. 
+  N = 4
+
+  def __init__(self, db_con, t_start, t_end, tx_id=None):
 
     # Store eigenvalue decomposition vectors and noise covariance
     # matrices in NumPy arrays. 
     cur = db_con.cursor()
-    cur.execute('''SELECT ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, 
+    cur.execute('''SELECT ID, siteid, txid, timestamp,
+                          edsp, ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, 
                           nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
                           nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
                           nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
                           nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
                      FROM est
-                    WHERE (%f <= timestamp) AND (timestamp <= %f)''' % (t_start, t_end))
-
+                    WHERE (%f <= timestamp) AND (timestamp <= %f) %s''' % (
+                            t_start, t_end, 
+                           ('AND txid=%d' % tx_id) if tx_id else ''))
+  
     raw = np.array(cur.fetchall(), dtype=float)
+    
+    # Metadata. 
+    (self.id, 
+     self.site_id, 
+     self.tx_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
+    self.timestamp = raw[:,3]
+    raw = raw[:,5:]
 
-    # Signal vector, 4 x 1.
-    self.signal = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
+    # Signal power. 
+    self.edsp = raw[:,0]
+    raw = raw[:,0:]
+
+    # Signal vector, N x 1.
+    self.ed = raw[:,0:8:2] + np.complex(0,-1) * raw[:,1:8:2]
     raw = raw[:,8:]
 
-    # Noise covariance matrix, 4 x 4. 
-    self.noise_cov = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
-    self.noise_cov = self.noise_cov.reshape(raw.shape[0], 4, 4)
+    # Noise covariance matrix, N x N. 
+    self.nc = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
+    self.nc = self.nc.reshape(raw.shape[0], self.N, self.N)
 
 
 
@@ -389,8 +406,8 @@ if __name__=="__main__":
 
   try:
     db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
-    fella = est()
-    fella.read_db(db_con, 1376420800.0, 1376427800.0)
+    fella = est2(db_con, 1376420800.0, 1376427800.0)
+    print fella.ed[0]
 
   except mdb.Error, e:
     print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])
