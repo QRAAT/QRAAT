@@ -407,7 +407,12 @@ if __name__=="__main__":
   try:
     db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
     fella = est2(db_con, 1376420800.0, 1376427800.0)
-    print fella.ed[0]
+    print fella.edsp
+
+    guy = est()
+    guy.read_db(db_con, 1376420800.0, 1376427800.0)
+    for i in range(len(guy)):
+      print guy[i].edsp
 
   except mdb.Error, e:
     print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])

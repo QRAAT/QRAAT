@@ -127,10 +127,45 @@ bl.est_ids = bl.sig_id = data.id
 bl.site_id = data.site_id
 bl.est_time = data.timestamp
 bl.signal  = data.ed
-bl.calc_likelihoods()
+#bl.calc_likelihoods()
 
-plot_distribution(bl, 0)
 
-def calc_prob_distribution(bl, i):
-  pass #TODO
+def calc_prob_distribution(bl, est, t):
+  
+  P = {}
+
+  # Noise covariance matrix.
+  Sigma = est.nc[t]
+
+  # Signal power covariance. 
+  sigma = est.edsp[t] - np.trace(Sigma)
+  
+  # Observed signal. 
+  V = est.ed[t]
+
+  print "SIGMA", Sigma
+  print "sigma", sigma
+  print "V", V
+
+  b = (np.pi ** est.N) 
+  
+  # Steering vectors.
+  for (theta, G) in zip(bl.bearings[bl.site_id[t]], bl.steering_vectors[bl.site_id[t]]):
+    
+    # Signal covariance matrix. 
+    R = (sigma * np.dot(G, np.conj(np.transpose(G)))) + Sigma
+
+    a = np.dot(np.dot(np.conj(np.transpose(V)), np.linalg.inv(R)), V) 
+          
+    P[theta] = np.exp(-1 * a) / (b * np.linalg.det(R))
+
+  print "P(theta) range:", min(P.values()), max(P.values())
+  
+
+
+
+
+calc_prob_distribution(bl, data, 0)
+  
+
 
