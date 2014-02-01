@@ -367,8 +367,8 @@ class est2:
     # Store eigenvalue decomposition vectors and noise covariance
     # matrices in NumPy arrays. 
     cur = db_con.cursor()
-    cur.execute('''SELECT ID, siteid, txid, timestamp,
-                          edsp, ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, 
+    cur.execute('''SELECT ID, siteid, txid, timestamp, edsp, 
+                          ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
                           nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
                           nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
                           nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
@@ -385,11 +385,11 @@ class est2:
      self.site_id, 
      self.tx_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
     self.timestamp = raw[:,3]
-    raw = raw[:,5:]
+    raw = raw[:,4:]
 
     # Signal power. 
     self.edsp = raw[:,0]
-    raw = raw[:,0:]
+    raw = raw[:,1:]
 
     # Signal vector, N x 1.
     self.ed = raw[:,0:8:2] + np.complex(0,-1) * raw[:,1:8:2]
@@ -406,13 +406,31 @@ if __name__=="__main__":
 
   try:
     db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
-    fella = est2(db_con, 1376420800.0, 1376427800.0)
-    print fella.edsp
 
     guy = est()
     guy.read_db(db_con, 1376420800.0, 1376427800.0)
-    for i in range(len(guy)):
-      print guy[i].edsp
+    print np.array( [
+      [ np.complex(guy[23].nc11r, guy[23].nc11i), 
+        np.complex(guy[23].nc12r, guy[23].nc12i), 
+        np.complex(guy[23].nc13r, guy[23].nc13i), 
+        np.complex(guy[23].nc14r, guy[23].nc14i) ],
+      [ np.complex(guy[23].nc21r, guy[23].nc21i), 
+        np.complex(guy[23].nc22r, guy[23].nc22i), 
+        np.complex(guy[23].nc23r, guy[23].nc23i), 
+        np.complex(guy[23].nc24r, guy[23].nc24i) ],
+      [ np.complex(guy[23].nc31r, guy[23].nc31i), 
+        np.complex(guy[23].nc32r, guy[23].nc32i), 
+        np.complex(guy[23].nc33r, guy[23].nc33i), 
+        np.complex(guy[23].nc34r, guy[23].nc34i) ],
+      [ np.complex(guy[23].nc41r, guy[23].nc41i), 
+        np.complex(guy[23].nc42r, guy[23].nc42i), 
+        np.complex(guy[23].nc43r, guy[23].nc43i), 
+        np.complex(guy[23].nc44r, guy[23].nc44i) ],
+        ] )
+
+    fella = est2(db_con, 1376420800.0, 1376427800.0)
+    print fella.nc[23]
+
 
   except mdb.Error, e:
     print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])

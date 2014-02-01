@@ -23,6 +23,11 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# TODO 
+# - Probability calculatio is wrong ... gotta figure this out. 
+# - Write class bearing, which will replace bearing_likelihoods. 
+
 
 import matplotlib.pyplot as pp
 from mpl_toolkits.mplot3d import Axes3D
@@ -67,12 +72,9 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=1376432160,#13
 
 (options, args) = parser.parse_args()
 
-def plot_distribution(bl, i):
+def plot_distribution(p, ll, t, s):
 
   fig = pp.gcf()
-
-  s = bl.site_id[i]
-  ll = bl.likelihoods[i,] 
 
   indexMax = np.argmax(ll) 
   x = map(lambda x0 : x0 % 360, 
@@ -82,8 +84,10 @@ def plot_distribution(bl, i):
   ax = fig.add_subplot(1,1,1)
   ax.axis([0, 360, 0, ll[indexMax] + (0.15 * ll[indexMax])])
 
-  ax.fill_between(range(0,360), [ll[x0] for x0 in x], 0, color='b', 
+  ax.fill_between(range(0,360), [ll[x0] for x0 in x], 0, color='b',
     alpha='0.20', label='Data window')
+
+  ax.plot(range(0,360), [p[x0] for x0 in x], color='g')
 
   ax.plot([180, 180], [0, ll[indexMax]], '-', color='0.30', 
     label='Max likelihood')
@@ -104,7 +108,6 @@ def plot_distribution(bl, i):
   pp.xlabel("Bearing to SiteID=%d" % s)
   pp.ylabel("Likelihood")
 
-  t = time.localtime(bl.est_time[i])
   pp.title('%04d-%02d-%02d %02d%02d:%02d txID=%d' % (
      t.tm_year, t.tm_mon, t.tm_mday,
      t.tm_hour, t.tm_min, t.tm_sec,
@@ -127,12 +130,13 @@ bl.est_ids = bl.sig_id = data.id
 bl.site_id = data.site_id
 bl.est_time = data.timestamp
 bl.signal  = data.ed
-#bl.calc_likelihoods()
+bl.calc_likelihoods()
 
 
 def calc_prob_distribution(bl, est, t):
   
-  P = {}
+  p  = np.zeros(360)
+  ll = np.zeros(360)
 
   # Noise covariance matrix.
   Sigma = est.nc[t]
@@ -157,15 +161,19 @@ def calc_prob_distribution(bl, est, t):
 
     a = np.dot(np.dot(np.conj(np.transpose(V)), np.linalg.inv(R)), V) 
           
-    P[theta] = np.exp(-1 * a) / (b * np.linalg.det(R))
+    p[theta] = np.exp(-1 * a.real) / (b * np.linalg.det(R).real)
+    
+    left_half = np.dot(V, np.conj(np.transpose(G)))
+    ll[theta] = (left_half * np.conj(left_half)).real
 
-  print "P(theta) range:", min(P.values()), max(P.values())
+  print "P(theta) range:", min(p), max(p)
+  return (p + 0.5, ll)
   
 
 
-
-
-calc_prob_distribution(bl, data, 0)
-  
-
+i = 0
+(p, ll) = calc_prob_distribution(bl, data, i) 
+plot_distribution( p, ll,     
+                   time.localtime(bl.est_time[i]), 
+                   bl.site_id[i] )
 
