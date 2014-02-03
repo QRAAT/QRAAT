@@ -23,10 +23,6 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-# TODO 
-# - Probability calculatio is wrong ... gotta figure this out. 
-# - Write class bearing, which will replace bearing_likelihoods. 
 
 
 import matplotlib.pyplot as pp
@@ -145,11 +141,7 @@ def calc_prob_distribution(bl, est, t):
   sigma = est.edsp[t] - np.trace(Sigma)
   
   # Observed signal. 
-  V = est.ed[t]
-
-  print "SIGMA", Sigma
-  print "sigma", sigma
-  print "V", V
+  V = est.ed[t,np.newaxis].transpose() * est.edsp[t]
 
   b = (np.pi ** est.N) 
   
@@ -163,10 +155,9 @@ def calc_prob_distribution(bl, est, t):
           
     p[theta] = np.exp(-1 * a.real) / (b * np.linalg.det(R).real)
     
-    left_half = np.dot(V, np.conj(np.transpose(G)))
+    left_half = np.dot(V.transpose(), np.conj(np.transpose(G)))
     ll[theta] = (left_half * np.conj(left_half)).real
 
-  print "P(theta) range:", min(p), max(p)
   return (p + 0.5, ll)
   
 
