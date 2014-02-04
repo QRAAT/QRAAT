@@ -33,29 +33,10 @@ except ImportError: pass
 #:  ~ Chris 1/2/14
 center = np.complex(4260500, 574500)
 
-class bearing_likelihoods:
+class steering_vectors:
   
-  def __init__(self, db_con, cal_id, tx_id=None, t_start=None, t_end=None):
-    ''' Encapsulate bearings and their likelihoods for a range of ESTs. 
-
-      *TODO*
-    ''' 
-    self.get_site_data(db_con, cal_id)
-    if tx_id != None: 
-      self.get_est_data(db_con, t_start, t_end, tx_id)
-      self.calc_likelihoods()
-    else: self.likelihoods = None
-
-  def __len__(self): 
-    if self.likelihoods != None: 
-      return self.likelihoods.shape[0]
-    else: return 0
-
-  def get_site_data(self, db_con, cal_id):
-    ''' Get steering vectors for likelihood calculations. ''' 
-
-    print "position: fetching site and cal data"
-
+  def __init__(self, db_con, cal_id):
+    ''' TODO ''' 
     deps = []
 
     # Get site locations.
@@ -99,79 +80,50 @@ class bearing_likelihoods:
                                                            prov_sv_ids, deps, sv_deps_by_site)
 
 
-  def get_est_data(self, db_con, t_start, t_end, tx_id):
-    ''' Get signals for transmitter in time range. ''' 
-    
-    print "position: fetching pulses for transmitter and time range"
-    
-    cur = db_con.cursor()
 
-    # Get pulses in time range.
-    cur.execute('''SELECT ID, siteid, timestamp,
-                          ed1r, ed1i, ed2r, ed2i,
-                          ed3r, ed3i, ed4r, ed4i
-                     FROM est
-                    WHERE timestamp >= %s
-                      AND timestamp <= %s
-                      AND txid = %s
-                    ORDER BY timestamp ASC''', (t_start,
-                                                t_end,
-                                                tx_id))
+class bearing: 
+  ''' TODO ''' 
 
-    raw_data = cur.fetchall()
-    prov_est_ids = util.get_field(raw_data, 0)
-    signal_data = np.array(raw_data, dtype=float)
-    est_ct = signal_data.shape[0]
-    if est_ct == 0:
-      print >>sys.stderr, "position: fatal: no est records for selected time range."
-      sys.exit(1)
-    else: print "position: processing %d records" % est_ct
-
-    sig_id =   np.array(signal_data[:,0], dtype=int)
-    site_id =  np.array(signal_data[:,1], dtype=int)
-    est_time = signal_data[:,2]
-    signal =   signal_data[:,3::2]+np.complex(0,-1)*signal_data[:,4::2]
-
-    (self.sig_id, self.site_id, self.est_time, 
-     self.signal, self.est_ids) = (sig_id, site_id, est_time, 
-                                        signal, prov_est_ids)
-
-
-  def calc_likelihoods(self): 
-    ''' Calculate the likelihood of each bearing for each pulse. ''' 
+  def __init__(self, sv, est): 
+  
+    self.sites   = sv.sites
+    self.site_id = est.site_id
+    self.time    = est.timestamp
 
     record_provenance_from_site_data = False
 
-    print "position: calculating pulse bearing likelihoods"
-
-    likelihoods = np.zeros((self.signal.shape[0],360))
-    for i in range(self.signal.shape[0]):
+    likelihoods = np.zeros((len(est), 360))
+    for i in range(len(est)):
       try:
-        sv =  self.steering_vectors[self.site_id[i]]
-        sv_deps = self.sv_deps_by_site[self.site_id[i]]
+        G      = sv.steering_vectors[self.site_id[i]]
+        G_deps = sv.sv_deps_by_site[self.site_id[i]]
       except KeyError:
         print >>sys.stderr, "position: error: no steering vectors for site ID=%d" % self.site_id[i]
         sys.exit(1)
 
-      sig = self.signal[i,np.newaxis,:]
-      sig_dep = self.est_ids[i]
-      left_half = np.dot(sig, np.conj(np.transpose(sv)))
+      V     = est.ed[i, np.newaxis,:]
+      V_dep = est.id[i]
+
+      left_half = np.dot(V, np.conj(np.transpose(G)))
       bearing_likelihood = (left_half * np.conj(left_half)).real
-      bearing_likelihood_deps = [('Steering_Vectors', x) for x in sv_deps]
-      bearing_likelihood_deps.append(('est', sig_dep))
+
+      bearing_likelihood_deps = [('Steering_Vectors', x) for x in G_deps]
+      bearing_likelihood_deps.append(('est', V_dep))
 
       likelihood_deps = {}
-      for j, value in enumerate(self.bearings[self.site_id[i]]):
-        likelihoods[i, value] = bearing_likelihood[0, j]
-        likelihood_deps[i, value] = bearing_likelihood_deps
+      for j, theta in enumerate(sv.bearings[self.site_id[i]]):
+        likelihoods[i, theta] = bearing_likelihood[0, j]
+        likelihood_deps[i, theta] = bearing_likelihood_deps
 
     self.likelihoods = likelihoods
     if record_provenance_from_site_data:
       self.likelihood_deps = likelihood_deps
     else:
       self.likelihood_deps = [] 
-    return (self.likelihoods, self.likelihood_deps)
 
+
+  def __len__(self): 
+    return self.likelihoods.shape[0]
 
   def position_estimation(self, index_list, center, scale, half_span=15):
     ''' Estimate the position of a transmitter over time interval ``[i, j]``.

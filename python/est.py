@@ -379,27 +379,36 @@ class est2:
                            ('AND txid=%d' % tx_id) if tx_id else ''))
   
     raw = np.array(cur.fetchall(), dtype=float)
-    
-    # Metadata. 
-    (self.id, 
-     self.site_id, 
-     self.tx_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
-    self.timestamp = raw[:,3]
-    raw = raw[:,4:]
 
-    # Signal power. 
-    self.edsp = raw[:,0]
-    raw = raw[:,1:]
+    if raw.shape[0] == 0: 
+      self.id = self.site_id = self.tx_id = self.timestamp = np.array([])
+      self.edsp = self.ed = self.nc = np.array([])
+      self.signal_ct = 0
+   
+    else:
+      # Metadata. 
+      (self.id, 
+       self.site_id, 
+       self.tx_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
+      self.timestamp = raw[:,3]
+      raw = raw[:,4:]
 
-    # Signal vector, N x 1.
-    self.ed = raw[:,0:8:2] + np.complex(0,-1) * raw[:,1:8:2]
-    raw = raw[:,8:]
+      # Signal power. 
+      self.edsp = raw[:,0]
+      raw = raw[:,1:]
 
-    # Noise covariance matrix, N x N. 
-    self.nc = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
-    self.nc = self.nc.reshape(raw.shape[0], self.N, self.N)
+      # Signal vector, N x 1.
+      self.ed = raw[:,0:8:2] + np.complex(0,-1) * raw[:,1:8:2]
+      raw = raw[:,8:]
 
+      # Noise covariance matrix, N x N. 
+      self.nc = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
+      self.nc = self.nc.reshape(raw.shape[0], self.N, self.N)
 
+      self.signal_ct = self.id.shape[0]
+
+  def __len__(self): 
+    return self.signal_ct
 
 
 if __name__=="__main__":
