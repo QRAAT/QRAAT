@@ -175,24 +175,24 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
   x_right = center.imag + (half_span * scale)
 
   # Constraints
-  for (s, constraints) in get_constraints(bl, i, j, 6).iteritems():
-    for constraint in constraints: 
-      for L in constraint: 
-        if L.pos:  # --->
-          x_range = (L.x_p, x_right)
-        else:      # <---
-          x_range = (x_left, L.x_p)
-        
-        # Reflect line over 'y = x' and transform to 
-        # image's coordinate space. 
-        x = [n(L(x_range[0])) - n(L.y_p) + e(L.x_p), 
-             n(L(x_range[1])) - n(L.y_p) + e(L.x_p)]
-
-        y = [e(x_range[0]) - e(L.x_p) + n(L.y_p), 
-             e(x_range[1]) - e(L.x_p) + n(L.y_p)]
-        
-        # Plot constraints. 
-        pp.plot(x, y, 'k-')
+#  for (s, constraints) in get_constraints(bl, i, j, 6).iteritems():
+#    for constraint in constraints: 
+#      for L in constraint: 
+#        if L.pos:  # --->
+#          x_range = (L.x_p, x_right)
+#        else:      # <---
+#          x_range = (x_left, L.x_p)
+#        
+#        # Reflect line over 'y = x' and transform to 
+#        # image's coordinate space. 
+#        x = [n(L(x_range[0])) - n(L.y_p) + e(L.x_p), 
+#             n(L(x_range[1])) - n(L.y_p) + e(L.x_p)]
+#
+#        y = [e(x_range[0]) - e(L.x_p) + n(L.y_p), 
+#             e(x_range[1]) - e(L.x_p) + n(L.y_p)]
+#        
+#        # Plot constraints. 
+#        pp.plot(x, y, 'k-')
     
   # Sites
   pp.scatter(
@@ -204,7 +204,7 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
   pp.legend()
   pp.axis([0, half_span * 2, 0, half_span * 2])
   
-  t = time.localtime((bl.est_time[i] + bl.est_time[j]) / 2)
+  t = time.localtime((bl.time[i] + bl.time[j]) / 2)
   pp.title('%04d-%02d-%02d %02d%02d:%02d txID=%d' % (
        t.tm_year, t.tm_mon, t.tm_mday,
        t.tm_hour, t.tm_min, t.tm_sec,
@@ -220,12 +220,14 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
 
 db_con = qraat.util.get_db('reader')
 
-bl = qraat.position.bearing_likelihoods(db_con, 
-                                        options.cal_id, 
-                                        options.tx_id, 
-                                        options.t_start, 
-                                        options.t_end)
+sv = qraat.position.steering_vectors(db_con, options.cal_id)
 
+est = qraat.est2(db_con, 
+                 options.t_start, 
+                 options.t_end, 
+                 options.tx_id)
+
+bl = qraat.position.bearing(sv, est)
 
 #: Calculated positions (time, pos). 
 pos_est = [] 
@@ -246,7 +248,7 @@ try:
 
     # Find the index j corresponding to the end of the time window. 
     j = i + 1
-    while j < len(bl) - 1 and (bl.est_time[j + 1] - bl.est_time[i]) <= t_window: 
+    while j < len(bl) - 1 and (bl.time[j + 1] - bl.time[i]) <= t_window: 
       j += 1
     
     #scale = 100
@@ -255,7 +257,7 @@ try:
     #  pos = plot_search_space(i, j, pos, scale)
     #  scale /= 10
 
-    t = time.localtime((bl.est_time[i] + bl.est_time[j]) / 2)
+    t = time.localtime((bl.time[i] + bl.time[j]) / 2)
     w_sites = set(bl.site_id[i:j])
 
     if len(w_sites) > 1: 
@@ -274,7 +276,7 @@ try:
 
     # Step index i forward t_delta seconds. 
     j = i + 1
-    while i < len(bl) - 1 and (bl.est_time[i + 1] - bl.est_time[j]) <= t_delta: 
+    while i < len(bl) - 1 and (bl.time[i + 1] - bl.time[j]) <= t_delta: 
       i += 1
 
 except KeyboardInterrupt: pass

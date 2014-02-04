@@ -3,7 +3,7 @@
 import sys, os, re, time
 
 
-progs={ "position" : "rmg_position", 
+progs={ "pos" : "rmg_position", 
         "ll" : "plot_ll.py", 
         "search_space" : "plot_search_space.py" }
 
@@ -39,6 +39,10 @@ if len(sys.argv) >= 3:
                                                   t_start, t_end,
                                                   t_win, t_step, 
                                                   tx_id))
+
+      if sys.argv[1] == 'pos': # Output the positions added to DB. 
+        os.system("mysql -u reader -B -e \"SELECT * FROM qraat.Position\"")
+        
  
   
   else: die("unknown prog")

@@ -71,11 +71,14 @@ parser.add_option('-v', '--verbose', action='store_true', default=False,
 
 db_con = qraat.util.get_db('writer')
 
-bl = qraat.position.bearing_likelihoods(db_con, 
-                                        options.cal_id, 
-                                        options.tx_id, 
-                                        options.t_start, 
-                                        options.t_end)
+sv = qraat.position.steering_vectors(db_con, options.cal_id)
+
+est = qraat.est2(db_con, 
+                 options.t_start, 
+                 options.t_end,
+                 options.tx_id)
+
+bl = qraat.position.bearing(sv, est)
 
 (pos_est, pos_est_deps) = qraat.position.calc_positions(bl, 
                                                         options.t_window, 

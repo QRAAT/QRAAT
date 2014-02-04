@@ -87,6 +87,7 @@ class bearing:
   def __init__(self, sv, est): 
   
     self.sites   = sv.sites
+    self.id      = est.id
     self.site_id = est.site_id
     self.time    = est.timestamp
 
@@ -171,26 +172,26 @@ class bearing:
 
 
 
-def calc_positions(bearing_likelihoods, t_window, t_delta, verbose=False):
+def calc_positions(bl, t_window, t_delta, verbose=False):
   ''' Calculate positions of a transmitter over a time interval. 
   
     The calculation is based on Bartlet's estimator. '''
   pos_est = []
   pos_est_deps = []
-  est_ct = bearing_likelihoods.likelihoods.shape[0]
+  est_ct = bl.likelihoods.shape[0]
 
   print "position: calculating position"
   if verbose:
     print "%15s %-19s %-19s %-19s" % ('time window',
               '100 meters', '10 meters', '1 meter')
 
-  start_step = np.ceil(bearing_likelihoods.est_time[0] / t_delta)
-  while start_step*t_delta - (t_window / 2.0) < bearing_likelihoods.est_time[0]:
+  start_step = np.ceil(bl.time[0] / t_delta)
+  while start_step*t_delta - (t_window / 2.0) < bl.time[0]:
     start_step += 1
   start_step -= 1
 
-  end_step = np.floor(bearing_likelihoods.est_time[-1] / t_delta)
-  while end_step*t_delta + (t_window / 2.0) > bearing_likelihoods.est_time[-1]:
+  end_step = np.floor(bl.time[-1] / t_delta)
+  while end_step*t_delta + (t_window / 2.0) > bl.time[-1]:
     end_step -= 1
   end_step += 1
 
@@ -199,10 +200,10 @@ def calc_positions(bearing_likelihoods, t_window, t_delta, verbose=False):
 
       # Find the indexes corresponding to the time window.
       est_index_list = np.where(
-        np.abs(bearing_likelihoods.est_time - time_step*t_delta - t_window / 2.0) 
+        np.abs(bl.time - time_step*t_delta - t_window / 2.0) 
           <= t_window / 2.0)[0]
 
-      if len(est_index_list) > 0 and len(set(bearing_likelihoods.site_id[est_index_list])) > 1:
+      if len(est_index_list) > 0 and len(set(bl.site_id[est_index_list])) > 1:
 
         if verbose: 
           print "Time window {0} - {1}".format(
@@ -211,7 +212,7 @@ def calc_positions(bearing_likelihoods, t_window, t_delta, verbose=False):
         scale = 100
         pos = center
         while scale >= 1: # 100, 10, 1 meters ...
-          pos = bearing_likelihoods.position_estimation(est_index_list, pos, scale)
+          pos = bl.position_estimation(est_index_list, pos, scale)
           if verbose:
             print "%8dn,%de" % (pos.real, pos.imag),
           scale /= 10
@@ -220,7 +221,7 @@ def calc_positions(bearing_likelihoods, t_window, t_delta, verbose=False):
 
         # Determine components of est that contribute to the computed position.
         for est_index in est_index_list:
-          pos_deps.append(bearing_likelihoods.est_ids[est_index])
+          pos_deps.append(bl.id[est_index])
         pos_est.append((time_step*t_delta,
                         pos.imag,  # easting
                         pos.real)) # northing

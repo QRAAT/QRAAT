@@ -130,8 +130,6 @@ db_con = qraat.util.get_db('reader')
 
 sv = qraat.position.steering_vectors(db_con, options.cal_id)
 
-print options.tx_id, options.t_start, options.t_end
-
 est = qraat.est2(db_con, 
                  options.t_start, 
                  options.t_end,
