@@ -7,9 +7,11 @@ progs={ "pos" : "rmg_position",
         "ll" : "plot_ll.py", 
         "search_space" : "plot_search_space.py" }
 
-                # t_start,           t_end,             tx_id, t_win, t_step
-exps={ "feb2" : ( 1391390700.638165, 1391396399.840252, 54,    30,    120),  
-       "cal" :  ( 1376420800.0     , 1376442000.0     , 51,    30,    120) }
+exps = {         # t_start,           t_end,             tx_id, t_win, t_step
+       "feb2"  : ( 1391390700.638165, 1391396399.840252, 54,    30,    120),  
+       "short" : ( 1391390700.638165, 1391391000.0     , 54,    30,    120),  
+       "cal"   : ( 1376420800.0     , 1376442000.0     , 51,    30,    120) 
+       }
 
 def die(msg):
   print >>sys.stderr, "error: %s. (-h for help.)" % msg

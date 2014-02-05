@@ -67,6 +67,22 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=1376432160,#13
 
 (options, args) = parser.parse_args()
 
+def maxima(ll, K): # TODO 
+  
+  for x in range(ll.shape[0]-1): 
+    print '%-4d%1.3f %1.3f' % (x, ll[x], ll[x+1] - ll[x])
+  
+  
+  
+  
+  return [np.argmax(ll)]
+
+
+
+
+
+
+
 def plot_ll(bl, i, j):
   ''' Plot search space, return point of maximum likelihood. '''
 
@@ -81,8 +97,10 @@ def plot_ll(bl, i, j):
       constraints[bl.site_id[e]] += bl.likelihoods[e,]
 
   for (s, ll) in constraints.iteritems(): 
+
+    if s != 2: continue # FIXME stop-gap 
     
-    indexMax = np.argmax(ll) 
+    indexMax = np.argmax(ll)
     x = map(lambda x0 : x0 % 360, 
              range(indexMax - 180, indexMax + 180))
     
@@ -93,8 +111,10 @@ def plot_ll(bl, i, j):
     ax.fill_between(range(0,360), [ll[x0] for x0 in x], 0, color='b', 
       alpha='0.20', label='Data window')
 
-    ax.plot([180, 180], [0, ll[indexMax]], '-', color='0.30', 
-      label='Max likelihood')
+    print "SiteID =", s
+    for i in maxima(ll, K=1):
+      ax.plot([180, 180], [0, ll[i]], '-', color='0.30', 
+        label='Max likelihood')
 
     ax.text(185, (0.03 * ll[indexMax]), '%d$^\circ$' % indexMax)
 
@@ -146,6 +166,8 @@ t_window = options.t_window
 
 i = 0
 
+
+# TODO fix so that T = 0 mod T_step
 try: 
   while i < len(bl) - 1:
 
@@ -163,6 +185,8 @@ try:
      t.tm_year, t.tm_mon, t.tm_mday,
      t.tm_hour, t.tm_min, t.tm_sec,
      j - i)
+
+    sys.exit(0) #FIXME stop-gap
 
     # Step index i forward t_delta seconds. 
     j = i + 1

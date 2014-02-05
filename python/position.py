@@ -34,9 +34,18 @@ except ImportError: pass
 center = np.complex(4260500, 574500)
 
 class steering_vectors:
+  ''' Encapsulate steering vectors. 
+    
+    The bearings and their corresponding steering vectors are stored
+    in dictionaries indexed by site ID. This class also stores 
+    provenance information for bearing likelihood calculation and 
+    position estimation. 
+
+    :param cal_id: Calibration ID. 
+    :type cal_id: int
+  ''' 
   
   def __init__(self, db_con, cal_id):
-    ''' TODO ''' 
     deps = []
 
     # Get site locations.
@@ -82,7 +91,14 @@ class steering_vectors:
 
 
 class bearing: 
-  ''' TODO ''' 
+  ''' Calculate and store bearing likelihood distribution for a signal window. 
+    
+    :param sv: Steering vectors per site. 
+    :type sv: qraat.position.steering_vectors
+    
+    :param est: A set of signals for a given transmitter and time window.  
+    :type qraat.est2: 
+  ''' 
 
   def __init__(self, sv, est): 
   
@@ -126,15 +142,17 @@ class bearing:
   def __len__(self): 
     return self.likelihoods.shape[0]
 
+
   def position_estimation(self, index_list, center, scale, half_span=15):
-    ''' Estimate the position of a transmitter over time interval ``[i, j]``.
+    ''' Estimate the position of a transmitter over time interval.
 
       Generate a set of candidate points centered around ``center``.
       Calculate the bearing to the receiver sites from each of this points.
       The log likelihood of a candidate corresponding to the actual location
       of the target transmitter over the time window is equal to the sum of
       the likelihoods of each of these bearings given the signal characteristics
-      of the ESTs in the window. This method uses Bartlet's estimator. 
+      of the ESTs in the window. The search space for this method is defined 
+      by Bartlett's estimator. 
     '''
 
     #: Generate candidate points centered around ``center``.
@@ -147,9 +165,7 @@ class bearing:
     #: candidate point to each receiver site.
     site_bearings = {}
     for site in self.sites:
-      #site_bearings[:,:,sv_index] = np.angle(grid - site.pos) * 180 / np.pi
       site_bearings[site.ID] = np.angle(grid - site.pos) * 180 / np.pi
-    #site_bearings = np.zeros(np.hstack((grid.shape,len(self.sites))))
 
     #: Based on bearing self.likelihoods for EST's in time range, calculate
     #: the log likelihood of each candidate point.
@@ -171,11 +187,18 @@ class bearing:
 
 
 
-
 def calc_positions(bl, t_window, t_delta, verbose=False):
   ''' Calculate positions of a transmitter over a time interval. 
   
-    The calculation is based on Bartlet's estimator. '''
+    :param bl: Bearing likelihoods for time range. 
+    :type bl: qraat.position.bearing
+    :param t_window: Number of seconds for each time window. 
+    :type t_window: int
+    :param t_delta: Interval of time between each position calculation.
+    :type t_delta: int
+    :param verbose: Output some debugging information. 
+    :type verbose: bool
+  '''
   pos_est = []
   pos_est_deps = []
   est_ct = bl.likelihoods.shape[0]
