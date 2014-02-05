@@ -327,7 +327,6 @@ def handle_provenance_insertion(cur, depends_on, obj):
   cur.executemany(query, prov_args) 
 
 
-
 class halfplane: 
   ''' A two-dimensional linear inequality. 
 
@@ -374,11 +373,18 @@ class halfplane:
 
   @classmethod
   def from_bearings(cls, p, theta_i, theta_j):
-    # TODO get plane constraints right.
     Ti = cls(p, theta_i)
-    Ti.plane = cls.plane_t.GT
     Tj = cls(p, theta_j) 
-    Tj.plane = cls.plane_t.GT
+    if Ti.pos:
+      Ti.plane = cls.plane_t.GT
+      if not Tj.pos:
+        Tj.plane = cls.plane_t.GT 
+      else: Tj.plane = cls.plane_t.LT
+    else:
+      Ti.plane = cls.plane_t.LT
+      if Tj.pos:
+        Tj.plane = cls.plane_t.LT
+      else: Tj.plane = cls.plane_t.GT
     return (Ti, Tj)    
 
   

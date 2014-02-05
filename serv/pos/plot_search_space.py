@@ -70,50 +70,30 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=1376427800,#13
 
 
 
-def get_constraints(bl, i, j, threshold=1.0): 
+def get_constraints(bl, i, j, half_span=15): 
   ''' Get linear constraints on search space. '''
-  constraints = {}
+  ll_sum = {}
 
   # Add up bearing likelihoods for each site. 
-  for e in range(i, j): 
-    if constraints.get(bl.site_id[e]) == None:
-      constraints[bl.site_id[e]] = bl.likelihoods[e,]
+  for k in range(i, j): 
+    if ll_sum.get(bl.site_id[k]) == None:
+      ll_sum[bl.site_id[k]] = bl.likelihoods[k,]
     else: 
-      constraints[bl.site_id[e]] += bl.likelihoods[e,]
+      ll_sum[bl.site_id[k]] += bl.likelihoods[k,]
 
-  # Get bearing ranges of log likelihoods above threshold. 
-  # TODO this could be done more statistically soundly. 
-  #   How to decide if a dip between two curves is wide and 
-  #   deep enough to treat the two curves as separate bearing
-  #   arcs or as one? 
   r = {}
-  for (e, ll) in constraints.iteritems():
-    r[e] = []
-    above = False
-    for j in range(ll.shape[0]):
-      if ll[j] >= threshold and not above: 
-        i = j
-        above = True
-    
-      elif ll[j] < threshold and above: 
-        r[e].append((i, j-1))
-        above = False 
-
-    if above: # Fix wrap around  
-      r[e][0] = (i, r[e][0][1])
-
-    #print e, r[e]
-    #print ll
-    #print ' ---------- '
-
+  for (site_id, ll) in ll_sum.iteritems():
+    theta_max = np.argmax(ll)
+    r[site_id] = ((theta_max - half_span) % 360, (theta_max + half_span) % 360)
+  
   constraints = {}
-  for (e, ranges) in r.iteritems():
-    constraints[e] = []
-    for (theta_i, theta_j) in ranges: 
-      constraints[e].append(
-        qraat.position.halfplane.from_bearings(
-          bl.sites.get(ID=e).pos, theta_i, theta_j)) 
+  for (site_id, (theta_i, theta_j)) in r.iteritems():
+    constraints[site_id] = qraat.position.halfplane.from_bearings(
+                                bl.sites.get(ID=site_id).pos, theta_i, theta_j)
 
+  for site_id in r.keys():
+    print r[site_id], constraints[site_id]
+    
   return constraints
 
 
@@ -157,6 +137,10 @@ def calculate_search_space(bl, i, j, center, scale, half_span=15):
 
 
 
+
+
+
+
 def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
   ''' Plot search space, return point of maximum likelihood. '''
 
@@ -175,24 +159,42 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
   x_right = center.imag + (half_span * scale)
 
   # Constraints
-#  for (s, constraints) in get_constraints(bl, i, j, 6).iteritems():
-#    for constraint in constraints: 
-#      for L in constraint: 
-#        if L.pos:  # --->
-#          x_range = (L.x_p, x_right)
-#        else:      # <---
-#          x_range = (x_left, L.x_p)
-#        
-#        # Reflect line over 'y = x' and transform to 
-#        # image's coordinate space. 
-#        x = [n(L(x_range[0])) - n(L.y_p) + e(L.x_p), 
-#             n(L(x_range[1])) - n(L.y_p) + e(L.x_p)]
-#
-#        y = [e(x_range[0]) - e(L.x_p) + n(L.y_p), 
-#             e(x_range[1]) - e(L.x_p) + n(L.y_p)]
-#        
-#        # Plot constraints. 
-#        pp.plot(x, y, 'k-')
+  for (site_id, (L_i, L_j)) in get_constraints(bl, i, j).iteritems():
+        
+        L = L_i
+        if L.pos:  # --->
+          x_range = (L.x_p, x_right)
+        else:      # <---
+          x_range = (x_left, L.x_p)
+        
+        # Reflect line over 'y = x' and transform to 
+        # image's coordinate space. 
+        x = [n(L(x_range[0])) - n(L.y_p) + e(L.x_p), 
+             n(L(x_range[1])) - n(L.y_p) + e(L.x_p)]
+
+        y = [e(x_range[0]) - e(L.x_p) + n(L.y_p), 
+             e(x_range[1]) - e(L.x_p) + n(L.y_p)]
+        
+        # Plot constraints. 
+        pp.plot(x, y, 'k-')
+
+        L = L_j
+        if L.pos:  # --->
+          x_range = (L.x_p, x_right)
+        else:      # <---
+          x_range = (x_left, L.x_p)
+        
+        # Reflect line over 'y = x' and transform to 
+        # image's coordinate space. 
+        x = [n(L(x_range[0])) - n(L.y_p) + e(L.x_p), 
+             n(L(x_range[1])) - n(L.y_p) + e(L.x_p)]
+
+        y = [e(x_range[0]) - e(L.x_p) + n(L.y_p), 
+             e(x_range[1]) - e(L.x_p) + n(L.y_p)]
+        
+        # Plot constraints. 
+        pp.plot(x, y, 'k-')
+
     
   # Sites
   pp.scatter(
@@ -220,17 +222,17 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
 
 db_con = qraat.util.get_db('reader')
 
+print "plot_seach_space: getting steering vectors"
 sv = qraat.position.steering_vectors(db_con, options.cal_id)
 
+print "plot_seach_space: getting est data"
 est = qraat.est2(db_con, 
                  options.t_start, 
                  options.t_end, 
                  options.tx_id)
 
+print "plot_seach_space: calculating bearing likelihoods (%d records)" % len(est)
 bl = qraat.position.bearing(sv, est)
-
-#: Calculated positions (time, pos). 
-pos_est = [] 
 
 #: The time step (in seconds) for the position estimation
 #: calculation.
@@ -239,7 +241,7 @@ t_delta = options.t_delta
 #: Time averaging window (in seconds). 
 t_window = options.t_window
 
-print "position: calculating position"
+print "plot_search_space: plotting"
 
 i = 0
 
