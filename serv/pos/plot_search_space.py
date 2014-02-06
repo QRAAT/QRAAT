@@ -68,37 +68,6 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=1376427800,#13
 (options, args) = parser.parse_args()
 
 
-
-
-def get_constraints(bl, i, j, half_span=15): 
-  ''' Get linear constraints on search space. '''
-  ll_sum = {}
-
-  # Add up bearing likelihoods for each site. 
-  for k in range(i, j): 
-    if ll_sum.get(bl.site_id[k]) == None:
-      ll_sum[bl.site_id[k]] = bl.likelihoods[k,]
-    else: 
-      ll_sum[bl.site_id[k]] += bl.likelihoods[k,]
-
-  r = {}
-  for (site_id, ll) in ll_sum.iteritems():
-    theta_max = np.argmax(ll)
-    r[site_id] = ((theta_max - half_span) % 360, (theta_max + half_span) % 360)
-  
-  constraints = {}
-  for (site_id, (theta_i, theta_j)) in r.iteritems():
-    constraints[site_id] = qraat.position.halfplane.from_bearings(
-                                bl.sites.get(ID=site_id).pos, theta_i, theta_j)
-
-  for site_id in r.keys():
-    print r[site_id], constraints[site_id]
-    
-  return constraints
-
-
-
-
 def calculate_search_space(bl, i, j, center, scale, half_span=15):
   ''' Plot search space, return point of maximum likelihood. '''
     
@@ -136,11 +105,6 @@ def calculate_search_space(bl, i, j, center, scale, half_span=15):
 
 
 
-
-
-
-
-
 def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
   ''' Plot search space, return point of maximum likelihood. '''
 
@@ -159,43 +123,27 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
   x_right = center.imag + (half_span * scale)
 
   # Constraints
-  for (site_id, (L_i, L_j)) in get_constraints(bl, i, j).iteritems():
-        
-        L = L_i
-        if L.pos:  # --->
-          x_range = (L.x_p, x_right)
-        else:      # <---
-          x_range = (x_left, L.x_p)
-        
-        # Reflect line over 'y = x' and transform to 
-        # image's coordinate space. 
-        x = [n(L(x_range[0])) - n(L.y_p) + e(L.x_p), 
-             n(L(x_range[1])) - n(L.y_p) + e(L.x_p)]
+#  for (site_id, (L_i, L_j)) in bl.calc_constraints(i, j).iteritems():
+#        
+#        L = L_i
+#        if L.pos:  # --->
+#          x_range = (L.x_p, x_right)
+#        else:      # <---
+#          x_range = (x_left, L.x_p)
+#        
+#        # Reflect line over 'y = x' and transform to 
+#        # image's coordinate space. 
+#        x = [n(L(x_range[0])) - n(L.y_p) + e(L.x_p), 
+#             n(L(x_range[1])) - n(L.y_p) + e(L.x_p)]
+#
+#        y = [e(x_range[0]) - e(L.x_p) + n(L.y_p), 
+#             e(x_range[1]) - e(L.x_p) + n(L.y_p)]
+#        
+#        # Plot constraints. 
+#        pp.plot(x, y, 'k-')
 
-        y = [e(x_range[0]) - e(L.x_p) + n(L.y_p), 
-             e(x_range[1]) - e(L.x_p) + n(L.y_p)]
-        
-        # Plot constraints. 
-        pp.plot(x, y, 'k-')
+  # TODO plot constrained search space
 
-        L = L_j
-        if L.pos:  # --->
-          x_range = (L.x_p, x_right)
-        else:      # <---
-          x_range = (x_left, L.x_p)
-        
-        # Reflect line over 'y = x' and transform to 
-        # image's coordinate space. 
-        x = [n(L(x_range[0])) - n(L.y_p) + e(L.x_p), 
-             n(L(x_range[1])) - n(L.y_p) + e(L.x_p)]
-
-        y = [e(x_range[0]) - e(L.x_p) + n(L.y_p), 
-             e(x_range[1]) - e(L.x_p) + n(L.y_p)]
-        
-        # Plot constraints. 
-        pp.plot(x, y, 'k-')
-
-    
   # Sites
   pp.scatter(
     [e(float(s.easting)) for s in bl.sites],

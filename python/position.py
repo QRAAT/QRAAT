@@ -16,6 +16,8 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# TODO in class bearing, create a map site_id -> pos. 
 
 import numpy as np
 import time, os, sys
@@ -184,6 +186,35 @@ class bearing:
              # designates sites as qraat nodes. ~ Chris 1/2/14 
 
     return grid.flat[np.argmax(pos_likelihood)]
+
+  def calc_constraints(self, i, j, half_span=15): 
+    ''' Get linear constraints on search space. 
+    
+      Sum the log likelihoods for each site and return linear inequalties 
+      constraining half_span * 2 degrees around the maximum likelihood. 
+      **TODO**: do something more intelligent like pick the bearing range 
+      for greater than half the maximum likelihood (Todd's idea). 
+    '''
+    ll_sum = {}
+
+    # Add up bearing likelihoods for each site. 
+    for k in range(i, j): 
+      if ll_sum.get(self.site_id[k]) == None:
+        ll_sum[self.site_id[k]] = self.likelihoods[k,]
+      else: 
+        ll_sum[self.site_id[k]] += self.likelihoods[k,]
+
+    constraints = {}
+    for (site_id, ll) in ll_sum.iteritems():
+      theta_max = np.argmax(ll)
+      constraints[site_id] = halfplane.from_bearings(
+       self.sites.get(ID=site_id).pos, # FIXME O(1)
+       (theta_max - half_span) % 360, 
+       (theta_max + half_span) % 360)
+      #print ((theta_max - half_span) % 360, (theta_max + half_span) % 360),
+      #print constraints[site_id]
+    
+    return constraints
 
 
 
