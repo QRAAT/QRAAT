@@ -71,20 +71,25 @@ parser.add_option('-v', '--verbose', action='store_true', default=False,
 
 db_con = qraat.util.get_db('writer')
 
+print "position: fetching site data." 
 sv = qraat.position.steering_vectors(db_con, options.cal_id)
 
+print "position: fetching signal data."
 est = qraat.est2(db_con, 
                  options.t_start, 
                  options.t_end,
                  options.tx_id)
 
+print "position: calculating bearing likelihoods (%d)." % len(est) 
 bl = qraat.position.bearing(sv, est)
 
+print "position: calculating positions."
 (pos_est, pos_est_deps) = qraat.position.calc_positions(bl, 
                                                         options.t_window, 
                                                         options.t_delta, 
                                                         options.verbose) 
 
+print "position: inserting positions."
 qraat.position.insert_positions(db_con, pos_est, pos_est_deps, options.tx_id)
 
 if options.plot: 

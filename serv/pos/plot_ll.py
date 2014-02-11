@@ -68,20 +68,7 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=1376432160,#13
 (options, args) = parser.parse_args()
 
 def maxima(ll, K): # TODO 
-  
-  for x in range(ll.shape[0]-1): 
-    print '%-4d%1.3f %1.3f' % (x, ll[x], ll[x+1] - ll[x])
-  
-  
-  
-  
   return [np.argmax(ll)]
-
-
-
-
-
-
 
 def plot_ll(bl, i, j):
   ''' Plot search space, return point of maximum likelihood. '''
@@ -98,8 +85,6 @@ def plot_ll(bl, i, j):
 
   for (s, ll) in constraints.iteritems(): 
 
-    if s != 2: continue # FIXME stop-gap 
-    
     indexMax = np.argmax(ll)
     x = map(lambda x0 : x0 % 360, 
              range(indexMax - 180, indexMax + 180))
@@ -148,13 +133,16 @@ def plot_ll(bl, i, j):
 
 db_con = qraat.util.get_db('reader')
 
+print "plot_ll: fetching site data."
 sv = qraat.position.steering_vectors(db_con, options.cal_id)
 
+print "plot_ll: fetching signal data."
 est = qraat.est2(db_con, 
                  options.t_start, 
                  options.t_end,
                  options.tx_id)
 
+print "plot_ll: calculating bearing likelihood distributions (%d records)." % len(est)
 bl = qraat.position.bearing(sv, est)
 
 #: The time step (in seconds) for the position estimation
@@ -164,18 +152,11 @@ t_delta = options.t_delta
 #: Time averaging window (in seconds). 
 t_window = options.t_window
 
-i = 0
-
-
-# TODO fix so that T = 0 mod T_step
 try: 
-  while i < len(bl) - 1:
 
-    # Find the index j corresponding to the end of the time window. 
-    j = i + 1
-    while j < len(bl) - 1 and (bl.time[j + 1] - bl.time[i]) <= t_window: 
-      j += 1
-    
+  for (t, index_list) in qraat.position.calc_windows(bl, t_window, t_delta):
+    (i, j) = (index_list[0], index_list[-1])
+
     t = time.localtime((bl.time[i] + bl.time[j]) / 2)
     w_sites = set(bl.site_id[i:j])
     
@@ -185,13 +166,6 @@ try:
      t.tm_year, t.tm_mon, t.tm_mday,
      t.tm_hour, t.tm_min, t.tm_sec,
      j - i)
-
-    sys.exit(0) #FIXME stop-gap
-
-    # Step index i forward t_delta seconds. 
-    j = i + 1
-    while i < len(bl) - 1 and (bl.time[i + 1] - bl.time[j]) <= t_delta: 
-      i += 1
 
 except KeyboardInterrupt: pass
 

@@ -17,7 +17,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-# TODO in class bearing, create a map site_id -> pos. 
+# TODO
+# - Move qraat.est2 to qraat.position.signal.
+# - bearing.jitter_estimator()
+# - Modify calc_positions to perform *some* task for the est window 
+#    and time step. 
+# - It bothers me that bearing.position_estimation takes in an index
+#    list instead of a range. (Whether this warrants modification is
+#    a different story.)
+# - class bearing uses's Bartlet's. We could rename it to "bartlet" 
+#    and implement MLE by overloading the constructor. This is the 
+#    direction-finding aspect of things. 
 
 import numpy as np
 import time, os, sys
@@ -93,8 +103,8 @@ class steering_vectors:
 
 
 class bearing: 
-  ''' Calculate and store bearing likelihood distribution for a signal window. 
-    
+  ''' Calculate and store bearing likelihood distributions for a signal window. 
+
     :param sv: Steering vectors per site. 
     :type sv: qraat.position.steering_vectors
     
@@ -123,6 +133,7 @@ class bearing:
       V     = est.ed[i, np.newaxis,:]
       V_dep = est.id[i]
 
+      # Bartlet's estimator. 
       left_half = np.dot(V, np.conj(np.transpose(G)))
       bearing_likelihood = (left_half * np.conj(left_half)).real
 
@@ -217,6 +228,42 @@ class bearing:
     return constraints
 
 
+def calc_windows(bl, t_window, t_delta):
+  ''' Divide est data into uniform time windows. 
+
+    Return a tuple with the timestamp of the start of the window 
+    and a list of indices corresponding to the est's wihtin the 
+    window. 
+
+    :param bl: Bearing likelihoods for time range. 
+    :type bl: qraat.position.bearing
+    :param t_window: Number of seconds for each time window. 
+    :type t_window: int
+    :param t_delta: Interval of time between each position calculation.
+    :type t_delta: int
+  '''
+
+  start_step = np.ceil(bl.time[0] / t_delta)
+  while start_step*t_delta - (t_window / 2.0) < bl.time[0]:
+    start_step += 1
+  start_step -= 1
+
+  end_step = np.floor(bl.time[-1] / t_delta)
+  while end_step*t_delta + (t_window / 2.0) > bl.time[-1]:
+    end_step -= 1
+  end_step += 1
+  
+  for time_step in range(int(start_step),int(end_step)):
+
+    # Find the indexes corresponding to the time window.
+    est_index_list = np.where(
+      np.abs(bl.time - time_step*t_delta - t_window / 2.0) 
+        <= t_window / 2.0)[0]
+
+    if len(est_index_list) > 0:
+      yield (time_step * t_delta, est_index_list)
+
+
 
 def calc_positions(bl, t_window, t_delta, verbose=False):
   ''' Calculate positions of a transmitter over a time interval. 
@@ -232,32 +279,15 @@ def calc_positions(bl, t_window, t_delta, verbose=False):
   '''
   pos_est = []
   pos_est_deps = []
-  est_ct = bl.likelihoods.shape[0]
 
-  print "position: calculating position"
   if verbose:
     print "%15s %-19s %-19s %-19s" % ('time window',
               '100 meters', '10 meters', '1 meter')
 
-  start_step = np.ceil(bl.time[0] / t_delta)
-  while start_step*t_delta - (t_window / 2.0) < bl.time[0]:
-    start_step += 1
-  start_step -= 1
-
-  end_step = np.floor(bl.time[-1] / t_delta)
-  while end_step*t_delta + (t_window / 2.0) > bl.time[-1]:
-    end_step -= 1
-  end_step += 1
-
   try:
-    for time_step in range(int(start_step),int(end_step)):
+    for (t, index_list) in calc_windows(bl, t_window, t_delta): 
 
-      # Find the indexes corresponding to the time window.
-      est_index_list = np.where(
-        np.abs(bl.time - time_step*t_delta - t_window / 2.0) 
-          <= t_window / 2.0)[0]
-
-      if len(est_index_list) > 0 and len(set(bl.site_id[est_index_list])) > 1:
+      if (len(set(bl.site_id[index_list])) > 1): 
 
         if verbose: 
           print "Time window {0} - {1}".format(
@@ -266,7 +296,7 @@ def calc_positions(bl, t_window, t_delta, verbose=False):
         scale = 100
         pos = center
         while scale >= 1: # 100, 10, 1 meters ...
-          pos = bl.position_estimation(est_index_list, pos, scale)
+          pos = bl.position_estimation(index_list, pos, scale)
           if verbose:
             print "%8dn,%de" % (pos.real, pos.imag),
           scale /= 10
@@ -274,14 +304,17 @@ def calc_positions(bl, t_window, t_delta, verbose=False):
         pos_deps = []
 
         # Determine components of est that contribute to the computed position.
-        for est_index in est_index_list:
+        for est_index in index_list:
           pos_deps.append(bl.id[est_index])
-        pos_est.append((time_step*t_delta,
+
+        pos_est.append((t,
                         pos.imag,  # easting
                         pos.real)) # northing
 
         pos_est_deps.append({'est':tuple(pos_deps)})
         if verbose: print
+
+      # else: pos_est.append((t, nil, nil)) TODO 
 
   except KeyboardInterrupt: 
     pass

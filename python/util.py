@@ -20,7 +20,7 @@ try:
   import MySQLdb as mdb
 except ImportError: pass
 
-import os 
+import os, sys
 from csv import csv
 
 

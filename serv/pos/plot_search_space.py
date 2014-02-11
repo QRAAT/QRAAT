@@ -62,7 +62,7 @@ parser.add_option('--t-window', type='float', metavar='SEC', default=30.0,
 parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800.0, 
                   help="Start time in secondes after the epoch (UNIX time).")
 
-parser.add_option('--t-end', type='float', metavar='SEC', default=1376427800,#1376442000.0,#1376427800 yields 302 rows
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0,#1376427800 yields 302 rows
                   help="End time in secondes after the epoch (UNIX time).")
 
 (options, args) = parser.parse_args()
@@ -170,16 +170,16 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
 
 db_con = qraat.util.get_db('reader')
 
-print "plot_seach_space: getting steering vectors"
+print "plot_search_space: fetching site data."
 sv = qraat.position.steering_vectors(db_con, options.cal_id)
 
-print "plot_seach_space: getting est data"
+print "plot_search_space: fetching signal data."
 est = qraat.est2(db_con, 
                  options.t_start, 
                  options.t_end, 
                  options.tx_id)
 
-print "plot_seach_space: calculating bearing likelihoods (%d records)" % len(est)
+print "plot_search_space: calculating bearing likelihoods (%d records)." % len(est)
 bl = qraat.position.bearing(sv, est)
 
 #: The time step (in seconds) for the position estimation
@@ -189,18 +189,14 @@ t_delta = options.t_delta
 #: Time averaging window (in seconds). 
 t_window = options.t_window
 
-print "plot_search_space: plotting"
-
-i = 0
+print "plot_search_space: plotting."
 
 try: 
-  while i < len(bl) - 1:
 
-    # Find the index j corresponding to the end of the time window. 
-    j = i + 1
-    while j < len(bl) - 1 and (bl.time[j + 1] - bl.time[i]) <= t_window: 
-      j += 1
-    
+  for (t, index_list) in qraat.position.calc_windows(bl, t_window, t_delta):
+
+    (i, j) = (index_list[0], index_list[-1])
+
     #scale = 100
     #pos = center
     #while scale >= 1: 
@@ -223,11 +219,6 @@ try:
        t.tm_year, t.tm_mon, t.tm_mday,
        t.tm_hour, t.tm_min, t.tm_sec,
        j - i, set(bl.site_id[i:j]))
-
-    # Step index i forward t_delta seconds. 
-    j = i + 1
-    while i < len(bl) - 1 and (bl.time[i + 1] - bl.time[j]) <= t_delta: 
-      i += 1
 
 except KeyboardInterrupt: pass
 
