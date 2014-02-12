@@ -19,6 +19,7 @@
 
 import numpy as np
 import time, os, sys
+import random
 
 import util
 from csv import csv
@@ -249,8 +250,16 @@ class bearing:
 
 
   def jitter_estimator(self, index_list, center, scale, half_span=15):
-    ''' TODO '''  
-    return self.position_estimator(index_list, center, scale, half_span) 
+    ''' Position estimator with a little jitter around the center. 
+    
+      Vary the northing and easting of the center uniformly plus 
+      or minus the scaling factor. 
+    ''' 
+
+    p = center + np.complex(round(random.uniform((-1)*scale, scale), 2), 
+                            round(random.uniform((-1)*scale, scale), 2))
+    
+    return self.position_estimator(index_list, p, scale, half_span) 
 
 
 
@@ -338,7 +347,7 @@ def calc_positions(bl, t_window, t_delta, verbose=False):
         scale = 100
         pos = center
         while scale >= 1: # 100, 10, 1 meters ...
-          pos = bl.position_estimator(index_list, pos, scale)
+          pos = bl.jitter_estimator(index_list, pos, scale)
           if verbose:
             print "%8dn,%de" % (pos.real, pos.imag),
           scale /= 10
