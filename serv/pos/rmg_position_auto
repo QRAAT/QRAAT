@@ -59,10 +59,12 @@ for tx in tx_list:
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
 
-    est = qraat.est2(db_con, time_range[0]-time_window, 
-                             time_range[1]+time_window, tx_id)
+    sig = qraat.position.signal(db_con, 
+                                time_range[0]-time_window, 
+                                time_range[1]+time_window, 
+                                tx_id)
 
-    bl = qraat.position.bearing(sv, est)
+    bl = qraat.position.bearing(sv, sig)
     (pos_est, pos_est_deps) = qraat.position.calc_positions(bl, time_window, time_delta)
     qraat.position.insert_positions(db_con, pos_est, pos_est_deps, tx_id)
 

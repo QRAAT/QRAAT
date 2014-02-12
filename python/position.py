@@ -16,18 +16,6 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-# TODO
-# - Move qraat.est2 to qraat.position.signal.
-# - bearing.jitter_estimator()
-# - Modify calc_positions to perform *some* task for the est window 
-#    and time step. 
-# - It bothers me that bearing.position_estimation takes in an index
-#    list instead of a range. (Whether this warrants modification is
-#    a different story.)
-# - class bearing uses's Bartlet's. We could rename it to "bartlet" 
-#    and implement MLE by overloading the constructor. This is the 
-#    direction-finding aspect of things. 
 
 import numpy as np
 import time, os, sys
@@ -101,28 +89,91 @@ class steering_vectors:
                                                            prov_sv_ids, deps, sv_deps_by_site)
 
 
+class signal:
+  ''' Encapsulate pulse signal data. 
+  
+    I'm evaluating what functionality I want from the est object so 
+    that the data is more chewable in bearing and position calculation.
+    My thinking now is that this could replace est entirely and be 
+    the interface between det's, DB, and file. For now, it will serve
+    useful for exploring. 
+  ''' 
+
+  #: Number of channels. 
+  N = 4
+
+  def __init__(self, db_con, t_start, t_end, tx_id=None):
+
+    # Store eigenvalue decomposition vectors and noise covariance
+    # matrices in NumPy arrays. 
+    cur = db_con.cursor()
+    cur.execute('''SELECT ID, siteid, txid, timestamp, edsp, 
+                          ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
+                          nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+                          nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+                          nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+                          nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
+                     FROM est
+                    WHERE (%f <= timestamp) AND (timestamp <= %f) %s''' % (
+                            t_start, t_end, 
+                           ('AND txid=%d' % tx_id) if tx_id else ''))
+  
+    raw = np.array(cur.fetchall(), dtype=float)
+
+    if raw.shape[0] == 0: 
+      self.id = self.site_id = self.tx_id = self.timestamp = np.array([])
+      self.edsp = self.ed = self.nc = np.array([])
+      self.signal_ct = 0
+   
+    else:
+      # Metadata. 
+      (self.id, 
+       self.site_id, 
+       self.tx_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
+      self.timestamp = raw[:,3]
+      raw = raw[:,4:]
+
+      # Signal power. 
+      self.edsp = raw[:,0]
+      raw = raw[:,1:]
+
+      # Signal vector, N x 1.
+      self.ed = raw[:,0:8:2] + np.complex(0,-1) * raw[:,1:8:2]
+      raw = raw[:,8:]
+
+      # Noise covariance matrix, N x N. 
+      self.nc = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
+      self.nc = self.nc.reshape(raw.shape[0], self.N, self.N)
+
+      self.signal_ct = self.id.shape[0]
+
+  def __len__(self): 
+    return self.signal_ct
+
+
 
 class bearing: 
-  ''' Calculate and store bearing likelihood distributions for a signal window. 
+  ''' Calculate and store bearing likelihood distributions for a signal window.
+
+    The likelihoods calculated for the bearings are based on Bartlet's estimator. 
 
     :param sv: Steering vectors per site. 
     :type sv: qraat.position.steering_vectors
-    
-    :param est: A set of signals for a given transmitter and time window.  
-    :type qraat.est2: 
+    :param sig: A set of signals for a given transmitter and time window.  
+    :type qraat.position.signal: 
   ''' 
 
-  def __init__(self, sv, est): 
+  def __init__(self, sv, sig): 
   
     self.sites   = sv.sites
-    self.id      = est.id
-    self.site_id = est.site_id
-    self.time    = est.timestamp
+    self.id      = sig.id
+    self.site_id = sig.site_id
+    self.time    = sig.timestamp
 
     record_provenance_from_site_data = False
 
-    likelihoods = np.zeros((len(est), 360))
-    for i in range(len(est)):
+    likelihoods = np.zeros((len(sig), 360))
+    for i in range(len(sig)):
       try:
         G      = sv.steering_vectors[self.site_id[i]]
         G_deps = sv.sv_deps_by_site[self.site_id[i]]
@@ -130,8 +181,8 @@ class bearing:
         print >>sys.stderr, "position: error: no steering vectors for site ID=%d" % self.site_id[i]
         sys.exit(1)
 
-      V     = est.ed[i, np.newaxis,:]
-      V_dep = est.id[i]
+      V     = sig.ed[i, np.newaxis,:]
+      V_dep = sig.id[i]
 
       # Bartlet's estimator. 
       left_half = np.dot(V, np.conj(np.transpose(G)))
@@ -155,8 +206,7 @@ class bearing:
   def __len__(self): 
     return self.likelihoods.shape[0]
 
-
-  def position_estimation(self, index_list, center, scale, half_span=15):
+  def position_estimator(self, index_list, center, scale, half_span=15):
     ''' Estimate the position of a transmitter over time interval.
 
       Generate a set of candidate points centered around ``center``.
@@ -164,8 +214,7 @@ class bearing:
       The log likelihood of a candidate corresponding to the actual location
       of the target transmitter over the time window is equal to the sum of
       the likelihoods of each of these bearings given the signal characteristics
-      of the ESTs in the window. The search space for this method is defined 
-      by Bartlett's estimator. 
+      of the ESTs in the window. 
     '''
 
     #: Generate candidate points centered around ``center``.
@@ -198,34 +247,27 @@ class bearing:
 
     return grid.flat[np.argmax(pos_likelihood)]
 
-  def calc_constraints(self, i, j, half_span=15): 
-    ''' Get linear constraints on search space. 
-    
-      Sum the log likelihoods for each site and return linear inequalties 
-      constraining half_span * 2 degrees around the maximum likelihood. 
-      **TODO**: do something more intelligent like pick the bearing range 
-      for greater than half the maximum likelihood (Todd's idea). 
-    '''
-    ll_sum = {}
 
-    # Add up bearing likelihoods for each site. 
-    for k in range(i, j): 
-      if ll_sum.get(self.site_id[k]) == None:
-        ll_sum[self.site_id[k]] = self.likelihoods[k,]
-      else: 
-        ll_sum[self.site_id[k]] += self.likelihoods[k,]
+  def jitter_estimator(self, index_list, center, scale, half_span=15):
+    ''' TODO '''  
+    return self.position_estimator(index_list, center, scale, half_span) 
 
-    constraints = {}
-    for (site_id, ll) in ll_sum.iteritems():
-      theta_max = np.argmax(ll)
-      constraints[site_id] = halfplane.from_bearings(
-       self.sites.get(ID=site_id).pos, # FIXME O(1)
-       (theta_max - half_span) % 360, 
-       (theta_max + half_span) % 360)
-      #print ((theta_max - half_span) % 360, (theta_max + half_span) % 360),
-      #print constraints[site_id]
-    
-    return constraints
+
+
+class MLEbearing (bearing): 
+  ''' Calculate bearing distribution with the minimum likelihood estimator. ''' 
+
+  def __init__(self, sv, sig): 
+    self.sites   = sv.sites
+    self.id      = sig.id
+    self.site_id = sig.site_id
+    self.time    = sig.timestamp
+
+    record_provenance_from_site_data = False
+
+    self.likelihoods = np.zeros((len(sig), 360)) # TODO 
+    self.likelihood_deps = []                    # TODO 
+
 
 
 def calc_windows(bl, t_window, t_delta):
@@ -296,7 +338,7 @@ def calc_positions(bl, t_window, t_delta, verbose=False):
         scale = 100
         pos = center
         while scale >= 1: # 100, 10, 1 meters ...
-          pos = bl.position_estimation(index_list, pos, scale)
+          pos = bl.position_estimator(index_list, pos, scale)
           if verbose:
             print "%8dn,%de" % (pos.real, pos.imag),
           scale /= 10

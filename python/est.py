@@ -349,68 +349,6 @@ class est (csv):
     cur.execute(query.substitute(row))
 
 
-class est2:
-  ''' Encapsulate pulse signal data. 
-  
-    I'm evaluating what functionality I want from the est object so 
-    that the data is more chewable in bearing and position calculation.
-    My thinking now is that this could replace est entirely and be 
-    the interface between det's, DB, and file. For now, it will serve
-    useful for exploring. 
-  ''' 
-
-  #: Number of channels. 
-  N = 4
-
-  def __init__(self, db_con, t_start, t_end, tx_id=None):
-
-    # Store eigenvalue decomposition vectors and noise covariance
-    # matrices in NumPy arrays. 
-    cur = db_con.cursor()
-    cur.execute('''SELECT ID, siteid, txid, timestamp, edsp, 
-                          ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
-                          nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
-                          nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
-                          nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
-                          nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
-                     FROM est
-                    WHERE (%f <= timestamp) AND (timestamp <= %f) %s''' % (
-                            t_start, t_end, 
-                           ('AND txid=%d' % tx_id) if tx_id else ''))
-  
-    raw = np.array(cur.fetchall(), dtype=float)
-
-    if raw.shape[0] == 0: 
-      self.id = self.site_id = self.tx_id = self.timestamp = np.array([])
-      self.edsp = self.ed = self.nc = np.array([])
-      self.signal_ct = 0
-   
-    else:
-      # Metadata. 
-      (self.id, 
-       self.site_id, 
-       self.tx_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
-      self.timestamp = raw[:,3]
-      raw = raw[:,4:]
-
-      # Signal power. 
-      self.edsp = raw[:,0]
-      raw = raw[:,1:]
-
-      # Signal vector, N x 1.
-      self.ed = raw[:,0:8:2] + np.complex(0,-1) * raw[:,1:8:2]
-      raw = raw[:,8:]
-
-      # Noise covariance matrix, N x N. 
-      self.nc = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
-      self.nc = self.nc.reshape(raw.shape[0], self.N, self.N)
-
-      self.signal_ct = self.id.shape[0]
-
-  def __len__(self): 
-    return self.signal_ct
-
-
 if __name__=="__main__":
 
   try:

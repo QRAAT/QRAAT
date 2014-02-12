@@ -174,13 +174,13 @@ print "plot_search_space: fetching site data."
 sv = qraat.position.steering_vectors(db_con, options.cal_id)
 
 print "plot_search_space: fetching signal data."
-est = qraat.est2(db_con, 
-                 options.t_start, 
-                 options.t_end, 
-                 options.tx_id)
+sig = qraat.position.signal(db_con, 
+                            options.t_start, 
+                            options.t_end, 
+                            options.tx_id)
 
-print "plot_search_space: calculating bearing likelihoods (%d records)." % len(est)
-bl = qraat.position.bearing(sv, est)
+print "plot_search_space: calculating bearing likelihoods (%d records)." % len(sig)
+bl = qraat.position.bearing(sv, sig)
 
 #: The time step (in seconds) for the position estimation
 #: calculation.

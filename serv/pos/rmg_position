@@ -75,13 +75,13 @@ print "position: fetching site data."
 sv = qraat.position.steering_vectors(db_con, options.cal_id)
 
 print "position: fetching signal data."
-est = qraat.est2(db_con, 
-                 options.t_start, 
-                 options.t_end,
-                 options.tx_id)
+sig = qraat.position.signal(db_con, 
+                            options.t_start, 
+                            options.t_end,
+                            options.tx_id)
 
-print "position: calculating bearing likelihoods (%d)." % len(est) 
-bl = qraat.position.bearing(sv, est)
+print "position: calculating bearing likelihoods (%d)." % len(sig) 
+bl = qraat.position.bearing(sv, sig)
 
 print "position: calculating positions."
 (pos_est, pos_est_deps) = qraat.position.calc_positions(bl, 
