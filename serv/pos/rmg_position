@@ -103,8 +103,8 @@ if options.plot:
 
   # Plot locations. 
   pp.plot( 
-   map(lambda (t, e, n): e, pos_est), 
-   map(lambda (t, e, n): n, pos_est), '.', alpha=0.3)
+   map(lambda (t, e, n, ll): e, pos_est), 
+   map(lambda (t, e, n, ll): n, pos_est), '.', alpha=0.3)
 
   pp.show()
 

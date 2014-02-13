@@ -214,8 +214,9 @@ class bearing:
       Calculate the bearing to the receiver sites from each of this points.
       The log likelihood of a candidate corresponding to the actual location
       of the target transmitter over the time window is equal to the sum of
-      the likelihoods of each of these bearings given the signal characteristics
-      of the ESTs in the window. 
+      the likelihoods of each of these bearings given the signals in the 
+      window. Return an estimate of the maximal point along with its 
+      likelihood.
     '''
 
     #: Generate candidate points centered around ``center``.
@@ -246,8 +247,8 @@ class bearing:
              # TODO perhaps there should be a row in qraat.sitelist that 
              # designates sites as qraat nodes. ~ Chris 1/2/14 
 
-    return grid.flat[np.argmax(pos_likelihood)]
-
+    max_index = np.argmax(pos_likelihood)
+    return (grid.flat[max_index], round(pos_likelihood.flat[max_index], 6))
 
   def jitter_estimator(self, index_list, center, scale, half_span=15):
     ''' Position estimator with a little jitter around the center. 
@@ -256,14 +257,15 @@ class bearing:
       or minus the scaling factor. 
     ''' 
 
-    p = center + np.complex(round(random.uniform((-1)*scale, scale), 2), 
-                            round(random.uniform((-1)*scale, scale), 2))
+    (j_neg, j_pos) = (scale / -2, scale / 2)
+    j_center = center + np.complex(round(random.uniform(j_neg, j_pos), 2), 
+                                   round(random.uniform(j_neg, j_pos), 2))
     
-    return self.position_estimator(index_list, p, scale, half_span) 
+    return self.position_estimator(index_list, j_center, scale, half_span) 
 
 
 
-class MLEbearing (bearing): 
+class mle_bearing (bearing): 
   ''' Calculate bearing distribution with the minimum likelihood estimator. ''' 
 
   def __init__(self, sv, sig): 
@@ -342,12 +344,12 @@ def calc_positions(bl, t_window, t_delta, verbose=False):
 
         if verbose: 
           print "Time window {0} - {1}".format(
-            time_step*t_delta - t_window / 2.0, time_step*t_delta + t_window)
+            t - t_window / 2.0, t + t_window)
 
         scale = 100
         pos = center
         while scale >= 1: # 100, 10, 1 meters ...
-          pos = bl.jitter_estimator(index_list, pos, scale)
+          (pos, ll) = bl.jitter_estimator(index_list, pos, scale)
           if verbose:
             print "%8dn,%de" % (pos.real, pos.imag),
           scale /= 10
@@ -358,14 +360,17 @@ def calc_positions(bl, t_window, t_delta, verbose=False):
         for est_index in index_list:
           pos_deps.append(bl.id[est_index])
 
-        pos_est.append((t,
-                        pos.imag,  # easting
-                        pos.real)) # northing
+        pos_est.append((t,        # timestamp
+                        pos.imag, # easting
+                        pos.real, # northing
+                        ll))      # likelihood
 
         pos_est_deps.append({'est':tuple(pos_deps)})
         if verbose: print
 
-      # else: pos_est.append((t, nil, nil)) TODO 
+      # else: pos_est.append((t, nil, nil)) 
+      # NOTE Perhaps we should insert a "nil" position if there wasn't 
+      #  enough data to calculate a position. ~Chris 2/12/14
 
   except KeyboardInterrupt: 
     pass
@@ -379,8 +384,8 @@ def insert_positions(db_con, pos_est, pos_est_deps, tx_id):
     cur = db_con.cursor()
 
     query = '''INSERT INTO Position
-                (txid, timestamp, easting, northing)
-               VALUES (%s, %s, %s, %s)'''
+                (txid, timestamp, easting, northing, likelihood)
+               VALUES (%s, %s, %s, %s, %s)'''
     #cur.executemany(, [(tx_id, pe[0], pe[1], pe[2]) for pe in pos_est])
 
     # Insert results into database.
@@ -388,7 +393,7 @@ def insert_positions(db_con, pos_est, pos_est_deps, tx_id):
     for pos_est_index in range(len(pos_est)):
       this_pos_est = pos_est[pos_est_index]
       this_pos_est_deps = pos_est_deps[pos_est_index]
-      cur.execute(query, (tx_id, this_pos_est[0], this_pos_est[1], this_pos_est[2]))
+      cur.execute(query, (tx_id, this_pos_est[0], this_pos_est[1], this_pos_est[2], this_pos_est[3]))
       pos_est_insertion_id = cur.lastrowid
       all_insertions.append(pos_est_insertion_id)
       handle_provenance_insertion(cur, this_pos_est_deps, {'Position':(pos_est_insertion_id,)})
