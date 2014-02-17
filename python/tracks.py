@@ -91,7 +91,6 @@ class track:
                     ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
     
     pos = cur.fetchall()
-    self.nodes = [node(i) for i in range(len(pos))]
     
     # Average.
     mean_speed = 0;
@@ -104,46 +103,46 @@ class track:
 
     mean_speed /= len(pos)
 
+    # NOTE This approach seems to be reasonable for one candidate per time 
+    #  unit. 
+    
     # Standard deviation.
-    stddev_speed = 0
-    for i in range(len(pos)-1): 
-      Pi = np.complex(pos[i][3], pos[i][4])
-      Pj = np.complex(pos[i+1][3], pos[i+1][4])
-      t_delta = float(pos[i+1][2]) - float(pos[i][2])
-      assert t_delta > 0
-      stddev_speed += ((dist(Pi, Pj) / t_delta) - mean_speed) ** 2
-
-    stddev_speed = np.sqrt(stddev_speed / len(pos))
-
-    print (mean_speed, stddev_speed)
- 
-    # Index and size of largest component. 
-    m_p = None; m_size = 0
-
-    # Connected component analysis. 
-    for i in range(len(pos)):
-      Pi = np.complex(pos[i][3], pos[i][4])
-      for j in range(i+1, len(pos)):  
-        Pj = np.complex(pos[j][3], pos[j][4])
-        t_delta = float(pos[j][2]) - float(pos[i][2])
-        assert t_delta > 0  # if t_delta == 0, then i, j should 
-                            # be treated as candidate positions for
-                            # the same time? 
-        #print (i, j), dist(Pi, Pj) / t_delta, self.nodes[i].c_find().index, self.nodes[j].c_find().index,
-        if (dist(Pi, Pj) / t_delta) < mean_speed:
-          p = self.nodes[i].c_union(self.nodes[j])
-          #print "parent=%d" % p.index
-          if len(p.c) > m_size:
-            m_p    = p
-            m_size = len(p.c)
+    #stddev_speed = 0
+    #for i in range(len(pos)-1): 
+    #  Pi = np.complex(pos[i][3], pos[i][4])
+    #  Pj = np.complex(pos[i+1][3], pos[i+1][4])
+    #  t_delta = float(pos[i+1][2]) - float(pos[i][2])
+    #  assert t_delta > 0
+    #  stddev_speed += ((dist(Pi, Pj) / t_delta) - mean_speed) ** 2
+    #stddev_speed = np.sqrt(stddev_speed / len(pos))
+    #print (mean_speed, stddev_speed)
+    
+    tracks = [[ (np.complex(pos[0][3], pos[i][4]), float(pos[0][2])) ]]
+    for i in range(1, len(pos)): 
+      P_i = np.complex(pos[i][3], pos[i][4])
+      t_i = float(pos[i][2])
+      guy = False
+      for track in tracks:
+        (P_j, t_j) = track[-1]
+        assert (t_i - t_j > 0)
+        if dist(P_j, P_i) / (t_i - t_j) <= mean_speed/1:
+          track.append( (P_i, t_i) )
+          guy = True
           break
-        #else: print
+      if not guy: 
+        tracks.append( [(P_i, t_i)] )
 
-    print m_size, "/", len(pos), "[%d]" % m_p.c_height
+    print [ len(track) for track in tracks ]
 
-    self.track = []
-    for i in m_p.c: 
-      self.track.append((pos[i][3], pos[i][4]))
+    m_track = None
+    m_size = 0
+    for track in tracks:
+      if len(track) > m_size:
+        m_track = track
+        m_size = len(track)
+
+    self.track = m_track
+ 
 
 
   def dfs(self, v):
@@ -182,8 +181,8 @@ if __name__ == '__main__':
 
   # Plot locations. 
   pp.plot( 
-   map(lambda (n, e): e, fella.track), 
-   map(lambda (n, e): n, fella.track), '.', alpha=0.3)
+   map(lambda (P, t): P.imag, fella.track), 
+   map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
 
   pp.show()
 
