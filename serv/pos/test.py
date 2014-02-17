@@ -8,9 +8,9 @@ progs={ "pos" : "rmg_position",
         "search_space" : "plot_search_space.py" }
 
 exps = {         # t_start,           t_end,             tx_id, t_win, t_step
-       "feb2"  : ( 1391390700.638165, 1391396399.840252, 54,    30,    120),  
+       "feb2"  : ( 1391390700.638165, 1391396399.840252, 54,    30,    5),  
        "short" : ( 1376420800.0     , 1376427800.0     , 51,    30,    120),  
-       "cal"   : ( 1376420800.0     , 1376442000.0     , 51,    30,    15) 
+       "cal"   : ( 1376420800.0     , 1376442000.0     , 51,    30,    5) 
        }
 
 def die(msg):
@@ -43,7 +43,7 @@ if len(sys.argv) >= 3:
                                                   tx_id))
 
       if sys.argv[1] == 'pos': # Output the positions added to DB. 
-        os.system("mysql -u reader -B -e \"SELECT * FROM qraat.Position\"")
+        pass#os.system("mysql -u reader -B -e \"SELECT * FROM qraat.Position\"")
         
  
   

@@ -35,7 +35,7 @@ class node:
 
   def __init__(self, index): 
     self.c_parent = None
-    self.c_size   = 1
+    self.c        = [index]
     self.c_height = 0
     self.index = index
     self.visited = False
@@ -57,17 +57,17 @@ class node:
     elif (x.c_height == y.c_height): # x and y have the same height.
       y.c_parent  = x
       x.c_height += 1
-      x.c_size   += y.c_size
+      x.c        += y.c
       p = x
 
     elif (x.c_height > y.c_height): # x is taller than y.
       y.c_parent = x
-      x.c_size  += y.c_size
+      x.c       += y.c
       p = x
 
     else: # y is taller than x.
       x.c_parent = y
-      y.c_size  += x.c_size
+      y.c       += x.c
       p = y
       
     return p
@@ -88,35 +88,72 @@ class track:
                      FROM Position
                     WHERE (%f <= timestamp) AND (timestamp <= %f)
                       AND txid = %d
-                    ORDER BY timestamp''' % (t_start, t_end, tx_id))
+                    ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
     
     pos = cur.fetchall()
-    nodes = [node(i) for i in range(len(pos))]
+    self.nodes = [node(i) for i in range(len(pos))]
+    
+    # Average.
+    mean_speed = 0;
+    for i in range(len(pos)-1): 
+      Pi = np.complex(pos[i][3], pos[i][4])
+      Pj = np.complex(pos[i+1][3], pos[i+1][4])
+      t_delta = float(pos[i+1][2]) - float(pos[i][2])
+      assert t_delta > 0
+      mean_speed += dist(Pi, Pj) / t_delta
 
+    mean_speed /= len(pos)
+
+    # Standard deviation.
+    stddev_speed = 0
+    for i in range(len(pos)-1): 
+      Pi = np.complex(pos[i][3], pos[i][4])
+      Pj = np.complex(pos[i+1][3], pos[i+1][4])
+      t_delta = float(pos[i+1][2]) - float(pos[i][2])
+      assert t_delta > 0
+      stddev_speed += ((dist(Pi, Pj) / t_delta) - mean_speed) ** 2
+
+    stddev_speed = np.sqrt(stddev_speed / len(pos))
+
+    print (mean_speed, stddev_speed)
+ 
     # Index and size of largest component. 
-    m_p = None; m_size =  0
-    edge_ct = 0
+    m_p = None; m_size = 0
 
-    # Add feasible edges to graph, keeping track of largest component. 
+    # Connected component analysis. 
     for i in range(len(pos)):
       Pi = np.complex(pos[i][3], pos[i][4])
       for j in range(i+1, len(pos)):  
         Pj = np.complex(pos[j][3], pos[j][4])
-        if dist(Pj, Pi) / (float(pos[j][2]) - float(pos[i][2])) < max_speed: 
-          edge_ct += 1
-          nodes[i].adj.append(j) # If there is only one calculation per unit
-                                 # time, finding the largest component may 
-                                 # suffice. 
-          p = nodes[i].c_union(nodes[j])
-          if p.c_size > m_size:
+        t_delta = float(pos[j][2]) - float(pos[i][2])
+        assert t_delta > 0  # if t_delta == 0, then i, j should 
+                            # be treated as candidate positions for
+                            # the same time? 
+        #print (i, j), dist(Pi, Pj) / t_delta, self.nodes[i].c_find().index, self.nodes[j].c_find().index,
+        if (dist(Pi, Pj) / t_delta) < mean_speed:
+          p = self.nodes[i].c_union(self.nodes[j])
+          #print "parent=%d" % p.index
+          if len(p.c) > m_size:
             m_p    = p
-            m_size = p.c_size
-    
-    print m_size, "/", len(pos), "[%d]" % m_p.c_height, "edges=%d" % edge_ct
+            m_size = len(p.c)
+          break
+        #else: print
 
-    # TODO Enumerate positions in largest component, plot them. 
+    print m_size, "/", len(pos), "[%d]" % m_p.c_height
+
+    self.track = []
+    for i in m_p.c: 
+      self.track.append((pos[i][3], pos[i][4]))
 
 
+  def dfs(self, v):
+    S = [v]; 
+    while (len(S) != 0): 
+      u = S.pop()
+      if not u.visited: 
+        u.visited = True
+        for i in u.adj:
+          S.append(self.nodes[i])
 
 
 
@@ -124,10 +161,16 @@ if __name__ == '__main__':
   
   db_con = util.get_db('reader')
 
-  t_start = 1376420800.0
-  t_end   = 1376442000.0
-  t_end_short = 1376427800.0 # short
-  cal_track = track(db_con, t_start, t_end, 51, 0.201) 
+  (t_start, t_end, tx_id) = (1376420800.0, 1376442000.0, 51)
+  t_end_short = 1376427650.0 # short
+
+  (t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165, 1391396399.840252, 54)
+
+  fella = track(db_con, t_start, t_end, tx_id, 4.4)
+  # With max_spaeed = 0.201, results are strange. 
+  # I expect see the largest component to be free of most 
+  # the false estimations. Instead I'm seeing a range of 
+  # values along the path missing. TODO
 
   import matplotlib.pyplot as pp
 
@@ -138,9 +181,9 @@ if __name__ == '__main__':
    [s.northing for s in sites], 'ro')
 
   # Plot locations. 
-  #pp.plot( 
-  # map(lambda (t, e, n, ll): e, pos_est), 
-  # map(lambda (t, e, n, ll): n, pos_est), '.', alpha=0.3)
+  pp.plot( 
+   map(lambda (n, e): e, fella.track), 
+   map(lambda (n, e): n, fella.track), '.', alpha=0.3)
 
   pp.show()
 
