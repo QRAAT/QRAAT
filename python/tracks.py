@@ -31,15 +31,37 @@ def dist(Pi, Pj):
   return np.sqrt((Pi.real - Pj.real)**2 + (Pi.imag - Pj.imag)**2)
 
 
-class node: 
+class Node: 
 
-  def __init__(self, index): 
+  def __init__(self, P, t, ll): 
     self.c_parent = None
-    self.c        = [index]
+    self.c_size   = 1
     self.c_height = 0
-    self.index = index
+    self.P = P
+    self.t = t
+    self.ll = ll
     self.visited = False
     self.adj = []
+    self.children = []
+
+  def dfs(self):
+    S = [self]; 
+    ct = 0
+    while (len(S) != 0): 
+      u = S.pop()
+      if not u.visited: 
+        u.visited = True
+        ct += 1
+        for v in u.adj:
+          S.append(v)
+    return ct
+
+  def topological_sort(self): 
+    # TODO Return most likely path, using ``ll``. 
+    return []
+
+  def dist (self, aNode):
+    return dist(self.P, aNode.P)
 
   def c_find(self):
     p = self
@@ -57,17 +79,17 @@ class node:
     elif (x.c_height == y.c_height): # x and y have the same height.
       y.c_parent  = x
       x.c_height += 1
-      x.c        += y.c
+      x.c_size   += y.c_size
       p = x
 
     elif (x.c_height > y.c_height): # x is taller than y.
       y.c_parent = x
-      x.c       += y.c
+      x.c_size  += y.c_size
       p = x
 
     else: # y is taller than x.
       x.c_parent = y
-      y.c       += x.c
+      y.c_size  += x.c_size
       p = y
       
     return p
@@ -81,8 +103,6 @@ class track:
   '''
 
   def __init__(self, db_con, t_start, t_end, tx_id, max_speed):
-    # TODO Assumming (n, e) in meters for the moment.
-
     cur = db_con.cursor()
     cur.execute('''SELECT ID, txID, timestamp, northing, easting, likelihood
                      FROM Position
@@ -100,7 +120,6 @@ class track:
       t_delta = float(pos[i+1][2]) - float(pos[i][2])
       assert t_delta > 0
       mean_speed += dist(Pi, Pj) / t_delta
-
     mean_speed /= len(pos)
 
     # NOTE This approach seems to be reasonable for one candidate per time 
@@ -125,7 +144,7 @@ class track:
       for track in tracks:
         (P_j, t_j) = track[-1]
         assert (t_i - t_j > 0)
-        if dist(P_j, P_i) / (t_i - t_j) <= mean_speed/1:
+        if dist(P_j, P_i) / (t_i - t_j) <= mean_speed/2:
           track.append( (P_i, t_i) )
           guy = True
           break
@@ -144,15 +163,88 @@ class track:
     self.track = m_track
  
 
+class track2:
 
-  def dfs(self, v):
-    S = [v]; 
-    while (len(S) != 0): 
-      u = S.pop()
-      if not u.visited: 
-        u.visited = True
-        for i in u.adj:
-          S.append(self.nodes[i])
+  ''' Track2.
+
+  :param max_speed: Maximum foot speed of target (m/s). 
+  :type max_speed: float
+  '''
+
+  def __init__(self, db_con, t_start, t_end, tx_id, max_speed):
+    cur = db_con.cursor()
+    cur.execute('''SELECT ID, txID, timestamp, northing, easting, likelihood
+                     FROM Position
+                    WHERE (%f <= timestamp) AND (timestamp <= %f)
+                      AND txid = %d
+                    ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
+    
+    pos = cur.fetchall()
+    
+    # Average speed.
+    mean_speed = 0;
+    for i in range(len(pos)-1): 
+      Pi = np.complex(pos[i][3], pos[i][4])
+      Pj = np.complex(pos[i+1][3], pos[i+1][4])
+      t_delta = float(pos[i+1][2]) - float(pos[i][2])
+      assert t_delta > 0 # TODO 
+      mean_speed += dist(Pi, Pj) / t_delta
+    mean_speed /= len(pos)
+
+    # Build tracks DAG.
+    nodes = []
+    roots = []; leaves = []
+    i = 0 
+    while i < len(pos):
+      
+      j = i
+      Tj = Ti = float(pos[i][2])
+      while j < len(pos) and (Ti - Tj == 0): # Candidates for next time interval. 
+        (Pj, Tj, ll) = (np.complex(pos[j][3], pos[j][4]), float(pos[j][2]), float(pos[j][5]))
+
+        node = Node(Pj, Tj, ll)
+        nodes.append(node)
+        ok = False
+        for k in range(len(leaves)):
+          if leaves[k].dist(node) / (node.t - leaves[k].t) < mean_speed: 
+            ok = True
+            node.adj.append(leaves[k])
+            leaves[k].children.append(node)
+        
+        if not ok: # New root. 
+          roots.append(node) 
+          leaves.append(node)
+
+        j += 1
+  
+      # Recalculate leaves. 
+      newLeaves = []
+      for u in leaves:
+        if len(u.children) == 0: 
+          newLeaves.append(u)
+        else: 
+          for v in u.children:
+            if v not in newLeaves:
+              newLeaves.append(v)
+      leaves = newLeaves
+
+      i = j
+
+    # I observed that the number of leaves is generally smaller than 
+    # the number of roots. Reverse the direction of the edges (using
+    # node.adj as the adjacency list) and find the path with the 
+    # highest likelihood. TODO  
+    for leaf in leaves: 
+      print leaf.dfs()
+      for node in nodes:
+        node.visited = False
+
+    print len(roots)
+    print len(leaves)
+    self.track = []
+
+    
+
 
 
 
@@ -165,7 +257,7 @@ if __name__ == '__main__':
 
   (t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165, 1391396399.840252, 54)
 
-  fella = track(db_con, t_start, t_end, tx_id, 4.4)
+  fella = track2(db_con, t_start, t_end, tx_id, 4.4)
   # With max_spaeed = 0.201, results are strange. 
   # I expect see the largest component to be free of most 
   # the false estimations. Instead I'm seeing a range of 
