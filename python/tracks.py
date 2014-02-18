@@ -56,10 +56,6 @@ class Node:
           S.append(v)
     return ct
 
-  def topological_sort(self): 
-    # TODO Return most likely path, using ``ll``. 
-    return []
-
   def dist (self, aNode):
     return dist(self.P, aNode.P)
 
@@ -242,6 +238,13 @@ class track2:
     print len(roots)
     print len(leaves)
     self.track = []
+
+  def critical_path(self, s): 
+    # TODO Return most likely path, using ``ll``. 
+    # w(i -> j) = nodes[i].ll. Probably negate the edge 
+    # weights and do Bellman-Ford (http://en.wikipedia.org/wiki/
+    # Longest_path_problem#Acyclic_graphs_and_critical_paths).
+    return []
 
     
 
