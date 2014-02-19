@@ -15,9 +15,6 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-# TODOs 
-#  - Fix mean / stddev calculation of target speed. 
 
 
 import numpy as np
@@ -31,6 +28,9 @@ try:
   import MySQLdb as mdb
 except ImportError: pass
 
+def distance(Pi, Pj):
+  ''' Calculate Euclidean distance between two points. ''' 
+  return np.sqrt((Pi.real - Pj.real)**2 + (Pi.imag - Pj.imag)**2)
 
 class TrackError (Exception):
   """ Exception class for building tracks. """
@@ -83,7 +83,7 @@ class Node:
 
   def distance(self, u):
     ''' Compute Euclidean distance to another node. ''' 
-    return np.sqrt((self.P.real - u.P.real)**2 + (self.P.imag - u.P.imag)**2)
+    return distance(self.P, u.P)
 
   def c_find(self):
     ''' Disjoint-set find operation for CC-analysis. ''' 
@@ -142,7 +142,7 @@ class track:
     :type C: float
   '''
 
-  def __init__(self, db_con, t_start, t_end, tx_id, M, C):
+  def __init__(self, db_con, t_start, t_end, tx_id, M, C=1):
     cur = db_con.cursor()
     cur.execute('''SELECT northing, easting, timestamp, likelihood
                      FROM Position
@@ -150,8 +150,13 @@ class track:
                       AND (timestamp <= %f)
                       AND txid = %d
                     ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
-    pos = cur.fetchall()
-    roots = self.track_graph(pos, M)
+    self.pos = cur.fetchall()
+    roots = self.graph(self.pos, M)
+    self.track = self.critical_path(self.toposort(roots), C)
+    self.track.reverse()
+  
+  def recompute(self, M, C=1):
+    roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
     self.track.reverse()
 
@@ -161,7 +166,7 @@ class track:
   def __getitem__(self, i):
     return self.track[i]
 
-  def track_graph(self, pos, M): 
+  def graph(self, pos, M): 
     ''' Create a graph from positions. 
           
       Each position corresponds to a node. An edge is drawn between nodes with 
@@ -275,6 +280,21 @@ class track:
     return path
     
 
+  def speed(self):
+    ''' Calculate mean and standard deviation of the target's speed. 
+    
+      :return: (mean, std) tuple. 
+    '''
+
+    speeds = []
+    for i in range(len(self.track)-1): 
+      assert (self.track[i+1][1] - self.track[i][1]) > 0
+      speeds.append( distance(self.track[i+1][0], self.track[i][0]) / \
+                              (self.track[i+1][1] - self.track[i][1]) )
+
+    return (np.mean(speeds), np.std(speeds))
+      
+
  
 
 
@@ -288,7 +308,21 @@ if __name__ == '__main__':
 
   (t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165, 1391396399.840252, 54)
 
-  fella = track(db_con, t_start, t_end, tx_id, 5.3, 1)
+  # A possible way to calculate good tracks. Compute the tracks
+  # with some a priori maximum speed that's on the high side. For
+  # the calibration data, we could safely assume that the gator 
+  # won't exceed 10 m/s. 
+  fella = track(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, 8) 
+
+  # We then calculate statistics on the transition speeds in the 
+  # critical path. Plotting the tracks might reveal spurious points
+  # that we want to filter out. 
+  (mean, std) = fella.speed()
+  print "(mu=%.4f, sigma=%.4f)" % (mean, std)
+
+  # Recompute the tracks, using the mean + one standard deviation as
+  # the maximum speed. 
+  fella.recompute(mean + std)
 
   import matplotlib.pyplot as pp
 
