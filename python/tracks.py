@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 # TODOs 
-#  - Stackify DFS in toposort(). 
 #  - Fix mean / stddev calculation of target speed. 
 #  - Clean up class track, class Node. 
 #  - Interface for class track, include in __init__.py. 
@@ -38,7 +37,28 @@ def dist(Pi, Pj):
   ''' Euclidean distance between points Pi and Pj. ''' 
   return np.sqrt((Pi.real - Pj.real)**2 + (Pi.imag - Pj.imag)**2)
 
-class Node: 
+
+class TrackError (Exception):
+  """ Exception class for building tracks. """
+
+  def __init__(self, msg):
+    self.msg = msg
+
+  def __str__(self):
+    return msg
+
+
+class Node:
+
+  ''' Node of track graph. 
+  
+    :param P: Position
+    :type P: np.complex
+    :param t: Time (UNIX timestamp) 
+    :type t: float
+    :param ll: Likelihood of position
+    :type ll: float
+  '''
 
   def __init__(self, P, t, ll): 
     # Position.  
@@ -54,24 +74,35 @@ class Node:
     self.t_visited = False
     self.t_sorted = False
 
-    # Critical path. 
-    self.distance = 0
+    # Critical path distance. 
+    self.t_dist = 0
 
     # Generic. 
     self.parent = None
     self.adj_in = []
     self.adj_out = []
 
-  def dist (self, aNode):
-    return dist(self.P, aNode.P)
+  def reset(self):
+    ''' Reset algorithm paramaters. ''' 
+    self.c_size   = 1
+    self.c_height = 0
+    self.distance = 0 
+    self.parent   = None
+
+  def dist(self, u):
+    ''' Compute Euclidean distance to another node. ''' 
+    return dist(self.P, u.P)
 
   def c_find(self):
+    ''' Disjoint-set find operation for CC-analysis. ''' 
     p = self
     while (p.parent != None): 
       p = p.parent
     return p
 
-  def c_union(self, u): 
+  def c_union(self, u):
+    ''' Disjoint-set union operation for CC-analysis. ''' 
+
     x = self.c_find()
     y = u.c_find()
 
@@ -97,38 +128,59 @@ class Node:
     return p
 
 
-
 class track:
 
-  ''' Track.
+  ''' Transmitter tracks. 
 
-  :param max_speed: Maximum foot speed of target (m/s). 
-  :type max_speed: float
+    A subset of positions. Feasible transitions between positions
+    are modeled as a directed, acycle graph, from which we compute
+    the critical path. 
+
+    :param db_con: DB connector for MySQL. 
+    :type db_con: MySQLdb.connections.Connection
+    :param t_start: Time start (Unix). 
+    :type t_start: float 
+    :param t_end: Time end (Unix).
+    :type t_end: float
+    :param tx_id: Transmitter ID. 
+    :type tx_id: int
+    :param M: Maximum foot speed of target (m/s). 
+    :type M: float
+    :param C: Constant hop cost in critical path calculation.
+    :type C: float
   '''
 
-  def __init__(self, db_con, t_start, t_end, tx_id, max_speed):
+  def __init__(self, db_con, t_start, t_end, tx_id, M, C):
     cur = db_con.cursor()
-    cur.execute('''SELECT ID, txID, timestamp, northing, easting, likelihood
+    cur.execute('''SELECT northing, easting, timestamp, likelihood
                      FROM Position
-                    WHERE (%f <= timestamp) AND (timestamp <= %f)
+                    WHERE (%f <= timestamp) 
+                      AND (timestamp <= %f)
                       AND txid = %d
                     ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
-    
     pos = cur.fetchall()
-    
-    # Average speed.
-    mean_speed = 0;
-    for i in range(len(pos)-1): 
-      Pi = np.complex(pos[i][3], pos[i][4])
-      Pj = np.complex(pos[i+1][3], pos[i+1][4])
-      t_delta = float(pos[i+1][2]) - float(pos[i][2])
-      assert t_delta > 0 # TODO 
-      mean_speed += dist(Pi, Pj) / t_delta
-    mean_speed /= len(pos)
-    
-    # TODO make this a method. 
-    # Build tracks DAG.
-    nodes = []
+    roots = self.track_graph(pos, M)
+    self.track = self.critical_path(self.toposort(roots), C)
+    self.track.reverse()
+
+
+  def track_graph(self, pos, M): 
+    ''' Create a graph from positions. 
+          
+      Each position corresponds to a node. An edge is drawn between nodes with 
+      a feasible transition, i.e. distance(Pi, Pj) / (Tj - Ti) < M. The result
+      will be a directed, acyclic graph. We define the roots of this graph to 
+      be a set of nodes from which all nodes are reachable.
+
+      :param pos: A list of 4-tuples (northing, easting, t, ll) sorted by t 
+                  corresponding to positions. 
+      :type pos: (np.complex, float, float) list 
+      :param M: Maximum target speed. 
+      :type M: float
+      :return: The roots of the graph. 
+      :rtype: Node list
+    '''
+  
     roots = []; leaves = []
     i = 0 
     while i < len(pos):
@@ -136,13 +188,13 @@ class track:
       j = i
       Tj = Ti = float(pos[i][2])
       while j < len(pos) and (Ti - Tj == 0): # Candidates for next time interval. 
-        (Pj, Tj, ll) = (np.complex(pos[j][3], pos[j][4]), float(pos[j][2]), float(pos[j][5]))
+        (Pj, Tj, ll) = (np.complex(pos[j][0], pos[j][1]), 
+                                           float(pos[j][2]), float(pos[j][3]))
 
         node = Node(Pj, Tj, ll)
-        nodes.append(node)
         ok = False
         for k in range(len(leaves)):
-          if leaves[k].dist(node) / (node.t - leaves[k].t) < mean_speed: 
+          if leaves[k].dist(node) / (node.t - leaves[k].t) < M: 
             ok = True
             node.adj_in.append(leaves[k])
             leaves[k].adj_out.append(node)
@@ -160,49 +212,63 @@ class track:
           newLeaves.append(u)
         else: 
           for v in u.adj_out:
-            if v not in newLeaves:
+            if v not in newLeaves: # FIXME O(n)
               newLeaves.append(v)
       leaves = newLeaves
 
       i = j
+    
+    return roots
 
-    self.track = self.critical_path(self.toposort(roots), C=-10)
-    self.track.reverse()
 
-
-  def visit(self, u, sorted_nodes): 
-    # TODO combine with toposort to do stack-style DFS. 
+  def _visit(self, u, sorted_nodes): 
     if u.t_visited and not u.t_sorted: 
-      raise "A cycle!"
+      raise TrackError("cycle discovered in track graph")
     elif not u.t_visited:
       u.t_visited = True
       for v in u.adj_out: 
-        self.visit(v, sorted_nodes)
+        self._visit(v, sorted_nodes)
       u.t_sorted = True
       sorted_nodes.append(u)
     
+
   def toposort(self, roots): 
+    ''' Compute a topological sorting of the track graph. 
+    
+      :param roots: Roots of the graph.
+      :type roots: Node list
+      :return: The sorted nodes.
+      :rtype: Node list
+    ''' 
     sorted_nodes = [] 
     for u in roots:
-      self.visit(u, sorted_nodes)
+      self._visit(u, sorted_nodes)
     sorted_nodes.reverse()
     return sorted_nodes
 
+
   def critical_path(self, sorted_nodes, C): 
+    ''' Calculate the critical path of the track graph.
+
+      :param sorted_nodes: Topologically sorted graph nodes. 
+      :type sorted_nodes: NOde list
+      :param C: Constant hop cost. 
+      :type C: float
+    ''' 
     cost = 0
     node = None 
     for v in sorted_nodes: 
-      mdistance = 0
+      mdist = 0
       mparent = None
       for u in v.adj_in:
-        if u.distance > mdistance:
-          mdistance = u.distance
+        if u.t_dist > mdist:
+          mdist = u.t_dist
           mparent = u
       v.parent = mparent
-      v.distance = mdistance + C + v.ll 
+      v.t_dist = mdist + C + v.ll 
       
-      if v.distance > cost:
-        cost = v.distance
+      if v.t_dist > cost:
+        cost = v.t_dist
         node = v
       
     path = []
@@ -225,7 +291,7 @@ if __name__ == '__main__':
 
   (t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165, 1391396399.840252, 54)
 
-  fella = track(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, 4.4)
+  fella = track(db_con, t_start, t_end, tx_id, 4.4, 0)
 
   import matplotlib.pyplot as pp
 
