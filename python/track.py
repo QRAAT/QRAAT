@@ -1,4 +1,5 @@
-# tracks.py
+# tracks.py - Calculate a highly likely track for a transmitter from
+# estimated positoins. 
 #
 # Copyright (C) 2014 Christopher Patton
 # 
@@ -17,8 +18,6 @@
 #
 # TODOs 
 #  - Fix mean / stddev calculation of target speed. 
-#  - Clean up class track, class Node. 
-#  - Interface for class track, include in __init__.py. 
 
 
 import numpy as np
@@ -31,11 +30,6 @@ from csv import csv
 try:
   import MySQLdb as mdb
 except ImportError: pass
-
-
-def dist(Pi, Pj): 
-  ''' Euclidean distance between points Pi and Pj. ''' 
-  return np.sqrt((Pi.real - Pj.real)**2 + (Pi.imag - Pj.imag)**2)
 
 
 class TrackError (Exception):
@@ -74,10 +68,8 @@ class Node:
     self.t_visited = False
     self.t_sorted = False
 
-    # Critical path distance. 
-    self.t_dist = 0
-
     # Generic. 
+    self.dist = 0
     self.parent = None
     self.adj_in = []
     self.adj_out = []
@@ -86,12 +78,12 @@ class Node:
     ''' Reset algorithm paramaters. ''' 
     self.c_size   = 1
     self.c_height = 0
-    self.distance = 0 
+    self.dist     = 0 
     self.parent   = None
 
-  def dist(self, u):
+  def distance(self, u):
     ''' Compute Euclidean distance to another node. ''' 
-    return dist(self.P, u.P)
+    return np.sqrt((self.P.real - u.P.real)**2 + (self.P.imag - u.P.imag)**2)
 
   def c_find(self):
     ''' Disjoint-set find operation for CC-analysis. ''' 
@@ -163,6 +155,11 @@ class track:
     self.track = self.critical_path(self.toposort(roots), C)
     self.track.reverse()
 
+  def __iter__(self):
+    return self.track
+
+  def __getitem__(self, i):
+    return self.track[i]
 
   def track_graph(self, pos, M): 
     ''' Create a graph from positions. 
@@ -194,7 +191,7 @@ class track:
         node = Node(Pj, Tj, ll)
         ok = False
         for k in range(len(leaves)):
-          if leaves[k].dist(node) / (node.t - leaves[k].t) < M: 
+          if leaves[k].distance(node) / (node.t - leaves[k].t) < M: 
             ok = True
             node.adj_in.append(leaves[k])
             leaves[k].adj_out.append(node)
@@ -261,14 +258,14 @@ class track:
       mdist = 0
       mparent = None
       for u in v.adj_in:
-        if u.t_dist > mdist:
-          mdist = u.t_dist
+        if u.dist > mdist:
+          mdist = u.dist
           mparent = u
       v.parent = mparent
-      v.t_dist = mdist + C + v.ll 
+      v.dist = mdist + C + v.ll 
       
-      if v.t_dist > cost:
-        cost = v.t_dist
+      if v.dist > cost:
+        cost = v.dist
         node = v
       
     path = []
@@ -291,7 +288,7 @@ if __name__ == '__main__':
 
   (t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165, 1391396399.840252, 54)
 
-  fella = track(db_con, t_start, t_end, tx_id, 4.4, 0)
+  fella = track(db_con, t_start, t_end, tx_id, 5.3, 1)
 
   import matplotlib.pyplot as pp
 
