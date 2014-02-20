@@ -185,13 +185,13 @@ class track:
   
     roots = []; leaves = []
     i = 0 
-    while i < len(pos):
+    while i < len(pos) - 1:
       
       j = i
-      Tj = Ti = float(pos[i][2])
-      while j < len(pos) and (Ti - Tj == 0): # Candidates for next time interval. 
-        (P, Tj, ll) = (np.complex(pos[j][0], pos[j][1]), 
-                                           float(pos[j][2]), float(pos[j][3]))
+      Ti = Tj = float(pos[i][2])
+      newLeaves = []
+      while j < len(pos) - 1 and Ti - Tj == 0: # Candidates for next time interval. 
+        (P, ll) = (np.complex(pos[j][0], pos[j][1]), float(pos[j][3]))
 
         node = Node(P, Tj, ll)
         ok = False
@@ -203,12 +203,12 @@ class track:
         
         if not ok: # New root. 
           roots.append(node) 
-          leaves.append(node)
+          newLeaves.append(node)
 
         j += 1
-  
+        Tj = float(pos[j][2])
+
       # Recalculate leaves. 
-      newLeaves = []
       for u in leaves:
         if len(u.adj_out) == 0: 
           newLeaves.append(u)
@@ -218,7 +218,7 @@ class track:
               newLeaves.append(v)
       leaves = newLeaves
 
-      i = j
+      i = j + 1
     
     return roots
 
@@ -312,7 +312,7 @@ if __name__ == '__main__':
   # with some a priori maximum speed that's on the high side. For
   # the calibration data, we could safely assume that the gator 
   # won't exceed 10 m/s. 
-  fella = track(db_con, t_start, t_end, tx_id, 8) 
+  fella = track(db_con, t_start, t_end, tx_id, 10) 
 
   # We then calculate statistics on the transition speeds in the 
   # critical path. Plotting the tracks might reveal spurious points
