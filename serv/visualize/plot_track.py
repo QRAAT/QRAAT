@@ -63,14 +63,11 @@ pp.plot(
 
 # Plot locations. 
 pp.plot( 
- map(lambda (P, t): P.imag, track), 
- map(lambda (P, t): P.real, track), '.', alpha=0.3)
+ map(lambda (P, t): P.imag, track.track), 
+ map(lambda (P, t): P.real, track.track), '.', alpha=0.3)
 
 pp.show()
 
-
-
-        
      
 
 

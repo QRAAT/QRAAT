@@ -15,7 +15,9 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+# 
+# TODOs
+#  - Look at acceleration for determining if a transition is feasible. 
 
 import numpy as np
 import time, os, sys
