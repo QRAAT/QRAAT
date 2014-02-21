@@ -17,6 +17,8 @@
 
 import qraat
 import matplotlib.pyplot as pp
+import matplotlib.image as mpimg
+import numpy as np
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -57,17 +59,32 @@ track.recompute(mean + std)
 
 # Plot sites.
 sites = qraat.csv(db_con=db_con, db_table='sitelist')
-pp.plot(
- [s.easting for s in sites], 
- [s.northing for s in sites], 'ro')
 
 # Plot locations. 
-pp.plot( 
- map(lambda (P, t): P.imag, track.track), 
- map(lambda (P, t): P.real, track.track), '.', alpha=0.3)
+#pp.plot( 
+# map(lambda (P, t): P.imag, track.track), 
+# map(lambda (P, t): P.real, track.track), '.', alpha=0.3)
+
+#pp.show()
+
+bg = mpimg.imread('qr-overlay.png')
+
+e0 = 572599.5
+e1 = 577331.4
+
+n0 = 4259439.5 + 110 + 60 - 20
+n1 = 4259483.7 + 210 + 85 -  20
+
+print bg.shape[0] # n
+print bg.shape[1] # e
+
+N = lambda(y) : bg.shape[0] - (y - n0) / float(bg.shape[0]) * (n1 - n0)
+
+pp.plot(
+ [100 for s in sites], 
+ [N(float(s.northing)) for s in sites], 'ro')
+pp.imshow(bg)
 
 pp.show()
-
-     
 
 

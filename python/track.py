@@ -34,16 +34,6 @@ def distance(Pi, Pj):
   ''' Calculate Euclidean distance between two points. ''' 
   return np.sqrt((Pi.real - Pj.real)**2 + (Pi.imag - Pj.imag)**2)
 
-class TrackError (Exception):
-  """ Exception class for building tracks. """
-
-  def __init__(self, msg):
-    self.msg = msg
-
-  def __str__(self):
-    return msg
-
-
 class Node:
 
   ''' Node of track graph. 
@@ -156,12 +146,10 @@ class track:
     self.pos = cur.fetchall()
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
-    self.track.reverse()
   
   def recompute(self, M, C=1):
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
-    self.track.reverse()
 
   def __iter__(self):
     return self.track
@@ -226,12 +214,13 @@ class track:
     return roots
 
   def toposort(self, roots): 
-    ''' Compute a topological sorting of the track graph. 
+    ''' Compute a topological sorting of the track graph. Return None if 
+        no sorting exists, i.e. graph has a cycle. 
     
       :param roots: Roots of the graph.
       :type roots: Node list
       :return: The sorted nodes.
-      :rtype: Node list
+      :rtype: Node list or None
     ''' 
     sorted_nodes = [] 
 
@@ -243,7 +232,7 @@ class track:
         ok = False
         for v in u.adj_out:
           if v.t_visited and not v.t_sorted:
-            raise TrackError("cycle found in graph")
+            return None # Graph contains cycle. 
           elif not v.t_visited:
             S.append(v)
             ok = True
@@ -284,6 +273,8 @@ class track:
     while node != None:
       path.append((node.P, node.t))
       node = node.parent
+    
+    path.reverse()
     return path
     
 
@@ -301,8 +292,12 @@ class track:
 
     return (np.mean(speeds), np.std(speeds))
       
+  
+  def insert_db(self, db_con): 
+    pass # TODO 
 
- 
+  def export_kml(self, fn): 
+    pass # TODO 
 
 
 
