@@ -152,6 +152,7 @@ class track:
                       AND (timestamp <= %f)
                       AND txid = %d
                     ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
+    self.ct = 0
     self.pos = cur.fetchall()
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
@@ -192,7 +193,7 @@ class track:
       j = i
       Ti = Tj = float(pos[i][2])
       newLeaves = []
-      while j < len(pos) - 1 and Ti - Tj == 0: # Candidates for next time interval. 
+      while j < len(pos) - 1 and Ti == Tj: # Candidates for next time interval. 
         (P, ll) = (np.complex(pos[j][0], pos[j][1]), float(pos[j][3]))
 
         node = Node(P, Tj, ll)
@@ -220,21 +221,9 @@ class track:
               newLeaves.append(v)
       leaves = newLeaves
 
-      i = j + 1
-    
+      i = j 
+   
     return roots
-
-
-  def _visit(self, u, sorted_nodes): 
-    if u.t_visited and not u.t_sorted: 
-      raise TrackError("cycle discovered in track graph")
-    elif not u.t_visited:
-      u.t_visited = True
-      for v in u.adj_out: 
-        self._visit(v, sorted_nodes)
-      u.t_sorted = True
-      sorted_nodes.append(u)
-    
 
   def toposort(self, roots): 
     ''' Compute a topological sorting of the track graph. 
@@ -245,8 +234,24 @@ class track:
       :rtype: Node list
     ''' 
     sorted_nodes = [] 
-    for u in roots:
-      self._visit(u, sorted_nodes)
+
+    for r in roots:
+      S = [r]
+      while (len(S) != 0):
+        u = S[-1]
+        u.t_visited = True
+        ok = False
+        for v in u.adj_out:
+          if v.t_visited and not v.t_sorted:
+            raise TrackError("cycle found in graph")
+          elif not v.t_visited:
+            S.append(v)
+            ok = True
+        if not ok: # No children to visit.  
+          u.t_sorted = True
+          sorted_nodes.append(u) 
+          S.pop()
+
     sorted_nodes.reverse()
     return sorted_nodes
 
@@ -314,7 +319,7 @@ if __name__ == '__main__':
   # with some a priori maximum speed that's on the high side. For
   # the calibration data, we could safely assume that the gator 
   # won't exceed 10 m/s. 
-  fella = track(db_con, t_start, t_end, tx_id, 10) 
+  fella = track(db_con, t_start, t_end, tx_id, 10, -10) 
 
   # We then calculate statistics on the transition speeds in the 
   # critical path. Plotting the tracks might reveal spurious points
@@ -324,7 +329,7 @@ if __name__ == '__main__':
 
   # Recompute the tracks, using the mean + one standard deviation as
   # the maximum speed. 
-  fella.recompute(mean + std)
+  fella.recompute(mean + (2*std), -10)
 
   import matplotlib.pyplot as pp
 
