@@ -5,7 +5,8 @@ import sys, os, re, time
 
 progs={ "pos" : "rmg_position", 
         "ll" : "plot_ll.py", 
-        "search_space" : "plot_search_space.py" }
+        "search_space" : "plot_search_space.py", 
+        "track" : "plot_track.py" }
 
 exps = {         # t_start,           t_end,             tx_id, t_win, t_step
        "feb2"  : ( 1391390700.638165, 1391396399.840252, 54,    30,    5),  
@@ -32,18 +33,29 @@ if len(sys.argv) >= 3:
   elif sys.argv[1] in progs.keys(): 
     
     if sys.argv[2] in exps.keys(): 
-      
-      fn = progs[sys.argv[1]]
-      (t_start, t_end, tx_id, t_win, t_step) = exps[sys.argv[2]]
-      res = os.system(("/usr/bin/python {0} " 
-        "--t-start={1} --t-end={2} " 
-        "--t-win={3} --t-delta={4} --tx-id={5}").format(fn, 
-                                                  t_start, t_end,
-                                                  t_win, t_step, 
-                                                  tx_id))
 
-      if sys.argv[1] == 'pos': # Output the positions added to DB. 
-        pass#os.system("mysql -u reader -B -e \"SELECT * FROM qraat.Position\"")
+      if sys.argv[2] == 'track':
+        
+        fn = progs[sys.argv[1]]
+        (t_start, t_end, tx_id, t_win, t_step) = exps[sys.argv[2]]
+        res = os.system(("/usr/bin/python {0} " 
+          "--t-start={1} --t-end={2} " 
+          "--t-win={3} --t-delta={4} --tx-id={5}").format(fn, 
+                                                    t_start, t_end,
+                                                    t_win, t_step, 
+                                                    tx_id))
+      
+      else:
+
+        fn = progs[sys.argv[1]]
+        (t_start, t_end, tx_id, t_win, t_step) = exps[sys.argv[2]]
+        res = os.system(("/usr/bin/python {0} " 
+          "--t-start={1} --t-end={2} --tx-id={3}").format(fn, 
+                                                    t_start, t_end,
+                                                    tx_id))
+
+        if sys.argv[1] == 'pos': # Output the positions added to DB. 
+          pass#os.system("mysql -u reader -B -e \"SELECT * FROM qraat.Position\"")
         
  
   

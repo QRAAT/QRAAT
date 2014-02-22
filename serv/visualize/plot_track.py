@@ -19,6 +19,7 @@ import qraat
 import matplotlib.pyplot as pp
 import matplotlib.image as mpimg
 import numpy as np
+import time
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -45,7 +46,7 @@ db_con = qraat.util.get_db('reader')
 
 # A possible way to calculate good tracks. Compute the tracks
 # with some a priori maximum speed that's on the high side. 
-track = qraat.track(db_con, options.t_start, options.t_end, options.tx_id, 10) 
+track = qraat.track(db_con, options.t_start, options.t_end, options.tx_id, 10, -10) 
 
 # We then calculate statistics on the transition speeds in the 
 # critical path. Plotting the tracks might reveal spurious points
@@ -55,36 +56,64 @@ print "(mu=%.4f, sigma=%.4f)" % (mean, std)
 
 # Recompute the tracks, using the mean + one standard deviation as
 # the maximum speed. 
-track.recompute(mean + std)
-
-# Plot sites.
-sites = qraat.csv(db_con=db_con, db_table='sitelist')
-
-# Plot locations. 
-#pp.plot( 
-# map(lambda (P, t): P.imag, track.track), 
-# map(lambda (P, t): P.real, track.track), '.', alpha=0.3)
-
-#pp.show()
+track.recompute(mean + (2 * std), -10)
 
 bg = mpimg.imread('qr-overlay.png')
 
-e0 = 572599.5
-e1 = 577331.4
+e0 = 572599.5 - 150
+e1 = 577331.4 - 150
 
-n0 = 4259439.5 + 110 + 60 - 20
-n1 = 4259483.7 + 210 + 85 -  20
+n0 = 4259439.5 + 110 + 60 - 20 - 500 
+n1 = 4259483.7 + 210 + 85 -  20 - 500 
 
-print bg.shape[0] # n
-print bg.shape[1] # e
-
+E = lambda(x) : float(bg.shape[1]) * (x - e0) /  (e1 - e0)
 N = lambda(y) : bg.shape[0] - (y - n0) / float(bg.shape[0]) * (n1 - n0)
 
-pp.plot(
- [100 for s in sites], 
- [N(float(s.northing)) for s in sites], 'ro')
-pp.imshow(bg)
+sites = qraat.csv(db_con=db_con, db_table='sitelist')
 
-pp.show()
+fig = pp.figure()
+ax = fig.add_subplot(1,1,1)
+
+#pp.text(E(track[0][0].imag) + 10, N(track[0][0].real) + 10, "Start", color='gray', size='smaller')
+#pp.text(E(track[-1][0].imag) + 10, N(track[-1][0].real) + 10, "End", color='gray', size='smaller')
+
+# Plot tracks. 
+pp.scatter( 
+ map(lambda (P, t): E(P.imag), track.track), 
+ map(lambda (P, t): N(P.real), track.track), alpha=0.2, s=2, c='k', 
+   label='Tracks')
+
+# Plot sites. 
+pp.plot(
+ [E(float(s.easting)) for s in sites], 
+ [N(float(s.northing)) for s in sites], 'ro', 
+    label='QRAAT receiver sites')
+
+t = time.localtime(track[0][1])
+s = time.localtime(track[-1][1])
+pp.title('%04d-%02d-%02d  %02d:%02d - %02d:%02d  txID=%d' % (
+     t.tm_year, t.tm_mon, t.tm_mday,
+     t.tm_hour, t.tm_min,
+     s.tm_hour, s.tm_min,
+     options.tx_id), size='smaller')
+
+pp.grid(b=True, which='both', color='gray', linestyle='-')
+
+pp.imshow(bg)
+pp.legend( prop={'size':'smaller'} )
+
+ax.set_xticks([ int(E(x)) for x in range(int(e0), int(e1), 500)])
+ax.set_xticklabels([])
+ax.set_xlabel("Easting (0.5 km step)", size='smaller')
+
+ax.set_yticks([ int(N(y)) for y in range(int(n0), int(n1+5000), 500)])
+ax.set_yticklabels([])
+ax.set_ylabel("Northing (0.5 km step)", size='smaller')
+
+pp.savefig('tx%d_%04d.%02d.%02d_%02d.%02d.%02d.png' % (options.tx_id, 
+   t.tm_year, t.tm_mon, t.tm_mday,
+   t.tm_hour, t.tm_min, t.tm_sec))
+
+
 
 
