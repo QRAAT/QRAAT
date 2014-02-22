@@ -6,3 +6,4 @@ install_rmg_log.txt
 *.pyc
 .DS_Store
 *.png
+*~

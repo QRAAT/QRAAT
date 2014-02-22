@@ -1,5 +1,5 @@
 # csv.py - Handler classes for QRAAT metadata, such as configuration
-# files, log files, etc. This program is part of the # QRAAT system. 
+# files, log files, etc. This program is part of the QRAAT system. 
 #
 # Copyright (C) 2013 Christopher Patton
 # 
@@ -15,7 +15,6 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 import sys, time, numpy as np
 import copy

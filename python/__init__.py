@@ -26,4 +26,4 @@ from gps import gps
 from det import det
 from est import est, ResolveIdError
 import position
-from track import track, TrackError
+from track import track

@@ -1,5 +1,5 @@
 # tracks.py - Calculate a highly likely track for a transmitter from
-# estimated positoins. 
+# estimated positions. 
 #
 # Copyright (C) 2014 Christopher Patton
 # 

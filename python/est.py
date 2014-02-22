@@ -1,5 +1,5 @@
-# est.py - Structure for holding processed .det files. Output 
-# formats: .csv and .est. This file is part of QRAAT, an automated 
+# est.py - Structure for processing .det files. Output to file 
+# (.csv) or database. This file is part of QRAAT, an automated 
 # animal tracking system based on GNU Radio. 
 #
 # Copyright (C) 2013 Todd Borrowman, Christopher Patton
@@ -16,6 +16,9 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# 
+# TODO 
+#  - Deal with legacy headers in reading .csv files. 
 
 from csv import csv, pretty_printer
 from det import det
