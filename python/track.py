@@ -142,7 +142,6 @@ class track:
                       AND (timestamp <= %f)
                       AND txid = %d
                     ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
-    self.ct = 0
     self.pos = cur.fetchall()
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
@@ -284,13 +283,14 @@ class track:
       :return: (mean, std) tuple. 
     '''
 
-    speeds = []
-    for i in range(len(self.track)-1): 
-      assert (self.track[i+1][1] - self.track[i][1]) > 0
-      speeds.append( distance(self.track[i+1][0], self.track[i][0]) / \
-                              (self.track[i+1][1] - self.track[i][1]) )
+    if len(self.track) > 0: 
+      speeds = []
+      for i in range(len(self.track)-1): 
+        speeds.append( distance(self.track[i+1][0], self.track[i][0]) / \
+                               (self.track[i+1][1] - self.track[i][1]) )
+      return (np.mean(speeds), np.std(speeds))
 
-    return (np.mean(speeds), np.std(speeds))
+    else: return (np.nan, np.nan)
       
   
   def insert_db(self, db_con): 
