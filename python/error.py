@@ -1,5 +1,6 @@
+# error.py - Exception classes for QRAAT. 
 #
-# Copyright (C) 2013 Todd Borrowman, Christopher Patton
+# Copyright (C) 2014 Christopher Patton
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,18 +14,30 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# Copyright 2008,2009 Free Software Foundation, Inc.
-#
 
-'''
-  This is the Python ``qraat`` module, comprising our application programming
-  interface. *This doc string is in python/__init__.py*. 
-'''
+class QraatError (Exception):
 
-from error import *
-from csv import csv, pretty_printer 
-from gps import gps
-from det import det
-from est import est
-import position
-from track import track
+  def __init__(self, msg, no=0):
+
+    self.msg = msg
+    self.no = no
+
+  def __str__(self):
+    
+    if self.no > 0:
+      return '[%d] %s' % (self.no, self.msg)
+
+    else:
+      return self.msg
+
+class ResolveIdError (QraatError):
+
+  def __init__(self, txid, siteid):
+    QraatError.__init__(self, None, 1)
+    self.txid = txid
+    self.siteid = siteid
+
+  def __str__(self):
+    return "could not resolve foreign key(s) for table row (txid='%s', siteid='%s')" % (
+      self.txid, self.siteid)
+

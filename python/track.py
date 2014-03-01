@@ -22,13 +22,12 @@
 import numpy as np
 import time, os, sys
 import random
-import utm, xml
-
 import util
 from csv import csv
 
 try:
   import MySQLdb as mdb
+  import utm, xml
 except ImportError: pass
 
 def distance(Pi, Pj):

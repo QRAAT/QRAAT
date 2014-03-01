@@ -20,6 +20,7 @@
 # TODO 
 #  - Deal with legacy headers in reading .csv files. 
 
+from error import ResolveIdError
 from csv import csv, pretty_printer
 from det import det
 import sys, os, time, errno
@@ -70,20 +71,6 @@ query_update_est = Template(
       nc41r=$nc41r, nc41i=$nc41i, nc42r=$nc42r, nc42i=$nc42i, nc43r=$nc43r, nc43i=$nc43i, nc44r=$nc44r, nc44i=$nc44i, 
       fdsnr=$fdsnr, edsnr=$edsnr, timezone='$timezone', txid=$txid
      WHERE ID=$ID''')
-
-
-
-class ResolveIdError (Exception):
-  """ Exception class for resolving database IDs for est entries. """
-
-  def __init__(self, row):
-    self.filename = row.fn
-    self.txid     = row.txid
-    self.siteid   = row.siteid
-     
-  def __str__(self):
-    return "could not resolve foreign key(s) for est table row (txid='%s', siteid='%s')" % (
-      self.txid, self.siteid)
 
 
 class est (csv):
