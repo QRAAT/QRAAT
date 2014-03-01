@@ -22,6 +22,7 @@
 import numpy as np
 import time, os, sys
 import random
+import utm
 
 import util
 from csv import csv
@@ -325,21 +326,22 @@ if __name__ == '__main__':
   # Recompute the tracks, using the mean + one standard deviation as
   # the maximum speed. 
   fella.recompute(mean + (2*std), -10)
+  fella.export_kml("fella.kml")
 
-  import matplotlib.pyplot as pp
+  #import matplotlib.pyplot as pp
 
   # Plot sites.
-  sites = csv(db_con=db_con, db_table='sitelist')
-  pp.plot(
-   [s.easting for s in sites], 
-   [s.northing for s in sites], 'ro')
+  #sites = csv(db_con=db_con, db_table='sitelist')
+  #pp.plot(
+  # [s.easting for s in sites], 
+  # [s.northing for s in sites], 'ro')
 
   # Plot locations. 
-  pp.plot( 
-   map(lambda (P, t): P.imag, fella.track), 
-   map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
+  #pp.plot( 
+  # map(lambda (P, t): P.imag, fella.track), 
+  # map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
 
-  pp.show()
+  #pp.show()
 
 
         
