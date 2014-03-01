@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from error import QraatError
 import sys, time, numpy as np
 import copy
 
@@ -86,12 +87,20 @@ class csv:
     lengths = self.__build_header(fd.readline().strip().split(','))
 
     # Populate the table.
+    line_no = 1
     for line in map(lambda l: l.strip().split(','), fd.readlines()):
+      if line == ['']: # Skip blank lines
+        continue
+
+      elif len(line) != len(self.headers): # Malformed line
+        raise QraatError("malformed row in CSV file (%d)" % line_no)
+
       self.table.append(self.Row())
       for i in range(len(self.headers)): 
         if lengths[i] < len(line[i]):
           lengths[i] = len(line[i])
         setattr(self.table[-1], self.headers[i], line[i])
+      line_no += 1
     fd.close()
     self.__build_row_template(lengths)
 
