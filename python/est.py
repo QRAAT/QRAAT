@@ -147,7 +147,7 @@ class est (csv):
     self._row_template = "%10s " * len(self.headers)
 
     if fn: 
-      self.read(fn)
+      self.read(fn, build_header=False)
 
     if det:
       self.append(det)
