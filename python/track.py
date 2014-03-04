@@ -22,12 +22,12 @@
 import numpy as np
 import time, os, sys
 import random
-
 import util
 from csv import csv
 
 try:
   import MySQLdb as mdb
+  import utm, xml
 except ImportError: pass
 
 def distance(Pi, Pj):
@@ -142,7 +142,6 @@ class track:
                       AND (timestamp <= %f)
                       AND txid = %d
                     ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
-    self.ct = 0
     self.pos = cur.fetchall()
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
@@ -284,20 +283,55 @@ class track:
       :return: (mean, std) tuple. 
     '''
 
-    speeds = []
-    for i in range(len(self.track)-1): 
-      assert (self.track[i+1][1] - self.track[i][1]) > 0
-      speeds.append( distance(self.track[i+1][0], self.track[i][0]) / \
-                              (self.track[i+1][1] - self.track[i][1]) )
+    if len(self.track) > 0: 
+      speeds = []
+      for i in range(len(self.track)-1): 
+        speeds.append( distance(self.track[i+1][0], self.track[i][0]) / \
+                               (self.track[i+1][1] - self.track[i][1]) )
+      return (np.mean(speeds), np.std(speeds))
 
-    return (np.mean(speeds), np.std(speeds))
+    else: return (np.nan, np.nan)
       
-  
   def insert_db(self, db_con): 
-    pass # TODO 
+    pass # TODO
 
-  def export_kml(self, fn): 
-    pass # TODO 
+  def export_kml(self, fn):
+
+    # E.g.: https://developers.google.com/kml/documentation/kmlreference#gxtrack 
+    # <?xml version="1.0" encoding="UTF-8"?>
+    # <kml xmlns="http://www.opengis.net/kml/2.2"
+    #  xmlns:gx="http://www.google.com/kml/ext/2.2">
+    # <Folder>
+    #   <Placemark>
+    #     <gx:Track>
+    #       <when>2010-05-28T02:02:09Z</when>
+    #       <when>2010-05-28T02:02:35Z</when>
+    #       <when>2010-05-28T02:02:44Z</when>
+    #       <when>2010-05-28T02:02:53Z</when>
+    #       <when>2010-05-28T02:02:54Z</when>
+    #       <when>2010-05-28T02:02:55Z</when>
+    #       <when>2010-05-28T02:02:56Z</when>
+    #       <gx:coord>-122.207881 37.371915 156.000000</gx:coord>
+    #       <gx:coord>-122.205712 37.373288 152.000000</gx:coord>
+    #       <gx:coord>-122.204678 37.373939 147.000000</gx:coord>
+    #       <gx:coord>-122.203572 37.374630 142.199997</gx:coord>
+    #       <gx:coord>-122.203451 37.374706 141.800003</gx:coord>
+    #       <gx:coord>-122.203329 37.374780 141.199997</gx:coord>
+    #       <gx:coord>-122.203207 37.374857 140.199997</gx:coord>
+    #     </gx:Track>
+    #   </Placemark>
+    # </Folder>
+    # </kml>
+
+    (zone, letter) = 10, 'S' # TODO Add UTM zone to position table, modify 
+                             # code to insert it automatically. 
+
+    for (P, t) in self.track: 
+      (lat, lon) = utm.to_latlon(P.imag, P.real, zone, letter) 
+      tm = time.localtime(t)
+      t = '%04d-%02d-%02dT%02d:%02d:%02dZ' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
+
 
 
 
@@ -325,21 +359,22 @@ if __name__ == '__main__':
   # Recompute the tracks, using the mean + one standard deviation as
   # the maximum speed. 
   fella.recompute(mean + (2*std), -10)
+  fella.export_kml("fella.kml")
 
-  import matplotlib.pyplot as pp
+  #import matplotlib.pyplot as pp
 
   # Plot sites.
-  sites = csv(db_con=db_con, db_table='sitelist')
-  pp.plot(
-   [s.easting for s in sites], 
-   [s.northing for s in sites], 'ro')
+  #sites = csv(db_con=db_con, db_table='sitelist')
+  #pp.plot(
+  # [s.easting for s in sites], 
+  # [s.northing for s in sites], 'ro')
 
   # Plot locations. 
-  pp.plot( 
-   map(lambda (P, t): P.imag, fella.track), 
-   map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
+  #pp.plot( 
+  # map(lambda (P, t): P.imag, fella.track), 
+  # map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
 
-  pp.show()
+  #pp.show()
 
 
         
