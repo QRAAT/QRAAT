@@ -334,6 +334,36 @@ class track:
 
 
 
+class trackall (track): 
+  
+  ''' Transmitter tracks over the entire position table. 
+
+    A subset of positions. Feasible transitions between positions
+    are modeled as a directed, acycle graph, from which we compute
+    the critical path. 
+
+    :param db_con: DB connector for MySQL. 
+    :type db_con: MySQLdb.connections.Connection
+    :param tx_id: Transmitter ID. 
+    :type tx_id: int
+    :param M: Maximum foot speed of target (m/s). 
+    :type M: float
+    :param C: Constant hop cost in critical path calculation.
+    :type C: float
+  '''
+
+  def __init__(self, db_con, tx_id, M, C=1):
+    cur = db_con.cursor()
+    cur.execute('''SELECT northing, easting, timestamp, likelihood
+                     FROM Position
+                    WHERE txid = %d
+                    ORDER BY timestamp ASC''' % tx_id)
+    self.pos = cur.fetchall()
+    roots = self.graph(self.pos, M)
+    self.track = self.critical_path(self.toposort(roots), C)
+  
+    
+
 
 if __name__ == '__main__': 
   
