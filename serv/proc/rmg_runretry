@@ -32,6 +32,7 @@ rmg_powerswitch $TYPE $IP $RX_OUTLET ON $invert
 
 while [ $RETRY_CT -lt $RETRY_MAX ]
 do 
+  mkdir -p $RMG_SITE_LOG_DIR
   run_rmg -d $RMG_SITE_DET_DIR \
         -f $RMG_SITE_METADATA_DIR/tx.csv \
         -p $RMG_SERIAL_PORT \
