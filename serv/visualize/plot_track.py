@@ -44,7 +44,7 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=float("+inf"),
 
 db_con = qraat.util.get_db('reader')
 
-M = 4 
+M = 5 
 C = 1
 overlay = True
 
@@ -65,6 +65,7 @@ print "(mu=%.4f, sigma=%.4f)" % (mean, std)
 # the maximum speed. 
 track.recompute(mean + std, C)
 
+track.acceleration()
 
 if overlay: 
 
@@ -92,7 +93,7 @@ if overlay:
   pp.scatter( 
    map(lambda (P, t): E(P.imag), track.track), 
    map(lambda (P, t): N(P.real), track.track), alpha=0.2, s=2, c='k', 
-     label='Tracks')
+     label='Transmitter tracks')
 
   # Plot sites. 
   pp.plot(

@@ -289,9 +289,35 @@ class track:
         speeds.append( distance(self.track[i+1][0], self.track[i][0]) / \
                                (self.track[i+1][1] - self.track[i][1]) )
       return (np.mean(speeds), np.std(speeds))
-
+    
     else: return (np.nan, np.nan)
+    
+  def acceleration(self): 
+    ''' Calculate mean and standard deviation of the target's acceleration. 
+
+      :return: (mean, std) tuple. 
+    ''' 
+
+    if len(self.track) > 0: 
       
+      V = []
+      for i in range(len(self.track)-1):
+        v = (self.track[i+1][0] - self.track[i][0]) / (self.track[i+1][1] - self.track[i][1])
+        V.append((v, (self.track[i][1] + self.track[i+1][1]) / 2))
+
+      A = []
+      for i in range(len(V)-1):
+        a = (V[i+1][0] - V[i][0]) / (V[i+1][1] - V[i][1])
+        A.append((a, (V[i][1] + V[i+1][1]) / 2))
+
+      # Keeping V and A around like this just in case I want to get at the
+      # timestamp or generate plots. For reporting, using magnitude of the 
+      # acceleration. 
+      A_mag = map(lambda(a, t) : mp.abs(a), A) 
+      return (np.mean(A_mag), np.std(A_mag))
+
+    else: return (np.nan, np.nan) 
+
   def insert_db(self, db_con): 
     pass # TODO
 
@@ -366,7 +392,10 @@ class trackall (track):
 
 
 if __name__ == '__main__': 
-  
+ 
+  M = 4
+  C = 1
+
   db_con = util.get_db('reader')
 
   (t_start, t_end, tx_id) = (1376420800.0, 1376442000.0, 51)
@@ -378,7 +407,7 @@ if __name__ == '__main__':
   # with some a priori maximum speed that's on the high side. For
   # the calibration data, we could safely assume that the gator 
   # won't exceed 10 m/s. 
-  fella = track(db_con, t_start, t_end, tx_id, 10, -10) 
+  fella = track(db_con, t_start, t_end, tx_id, M, C) 
 
   # We then calculate statistics on the transition speeds in the 
   # critical path. Plotting the tracks might reveal spurious points
@@ -388,23 +417,23 @@ if __name__ == '__main__':
 
   # Recompute the tracks, using the mean + one standard deviation as
   # the maximum speed. 
-  fella.recompute(mean + (2*std), -10)
+  fella.recompute(mean + (std), C)
   fella.export_kml("fella.kml")
 
-  #import matplotlib.pyplot as pp
+  import matplotlib.pyplot as pp
 
   # Plot sites.
-  #sites = csv(db_con=db_con, db_table='sitelist')
-  #pp.plot(
-  # [s.easting for s in sites], 
-  # [s.northing for s in sites], 'ro')
+  sites = csv(db_con=db_con, db_table='sitelist')
+  pp.plot(
+   [s.easting for s in sites], 
+   [s.northing for s in sites], 'ro')
 
   # Plot locations. 
-  #pp.plot( 
-  # map(lambda (P, t): P.imag, fella.track), 
-  # map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
+  pp.plot( 
+   map(lambda (P, t): P.imag, fella.track), 
+   map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
 
-  #pp.show()
+  pp.show()
 
 
         
