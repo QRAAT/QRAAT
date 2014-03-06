@@ -59,13 +59,13 @@ else:
 # critical path. Plotting the tracks might reveal spurious points
 # that we want to filter out. 
 (mean, std) = track.speed()
-print "(mu=%.4f, sigma=%.4f)" % (mean, std)
+print "speed        (mu=%.4f, sigma=%.4f)" % (mean, std)
+(mean, std) = track.acceleration()
+print "acceleration (mu=%.4f, sigma=%.4f)" % (mean, std)
 
 # Recompute the tracks, using the mean + one standard deviation as
 # the maximum speed. 
 track.recompute(mean + std, C)
-
-track.acceleration()
 
 if overlay: 
 

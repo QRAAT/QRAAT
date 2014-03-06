@@ -313,7 +313,13 @@ class track:
       # Keeping V and A around like this just in case I want to get at the
       # timestamp or generate plots. For reporting, using magnitude of the 
       # acceleration. 
-      A_mag = map(lambda(a, t) : mp.abs(a), A) 
+      A_mag = map(lambda(a, t) : np.abs(a), A) 
+
+      #fd = open('acceleration.csv', 'w')
+      #fd.write('accel\n')
+      #for a in A_mag:
+      #  fd.write('%f\n' % a)
+
       return (np.mean(A_mag), np.std(A_mag))
 
     else: return (np.nan, np.nan) 
