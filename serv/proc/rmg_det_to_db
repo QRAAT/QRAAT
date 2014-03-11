@@ -132,7 +132,6 @@ try:
               '/bin/tar -cf %s -C %s .' % (arch_fn, leaf_dir))
 
           # Delete processed det files. 
-          # TODO prune empty directories? 
           if status != 0: 
             print >>sys.stderr, "det_to_db: error: archiving %s: %s" % (
               site, output)
