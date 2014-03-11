@@ -88,14 +88,15 @@ class det (pulse_data):
     files = os.listdir(base_dir)
     files.sort()
     det_list = []
+    bad_file_list = []
     for fn in files:
       try:
         det_list.append(cls(base_dir + '/' + fn))
       except:
         import sys
         print >>sys.stderr, "Couldn't read det file: {}".format(base_dir + '/' + fn)
-        raise IOError
-    return det_list 
+        bad_file_list.append(base_dir + '/' + fn)
+    return det_list, bad_file_list
   
   @classmethod
   def read_many(cls, i, j, base_dir): 
