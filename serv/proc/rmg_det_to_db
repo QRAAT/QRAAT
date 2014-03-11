@@ -84,17 +84,23 @@ try:
 
         for leaf_dir in leaf_dirs:
 
-          # Process det files, store signals in the databse. 
-          try:
-            table = qraat.est(dets=qraat.det.read_dir(leaf_dir))
-          except IOError:
-            m = leaf_regex.search(leaf_dir)
+          #get directories
+          m = leaf_regex.search(leaf_dir)
+
+          # Process det files, store signals in the database. 
+          det_list, bad_list = qraat.det.read_dir(leaf_dir)
+                    
+          if bad_list: #there are non-readable det files
+            
             det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
             q_dir = ("%s/%s_" % (det_q, site)) +\
                        ("%s.%s.%s.%s.%s/" % m.groups(0))
-            commands.getstatusoutput("mv {0} {1}".format(leaf_dir,q_dir))
-            continue
-            
+            os.makedirs(q_dir)
+            for f in bad_list:
+              commands.getstatusoutput("mv {0} {1}".format(f,q_dir))
+          
+          table = qraat.est(dets=det_list)
+  
           cur = db_con.cursor()
           for row in table: 
             try:
