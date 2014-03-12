@@ -326,7 +326,7 @@ class est (csv):
       row.siteid = self.siteid_index.get(site)
 
     if row.txid == None or row.siteid == None:
-      raise ResolveIdError(row)
+      raise ResolveIdError(row.txid,row.siteid)
 
     query = query_insert_est if row.ID == None else query_update_est
     # When the template string performs the substitution, it casts 
