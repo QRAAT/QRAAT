@@ -74,12 +74,9 @@ class det (pulse_data):
   
   @classmethod
   def read_dir(cls, base_dir): 
-    """ Return a set of det instances over time interval ``(i, j)``. 
+    """ Return a list of det instances from readable files in base_dir
+        and a list of file names of un-readable files. 
 
-      :param i: Interval start
-      :type i: datetime.datetime
-      :param j: Interval end
-      :type j: datetime.datetime
       :param base_dir: Root directory for det files. 
       :type base_dir: str
       :rtype: :class:`qraat.det.det` list
@@ -98,24 +95,6 @@ class det (pulse_data):
         bad_file_list.append(base_dir + '/' + fn)
     return det_list, bad_file_list
   
-  @classmethod
-  def read_many(cls, i, j, base_dir): 
-    """ Return a set of det instances over time interval ``(i, j)``. 
-      
-       .. warning:: 
-         This function is not implemented. 
-
-    :param i: Interval start (Unix time).
-    :type i: float
-    :param j: Interval end (Unix).
-    :type j: float
-    :param base_dir: Root directory for det files. 
-    :type base_dir: str
-    :rtype: :class:`qraat.det.det` list
-
-    """
-    return [] 
-
 
   def fft(self):
     """ Performs an fft on pulse data. 
