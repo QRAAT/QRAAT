@@ -32,12 +32,13 @@ class QraatError (Exception):
 
 class ResolveIdError (QraatError):
 
-  def __init__(self, txid, siteid):
+  def __init__(self, id_str, row_str, filename):
     QraatError.__init__(self, None, 1)
-    self.txid = txid
-    self.siteid = siteid
+    self.id_str = id_str
+    self.row_str = row_str
+    self.filename = filename
 
   def __str__(self):
-    return "could not resolve foreign key(s) for table row (txid='%s', siteid='%s')" % (
-      self.txid, self.siteid)
+    return "could not resolve foreign key(s) for table row with %s as %s from file %s" % (
+      self.id_str, self.row_str, self.filename)
 

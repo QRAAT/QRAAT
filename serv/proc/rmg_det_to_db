@@ -107,7 +107,16 @@ try:
               table.write_db_row(cur, row, site)
             except qraat.ResolveIdError, e:
               print >>sys.stderr, "det_to_db: warning: skipping est corresponding to '%s'" % e.filename
-#          cur.execute('COMMIT')
+              det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
+              q_dir = ("%s/%s_" % (det_q, site)) +\
+                       ("%s.%s.%s.%s.%s/" % date_tuple)
+              try:
+                os.makedirs(q_dir)
+              except OSError, e:            # Catch if directory exists;
+                if e.errno != errno.EEXIST: # otherwise, throw exception.  
+                  raise e
+              commands.getstatusoutput("mv {0} {1}".format(e.filename,q_dir))
+          
                   
           # Archive table as est file. 
           table.write(("%s/%s/" % (est_arch, site)) +\
