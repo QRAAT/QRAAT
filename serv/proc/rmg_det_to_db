@@ -73,7 +73,7 @@ try:
         '/usr/bin/find %s/%s/????/??/??/??/?? -type d' % (
           det_dir, site))
            
-      if status == 0:
+      if status == 0 and output:
     
         # Batch process only the newest 20 directories that were created.
         leaf_dirs = sorted(output.split('\n'), reverse=True)
@@ -145,6 +145,9 @@ try:
               site, output)
           else:  
             commands.getstatusoutput('rm -fr %s' % leaf_dir)
+
+      else:# error in find or it returned nothing
+        print >>sys.stderr, "det_to_db: error: find returned \"{0}\" with status {1}".format(output,status)
 
 except mdb.Error, e: 
   print >>sys.stderr, "det_to_db: error: [%d] %s" % (e.args[0], e.args[1])
