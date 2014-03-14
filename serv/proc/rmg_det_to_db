@@ -66,8 +66,8 @@ try:
 
     site_dir = '%s/%s' % (det_dir, site)
     
-    # Don't process sites currently being fetched. 
-    if not os.path.isfile('%s/fetching.site' % (site_dir)):
+    # Don't process sites currently being fetched or that don't have files in them. 
+    if os.path.isdir(site_dir) and not os.path.isfile('%s/fetching.site' % (site_dir)):
               
       (status, output) = commands.getstatusoutput(
         '/usr/bin/find %s/%s/????/??/??/??/?? -type d' % (
