@@ -70,8 +70,8 @@ try:
     if os.path.isdir(site_dir) and not os.path.isfile('%s/fetching.site' % (site_dir)):
               
       (status, output) = commands.getstatusoutput(
-        '/usr/bin/find %s/%s/????/??/??/??/?? -type d' % (
-          det_dir, site))
+        '/usr/bin/find %s/????/??/??/??/?? -type d' % site_dir )
+
            
       if status == 0 and output:
     
@@ -147,7 +147,7 @@ try:
             commands.getstatusoutput('rm -fr %s' % leaf_dir)
 
       else:# error in find or it returned nothing
-        print >>sys.stderr, "det_to_db: error: find returned \"{0}\" with status {1}".format(output,status)
+        print >>sys.stderr, "det_to_db: error: {2}: find returned \"{0}\" with status {1}".format(output,status,site_dir)
 
 except mdb.Error, e: 
   print >>sys.stderr, "det_to_db: error: [%d] %s" % (e.args[0], e.args[1])
