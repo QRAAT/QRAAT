@@ -3,7 +3,7 @@
 import sys, os, re, time
 
 
-progs={ "pos" : "rmg_position", 
+progs={ "pos" : "../pos/rmg_position", 
         "ll" : "plot_ll.py", 
         "search_space" : "plot_search_space.py", 
         "track" : "plot_track.py" }
@@ -35,15 +35,13 @@ if len(sys.argv) >= 3:
     
     if sys.argv[2] in exps.keys(): 
 
-      if sys.argv[2] == 'track':
+      if sys.argv[1] == 'track':
         
         fn = progs[sys.argv[1]]
         (t_start, t_end, tx_id, t_win, t_step) = exps[sys.argv[2]]
         res = os.system(("/usr/bin/python {0} " 
-          "--t-start={1} --t-end={2} " 
-          "--t-win={3} --t-delta={4} --tx-id={5}").format(fn, 
+          "--t-start={1} --t-end={2} --tx-id={3}").format(fn, 
                                                     t_start, t_end,
-                                                    t_win, t_step, 
                                                     tx_id))
       
       else:
@@ -51,9 +49,10 @@ if len(sys.argv) >= 3:
         fn = progs[sys.argv[1]]
         (t_start, t_end, tx_id, t_win, t_step) = exps[sys.argv[2]]
         res = os.system(("/usr/bin/python {0} " 
-          "--t-start={1} --t-end={2} --tx-id={3}").format(fn, 
+          "--t-start={1} --t-end={2} --tx-id={3} "
+          "--t-delta={3} --t-window={4}" ).format(fn, 
                                                     t_start, t_end,
-                                                    tx_id))
+                                                    tx_id, t_step, t_win))
 
         if sys.argv[1] == 'pos': # Output the positions added to DB. 
           pass#os.system("mysql -u reader -B -e \"SELECT * FROM qraat.Position\"")

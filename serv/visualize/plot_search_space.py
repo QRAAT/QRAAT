@@ -42,7 +42,7 @@ Plot the search space for position estimation. This program is
 part of QRAAT, an automated animal tracking system based on GNU Radio.   
 '''
 
-parser.add_option('--cal-id', type='int', metavar='INT', default=1,
+parser.add_option('--cal-id', type='int', metavar='INT', default=3,
                   help="Calibration ID, the serial identifier in the database "
                        "context identifying a calibration run. (Default is 1.)")
 
@@ -177,7 +177,7 @@ print "plot_search_space: fetching signal data."
 sig = qraat.position.signal(db_con, 
                             options.t_start, 
                             options.t_end, 
-                            options.tx_id)
+                            options.tx_id, band_filter=True)
 
 print "plot_search_space: calculating bearing likelihoods (%d records)." % len(sig)
 bl = qraat.position.bearing(sv, sig)

@@ -42,7 +42,7 @@ Plot the search space for position estimation. This program is
 part of QRAAT, an automated animal tracking system based on GNU Radio.   
 '''
 
-parser.add_option('--cal-id', type='int', metavar='INT', default=1,
+parser.add_option('--cal-id', type='int', metavar='INT', default=3,
                   help="Calibration ID, the serial identifier in the database "
                        "context identifying a calibration run. (Default is 1.)")
 
