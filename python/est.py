@@ -296,7 +296,6 @@ class est (csv):
     cur = db_con.cursor()
     for row in self.table: 
       self.write_db_row(cur, row, site) 
-    cur.execute('COMMIT')
 
   def write_db_row(self, cur, row, site=None):
     """ Write a row to the database. 
@@ -325,8 +324,11 @@ class est (csv):
     if row.siteid == None:
       row.siteid = self.siteid_index.get(site)
 
-    if row.txid == None or row.siteid == None:
-      raise ResolveIdError(row)
+    if row.txid == None:
+      raise ResolveIdError('txid',row.tagname,row.fn)
+
+    if row.siteid == None:
+      raise ResolveIdError('siteid',site,row.fn)
 
     query = query_insert_est if row.ID == None else query_update_est
     # When the template string performs the substitution, it casts 
