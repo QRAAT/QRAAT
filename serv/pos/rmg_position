@@ -78,7 +78,7 @@ print "position: fetching signal data."
 sig = qraat.position.signal(db_con, 
                             options.t_start, 
                             options.t_end,
-                            options.tx_id)
+                            options.tx_id, band_filter=False)
 
 print "position: calculating bearing likelihoods (%d)." % len(sig) 
 bl = qraat.position.bearing(sv, sig)
