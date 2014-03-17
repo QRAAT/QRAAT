@@ -177,7 +177,7 @@ print "plot_search_space: fetching signal data."
 sig = qraat.position.signal(db_con, 
                             options.t_start, 
                             options.t_end, 
-                            options.tx_id, band_filter=True)
+                            options.tx_id)
 
 print "plot_search_space: calculating bearing likelihoods (%d records)." % len(sig)
 bl = qraat.position.bearing(sv, sig)
