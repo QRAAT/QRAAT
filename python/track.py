@@ -324,6 +324,20 @@ class track:
 
     else: return (np.nan, np.nan) 
 
+  def stats(self):
+      
+    V = []
+    for i in range(len(self.track)-1):
+      v = (self.track[i+1][0] - self.track[i][0]) / (self.track[i+1][1] - self.track[i][1])
+      V.append((v, (self.track[i][1] + self.track[i+1][1]) / 2))
+
+    A = []
+    for i in range(len(V)-1):
+      a = (V[i+1][0] - V[i][0]) / (V[i+1][1] - V[i][1])
+      A.append((a, (V[i][1] + V[i+1][1]) / 2))
+
+    return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
+
   def insert_db(self, db_con): 
     pass # TODO
 
@@ -395,6 +409,38 @@ class trackall (track):
     self.track = self.critical_path(self.toposort(roots), C)
   
     
+
+class trackraw (track):
+
+  ''' Unfiltered positions.   
+
+    :param db_con: DB connector for MySQL. 
+    :type db_con: MySQLdb.connections.Connection
+    :param t_start: Time start (Unix). 
+    :type t_start: float 
+    :param t_end: Time end (Unix).
+    :type t_end: float
+    :param tx_id: Transmitter ID. 
+    :type tx_id: int
+    :param M: Maximum foot speed of target (m/s). 
+    :type M: float
+    :param C: Constant hop cost in critical path calculation.
+    :type C: float
+  '''
+
+  def __init__(self, db_con, t_start, t_end, tx_id):
+    cur = db_con.cursor()
+    cur.execute('''SELECT northing, easting, timestamp, likelihood
+                     FROM Position
+                    WHERE (%f <= timestamp) 
+                      AND (timestamp <= %f)
+                      AND txid = %d
+                    ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
+    self.pos = cur.fetchall()
+    self.track = []
+    for row in self.pos:
+      self.track.append((np.complex(float(row[0]), float(row[1])), float(row[2])))
+
 
 
 if __name__ == '__main__': 

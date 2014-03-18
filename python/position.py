@@ -155,6 +155,7 @@ class signal:
 
 
 
+
 class bearing: 
   ''' Calculate and store bearing likelihood distributions for a signal window.
 
