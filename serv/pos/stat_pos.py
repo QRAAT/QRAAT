@@ -83,6 +83,13 @@ try:
      '  $\sigma=%d$\n'
      '  range (%d, %d)') % (mean, stddev, min(A), max(A)))
   pp.savefig('tx%d_%s_accel.png' % (options.tx_id, options.t_start))
+  
+  print len(positions.track)
+  pp.clf()
+  pp.plot( 
+   map(lambda (P, t): P.imag, positions.track), 
+   map(lambda (P, t): P.real, positions.track), '.', alpha=0.3)
+  pp.savefig('plot.png')
 
 except mdb.Error, e:
   print >>sys.stderr, "stat_pos: error: [%d] %s" % (e.args[0], e.args[1])

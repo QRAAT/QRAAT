@@ -412,7 +412,10 @@ class trackall (track):
 
 class trackraw (track):
 
-  ''' Unfiltered positions.   
+  ''' Unfiltered positions. 
+
+    For times with multiple candidates, choose the one with
+    highest likelihood. 
 
     :param db_con: DB connector for MySQL. 
     :type db_con: MySQLdb.connections.Connection
@@ -436,11 +439,19 @@ class trackraw (track):
                       AND (timestamp <= %f)
                       AND txid = %d
                     ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
+    
     self.pos = cur.fetchall()
     self.track = []
-    for row in self.pos:
-      self.track.append((np.complex(float(row[0]), float(row[1])), float(row[2])))
-
+    i = 0
+    while i < len(self.pos):
+      t = self.pos[i][2]
+      j = i
+      while i < len(self.pos) and t == self.pos[i][2]:
+        if self.pos[i][3] > self.pos[j][3]: 
+          j = i
+        i += 1
+      self.track.append((np.complex(float(self.pos[j][0]), 
+                      float(self.pos[j][1])), float(self.pos[j][2])))
 
 
 if __name__ == '__main__': 
