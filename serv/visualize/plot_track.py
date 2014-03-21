@@ -44,7 +44,7 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=float("+inf"),
 
 db_con = qraat.util.get_db('reader')
 
-M = 5 
+M = 2
 C = 1
 overlay = True
 
@@ -103,9 +103,10 @@ if overlay:
 
   t = time.localtime(track[0][1])
   s = time.localtime(track[-1][1])
-  pp.title('%04d-%02d-%02d  %02d:%02d - %02d:%02d  txID=%d' % (
+  pp.title('%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  txID=%d' % (
        t.tm_year, t.tm_mon, t.tm_mday,
        t.tm_hour, t.tm_min,
+       s.tm_year, s.tm_mon, s.tm_mday,
        s.tm_hour, s.tm_min,
        options.tx_id), size='smaller')
 
