@@ -15,9 +15,6 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# 
-# TODOs
-#  - Look at acceleration for determining if a transition is feasible. 
 
 import numpy as np
 import time, os, sys
@@ -33,6 +30,16 @@ except ImportError: pass
 def distance(Pi, Pj):
   ''' Calculate Euclidean distance between two points. ''' 
   return np.sqrt((Pi.real - Pj.real)**2 + (Pi.imag - Pj.imag)**2)
+
+def speed(v, w):
+  return np.abs((w.P - v.P) / (w.t - v.t))
+
+def acceleration(u, v, w): 
+  V1 = (v.P - u.P) / (v.t - u.t) 
+  V2 = (w.P - v.P) / (w.t - v.t) 
+  t1 = (v.t + u.t) / 2
+  t2 = (w.t + v.t) / 2  
+  return np.abs((V2 - V1) / (t2 - t1))
 
 class Node:
 
@@ -183,17 +190,17 @@ class track:
       while j < len(pos) - 1 and Ti == Tj: # Candidates for next time interval. 
         (P, ll) = (np.complex(pos[j][0], pos[j][1]), float(pos[j][3]))
 
-        node = Node(P, Tj, ll)
+        w = Node(P, Tj, ll)
         ok = False
-        for k in range(len(leaves)):
-          if leaves[k].distance(node) / (node.t - leaves[k].t) < M: 
+        for v in leaves:
+          if speed(v, w) < M:
             ok = True
-            node.adj_in.append(leaves[k])
-            leaves[k].adj_out.append(node)
+            w.adj_in.append(v)
+            v.adj_out.append(w)
         
         if not ok: # New root. 
-          roots.append(node) 
-          newLeaves.append(node)
+          roots.append(w) 
+          newLeaves.append(w)
 
         j += 1
         Tj = float(pos[j][2])
@@ -211,6 +218,7 @@ class track:
       i = j 
    
     return roots
+  
 
   def toposort(self, roots): 
     ''' Compute a topological sorting of the track graph. Return None if 
@@ -454,10 +462,76 @@ class trackraw (track):
                       float(self.pos[j][1])), float(self.pos[j][2])))
 
 
+class track2 (track):
+  
+  def graph(self, pos, M): 
+    ''' Create a graph from positions. 
+          
+      Each position corresponds to a node. An edge is drawn between nodes with 
+      a feasible transition, i.e. distance(Pi, Pj) / (Tj - Ti) < M. The result
+      will be a directed, acyclic graph. We define the roots of this graph to 
+      be a set of nodes from which all nodes are reachable.
+
+      :param pos: A list of 4-tuples (northing, easting, t, ll) sorted by t 
+                  corresponding to positions. 
+      :type pos: (np.complex, float, float) list 
+      :param M: Maximum target speed. 
+      :type M: float
+      :return: The roots of the graph. 
+      :rtype: Node list
+    '''
+  
+    roots = []; leaves = []
+    i = 0 
+    while i < len(pos) - 1:
+      
+      j = i
+      Ti = Tj = float(pos[i][2])
+      newLeaves = []
+      while j < len(pos) - 1 and Ti == Tj: # Candidates for next time interval. 
+        (P, ll) = (np.complex(pos[j][0], pos[j][1]), float(pos[j][3]))
+
+        w = Node(P, Tj, ll)
+        ok = False
+        for v in leaves:
+          if len(v.adj_in) == 0: 
+            ok = True
+            w.adj_in.append(v)
+            v.adj_out.append(w)
+          
+          else: 
+            for u in v.adj_in:
+              if acceleration(u, v, w) < M: 
+                ok = True
+                w.adj_in.append(v)
+                v.adj_out.append(w)
+        
+        if not ok: # New root. 
+          roots.append(w) 
+          newLeaves.append(w)
+
+        j += 1
+        Tj = float(pos[j][2])
+
+      # Recalculate leaves. 
+      for u in leaves:
+        if len(u.adj_out) == 0: 
+          newLeaves.append(u)
+        else: 
+          for v in u.adj_out:
+            if v not in newLeaves: # FIXME O(n)
+              newLeaves.append(v)
+      leaves = newLeaves
+
+      i = j 
+   
+    return roots
+
+
 if __name__ == '__main__': 
  
-  M = 4
-  C = 1
+  M = 10
+  C = -10
 
   db_con = util.get_db('reader')
 
@@ -470,7 +544,7 @@ if __name__ == '__main__':
   # with some a priori maximum speed that's on the high side. For
   # the calibration data, we could safely assume that the gator 
   # won't exceed 10 m/s. 
-  fella = track(db_con, t_start, t_end, tx_id, M, C) 
+  fella = track(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M, C) 
 
   # We then calculate statistics on the transition speeds in the 
   # critical path. Plotting the tracks might reveal spurious points
@@ -496,7 +570,25 @@ if __name__ == '__main__':
    map(lambda (P, t): P.imag, fella.track), 
    map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
 
-  pp.show()
+  pp.savefig("vel.png")
+  
+
+  M = .1
+  C = -10
+
+  fella = track2(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M, C) 
+  
+  pp.clf()
+  pp.plot(
+   [s.easting for s in sites], 
+   [s.northing for s in sites], 'ro')
+
+  # Plot locations. 
+  pp.plot( 
+   map(lambda (P, t): P.imag, fella.track), 
+   map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
+
+  pp.savefig("accel.png")
 
 
         
