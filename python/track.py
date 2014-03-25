@@ -15,6 +15,15 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# TODO 
+# - Look at velocity distribution for all transitions. 
+# - track2: construct DAG from all transitions. 
+# - In deciding if a transition is feasible, build in the assumption 
+#   that the target won't travel at maximum speed for a long time. 
+#   (Assume some linearily decaying maximum speed.) 
+# - For real time implementation, use overlapping windows and stitch
+#   critcal paths together. 
 
 import numpy as np
 import time, os, sys
@@ -28,7 +37,6 @@ try:
 except ImportError: pass
 
 def distance(Pi, Pj):
-  ''' Calculate Euclidean distance between two points. ''' 
   return np.sqrt((Pi.real - Pj.real)**2 + (Pi.imag - Pj.imag)**2)
 
 def speed(v, w):
@@ -283,14 +291,12 @@ class track:
     
     path.reverse()
     return path
-    
-
+  
   def speed(self):
     ''' Calculate mean and standard deviation of the target's speed. 
     
       :return: (mean, std) tuple. 
     '''
-
     if len(self.track) > 0: 
       speeds = []
       for i in range(len(self.track)-1): 
@@ -299,41 +305,10 @@ class track:
       return (np.mean(speeds), np.std(speeds))
     
     else: return (np.nan, np.nan)
-    
-  def acceleration(self): 
-    ''' Calculate mean and standard deviation of the target's acceleration. 
-
-      :return: (mean, std) tuple. 
-    ''' 
-
-    if len(self.track) > 0: 
-      
-      V = []
-      for i in range(len(self.track)-1):
-        v = (self.track[i+1][0] - self.track[i][0]) / (self.track[i+1][1] - self.track[i][1])
-        V.append((v, (self.track[i][1] + self.track[i+1][1]) / 2))
-
-      A = []
-      for i in range(len(V)-1):
-        a = (V[i+1][0] - V[i][0]) / (V[i+1][1] - V[i][1])
-        A.append((a, (V[i][1] + V[i+1][1]) / 2))
-
-      # Keeping V and A around like this just in case I want to get at the
-      # timestamp or generate plots. For reporting, using magnitude of the 
-      # acceleration. 
-      A_mag = map(lambda(a, t) : np.abs(a), A) 
-
-      #fd = open('acceleration.csv', 'w')
-      #fd.write('accel\n')
-      #for a in A_mag:
-      #  fd.write('%f\n' % a)
-
-      return (np.mean(A_mag), np.std(A_mag))
-
-    else: return (np.nan, np.nan) 
 
   def stats(self):
-      
+    ''' Piecewise velocity and acceleration along critcal path. '''   
+    
     V = []
     for i in range(len(self.track)-1):
       v = (self.track[i+1][0] - self.track[i][0]) / (self.track[i+1][1] - self.track[i][1])
@@ -345,6 +320,19 @@ class track:
       A.append((a, (V[i][1] + V[i+1][1]) / 2))
 
     return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
+
+  @classmethod
+  def transition_distribution(cls, db_con, t_start, t_end, tx_id):
+    ''' TODO '''
+    cur = db_con.cursor()
+    cur.execute('''SELECT northing, easting, timestamp, likelihood
+                     FROM Position
+                    WHERE (%f <= timestamp) 
+                      AND (timestamp <= %f)
+                      AND txid = %d
+                    ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
+    pos = cur.fetchall()
+    return []
 
   def insert_db(self, db_con): 
     pass # TODO
@@ -416,116 +404,17 @@ class trackall (track):
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
   
-    
-
-class trackraw (track):
-
-  ''' Unfiltered positions. 
-
-    For times with multiple candidates, choose the one with
-    highest likelihood. 
-
-    :param db_con: DB connector for MySQL. 
-    :type db_con: MySQLdb.connections.Connection
-    :param t_start: Time start (Unix). 
-    :type t_start: float 
-    :param t_end: Time end (Unix).
-    :type t_end: float
-    :param tx_id: Transmitter ID. 
-    :type tx_id: int
-    :param M: Maximum foot speed of target (m/s). 
-    :type M: float
-    :param C: Constant hop cost in critical path calculation.
-    :type C: float
-  '''
-
-  def __init__(self, db_con, t_start, t_end, tx_id):
-    cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood
-                     FROM Position
-                    WHERE (%f <= timestamp) 
-                      AND (timestamp <= %f)
-                      AND txid = %d
-                    ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
-    
-    self.pos = cur.fetchall()
-    self.track = []
-    i = 0
-    while i < len(self.pos):
-      t = self.pos[i][2]
-      j = i
-      while i < len(self.pos) and t == self.pos[i][2]:
-        if self.pos[i][3] > self.pos[j][3]: 
-          j = i
-        i += 1
-      self.track.append((np.complex(float(self.pos[j][0]), 
-                      float(self.pos[j][1])), float(self.pos[j][2])))
 
 
-class track2 (track):
-  
-  def graph(self, pos, M): 
-    ''' Create a graph from positions. 
-          
-      Each position corresponds to a node. An edge is drawn between nodes with 
-      a feasible transition, i.e. distance(Pi, Pj) / (Tj - Ti) < M. The result
-      will be a directed, acyclic graph. We define the roots of this graph to 
-      be a set of nodes from which all nodes are reachable.
+class track2 (track): 
+ 
+  ''' Test all possible transitions, i.e. overload graph(). ''' 
 
-      :param pos: A list of 4-tuples (northing, easting, t, ll) sorted by t 
-                  corresponding to positions. 
-      :type pos: (np.complex, float, float) list 
-      :param M: Maximum target speed. 
-      :type M: float
-      :return: The roots of the graph. 
-      :rtype: Node list
-    '''
-  
-    roots = []; leaves = []
-    i = 0 
-    while i < len(pos) - 1:
-      
-      j = i
-      Ti = Tj = float(pos[i][2])
-      newLeaves = []
-      while j < len(pos) - 1 and Ti == Tj: # Candidates for next time interval. 
-        (P, ll) = (np.complex(pos[j][0], pos[j][1]), float(pos[j][3]))
+  def graph(self): 
+    pass # TODO 
 
-        w = Node(P, Tj, ll)
-        ok = False
-        for v in leaves:
-          if len(v.adj_in) == 0: 
-            ok = True
-            w.adj_in.append(v)
-            v.adj_out.append(w)
-          
-          else: 
-            for u in v.adj_in:
-              if acceleration(u, v, w) < M: 
-                ok = True
-                w.adj_in.append(v)
-                v.adj_out.append(w)
-        
-        if not ok: # New root. 
-          roots.append(w) 
-          newLeaves.append(w)
 
-        j += 1
-        Tj = float(pos[j][2])
 
-      # Recalculate leaves. 
-      for u in leaves:
-        if len(u.adj_out) == 0: 
-          newLeaves.append(u)
-        else: 
-          for v in u.adj_out:
-            if v not in newLeaves: # FIXME O(n)
-              newLeaves.append(v)
-      leaves = newLeaves
-
-      i = j 
-   
-    return roots
 
 
 if __name__ == '__main__': 
@@ -544,7 +433,7 @@ if __name__ == '__main__':
   # with some a priori maximum speed that's on the high side. For
   # the calibration data, we could safely assume that the gator 
   # won't exceed 10 m/s. 
-  fella = track(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M, C) 
+  fella = track(db_con, t_start, t_end, tx_id, M, C) 
 
   # We then calculate statistics on the transition speeds in the 
   # critical path. Plotting the tracks might reveal spurious points
@@ -570,28 +459,8 @@ if __name__ == '__main__':
    map(lambda (P, t): P.imag, fella.track), 
    map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
 
-  pp.savefig("vel.png")
-  
-
-  M = .1
-  C = -10
-
-  fella = track2(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M, C) 
-  
-  pp.clf()
-  pp.plot(
-   [s.easting for s in sites], 
-   [s.northing for s in sites], 'ro')
-
-  # Plot locations. 
-  pp.plot( 
-   map(lambda (P, t): P.imag, fella.track), 
-   map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
-
-  pp.savefig("accel.png")
-
-
-        
+  pp.savefig("test.png")
+ 
      
 
 
