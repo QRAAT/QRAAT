@@ -37,7 +37,7 @@ try:
 except ImportError: pass
 
 def distance(Pi, Pj):
-  return np.sqrt((Pi.real - Pj.real)**2 + (Pi.imag - Pj.imag)**2)
+  return np.abs(Pj - Pi)
 
 def speed(v, w):
   return np.abs((w.P - v.P) / (w.t - v.t))
@@ -48,6 +48,16 @@ def acceleration(u, v, w):
   t1 = (v.t + u.t) / 2
   t2 = (w.t + v.t) / 2  
   return np.abs((V2 - V1) / (t2 - t1))
+
+def maxspeed_linear(burst, sustained):
+  ''' Maximum speed equation given burst and sustained speeds
+      of the target.
+    
+    Inputs are tuples of the form (t, V). Returns a lambda 
+    function giving the maximum speed given the duration. 
+  ''' 
+  return lambda (t) : max(0.01, (t - burst[0]) * (
+          float(sustained[1] - burst[1]) / (sustained[0] - burst[0])) + burst[1])
 
 class Node:
 
@@ -143,13 +153,14 @@ class track:
     :type t_end: float
     :param tx_id: Transmitter ID. 
     :type tx_id: int
-    :param M: Maximum foot speed of target (m/s). 
-    :type M: float
+    :param M: Maximum foot speed of target (m/s), given
+              transition time
+    :type M: lambda (t) -> float
     :param C: Constant hop cost in critical path calculation.
     :type C: float
   '''
-
-  def __init__(self, db_con, t_start, t_end, tx_id, M, C=1):
+  
+  def _fetch(self, db_con, t_start, t_end, tx_id): 
     cur = db_con.cursor()
     cur.execute('''SELECT northing, easting, timestamp, likelihood
                      FROM Position
@@ -158,6 +169,17 @@ class track:
                       AND txid = %d
                     ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
     self.pos = cur.fetchall()
+  
+  def _fetchall(self, db_con, tx_id):
+    cur = db_con.cursor()
+    cur.execute('''SELECT northing, easting, timestamp, likelihood
+                     FROM Position
+                    WHERE txid = %d
+                    ORDER BY timestamp ASC''' % tx_id)
+    self.pos = cur.fetchall()
+
+  def __init__(self, db_con, t_start, t_end, tx_id, M, C=1):
+    self._fetch(db_con, t_start, t_end, tx_id)
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
   
@@ -201,7 +223,7 @@ class track:
         w = Node(P, Tj, ll)
         ok = False
         for v in leaves:
-          if speed(v, w) < M:
+          if speed(v, w) < M(w.t - v.t):
             ok = True
             w.adj_in.append(v)
             v.adj_out.append(w)
@@ -378,29 +400,11 @@ class track:
 
 class trackall (track): 
   
-  ''' Transmitter tracks over the entire position table. 
-
-    A subset of positions. Feasible transitions between positions
-    are modeled as a directed, acycle graph, from which we compute
-    the critical path. 
-
-    :param db_con: DB connector for MySQL. 
-    :type db_con: MySQLdb.connections.Connection
-    :param tx_id: Transmitter ID. 
-    :type tx_id: int
-    :param M: Maximum foot speed of target (m/s). 
-    :type M: float
-    :param C: Constant hop cost in critical path calculation.
-    :type C: float
-  '''
+  ''' Transmitter tracks over the entire position table. '''
+    
 
   def __init__(self, db_con, tx_id, M, C=1):
-    cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood
-                     FROM Position
-                    WHERE txid = %d
-                    ORDER BY timestamp ASC''' % tx_id)
-    self.pos = cur.fetchall()
+    self._fetchall(cb_con, tx_id)
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
   
@@ -419,32 +423,26 @@ class track2 (track):
 
 if __name__ == '__main__': 
  
-  M = 10
-  C = -10
+  M = maxspeed_linear((3, 2), (60 , 0.2))
+  C = 1
 
   db_con = util.get_db('reader')
 
   (t_start, t_end, tx_id) = (1376420800.0, 1376442000.0, 51)
   t_end_short = 1376427650.0 # short
 
-  (t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165, 1391396399.840252, 54)
+  (t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165 - (3600 * 6), 1391396399.840252 + (3600 * 6), 54)
 
   # A possible way to calculate good tracks. Compute the tracks
   # with some a priori maximum speed that's on the high side. For
   # the calibration data, we could safely assume that the gator 
   # won't exceed 10 m/s. 
-  fella = track(db_con, t_start, t_end, tx_id, M, C) 
+  fella = track(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M, C) 
+  
+  print "%d total positions" % len(fella.pos)
 
-  # We then calculate statistics on the transition speeds in the 
-  # critical path. Plotting the tracks might reveal spurious points
-  # that we want to filter out. 
   (mean, std) = fella.speed()
   print "(mu=%.4f, sigma=%.4f)" % (mean, std)
-
-  # Recompute the tracks, using the mean + one standard deviation as
-  # the maximum speed. 
-  fella.recompute(mean + (std), C)
-  fella.export_kml("fella.kml")
 
   import matplotlib.pyplot as pp
 

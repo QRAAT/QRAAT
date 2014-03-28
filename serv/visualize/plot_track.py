@@ -44,7 +44,7 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=float("+inf"),
 
 db_con = qraat.util.get_db('reader')
 
-M = 2
+M = lambda(t) : 10 
 C = 1
 overlay = True
 
@@ -60,12 +60,10 @@ else:
 # that we want to filter out. 
 (mean, std) = track.speed()
 print "speed        (mu=%.4f, sigma=%.4f)" % (mean, std)
-(mean, std) = track.acceleration()
-print "acceleration (mu=%.4f, sigma=%.4f)" % (mean, std)
 
 # Recompute the tracks, using the mean + one standard deviation as
 # the maximum speed. 
-track.recompute(mean + std, C)
+track.recompute(lambda(t) : mean + std, C)
 
 if overlay: 
 
