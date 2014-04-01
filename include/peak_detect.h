@@ -62,4 +62,8 @@ public:
    */
   detect_state_t detect(const float data);
 
+  float get_rise() { return rise; }
+
+  float get_alpha() { return alpha; }
+
 };
