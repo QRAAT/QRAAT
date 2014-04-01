@@ -103,6 +103,9 @@ class signal:
   #: Number of channels. 
   N = 4
 
+  
+  # FIXME band_filter option is a temporary solution. 
+
   def __init__(self, db_con, t_start, t_end, tx_id=None, band_filter=False):
 
     # Store eigenvalue decomposition vectors and noise covariance
