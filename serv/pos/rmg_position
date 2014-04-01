@@ -20,11 +20,18 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-# TODO add timers for logging (e.g. see serv/proc/rmg_det_to_db) 
 
-from optparse import OptionParser
 import qraat
+import time, os, sys, commands
+import MySQLdb as mdb
+from optparse import OptionParser
+
+# Check for running instances of this program. 
+(status, output) = commands.getstatusoutput(
+  'pgrep -c `basename %s`' % (sys.argv[0]))
+if int(output) > 1: 
+  print >>sys.stderr, "position: error: attempted reentry, exiting"
+  sys.exit(1)
 
 parser = OptionParser()
 
@@ -61,51 +68,61 @@ parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800.0
 parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0, 
                   help="End time in secondes after the epoch (UNIX time).")
 
-parser.add_option('--plot', action='store_true', default=False, 
-                  help="Show positions and receiver sites.")
+parser.add_option('--t-chunk', type='float', metavar='SEC', default=60 * 60 * 4, 
+                  help="Size of signal chunk to fetch simultaneously. (Note that this "
+                       "doesn't affect the calculation, just the memory foot print of " 
+                       "this program.)")
 
 parser.add_option('-v', '--verbose', action='store_true', default=False, 
                   help="Print the progression of the algorithm to the terminal.")
 
+parser.add_option('--band-filter', action='store_true', default=False,  
+                  help="Apply band filter to signal data. DEPRECATE.") # FIXME deprecatue
+
 (options, args) = parser.parse_args()
 
-db_con = qraat.util.get_db('writer')
+try: 
+  start = time.time()
+  print "position: start time:", time.asctime(time.localtime(start))
 
-print "position: fetching site data." 
-sv = qraat.position.steering_vectors(db_con, options.cal_id)
+  db_con = qraat.util.get_db('writer')
 
-print "position: fetching signal data."
-sig = qraat.position.signal(db_con, 
-                            options.t_start, 
-                            options.t_end,
-                            options.tx_id)
+  print "position: fetching site data." 
+  sv = qraat.position.steering_vectors(db_con, options.cal_id)
 
-print "position: calculating bearing likelihoods (%d)." % len(sig) 
-bl = qraat.position.bearing(sv, sig)
+  chunks = range(int(options.t_start), int(options.t_end), int(options.t_chunk))
 
-print "position: calculating positions."
-(pos_est, pos_est_deps) = qraat.position.calc_positions(bl, 
-                                                        options.t_window, 
-                                                        options.t_delta, 
-                                                        options.verbose) 
+  for i in range(len(chunks)):
 
-print "position: inserting positions."
-qraat.position.insert_positions(db_con, pos_est, pos_est_deps, options.tx_id)
+    print "position: fetching chunk %d of %d." % (i+1, len(chunks)) 
+    sig = qraat.position.signal(db_con, 
+                                chunks[i], 
+                                chunks[i] + options.t_chunk,
+                                options.tx_id,
+                                options.band_filter) # FIXME deprecate
 
-if options.plot: 
+    if len(sig) == 0:
+      print "position: skipping empty chunk."
+      continue
 
-  import matplotlib.pyplot as pp
+    print "position: calculating bearing likelihoods (%d)." % len(sig) 
+    bl = qraat.position.bearing(sv, sig)
 
-  # Plot sites.
-  pp.plot(
-   [s.easting for s in bl.sites], 
-   [s.northing for s in bl.sites], 'ro')
+    print "position: calculating positions."
+    (pos_est, pos_est_deps) = qraat.position.calc_positions(bl, 
+                                                            options.t_window, 
+                                                            options.t_delta, 
+                                                            options.verbose) 
 
-  # Plot locations. 
-  pp.plot( 
-   map(lambda (t, e, n, ll): e, pos_est), 
-   map(lambda (t, e, n, ll): n, pos_est), '.', alpha=0.3)
+    print "position: inserting positions."
+    qraat.position.insert_positions(db_con, pos_est, pos_est_deps, options.tx_id)
 
-  pp.show()
+except mdb.Error, e:
+  print >>sys.stderr, "position: error: [%d] %s" % (e.args[0], e.args[1])
+  sys.exit(1)
 
+except qraat.QraatError, e:
+  print >>sys.stderr, "position: error: %s." % e
 
+finally: 
+  print "position: finished in %.2f seconds." % (time.time() - start)
