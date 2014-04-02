@@ -19,23 +19,79 @@
  */
 
 #include <peak_detect.h>
+#include <exception>
 
-peak_detect::peak_detect(float rise_in, float fall_in, float alpha_in){
+peak_detect::peak_detect(float rise_in, int confirmation_time_in, float alpha_in){
 
-  /**
-   * TODO add error checking. What sort? Should an exception be thrown? 
-   */
-
-  rise=rise_in;
-  fall=fall_in;
-  alpha=alpha_in;
+  if (rise_in > 1){
+    rise=rise_in;
+  }
+  else{
+    throw invalid_argument("rise must be greater than 1");
+  }
+  if (confirmation_time_in >= 0){
+    confirmation_time=confirmation_time_in;
+  }
+  else{
+    throw invalid_argument("confirmation_time must not be negative");
+  }
+  if (alpha_in >= 0 && alpha_in <= 1){
+    alpha=alpha_in;
+  }
+  else{
+    throw invalid_argument("alpha must be between 0 and 1 inclusive");
+  }
   state=BELOW_THRESHOLD;
-  avg=0.0;
+  noise_floor=0.0;
   peak_value=0.0;
+  confirmation_counter = 0;
   
 }
 
+void set_rise(float rise_in){
 
+  if (rise_in > 1){
+    rise=rise_in;
+  }
+  else{
+    throw invalid_argument("rise must be greater than 1");
+  }
+
+}
+
+
+void set_confirmation_time(int confirmation_time_in){
+
+  if (confirmation_time_in >= 0){
+    confirmation_time=confirmation_time_in;
+  }
+  else{
+    throw invalid_argument("confirmation_time must not be negative");
+  }
+
+}
+
+
+void set_alpha(float alpha_in){
+
+  if (alpha_in >= 0 && alpha_in <= 1){
+    alpha=alpha_in;
+  }
+  else{
+    throw invalid_argument("alpha must be between 0 and 1 inclusive");
+  }
+
+}
+
+
+void set_noise_floor(float noise_floor_in){
+
+  if (noise_floor_in > 0.0){
+    noise_floor=noise_floor_in;
+  else{
+    throw invalid_argument("noise_floor must be greater than zero");
+  }
+}
 
 detect_state_t peak_detect::detect(const float data){
 /** 
@@ -67,15 +123,17 @@ detect_state_t peak_detect::detect(const float data){
     case PEAK:
 
       state = ABOVE_THRESHOLD;
+      confirmation_counter = 0;
       //continue to above_threshold code
 
     case ABOVE_THRESHOLD:
 
+      confirmation_counter++;
       if(data>peak_value){    //possible peak
         state=PEAK;
         peak_value=data;
       }
-      else if(data<avg*fall){ //confirmed peak
+      else if(confirmation_counter >= confirmation_time){ //confirmed peak
         state=TRIGGER;
       }
     

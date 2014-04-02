@@ -39,10 +39,11 @@ friend class detectmod_detect;
 private:
 
   float rise;       //! Rise trigger
-  float fall;       //! Fall trigger
+  int confirmation_time;  //! Number of samples after peak to wait before triggering
   float alpha;      //! Alpha factor
-  float peak_value; //! Previous peak value?
-  float avg;        //! What is this? 
+  float peak_value; //! Current peak value
+  float noise_floor;        //! Noise floor running average
+  int confirmation_counter; //! Number of samples since peak
 
   detect_state_t state; //! Current state. 
 
@@ -51,10 +52,10 @@ public:
   /*! 
    * \brief Constructor.
    * \param rise_in - Rise trigger
-   * \param fall_in - Fall trigger
+   * \param confirmation_time_in - period to wait to confirm peak
    * \param alpha_in - Alpha factor
    */
-  peak_detect(float rise_in, float fall_in, float alpha_in);
+  peak_detect(float rise_in, int confirmation_time_in, float alpha_in);
 
   /*!
    * \brief Run state machine. 
@@ -62,8 +63,47 @@ public:
    */
   detect_state_t detect(const float data);
 
+  /*!
+   * \brief Get rise value
+   *
+   */ 
   float get_rise() { return rise; }
 
+  /*!
+   * \brief Get confirmation time value
+   *
+   */ 
+  int get_confirmation_time() { return confirmation_time; }
+
+
+  /*!
+   * \brief Get alpha value
+   *
+   */
   float get_alpha() { return alpha; }
+
+  /*!
+   * \brief Set rise value
+   * \param rise_in - New rise value.
+   */
+  void set_rise(float rise_in);
+
+  /*!
+   * \brief Set confirmation time value
+   * \param confirmation_time_in - New confirmation_time value.
+   */
+  void set_confirmation_time(int confirmation_time_in);
+
+  /*!
+   * \brief Set alpha value
+   * \param alpha_in - New alpha value.
+   */
+  void set_alpha(float alpha_in);
+
+  /*!
+   * \brief Set noise floor value
+   * \param noise_floor_in - New noise_floor estimate.
+   */
+  void set_noise_floor(float noise_floor_in);
 
 };

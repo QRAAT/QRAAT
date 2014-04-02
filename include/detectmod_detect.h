@@ -56,12 +56,27 @@ typedef boost::shared_ptr<detectmod_detect> detectmod_detect_sptr;
  * public interface.
  */
 RMG_API detectmod_detect_sptr detectmod_make_detect (
+    int num_channels, 
+    float rate, 
     int pulse_width, 
     int save_width, 
-    int channels, 
+    float c_freq,
     const char *directory, 
     const char *tx_name,
-    float rate, float c_freq, char psd);
+    char psd,
+    float rise,
+    float alpha);
+
+/*!
+ * \brief Return a shared_ptr to a new instance of detectmod_detect using default parameters.
+ *
+ * This routine provides access to the pulse detector. To avoid using raw
+ * pointers, the detector's constructor is declared private. This is the 
+ * public interface.
+ */
+RMG_API detectmod_detect_sptr detectmod_make_detect (
+    int num_channels, 
+    float rate);
 
 /*!
  * A pulse detector block for GNU Radio. Input a four channel signal from   
@@ -72,14 +87,18 @@ class RMG_API detectmod_detect : public gr_sync_block
 private:
 
   friend RMG_API detectmod_detect_sptr detectmod_make_detect (
-     int pulse_width, 
-     int save_width, 
-     int channels,
-     const char *directory,
-     const char *tx_name,
-     float rate, float c_freq, char psd);
+    int num_channels, 
+    float rate, 
+    int pulse_width, 
+    int save_width, 
+    float c_freq,
+    const char *directory, 
+    const char *tx_name,
+    char psd,
+    float rise,
+    float alpha);
   
-  //! Size of the time-matched signal filter.  
+  //! Size, in samples, of the time-matched signal filter.  
   int acc_length;
 
   //! Numbers of samples to save per pulse.
@@ -88,21 +107,18 @@ private:
   //! Number of input channels.
   int ch;
 
-  //! What is this? 
+  //! Amount of samples between the start of a pulse and the end of the file
   int fill_length;
 
   //! Time-matched filter. 
   accumulator *acc;
   
-  //! State machine based for rise and fall triggers, base on accumulator sum.
+  //! State machine to detect peaks in accumulator sum (filtered data).
   peak_detect *pkdet;
 
   //! Stored pulse samples. 
   pulse_data *save_holder;
   
-  //! Stored pulse samples. 
-  pulse_data *peak_holder;
-
   //! Input sample rate. 
   float rate;
 
@@ -118,23 +134,20 @@ private:
    */
   char *tx_name; 
 
-  //! What is this? 
-  int fill_counter;
-
   //! Current state of detector. 
   module_state_t state;
 
-  //! A file descriptor used for status.txt output. 
+  //! A file descriptor used for data output (pulses or continuous). 
   void	       *d_fp;
 
-  //! Use pulse discriminator flag. (Why char?) 
+  //! Use pulse discriminator flag.
   char psd;
   
-  //! Enable detector flag. (Why char?) 
+  //! Enable detector flag.
   char enable_detect;
 
   /*!
-   * \brief What is this? 
+   * filter based on the shape of the pulse
    */ 
   bool pulse_shape_discriminator(pulse_data *);
 
@@ -158,31 +171,43 @@ private:
   void close();
 
   //! Private constructor. 
-  detectmod_detect (int pulse_width, 
-                    int save_width, 
-                    int channels,
-                    const char *filename,
-                    const char *tx_name, 
+  detectmod_detect (int num_channels, 
                     float rate, 
-                    float c_freq, 
-                    char psd);
- 
+                    int pulse_width, 
+                    int save_width, 
+                    float c_freq,
+                    const char *directory, 
+                    const char *tx_name,
+                    char psd,
+                    float rise,
+                    int confirmation_time,
+                    float alpha);
+
+  void initialize_variables(
+    int _pulse_width, 
+    int _save_width, 
+    float _band_center_freq,
+    const char *_directory, 
+    const char *_tx_name,
+    char _psd,
+    float _rise,
+    float _alpha);
+
+  void free_dynamic_memory();
+
 public:
 
   //! Public destructor.
   ~detectmod_detect ();	
 
   //! Set rise trigger factor.
-  void rise_factor(float r);
-
-  //! Set fall trigger factor.
-  void fall_factor(float f);
+  void set_rise_factor(float rise_in);
 
   //! Set alpha factor.
-  void alpha_factor(float a);
+  void set_alpha_factor(float alpha_in);
 
   /*!
-   * Reset the pulse detector. (Explanation)
+   * Reset the pulse detector. (Reinitialize state machine)
    */ 
   void reset();
   
@@ -194,12 +219,14 @@ public:
   /*!
    * Enable pulse detector with new parameters. 
    */ 
-  void enable(int pulse_width, 
-              int save_width, 
-              const char *directory, 
-              const char *tx_name, 
-              float center_freq,
-              char use_pid);
+  void enable(int _pulse_width, 
+              int _save_width, 
+              const char *_directory, 
+              const char *_tx_name,
+              float _center_freq, 
+              char _use_psd,
+              float _rise,
+              float _alpha);
 
   /*!
    * Enable continuous recording of baseband. 
