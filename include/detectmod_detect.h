@@ -37,7 +37,6 @@ typedef enum
   FILL_ACCUMULATOR, //!< fill accumulator
   DETECT,           //!< detect
   CONFIRM_PEAK,     //!< confirm peak
-  FILL_BUFFER       //!< fill buffer
 } module_state_t;
 
 /*
@@ -97,6 +96,10 @@ private:
     char psd,
     float rise,
     float alpha);
+
+  friend RMG_API detectmod_detect_sptr detectmod_make_detect (
+    int num_channels, 
+    float rate);
   
   //! Size, in samples, of the time-matched signal filter.  
   int acc_length;
@@ -180,7 +183,6 @@ private:
                     const char *tx_name,
                     char psd,
                     float rise,
-                    int confirmation_time,
                     float alpha);
 
   void initialize_variables(

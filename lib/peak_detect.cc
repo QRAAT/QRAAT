@@ -19,7 +19,7 @@
  */
 
 #include <peak_detect.h>
-#include <exception>
+#include <stdexcept>
 
 peak_detect::peak_detect(float rise_in, int confirmation_time_in, float alpha_in){
 
@@ -27,19 +27,19 @@ peak_detect::peak_detect(float rise_in, int confirmation_time_in, float alpha_in
     rise=rise_in;
   }
   else{
-    throw invalid_argument("rise must be greater than 1");
+    throw std::invalid_argument("rise must be greater than 1");
   }
   if (confirmation_time_in >= 0){
     confirmation_time=confirmation_time_in;
   }
   else{
-    throw invalid_argument("confirmation_time must not be negative");
+    throw std::invalid_argument("confirmation_time must not be negative");
   }
   if (alpha_in >= 0 && alpha_in <= 1){
     alpha=alpha_in;
   }
   else{
-    throw invalid_argument("alpha must be between 0 and 1 inclusive");
+    throw std::invalid_argument("alpha must be between 0 and 1 inclusive");
   }
   state=BELOW_THRESHOLD;
   noise_floor=0.0;
@@ -48,48 +48,49 @@ peak_detect::peak_detect(float rise_in, int confirmation_time_in, float alpha_in
   
 }
 
-void set_rise(float rise_in){
+void peak_detect::set_rise(float rise_in){
 
   if (rise_in > 1){
     rise=rise_in;
   }
   else{
-    throw invalid_argument("rise must be greater than 1");
+    throw std::invalid_argument("rise must be greater than 1");
   }
 
 }
 
 
-void set_confirmation_time(int confirmation_time_in){
+void peak_detect::set_confirmation_time(int confirmation_time_in){
 
   if (confirmation_time_in >= 0){
     confirmation_time=confirmation_time_in;
   }
   else{
-    throw invalid_argument("confirmation_time must not be negative");
+    throw std::invalid_argument("confirmation_time must not be negative");
   }
 
 }
 
 
-void set_alpha(float alpha_in){
+void peak_detect::set_alpha(float alpha_in){
 
   if (alpha_in >= 0 && alpha_in <= 1){
     alpha=alpha_in;
   }
   else{
-    throw invalid_argument("alpha must be between 0 and 1 inclusive");
+    throw std::invalid_argument("alpha must be between 0 and 1 inclusive");
   }
 
 }
 
 
-void set_noise_floor(float noise_floor_in){
+void peak_detect::set_noise_floor(float noise_floor_in){
 
   if (noise_floor_in > 0.0){
     noise_floor=noise_floor_in;
+  }
   else{
-    throw invalid_argument("noise_floor must be greater than zero");
+    throw std::invalid_argument("noise_floor must be greater than zero");
   }
 }
 
@@ -111,12 +112,12 @@ detect_state_t peak_detect::detect(const float data){
 
     case BELOW_THRESHOLD:
 
-      if(data > avg*rise){    //possible peak
+      if(data > noise_floor*rise){    //possible peak
         state=PEAK;
         peak_value=data;
       }
-      else{                   //update avg
-        avg=alpha*data+(1-alpha)*avg;
+      else{                   //update noise_floor
+        noise_floor=alpha*data+(1-alpha)*noise_floor;
       }
     break;
   

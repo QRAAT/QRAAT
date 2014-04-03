@@ -42,7 +42,7 @@
 #define	O_BINARY 0
 #endif 
 
-detectmod_detect_sptr 
+RMG_API detectmod_detect_sptr 
 detectmod_make_detect (
     int num_channels, 
     float rate, 
@@ -139,17 +139,17 @@ void detectmod_detect::initialize_variables(
     float _alpha)
 {
   c_freq = _band_center_freq;
-  acc_length = pulse_width;//size of the accumulator
+  acc_length = _pulse_width;//size of the accumulator
   
   /* 
    * length of the file needs to be at least 3 times as long as 
    * the pulse to accomidate the noise covariance calculation
    */
-  if(save_width < 3*acc_length){
+  if(_save_width < 3*acc_length){
     save_length = 3*acc_length;
   }
   else{
-    save_length = save_width;
+    save_length = _save_width;
   }
 
   directory = new char[strlen(_directory) + 1];
@@ -183,14 +183,15 @@ void detectmod_detect::initialize_variables(
 detectmod_detect::~detectmod_detect(){
 
   close();
+  free_dynamic_memory();
+}
 
 void detectmod_detect::free_dynamic_memory()
 {
-  delete directory; 
-  delete tx_name;
+  delete[] directory; 
+  delete[] tx_name;
   delete acc;
   delete save_holder;
-  delete peak_holder;
   delete pkdet;
 }
 
@@ -219,7 +220,6 @@ detectmod_detect::work (int noutput_items,
         r = current_sample[m].real();
         i = current_sample[m].imag();
         sample_pwr += (r*r) + (i*i);
-        
       }
       save_holder->inc_index();
       acc_total = acc->add(sample_pwr);
@@ -331,8 +331,8 @@ void detectmod_detect::write_data(pulse_data *data_holder){
   }
 
   // Print some stuff. 
-  float snr = 10.0*log10(pkdet->peak_value/pkdet->avg);
-  float noise_db = 10.0*log10(pkdet->avg/1e-5);
+  float snr = 10.0*log10(pkdet->get_peak()/pkdet->get_noise_floor());
+  float noise_db = 10.0*log10(pkdet->get_noise_floor()/1e-5);
   strftime(time_string,40,"%H:%M:%S %d %b %Y",time_struct);
   
   printf("pulse %s,%d,%f,%f\n", tx_name, int_seconds, noise_db, snr);  
@@ -422,7 +422,7 @@ bool detectmod_detect::pulse_shape_discriminator(pulse_data *data_holder){
   if(count>SHAPE_THREASHOLD)
     result = true;
 
-  delete pulse_pwr;
+  delete[] pulse_pwr;
   return result;
 
 }
@@ -434,7 +434,13 @@ void detectmod_detect::set_rise_factor(float rise_in)
 
 void detectmod_detect::set_alpha_factor(float alpha_in)
 {
-  pkdet->set_alpha(alpha_in);
+  float temp_alpha;
+  if (alpha_in < 1){
+    temp_alpha = alpha_in;
+  }
+  else{
+    temp_alpha = 1/(alpha_in*rate);
+  }pkdet->set_alpha(temp_alpha);
 }
 
 void detectmod_detect::reset()
@@ -446,7 +452,6 @@ void detectmod_detect::reset()
     }
   }
   state = FILL_ACCUMULATOR;
-  fill_counter = -7;
 }
 
 void detectmod_detect::enable()

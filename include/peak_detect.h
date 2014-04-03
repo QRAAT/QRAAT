@@ -34,8 +34,6 @@ class detectmod_detect;
 class peak_detect
 {
 
-friend class detectmod_detect; 
-
 private:
 
   float rise;       //! Rise trigger
@@ -81,6 +79,18 @@ public:
    *
    */
   float get_alpha() { return alpha; }
+
+  /*!
+   * \brief Get noise floor value
+   *
+   */
+  float get_noise_floor() { return noise_floor; }
+
+  /*!
+   * \brief Get peak value
+   *
+   */
+  float get_peak() { return peak_value; }
 
   /*!
    * \brief Set rise value
