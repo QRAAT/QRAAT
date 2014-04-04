@@ -150,14 +150,7 @@ class software_backend(gr.hier_block2):
             
             # Using default parameters for now. Actual parameters are provided 
             # when the detector bank is enabled. 
-            new_det = detect(160,
-                             160 * 3,
-                             channels,
-                             str('./dtest' + str(j) + '_'), 
-                             str(j), 
-                             band_rate,
-                             0, 
-                             USE_PSD)
+            new_det = detect(channels, band_rate)
 
             self.det.append(new_det)
   
@@ -192,15 +185,14 @@ class software_backend(gr.hier_block2):
 
             # Enable pulse detector.
             if (j.tx_type == params.det_type.PULSE):
-                self.det[j.band_num].rise_factor(j.rise)
-                self.det[j.band_num].fall_factor(j.fall)
-                self.det[j.band_num].alpha_factor(j.alpha)
                 self.det[j.band_num].enable(j.filter_length, 
                                             j.filter_length*3, 
+                                            j.cf,
                                             str(j.directory), 
                                             str(j.name), 
-                                            j.cf, 
-                                            USE_PSD)
+                                            USE_PSD,
+                                            j.rise,
+                                            j.alpha)
 
             # Enable continuous recording. 
             elif (j.tx_type == params.det_type.CONT):
