@@ -19,9 +19,6 @@
 # TODO 
 # - Look at velocity distribution for all transitions. 
 # - track2: construct DAG from all transitions. 
-# - In deciding if a transition is feasible, build in the assumption 
-#   that the target won't travel at maximum speed for a long time. 
-#   (Assume some linearily decaying maximum speed.) 
 # - For real time implementation, use overlapping windows and stitch
 #   critcal paths together. 
 
@@ -58,6 +55,22 @@ def maxspeed_linear(burst, sustained):
   ''' 
   return lambda (t) : max(0.01, (t - burst[0]) * (
           float(sustained[1] - burst[1]) / (sustained[0] - burst[0])) + burst[1])
+
+def maxspeed_exp(burst, sustained, limit):
+  ''' Exponentially decaying maximum speed. 
+  
+    ``limit`` is the value at which the funciton converges. 
+  '''  
+  (t1, y1) = burst; (t2, y2) = sustained
+  C = limit
+
+  r = np.log((y2 - C) / (y1 - C)) / (t1 - t2) 
+  B = np.exp(r * t2) * (y2 - C)
+  r *= -1
+  print 'r', r
+  print 'B', B
+  
+  return lambda (t) : (B * np.exp(r * t) + C)
 
 class Node:
 
@@ -187,7 +200,7 @@ class track:
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
 
-  def __iter__(self):
+  def __iter__(self): # TODO __getiter__ ? 
     return self.track
 
   def __getitem__(self, i):
@@ -354,7 +367,7 @@ class track:
                       AND txid = %d
                     ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
     pos = cur.fetchall()
-    return []
+    return [] # TODO 
 
   def insert_db(self, db_con): 
     pass # TODO
@@ -414,8 +427,33 @@ class track2 (track):
  
   ''' Test all possible transitions, i.e. overload graph(). ''' 
 
-  def graph(self): 
-    pass # TODO 
+  def __init__(self, db_con, tx_id, M):
+    self._fetch(db_con, tx_id)
+    roots = self.graph(self.pos, M) 
+    self.track = self.critical_path(self.toposort(roots), M)
+
+  def graph(self, pos): 
+    
+    nodes = []
+    for i in range(min(len(pos),100)): # FIXME stop gap
+      (P, t, ll) = (np.complex(pos[i][0], pos[i][1]), float(pos[i][2]), float(pos[i][3]))
+      nodes.append(Node(P, t, ll)) 
+
+    for i in range(len(pos)):
+      for j in range(i+1, len(pos)):
+        if nodes[i].t < nodes[j].t: # and speed(nodes[i], nodes[j]) < M(nodes[j].t - nodes[i].t): 
+          nodes[i].adj_out.append(nodes[j])
+          nodes[j].adj_in.append(nodes[i]) 
+    
+    roots = [] 
+    for u in nodes:
+      if len(u.adj_in) == 0:
+        roots.append(u) 
+   
+    return roots
+  
+  def critical_path(self, sorted_nodes, M): 
+    return [] # TODO 
 
 
 
@@ -423,7 +461,8 @@ class track2 (track):
 
 if __name__ == '__main__': 
  
-  M = maxspeed_linear((3, 2), (60 , 0.2))
+  M = maxspeed_exp((10, 1.0), (180, 0.2), 0.01)
+  print M(30), M(3600)
   C = 1
 
   db_con = util.get_db('reader')
