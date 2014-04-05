@@ -38,10 +38,11 @@ private:
 
   float rise;       //! Rise trigger
   int confirmation_time;  //! Number of samples after peak to wait before triggering
+  int wait_time;  //! Number of samples after trigger to wait before detecting
   float alpha;      //! Alpha factor
   float peak_value; //! Current peak value
   float noise_floor;        //! Noise floor running average
-  int confirmation_counter; //! Number of samples since peak
+  int sample_counter; //! Number of samples since event
 
   detect_state_t state; //! Current state. 
 
@@ -51,9 +52,10 @@ public:
    * \brief Constructor.
    * \param rise_in - Rise trigger
    * \param confirmation_time_in - period to wait to confirm peak
+   * \param wait_time_in - period to wait to restart detect
    * \param alpha_in - Alpha factor
    */
-  peak_detect(float rise_in, int confirmation_time_in, float alpha_in);
+  peak_detect(float rise_in, int confirmation_time_in, int wait_time_in, float alpha_in);
 
   /*!
    * \brief Run state machine. 
@@ -73,6 +75,11 @@ public:
    */ 
   int get_confirmation_time() { return confirmation_time; }
 
+  /*!
+   * \brief Get confirmation time value
+   *
+   */ 
+  int get_wait_time() { return wait_time; }
 
   /*!
    * \brief Get alpha value
@@ -103,6 +110,12 @@ public:
    * \param confirmation_time_in - New confirmation_time value.
    */
   void set_confirmation_time(int confirmation_time_in);
+
+  /*!
+   * \brief Set wait time value
+   * \param wait_time_in - New wait_time value.
+   */
+  void set_wait_time(int wait_time_in);
 
   /*!
    * \brief Set alpha value
