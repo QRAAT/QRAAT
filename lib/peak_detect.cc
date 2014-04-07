@@ -21,7 +21,7 @@
 #include <peak_detect.h>
 #include <stdexcept>
 
-peak_detect::peak_detect(float rise_in, int confirmation_time_in, int wait_time_in, float alpha_in){
+peak_detect::peak_detect(float rise_in, int confirmation_time_in, float alpha_in){
 
   if (rise_in > 1){
     rise=rise_in;
@@ -34,12 +34,6 @@ peak_detect::peak_detect(float rise_in, int confirmation_time_in, int wait_time_
   }
   else{
     throw std::invalid_argument("confirmation_time must not be negative");
-  }
-  if (wait_time_in >= 0){
-    wait_time=wait_time_in;
-  }
-  else{
-    throw std::invalid_argument("wait_time must not be negative");
   }
   if (alpha_in >= 0 && alpha_in <= 1){
     alpha=alpha_in;
@@ -73,17 +67,6 @@ void peak_detect::set_confirmation_time(int confirmation_time_in){
   }
   else{
     throw std::invalid_argument("confirmation_time must not be negative");
-  }
-
-}
-
-void peak_detect::set_wait_time(int wait_time_in){
-
-  if (wait_time_in >= 0){
-    wait_time=wait_time_in;
-  }
-  else{
-    throw std::invalid_argument("wait_time must not be negative");
   }
 
 }

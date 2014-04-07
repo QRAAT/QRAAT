@@ -38,7 +38,6 @@ private:
 
   float rise;       //! Rise trigger
   int confirmation_time;  //! Number of samples after peak to wait before triggering
-  int wait_time;  //! Number of samples after trigger to wait before detecting
   float alpha;      //! Alpha factor
   float peak_value; //! Current peak value
   float noise_floor;        //! Noise floor running average
@@ -76,12 +75,6 @@ public:
   int get_confirmation_time() { return confirmation_time; }
 
   /*!
-   * \brief Get confirmation time value
-   *
-   */ 
-  int get_wait_time() { return wait_time; }
-
-  /*!
    * \brief Get alpha value
    *
    */
@@ -110,12 +103,6 @@ public:
    * \param confirmation_time_in - New confirmation_time value.
    */
   void set_confirmation_time(int confirmation_time_in);
-
-  /*!
-   * \brief Set wait time value
-   * \param wait_time_in - New wait_time value.
-   */
-  void set_wait_time(int wait_time_in);
 
   /*!
    * \brief Set alpha value
