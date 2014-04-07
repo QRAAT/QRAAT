@@ -173,11 +173,7 @@ void detectmod_detect::initialize_variables(
     temp_alpha = 1/(_alpha*rate);
   }
 
-  int wait_length = acc_length - fill_length;
-  if (wait_length < 0){
-    wait_length = 0;
-  }
-  pkdet = new peak_detect(_rise, fill_length, wait_length, temp_alpha);
+  pkdet = new peak_detect(_rise, fill_length, temp_alpha);
 
   psd = _psd;
 
