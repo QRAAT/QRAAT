@@ -41,7 +41,7 @@ private:
   float alpha;      //! Alpha factor
   float peak_value; //! Current peak value
   float noise_floor;        //! Noise floor running average
-  int sample_counter; //! Number of samples since event
+  int confirmation_counter; //! Number of samples since event
 
   detect_state_t state; //! Current state. 
 
@@ -54,7 +54,7 @@ public:
    * \param wait_time_in - period to wait to restart detect
    * \param alpha_in - Alpha factor
    */
-  peak_detect(float rise_in, int confirmation_time_in, int wait_time_in, float alpha_in);
+  peak_detect(float rise_in, int confirmation_time_in, float alpha_in);
 
   /*!
    * \brief Run state machine. 

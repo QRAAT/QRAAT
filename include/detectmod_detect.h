@@ -113,6 +113,9 @@ private:
   //! Amount of samples between the start of a pulse and the end of the file
   int fill_length;
 
+  //! Coefficient of noise_floor for maximum allowable power into accumulator
+  float clipping_factor;
+
   //! Time-matched filter. 
   accumulator *acc;
   

@@ -152,6 +152,8 @@ void detectmod_detect::initialize_variables(
     save_length = _save_width;
   }
 
+  clipping_factor = (2.0*_rise-1)/(float)acc_length;
+
   directory = new char[strlen(_directory) + 1];
   strcpy(directory, _directory);
 
@@ -203,7 +205,7 @@ detectmod_detect::work (int noutput_items,
 {
   
   gr_complex *current_sample; 
-  float r,i,sample_pwr,acc_total;
+  float r,i,sample_pwr,acc_total,noise_floor,max_pwr;
   detect_state_t det_state = BELOW_THRESHOLD;
   int save_holder_index;
 
@@ -223,13 +225,14 @@ detectmod_detect::work (int noutput_items,
         sample_pwr += (r*r) + (i*i);
       }
       save_holder->inc_index();
-      acc_total = acc->add(sample_pwr);
+
+
 
       switch(state){
         
             //initialize the time-matched filter and circular buffer
         case FILL_ACCUMULATOR:
-
+          acc_total = acc->add(sample_pwr);
           save_holder_index = save_holder->get_index();
           if (save_holder_index == (save_length-1)){
             state = DETECT;
@@ -241,7 +244,15 @@ detectmod_detect::work (int noutput_items,
       
             //Run detector
         case DETECT:
-
+          
+          noise_floor = pkdet->get_noise_floor();
+          max_pwr = clipping_factor*noise_floor;
+          if (sample_pwr > max_pwr){
+            acc_total = acc->add(max_pwr);
+          }
+          else{
+            acc_total = acc->add(sample_pwr);  
+          }
           det_state = pkdet->detect(acc_total);
           if(det_state == PEAK){
             save_holder->params.pulse_index = save_length - acc_length;
@@ -251,6 +262,14 @@ detectmod_detect::work (int noutput_items,
         break;
 
         case CONFIRM_PEAK:
+          noise_floor = pkdet->get_noise_floor();
+          max_pwr = clipping_factor*noise_floor;
+          if (sample_pwr > max_pwr){
+            acc_total = acc->add(max_pwr);
+          }
+          else{
+            acc_total = acc->add(sample_pwr);  
+          }
           det_state = pkdet->detect(acc_total);
           save_holder->params.pulse_index--;
           if(det_state == TRIGGER){
