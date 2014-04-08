@@ -67,8 +67,6 @@ def maxspeed_exp(burst, sustained, limit):
   r = np.log((y2 - C) / (y1 - C)) / (t1 - t2) 
   B = np.exp(r * t2) * (y2 - C)
   r *= -1
-  print 'r', r
-  print 'B', B
   
   return lambda (t) : (B * np.exp(r * t) + C)
 
@@ -200,11 +198,14 @@ class track:
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
 
-  def __iter__(self): # TODO __getiter__ ? 
+  def __getiter__(self): # TODO __getiter__ ? 
     return self.track
 
   def __getitem__(self, i):
     return self.track[i]
+  
+  def __len__(self):
+    return len(self.track)
 
   def graph(self, pos, M): 
     ''' Create a graph from positions. 
@@ -427,9 +428,9 @@ class track2 (track):
  
   ''' Test all possible transitions, i.e. overload graph(). ''' 
 
-  def __init__(self, db_con, tx_id, M):
-    self._fetch(db_con, tx_id)
-    roots = self.graph(self.pos, M) 
+  def __init__(self, db_con, t_start, t_end, tx_id, M):
+    self._fetch(db_con, t_start, t_end, tx_id)
+    roots = self.graph(self.pos)
     self.track = self.critical_path(self.toposort(roots), M)
 
   def graph(self, pos): 
@@ -439,12 +440,12 @@ class track2 (track):
       (P, t, ll) = (np.complex(pos[i][0], pos[i][1]), float(pos[i][2]), float(pos[i][3]))
       nodes.append(Node(P, t, ll)) 
 
-    for i in range(len(pos)):
-      for j in range(i+1, len(pos)):
+    for i in range(len(nodes)):
+      for j in range(i+1, len(nodes)):
         if nodes[i].t < nodes[j].t: # and speed(nodes[i], nodes[j]) < M(nodes[j].t - nodes[i].t): 
           nodes[i].adj_out.append(nodes[j])
           nodes[j].adj_in.append(nodes[i]) 
-    
+  
     roots = [] 
     for u in nodes:
       if len(u.adj_in) == 0:
@@ -453,30 +454,52 @@ class track2 (track):
     return roots
   
   def critical_path(self, sorted_nodes, M): 
-    return [] # TODO 
+    cost = 0
+    node = None 
+
+    for v in sorted_nodes: 
+      mdist = 0
+      mparent = None
+      for u in v.adj_in:
+        if u.dist > mdist:
+          mdist = u.dist
+          mparent = u
+      v.parent = mparent
+      if mparent:
+        ll = v.ll / sum(map(lambda(w) : w.ll, mparent.adj_out))
+        v.dist = mdist + (ll * np.exp((-1) * M(v.t - mparent.t) * speed(mparent, v))) 
+      else: v.dist = mdist + 0.01
+      if v.dist > cost:
+        cost = v.dist
+        node = v
+      
+    path = []
+    while node != None:
+      path.append((node.P, node.t))
+      node = node.parent
+    
+    path.reverse()
+    return path
 
 
 
 
 
 if __name__ == '__main__': 
- 
-  M = maxspeed_exp((10, 1.0), (180, 0.2), 0.01)
-  print M(30), M(3600)
+  M = maxspeed_exp((10, 1.0), (180, 0.2), 0)
   C = 1
 
   db_con = util.get_db('reader')
-
+  
   (t_start, t_end, tx_id) = (1376420800.0, 1376442000.0, 51)
   t_end_short = 1376427650.0 # short
 
   (t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165 - (3600 * 6), 1391396399.840252 + (3600 * 6), 54)
 
-  # A possible way to calculate good tracks. Compute the tracks
-  # with some a priori maximum speed that's on the high side. For
-  # the calibration data, we could safely assume that the gator 
-  # won't exceed 10 m/s. 
-  fella = track(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M, C) 
+  #fella = track(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M, C) 
+  fella = track2(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M) 
+  
+  print len(fella)
   
   print "%d total positions" % len(fella.pos)
 
@@ -493,8 +516,8 @@ if __name__ == '__main__':
 
   # Plot locations. 
   pp.plot( 
-   map(lambda (P, t): P.imag, fella.track), 
-   map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
+   map(lambda (P, t): P.imag, fella), 
+   map(lambda (P, t): P.real, fella), '.', alpha=0.3)
 
   pp.savefig("test.png")
  
