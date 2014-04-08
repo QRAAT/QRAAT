@@ -36,34 +36,27 @@ parser.add_option('--tx-id', type='int', metavar='INT', default=51,
 parser.add_option('--t-start', type='float', metavar='SEC', default=0.0, 
                   help="Start time in secondes after the epoch (UNIX time).")
 
-parser.add_option('--t-end', type='float', metavar='SEC', default=float("+inf"),
+parser.add_option('--t-end', type='float', metavar='SEC', default=2222222222,
                   help="End time in secondes after the epoch (UNIX time).")
 
 (options, args) = parser.parse_args()
 
+overlay = True
 
 db_con = qraat.util.get_db('reader')
 
-M = lambda(t) : 10 
-C = 1
-overlay = True
+cur = db_con.cursor()
+cur.execute('''SELECT northing, easting, timestamp, likelihood
+                 FROM Position
+                WHERE (%f <= timestamp) 
+                  AND (timestamp <= %f)
+                  AND txid = %d
+                ORDER BY timestamp ASC''' % (options.t_start, options.t_end, options.tx_id))
+      
+track = []
+for pos in cur.fetchall():
+  track.append((np.complex(pos[0], pos[1]), float(pos[2])))
 
-# A possible way to calculate good tracks. Compute the tracks
-# with some a priori maximum speed that's on the high side. 
-if options.t_start == 0.0 and options.t_end == float("+inf"): 
-  track = qraat.trackall(db_con, options.tx_id, M, C)
-else:
-  track = qraat.track(db_con, options.t_start, options.t_end, options.tx_id, M, C)
-
-# We then calculate statistics on the transition speeds in the 
-# critical path. Plotting the tracks might reveal spurious points
-# that we want to filter out. 
-(mean, std) = track.speed()
-print "speed        (mu=%.4f, sigma=%.4f)" % (mean, std)
-
-# Recompute the tracks, using the mean + one standard deviation as
-# the maximum speed. 
-track.recompute(lambda(t) : mean + std, C)
 
 if overlay: 
 
