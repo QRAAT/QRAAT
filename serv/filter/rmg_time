@@ -1,80 +1,482 @@
 #!/usr/bin/python
-# rmg_template
-# Template for writing scripts. This program is part of QRAAT, 
-# an automated animal tracking system based on GNU Radio. 
+# rmg_filter
+# Script to filter records both by parametric properties and time-based ones.
 #
-# Copyright (C) 2013 Christopher Patton
-# 
+# Copyright (C) 2013-2014 Regents of the University of California
+# Authored: Sean Riddle
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import bisect
+from collections import defaultdict
+import cProfile
+import csv
+import datetime
+import decimal
+import itertools
+import math
+import numpy
+import pickle
 import qraat
-import time, os, sys
-import MySQLdb as mdb
-from optparse import OptionParser
+import re
+import registry as reg
+import sys
+import time
+import window
 
-parser = OptionParser()
+MIN_INTERVAL = 0.8
 
-parser.description = '''This does nothing.'''
+def filter_site(s):
+	sites = s.split(',')
+	sites = [int(x.strip()) for x in sites]
+	def f(x):
+		return x['siteid'] in sites
+	def g(x):
+		return x in sites
+	return f, g
 
-(options, args) = parser.parse_args()
+def filter_txid(s):
+	txids = s.split(',')
+	txids = [int(x.strip()) for x in txids]
+	def f(x):
+		return x['txid'] in txids
+	def g(x):
+		return x in txids
+	return f, g
 
-# Get database credentials.
-try: 
-  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='reader')
+def noneFactory():
+	return None
 
-except KeyError: 
-  print >>sys.stderr, "test: error: undefined environment variables. Try `source rmg_env.`" 
-  sys.exit(1) 
+def parse_arguments(argv):
+	args = defaultdict(noneFactory)
+	while len(argv) != 0:
+		value = argv.pop()
+		field_name = argv.pop()
+		prefix = '--'
+		assert field_name.startswith(prefix)
+		field_name = field_name[len(prefix):]
+		args[field_name] = value
+	return args
 
-except IOError, e: 
-  print >>sys.stderr, "test: error: missing DB credential file '%s'." % e.filename
-  sys.exit(1)
+def pass_all(x):
+	return True
+
+MOUSE = False
+
+def main():
+
+	arguments = parse_arguments(sys.argv[1:])
+
+	if 't_start' not in arguments or 't_end' not in arguments:
+		print 'Please provide arguments t_start and t_end to specify appropriate time range to process. ' + \
+				'Eg., --t_start 345 --t_end 700'
+		sys.exit(1)
+
+	if 'txid' not in arguments:
+		print 'Please provide argument txid for transmitter ID to process'
+		sys.exit(1)
+
+	if 'siteid' not in arguments:
+		print 'Please provide argument siteid for site ID to process'
+		sys.exit(1)
+
+	arg_txid = int(arguments['txid'])
+	arg_siteid = int(arguments['siteid'])
+
+	arg_t_start = float(arguments['t_start'])
+	arg_t_end = float(arguments['t_end'])
+
+	db_con = qraat.util.get_db('reader')
+
+	# Something ...
+	cur = db_con.cursor()
+
+	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
+
+	cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), arg_t_start, arg_t_end, arg_txid, arg_siteid))
+
+	site_data = {}
+	row = -1
+	while True:
+		row = cur.fetchone()
+		if row is None:
+			break
+		else:
+			row = tuple(row)
+		named_row = dict(zip(fields, row))
+		for k in named_row:
+			if named_row[k].__class__ == decimal.Decimal:
+				named_row[k] = float(named_row[k])
+		site_data[named_row['ID']] = named_row
+
+	# Just a test
+	db_con.close()
 
 
-try: 
-  start = time.time()
-  print "test: start time:", time.asctime(time.localtime(start))
 
-  # Connect to database. 
-  db_con = mdb.connect(db_config.host, 
-                       db_config.user,
-                       db_config.password,
-                       db_config.name)
-  
-  # cal run
-  t_start = 1376420800
-  t_end   = 1376442000
-  cal_id  = 1
-  tx_id   = 51
 
-  cur = db_con.cursor()
-  
-  # Get pulses in time range.
-  cur.execute('''SELECT ID, siteid, timestamp
-                   FROM est
-                  WHERE timestamp >= %s
-                    AND timestamp <= %s
-                    AND txid = %s
-                  ORDER BY timestamp ASC''', (t_start,
-                                              t_end,
-                                              tx_id))
 
-  # Do something ... 
+	# Bucket site_data by (siteid, txid).
+	#bucketed = {}
+	buckets = defaultdict(list)
+	for v in site_data.values():
+		k = (v['siteid'], v['txid'])
+		#print 'iterating through:', k
+		buckets[k].append(v)
 
-except mdb.Error, e:
-  print >>sys.stderr, "test: error: [%d] %s" % (e.args[0], e.args[1])
-  sys.exit(1)
+	assert len(buckets) == 1
 
-finally: 
-  print "test: finished in %.2f seconds." % (time.time() - start)
+	filter_txid_f, filter_txid_simple_f = pass_all, pass_all
+	if arguments['filter-txid'] is not None:
+		filter_txid_f, filter_txid_simple_f = filter_txid(arguments['filter-txid'])
+
+	filter_site_f, filter_site_simple_f = pass_all, pass_all
+	if arguments['filter-site'] is not None:
+		filter_site_f, filter_site_simple_f = filter_site(arguments['filter-site'])
+
+	all_sites = set()
+	all_sites.update([x[0] for x in buckets.keys()])
+	all_txids = set()
+	all_txids.update([x[1] for x in buckets.keys()])
+	print 'all sites ({}): {}'.format(len(all_sites), all_sites)
+	print 'all txids ({}): {}'.format(len(all_txids), all_txids)
+
+	sql_output_filename = 'update.sql'
+	sql_w = open(sql_output_filename, 'w')
+
+	# Only processing one
+
+	for i, site_and_txid in enumerate(buckets.keys()):
+		site_id, txid = site_and_txid
+		if not filter_site_simple_f(site_id):
+			#print 'Filtering bucket by site'
+			continue
+
+		if not filter_txid_simple_f(txid):
+			#print 'Filtering bucket by txid'
+			continue
+
+		registry = reg.Registry(arguments)
+		for point in buckets[site_and_txid]:
+			registry.register_point(point)
+
+		#values = registry.get_all_ids()
+
+		#ids = [x[0] for x in values]
+
+		ids = registry.get_all_ids()
+
+		scored_points = None
+
+		#use_time_filter = arguments['time-filter'] is not None
+		#hide_bad_points = arguments['hide-bad'] is not None
+		# Eliminate unnecessary conditional when this all works, for now:
+		use_time_filter, hide_bad_points = True, False
+
+		good_stuff, bad_stuff, good_ids, bad_ids, good_points, bad_points, good_xs, bad_xs, = None, None, None, None, None, None, None, None
+
+		print 'Partitioning {} points'.format(len(buckets[site_and_txid]))
+		if use_time_filter or hide_bad_points:
+			# Must compute the good bad points stuff.
+			good_stuff, bad_stuff = registry.screen_bad(registry.points)
+			print 'Got {} good items and {} bad items'.format(len(good_stuff), len(bad_stuff))
+
+			good_ids = [x['ID'] for x in good_stuff]
+			bad_ids = [x['ID'] for x in bad_stuff]
+			# TODO: Danger
+			#good_points = [(x['timestamp'], x[item_to_plot]) for x in good_stuff]
+			#bad_points = [(x['timestamp'], x[item_to_plot]) for x in bad_stuff]
+			#good_xs, good_ys = zip(*good_points)
+			#bad_xs, bad_ys = zip(*bad_points)
+			good_xs = [x['timestamp'] for x in good_stuff]
+			bad_xs = [x['timestamp'] for x in bad_stuff]
+			for bad_id in bad_ids:
+				sql_w.write('update est set score = -1 where ID = {};\n'.format(bad_id))
+
+		if use_time_filter:
+			points_under_consideration = []
+			print 'Attempting temporal alignment'
+			print 'Got {} good points'.format(len(good_ids))
+			# Create list of intervals.
+			#intervals = []
+			for i in range(len(good_xs)):
+				x = good_xs[i]
+				id = good_ids[i]
+				points_under_consideration.append((x, id))
+
+			# Generate ALL points struct
+			all_points_data = list(points_under_consideration)
+			for i in range(len(bad_xs)):
+				x = bad_xs[i]
+				id = bad_ids[i]
+				all_points_data.append((x, id))
+
+			score_unclean_data = False
+
+			if score_unclean_data:
+				scored_points = apply_time_filtering(all_points_data, txid, interval_computation_only_data=points_under_consideration)
+			else:
+				scored_points = apply_time_filtering(points_under_consideration, txid)
+
+			for (id, score) in scored_points.items():
+				sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
+
+
+
+
+	sql_w.close()
+
+
+def apply_time_filtering(points_under_consideration, txid, interval_computation_only_data=None):
+	print 'begin apply_time_filtering()'
+
+	arguments = parse_arguments(sys.argv[1:])
+
+	sorted_points = sorted(points_under_consideration)
+
+	#((min_x, min_y, min_id), (max_x, max_y, max_id)) = sorted_points[0], sorted_points[-1]
+
+	interval_window_size = float(60 * 60)
+
+	interval_windows = None
+	if interval_computation_only_data is None:
+		interval_windows = window.WindowIterator(sorted_points, interval_window_size)
+	else:
+		interval_windows = window.WindowIterator(interval_computation_only_data, interval_window_size)
+
+	print 'Window count: {}'.format(interval_windows.get_window_count())
+
+	total_data = 0
+
+
+
+	# Here's what to do...
+
+	for (i, w) in enumerate(interval_windows):
+		interval = w.calculate_interval_from(txid=txid, slice_id=i+1)
+		w.attach_property('interval', interval)
+		print 'attached attribute "interval"'
+
+	# Interval values are calculated.
+	# Go over these windows with a sub-window, a scoring window centered around
+	# each point. Must be able to access the interval of a point falling within
+	# a particular interval window.
+
+	#interval = interval_windows.get_property_for_point(point, 'interval')
+
+
+	# Configuration goes here:
+	DELTA_AWAY = 3
+	ERROR_ALLOWANCE = 0.2
+
+	scores = {}
+
+	all_timestamps = [x[0] for x in sorted_points]
+
+	for (tstamp, ident) in sorted_points:
+		# Scoring this point (with id=ident)
+		score = 0
+		# get appropriate interval
+		interval = interval_windows.get_property_for_point(tstamp, 'interval')
+		if interval < 0.5:
+			raise Exception('Found interval abnormally low: {}'.format(interval))
+
+		# calculate possible center points to investigate
+		factors = [x for x in range(-DELTA_AWAY, DELTA_AWAY + 1) if x != 0]
+		offsets = [x * interval for x in factors]
+		absolute = [tstamp + x for x in offsets]
+		search_space = [(x - ERROR_ALLOWANCE, x + ERROR_ALLOWANCE) for x in absolute]
+
+		for start, end in search_space:
+			start_ind = bisect.bisect_left(all_timestamps, start)
+			end_ind = bisect.bisect_right(all_timestamps, end)
+			if start_ind == end_ind:
+				# No points found
+				pass
+			else:
+				score += 1
+		scores[ident] = score
+
+	print 'Calculated scores for {} points'.format(len(scores))
+	return scores
+
+
+
+	#interval_windows = window.WindowIterator(sorted_points, interval_window_size)
+
+	for (i, w) in enumerate(interval_windows):
+		v = w.value()
+		print 'There are {} points in window {}:'.format(len(v), (i+1))
+		print 'There are {} attributes'.format(len(w.attributes))
+		total_data += len(v)
+		for (k, v) in w.attributes.items():
+			print '\t{} -> {}'.format(k, v)
+
+	assert total_data == len(sorted_points)
+
+
+
+def get_bucket_for(x, bounds):
+	gap = bounds[1] - bounds[0]
+	curr_min, curr_max = None, None
+	for (b_ind, boundary) in enumerate(bounds):
+		if boundary > x:
+			curr_min = bounds[b_ind - 1]
+			curr_max = boundary
+			break
+	if curr_min is None and curr_max is None:
+		curr_min = bounds[-1]
+		curr_max = curr_min + gap
+	return curr_min, curr_max
+
+def get_center_points(x, min, max, interval):
+	points = []
+	if x is None: print 'x is none'
+	if interval is None: print 'interval is none'
+	i = x - interval
+	# Look down...
+	while i > min:
+		points.append(i)
+		i -= interval
+
+	i = x + interval
+	while i < max:
+		points.append(i)
+		i += interval
+
+	return points
+
+def interpolate_interval(interval_map, ident):
+	keys = interval_map.keys()
+	print 'interpolate_interval()'.format(ident, ', '.join([str(z) for z in keys]))
+	max_not_above = None
+	min_not_below = None
+	for k in keys:
+		if (max_not_above is None or k > max_not_above) and k < ident:
+			max_not_above = k
+		if (min_not_below is None or k < min_not_below) and k > ident:
+			min_not_below = k
+
+	if max_not_above is None and min_not_below is None:
+		print '!!!!!!!!!!!!\n!!!!!!!!!!!!\n!!!!!!!!!!!!\n!!!!!!!!!!!!\n'
+		raise Exception()
+
+	if max_not_above is None:
+		return interval_map[min_not_below]
+	if min_not_below is None:
+		return interval_map[max_not_above]
+
+	low_val = interval_map[max_not_above]
+	high_val = interval_map[min_not_below]
+
+	# get line defined by (max_not_above, low_val) and (min_not_below, high_val)
+
+	#(x1, y1)
+	#(x2, y2)
+
+	#slope = (y2 - y1) / (x2 - x1)
+	#y = mx + b
+	#y = ((y2 - y1) / (x2 - x1)) x + b
+
+	#y1 = ((y2 - y1) / (x2 - x1)) x1 + b
+	#b = y1 - ((y2 - y1) / (x2 - x1)) * x1
+
+	slope = (high_val - low_val) / float(min_not_below - max_not_above)
+	b = low_val - ((high_val - low_val) / float(min_not_below - max_not_above)) * max_not_above
+
+	# Sanity check
+	l = slope * max_not_above + b
+	h = slope * min_not_below + b
+	#print 'Started with {}, ended up with {}'.format(low_val, l)
+	#print 'Started with {}, ended up with {}'.format(high_val, h)
+
+	return slope * ident + b
+
+# point is a time float
+# points is a list of all point floats for the hour, in order
+
+SEARCH_START, SEARCH_END = None, None
+
+def reset_points_radius_search():
+	global SEARCH_START, SEARCH_END
+	SEARCH_START = None
+	SEARCH_END = None
+
+def are_points_in_radius(point, points, radius):
+	print 'are_points_in_radius()'
+	global SEARCH_START, SEARCH_END
+
+	low, high = point - radius, point + radius
+	print 'low thresh:', low
+	print 'high thresh:', high
+
+	if SEARCH_START is None and SEARCH_END is None:
+		print 'initializing vals'
+		# initialize the search points using bisect calls
+		SEARCH_START = bisect.bisect_left(points, low)
+		SEARCH_END = bisect.bisect_left(points, high)
+		pass
+	else:
+		assert SEARCH_START is not None and SEARCH_END is not None
+		# maintain SEARCH_START and SEARCH_END
+
+		###
+		# |---&------|---&
+		###
+		#print 'maintaining'
+
+		#print 'SEARCH_START={}, SEARCH_END={}, |points|={}'.format(SEARCH_START, SEARCH_END, len(points))
+
+		while points[SEARCH_START] <= low:
+			SEARCH_START += 1
+		SEARCH_START -= 1
+
+		while SEARCH_END < len(points) and points[SEARCH_END] <= high:
+			SEARCH_END += 1
+
+		#if SEARCH_END > 0:
+			#SEARCH_END -= 1
+		#else:
+			#print 'Asserted!'
+			#assert SEARCH_END == 0
+			#if SEARCH_START != 0:
+				#print 'This would have sent the SEARCH_END ({}) negative...{}'.format(SEARCH_END, SEARCH_START)
+			#assert SEARCH_START == 0
+
+	# both of SEARCH_START and SEARCH_END are set
+
+	print 'Searching a slice of size:', (SEARCH_END - SEARCH_START)
+
+	if (SEARCH_END - SEARCH_START) < 0:
+		print 'SEARCH_START={}, SEARCH_END={}, |points|={}'.format(SEARCH_START, SEARCH_END, len(points))
+
+	for i in range(SEARCH_START, SEARCH_END):
+		_point = points[i]
+		if _point == point:
+			print 'Skipping self point'
+			continue
+
+		if _point >= low and _point <= high:
+			print 'Yes, there\'s something in here'
+			return True
+	print 'There is nothing there'
+	return False
+
+
+if __name__ == '__main__':
+	#cProfile.run('main()')
+	main()
+	#succ = are_points_in_radius(1.3, (0.5, 1.7, 3.7), 0.2)
+	#print 'Returned true' if succ else 'Returned false'
+
