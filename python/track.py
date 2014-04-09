@@ -217,6 +217,7 @@ class track:
             ok = True
             w.adj_in.append(v)
             v.adj_out.append(w)
+            # TODO Union
         
         if not ok: # New root. 
           roots.append(w) 
@@ -279,7 +280,9 @@ class track:
       :type sorted_nodes: NOde list
       :param C: Constant hop cost. 
       :type C: float
-    ''' 
+    '''
+    # TODO map : CC -> (cost, node) 
+
     cost = 0
     node = None 
     for v in sorted_nodes: 
@@ -349,23 +352,15 @@ class track:
     pos = cur.fetchall()
     return [] # TODO 
 
+  def
+
   @classmethod
   def maxspeed_linear(cls, burst, sustained):
-    ''' Maximum speed equation given burst and sustained speeds
-        of the target.
-      
-      Inputs are tuples of the form (t, V). Returns a lambda 
-      function giving the maximum speed given the duration. 
-    ''' 
     return lambda (t) : max(0.01, (t - burst[0]) * (
             float(sustained[1] - burst[1]) / (sustained[0] - burst[0])) + burst[1])
 
   @classmethod
   def maxspeed_exp(cls, burst, sustained, limit):
-    ''' Exponentially decaying maximum speed. 
-    
-      ``limit`` is the value at which the funciton converges. 
-    '''  
     (t1, y1) = burst; (t2, y2) = sustained
     C = limit
 
@@ -374,6 +369,10 @@ class track:
     r *= -1
     
     return lambda (t) : (B * np.exp(r * t) + C)
+
+  @classmethod
+  def maxspeed_const(cls, m):
+    return lambda (t) : m
 
   def insert_db(self, db_con): 
     pass # TODO
@@ -503,6 +502,9 @@ if __name__ == '__main__':
   #fella = track2(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M) 
 
   # Testing track output ... 
+  # NOTE I'm experimenting now with calculating the critical path for each CC 
+  # and stitching them together in post processing. Could I prove the optimality 
+  # of this approach? 
   fella = trackall(db_con, tx_id, M, C) 
   
   t = time.localtime(fella[0][1])
