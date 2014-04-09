@@ -46,30 +46,6 @@ def acceleration(u, v, w):
   t2 = (w.t + v.t) / 2  
   return np.abs((V2 - V1) / (t2 - t1))
 
-def maxspeed_linear(burst, sustained):
-  ''' Maximum speed equation given burst and sustained speeds
-      of the target.
-    
-    Inputs are tuples of the form (t, V). Returns a lambda 
-    function giving the maximum speed given the duration. 
-  ''' 
-  return lambda (t) : max(0.01, (t - burst[0]) * (
-          float(sustained[1] - burst[1]) / (sustained[0] - burst[0])) + burst[1])
-
-def maxspeed_exp(burst, sustained, limit):
-  ''' Exponentially decaying maximum speed. 
-  
-    ``limit`` is the value at which the funciton converges. 
-  '''  
-  (t1, y1) = burst; (t2, y2) = sustained
-  C = limit
-
-  r = np.log((y2 - C) / (y1 - C)) / (t1 - t2) 
-  B = np.exp(r * t2) * (y2 - C)
-  r *= -1
-  
-  return lambda (t) : (B * np.exp(r * t) + C)
-
 class Node:
 
   ''' Node of track graph. 
@@ -370,6 +346,32 @@ class track:
     pos = cur.fetchall()
     return [] # TODO 
 
+  @classmethod
+  def maxspeed_linear(cls, burst, sustained):
+    ''' Maximum speed equation given burst and sustained speeds
+        of the target.
+      
+      Inputs are tuples of the form (t, V). Returns a lambda 
+      function giving the maximum speed given the duration. 
+    ''' 
+    return lambda (t) : max(0.01, (t - burst[0]) * (
+            float(sustained[1] - burst[1]) / (sustained[0] - burst[0])) + burst[1])
+
+  @classmethod
+  def maxspeed_exp(cls, burst, sustained, limit):
+    ''' Exponentially decaying maximum speed. 
+    
+      ``limit`` is the value at which the funciton converges. 
+    '''  
+    (t1, y1) = burst; (t2, y2) = sustained
+    C = limit
+
+    r = np.log((y2 - C) / (y1 - C)) / (t1 - t2) 
+    B = np.exp(r * t2) * (y2 - C)
+    r *= -1
+    
+    return lambda (t) : (B * np.exp(r * t) + C)
+
   def insert_db(self, db_con): 
     pass # TODO
 
@@ -418,7 +420,7 @@ class trackall (track):
     
 
   def __init__(self, db_con, tx_id, M, C=1):
-    self._fetchall(cb_con, tx_id)
+    self._fetchall(db_con, tx_id)
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
   
@@ -486,7 +488,7 @@ class track2 (track):
 
 
 if __name__ == '__main__': 
-  M = maxspeed_exp((10, 1.0), (180, 0.2), 0)
+  M = track.maxspeed_exp((10, 1.0), (180, 0.2), 0)
   C = 1
 
   db_con = util.get_db('reader')
