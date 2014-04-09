@@ -45,7 +45,7 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=float("+inf"),
 db_con = qraat.util.get_db('reader')
 
 overlay = True
-M = qraat.track.maxspeed_exp((10, 1.0), (180, 0.2), 0)
+M = qraat.track.maxspeed_exp((10, 1), (180, 0.1),0)
 C = 1
 
 # A possible way to calculate good tracks. Compute the tracks
@@ -63,7 +63,7 @@ print "speed        (mu=%.4f, sigma=%.4f)" % (mean, std)
 
 # Recompute the tracks, using the mean + one standard deviation as
 # the maximum speed. 
-track.recompute(lambda(t) : mean + std, C)
+#track.recompute(lambda(t) : mean + std, C)
 
 if overlay: 
 

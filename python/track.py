@@ -236,7 +236,7 @@ class track:
       leaves = newLeaves
 
       i = j 
-   
+  
     return roots
   
 
@@ -304,6 +304,9 @@ class track:
     path.reverse()
     return path
   
+
+
+
   def speed(self):
     ''' Calculate mean and standard deviation of the target's speed. 
     
@@ -426,12 +429,12 @@ class trackall (track):
   
 
 
-class track2 (track): 
+class trackall2 (track): 
  
   ''' Test all possible transitions, i.e. overload graph(). ''' 
 
-  def __init__(self, db_con, t_start, t_end, tx_id, M):
-    self._fetch(db_con, t_start, t_end, tx_id)
+  def __init__(self, db_con, tx_id, M):
+    self._fetchall(db_con, tx_id)
     roots = self.graph(self.pos)
     self.track = self.critical_path(self.toposort(roots), M)
 
@@ -488,40 +491,47 @@ class track2 (track):
 
 
 if __name__ == '__main__': 
-  M = track.maxspeed_exp((10, 1.0), (180, 0.2), 0)
+  
+  tx_id = 6
+  M = track.maxspeed_exp((10, 1), (180, 0.1), 0)
   C = 1
 
   db_con = util.get_db('reader')
   
-  (t_start, t_end, tx_id) = (1376420800.0, 1376442000.0, 51)
-  t_end_short = 1376427650.0 # short
+  # NOTE still experimenting with this. 
+  #(t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165 - (3600 * 6), 1391396399.840252 + (3600 * 6), 54)
+  #fella = track2(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M) 
 
-  (t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165 - (3600 * 6), 1391396399.840252 + (3600 * 6), 54)
-
-  #fella = track(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M, C) 
-  fella = track2(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M) 
+  # Testing track output ... 
+  fella = trackall(db_con, tx_id, M, C) 
   
-  print len(fella)
-  
-  print "%d total positions" % len(fella.pos)
+  t = time.localtime(fella[0][1])
+  s = time.localtime(fella[-1][1])
+  print '%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  txID=%d' % (
+       t.tm_year, t.tm_mon, t.tm_mday,
+       t.tm_hour, t.tm_min,
+       s.tm_year, s.tm_mon, s.tm_mday,
+       s.tm_hour, s.tm_min,
+       tx_id)
 
-  (mean, std) = fella.speed()
-  print "(mu=%.4f, sigma=%.4f)" % (mean, std)
+  print 'Length of critical path: %d (out of %d)' % (len(fella), len(fella.pos))
 
-  import matplotlib.pyplot as pp
+  if True:
 
-  # Plot sites.
-  sites = csv(db_con=db_con, db_table='sitelist')
-  pp.plot(
-   [s.easting for s in sites], 
-   [s.northing for s in sites], 'ro')
+    import matplotlib.pyplot as pp
 
-  # Plot locations. 
-  pp.plot( 
-   map(lambda (P, t): P.imag, fella), 
-   map(lambda (P, t): P.real, fella), '.', alpha=0.3)
+    # Plot sites.
+    sites = csv(db_con=db_con, db_table='sitelist')
+    pp.plot(
+     [s.easting for s in sites], 
+     [s.northing for s in sites], 'ro')
 
-  pp.savefig("test.png")
+    # Plot locations. 
+    pp.plot( 
+     map(lambda (P, t): P.imag, fella), 
+     map(lambda (P, t): P.real, fella), '.', alpha=0.3)
+
+    pp.savefig("test.png")
  
      
 
