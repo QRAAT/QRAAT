@@ -67,7 +67,8 @@ track.recompute(lambda(t) : mean + std, C)
 
 if overlay: 
 
-  bg = mpimg.imread('qr-overlay.png')
+  # FIXME Where/how to install this file? 
+  bg = mpimg.imread('/home/christopher/continuum/work/QRAAT/QRAAT/serv/visualize/qr-overlay.png') 
 
   e0 = 572599.5 - 150
   e1 = 577331.4 - 150

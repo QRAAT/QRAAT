@@ -19,7 +19,7 @@ import qraat
 import matplotlib.pyplot as pp
 import matplotlib.image as mpimg
 import numpy as np
-import time
+import time, sys
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -57,10 +57,14 @@ track = []
 for pos in cur.fetchall():
   track.append((np.complex(pos[0], pos[1]), float(pos[2])))
 
+if len(track) == 0: 
+  print >>sys.stderr, "plot_pos: skipping: no data."
+  sys.exit(0)
 
 if overlay: 
 
-  bg = mpimg.imread('qr-overlay.png')
+  # FIXME Where/how to install this file? 
+  bg = mpimg.imread('/home/christopher/continuum/work/QRAAT/QRAAT/serv/visualize/qr-overlay.png') 
 
   e0 = 572599.5 - 150
   e1 = 577331.4 - 150
