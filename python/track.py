@@ -93,11 +93,12 @@ class Node:
     :type ll: float
   '''
 
-  def __init__(self, P, t, ll): 
+  def __init__(self, P, t, ll, pos_id): 
     # Position.  
     self.P = P
     self.t = t
     self.ll = ll
+    self.pos_id = pos_id
 
     # Connected component analysis. 
     self.c_size   = 1
@@ -184,9 +185,13 @@ class track:
     :type C: float
   '''
   
+  (zone, letter) = 10, 'S' # TODO Add UTM zone to position table, modify 
+                           # code to insert it automatically. 
+
+  
   def _fetch(self, db_con, t_start, t_end, tx_id): 
     cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood
+    cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
                      FROM Position
                     WHERE (%f <= timestamp) 
                       AND (timestamp <= %f)
@@ -196,13 +201,14 @@ class track:
   
   def _fetchall(self, db_con, tx_id):
     cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood
+    cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
                      FROM Position
                     WHERE txid = %d
                     ORDER BY timestamp ASC''' % tx_id)
     self.pos = cur.fetchall()
 
   def __init__(self, db_con, t_start, t_end, tx_id, M, C=1):
+    self.tx_id = tx_id
     self._fetch(db_con, t_start, t_end, tx_id)
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
@@ -211,7 +217,7 @@ class track:
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
 
-  def __getiter__(self): # TODO __getiter__ ? 
+  def __getiter__(self): 
     return self.track
 
   def __getitem__(self, i):
@@ -239,8 +245,11 @@ class track:
     
     nodes = []
     for i in range(len(pos)): 
-      (P, t, ll) = (np.complex(pos[i][0], pos[i][1]), float(pos[i][2]), float(pos[i][3]))
-      nodes.append(Node(P, t, ll)) 
+      (P, t, ll, pos_id) = (np.complex(pos[i][0], pos[i][1]), 
+                            float(pos[i][2]), 
+                            float(pos[i][3]), 
+                            int(pos[i][4]))
+      nodes.append(Node(P, t, ll, pos_id)) 
 
     for i in range(len(nodes)):
       for j in range(i+1, len(nodes)):
@@ -265,7 +274,8 @@ class track:
       the true track of the target can be orphaned by the process. More
       thinking is required. **TODO** 
     '''
-
+    
+    # TODO update this code to include posID in Node() constructor. 
     roots = []; leaves = []
     i = 0 
     while i < len(pos) - 1:
@@ -374,7 +384,7 @@ class track:
     path = []
     
     while node != None:
-      path.append((node.P, node.t))
+      path.append((node.P, node.t, node.pos_id))
       node = node.parent
     
     path.reverse()
@@ -416,7 +426,7 @@ class track:
   def transition_distribution(cls, db_con, t_start, t_end, tx_id):
     ''' TODO '''
     cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood
+    cur.execute('''SELECT northing, easting, timestamp
                      FROM Position
                     WHERE (%f <= timestamp) 
                       AND (timestamp <= %f)
@@ -446,7 +456,18 @@ class track:
     return lambda (t) : m
 
   def insert_db(self, db_con): 
-    pass # TODO
+    ''' Insert tracks into datbase. ''' 
+    cur = db_con.cursor()
+    for (P, t, pos_id) in self.track: 
+      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+      tm = time.gmtime(t)
+      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                             tm.tm_hour, tm.tm_min, tm.tm_sec)
+      cur.execute('''INSERT INTO qraat.Track 
+                            (txID, posId, lon, lat, datetime, timezone) 
+                     VALUES (%d, %d, %f, %f, '%s', '%s')''' % (self.tx_id, 
+                     pos_id, lon, lat, t, 'UTC'))
+
 
   def export_kml(self, fn):
 
@@ -475,16 +496,8 @@ class track:
     #   </Placemark>
     # </Folder>
     # </kml>
-
-    (zone, letter) = 10, 'S' # TODO Add UTM zone to position table, modify 
-                             # code to insert it automatically. 
-
-    for (P, t) in self.track: 
-      (lat, lon) = utm.to_latlon(P.imag, P.real, zone, letter) 
-      tm = time.localtime(t)
-      t = '%04d-%02d-%02dT%02d:%02d:%02dZ' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
-                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
-
+    
+    pass # TODO 
 
 
 class trackall (track): 
@@ -493,6 +506,7 @@ class trackall (track):
     
 
   def __init__(self, db_con, tx_id, M, C=1):
+    self.tx_id = tx_id
     self._fetchall(db_con, tx_id)
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
@@ -503,12 +517,12 @@ class trackall (track):
 
 if __name__ == '__main__': 
   
-  tx_id = 8 
+  tx_id = 9 
   M = track.maxspeed_exp((10, 1), (300, 0.1), 0.05)
   #M = track.maxspeed_linear((10, 1), (180, 0.1), 0.05)
   C = 1
 
-  db_con = util.get_db('reader')
+  db_con = util.get_db('writer')
   
   # NOTE still experimenting with this. 
   #(t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165 - (3600 * 6), 1391396399.840252 + (3600 * 6), 54)
@@ -519,7 +533,8 @@ if __name__ == '__main__':
   # and stitching them together in post processing. Could I prove the optimality 
   # of this approach? 
   fella = trackall(db_con, tx_id, M, C) 
-  
+  fella.insert_db(db_con)
+
   t = time.localtime(fella[0][1])
   s = time.localtime(fella[-1][1])
   print '%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  txID=%d' % (
@@ -543,8 +558,8 @@ if __name__ == '__main__':
 
     # Plot locations. 
     pp.plot( 
-     map(lambda (P, t): P.imag, fella), 
-     map(lambda (P, t): P.real, fella), '.', alpha=0.3)
+     map(lambda (P, t, pos_id): P.imag, fella), 
+     map(lambda (P, t, pos_id): P.real, fella), '.', alpha=0.3)
 
     pp.savefig("test.png")
  
