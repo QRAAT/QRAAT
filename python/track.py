@@ -472,38 +472,18 @@ class track:
   def export_kml(self, name):
 
     # E.g.: https://developers.google.com/kml/documentation/kmlreference#gxtrack 
-    # <?xml version="1.0" encoding="UTF-8"?>
-    # <kml xmlns="http://www.opengis.net/kml/2.2"
-    #  xmlns:gx="http://www.google.com/kml/ext/2.2">
-    # <Folder>
-    #   <Placemark>
-    #     <gx:Track>
-    #       <when>2010-05-28T02:02:09Z</when>
-    #       <when>2010-05-28T02:02:35Z</when>
-    #       <when>2010-05-28T02:02:44Z</when>
-    #       <when>2010-05-28T02:02:53Z</when>
-    #       <when>2010-05-28T02:02:54Z</when>
-    #       <when>2010-05-28T02:02:55Z</when>
-    #       <when>2010-05-28T02:02:56Z</when>
-    #       <gx:coord>-122.207881 37.371915 156.000000</gx:coord>
-    #       <gx:coord>-122.205712 37.373288 152.000000</gx:coord>
-    #       <gx:coord>-122.204678 37.373939 147.000000</gx:coord>
-    #       <gx:coord>-122.203572 37.374630 142.199997</gx:coord>
-    #       <gx:coord>-122.203451 37.374706 141.800003</gx:coord>
-    #       <gx:coord>-122.203329 37.374780 141.199997</gx:coord>
-    #       <gx:coord>-122.203207 37.374857 140.199997</gx:coord>
-    #     </gx:Track>
-    #   </Placemark>
-    # </Folder>
-    # </kml>
-    
+    # TODO The file is way longer than it needs to be, since I wanted to display
+    # the coordinates and datetime in the tooltip that appears in Google Earth.
+    # Perhaps what we want is not a gx:track, but something fucnctionally 
+    # similar. 
+
     fd = open('%s.kml' % name, 'w')
     fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
     fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
     fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
     fd.write('<Folder>\n')
     fd.write('  <Placemark>\n')
-    fd.write('    <name>Transmitter %s tracks</name>\n' % name)
+    fd.write('    <name>Transmitter %s</name>\n' % name)
     fd.write('    <gx:Track>\n')
     for (P, t, pos_id) in self.track: 
       tm = time.gmtime(t)
@@ -513,6 +493,29 @@ class track:
     for (P, t, pos_id) in self.track: 
       (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
       fd.write('      <gx:coord>%f %f 0</gx:coord>\n' % (lon, lat))
+    fd.write('      <ExtendedData>\n')
+    fd.write('        <SchemaData schemaUrl="#schema">\n')
+    fd.write('          <gx:SimpleArrayData name="Time">\n')
+    for (P, t, pos_id) in self.track: 
+      tm = time.gmtime(t)
+      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
+      fd.write('          <gx:value>%s</gx:value>\n' % t)
+    fd.write('          </gx:SimpleArrayData>\n')
+    fd.write('          <gx:SimpleArrayData name="(lat, long)">\n')
+    for (P, t, pos_id) in self.track: 
+      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+      fd.write('          <gx:value>%fN, %fW</gx:value>\n' % (lat, lon))
+    fd.write('          </gx:SimpleArrayData>\n')
+    fd.write('          <gx:SimpleArrayData name="posID">\n')
+    for (P, t, pos_id) in self.track: 
+      tm = time.gmtime(t)
+      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
+      fd.write('          <gx:value>%d</gx:value>\n' % pos_id)
+    fd.write('          </gx:SimpleArrayData>\n')
+    fd.write('        </SchemaData>\n')
+    fd.write('      </ExtendedData>\n')
     fd.write('    </gx:Track>\n')
     fd.write('  </Placemark>\n')
     fd.write('</Folder>\n')
@@ -544,7 +547,7 @@ def tx_name(db_con):
 
 if __name__ == '__main__': 
   
-  tx_id = 6 
+  tx_id = 5 
   M = track.maxspeed_exp((10, 1), (300, 0.1), 0.05)
   #M = track.maxspeed_linear((10, 1), (180, 0.1), 0.05)
   C = 1
