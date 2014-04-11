@@ -1,2 +1,0 @@
-#!/bin/bash
-tail -30 -f `ls -tr tmp/debug* | tail -1`

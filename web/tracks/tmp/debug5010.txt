@@ -1,0 +1,13 @@
+Fri, 11 Apr 14 14:46:00 -0700: === start
+Fri, 11 Apr 14 14:46:00 -0700: Command extent
+Fri, 11 Apr 14 14:46:00 -0700: Start extent
+Fri, 11 Apr 14 14:46:00 -0700: Read 6 items from database
+Fri, 11 Apr 14 14:46:00 -0700: Start=2013-07-27 11:06:45 Stop=2013-08-06 06:06:00 North=38.499327 South=38.491174 East=-122.139387 West=-122.153696
+Fri, 11 Apr 14 14:46:00 -0700: OK
+Start=2013-07-27 11:06:45
+Stop=2013-08-06 06:06:00
+North=38.499327
+South=38.491174
+East=-122.139387
+West=-122.153696
+Fri, 11 Apr 14 14:46:00 -0700: === finish

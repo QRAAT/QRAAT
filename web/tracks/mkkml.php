@@ -107,11 +107,13 @@
 		debug("Track=$track\n") ;
 		if( $track == "All" )
 		{
-			$query = "SELECT * from track WHERE datetime between '$start' and '$stop' ORDER BY transmitter, datetime ASC ;" ;
+			$query = "SELECT t.datetime, t.lon, t.lat, tx.name FROM Track AS t JOIN txlist AS tx ON tx.ID=t.txID WHERE datetime BETWEEN '$start' and '$stop' ORDER BY tx.name, t.datetime ASC ;" ;
 		}
 		else
 		{
-			$query = "SELECT * from track WHERE datetime between '$start' and '$stop' and transmitter like '$track' ORDER BY transmitter, datetime ASC ;" ;
+			$query = "SELECT t.datetime, t.lon, t.lat, tx.name FROM Track AS t JOIN txlist AS tx ON tx.ID=t.txID WHERE datetime BETWEEN '$start' and '$stop' AND tx.name LIKE '$track' ORDER BY tx.name, t.datetime ASC ;" ;
+                        
+                        
 		}
 		$trackdata = getdata($query) ;
 		if( count($trackdata) < 1 )
@@ -228,11 +230,10 @@
 		for( $line = 0 ; $line < $numberoflines ; $line++ )
 		{
 			$linedata = $trackdata[$line] ;
-			$tracktime = $linedata[1]." ".$linedata[2] ;
+			$tracktime = $linedata[0] ;
+			$tracklon = $linedata[1] ;
+			$tracklat = $linedata[2] ;
 			$trackname = $linedata[3] ;
-			$tracklat = $linedata[4] ;
-			$tracklon = $linedata[5] ;
-			$trackflag = $linedata[6] ;
 			if( $lasttrackname != $trackname )	// Transition to a new track
 			{
 				$trackcount++ ;

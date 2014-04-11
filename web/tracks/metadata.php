@@ -108,7 +108,7 @@
 	function extent()
 	{
 		debug("Start extent\n") ;
-		$query = "SELECT min(datetime), max(datetime), max(lat), min(lat), max(lon), min(lon) from track ;" ;
+		$query = "SELECT min(datetime), max(datetime), max(lat), min(lat), max(lon), min(lon) FROM Track ;" ;
 		$data = getdata($query) ;
 		$row = $data[0] ;
 		$items = count($row) ;
@@ -141,7 +141,7 @@
 	function tracklist()
 	{
 		debug("Start tracklist\n") ;
-		$query = "SELECT DISTINCT transmitter FROM track ;" ;
+		$query = "SELECT DISTINCT tx.name FROM Track AS t, txlist AS tx where t.txID=tx.ID;" ;
 		$data = getdata($query) ;
 		$items = count($data) ;
 		debug("Read ".$items." items from database\n") ;

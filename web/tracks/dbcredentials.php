@@ -1,6 +1,7 @@
 <?php
-	$hostname = "localhost:/tmp/mysql.sock" ;
-	$username = "rmguser" ;
-	$password = "rmguserP@55W0RD" ;
-	$database = "rmgdata" ;
+	$hostname = "localhost" ;
+	#$hostname = "localhost:/var/run/mysqld/mysqld.sock" ;
+	$username = "reader" ;
+	$password = "reader" ;
+	$database = "qraat" ;
 ?>
