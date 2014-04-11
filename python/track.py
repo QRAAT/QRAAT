@@ -469,7 +469,7 @@ class track:
                      pos_id, lon, lat, t, 'UTC'))
 
 
-  def export_kml(self, name):
+  def export_kml(self, name, tx_id):
 
     # E.g.: https://developers.google.com/kml/documentation/kmlreference#gxtrack 
     # TODO The file is way longer than it needs to be, since I wanted to display
@@ -483,7 +483,7 @@ class track:
     fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
     fd.write('<Folder>\n')
     fd.write('  <Placemark>\n')
-    fd.write('    <name>Transmitter %s</name>\n' % name)
+    fd.write('    <name>%s (txID=%d)</name>\n' % (name, tx_id))
     fd.write('    <gx:Track>\n')
     for (P, t, pos_id) in self.track: 
       tm = time.gmtime(t)
@@ -547,7 +547,7 @@ def tx_name(db_con):
 
 if __name__ == '__main__': 
   
-  tx_id = 5 
+  tx_id = 5
   M = track.maxspeed_exp((10, 1), (300, 0.1), 0.05)
   #M = track.maxspeed_linear((10, 1), (180, 0.1), 0.05)
   C = 1
@@ -563,7 +563,7 @@ if __name__ == '__main__':
   # and stitching them together in post processing. Could I prove the optimality 
   # of this approach? 
   fella = trackall(db_con, tx_id, M, C) 
-  fella.export_kml(tx_name(db_con)[tx_id])
+  fella.export_kml(tx_name(db_con)[tx_id], tx_id)
 
   t = time.localtime(fella[0][1])
   s = time.localtime(fella[-1][1])
