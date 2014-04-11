@@ -469,7 +469,7 @@ class track:
                      pos_id, lon, lat, t, 'UTC'))
 
 
-  def export_kml(self, fn):
+  def export_kml(self, name):
 
     # E.g.: https://developers.google.com/kml/documentation/kmlreference#gxtrack 
     # <?xml version="1.0" encoding="UTF-8"?>
@@ -497,7 +497,27 @@ class track:
     # </Folder>
     # </kml>
     
-    pass # TODO 
+    fd = open('%s.kml' % name, 'w')
+    fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+    fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
+    fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
+    fd.write('<Folder>\n')
+    fd.write('  <Placemark>\n')
+    fd.write('    <name>Transmitter %s tracks</name>\n' % name)
+    fd.write('    <gx:Track>\n')
+    for (P, t, pos_id) in self.track: 
+      tm = time.gmtime(t)
+      t = '%04d-%02d-%02dT%02d:%02d:%02dZ' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
+      fd.write('      <when>%s</when>\n' % t)
+    for (P, t, pos_id) in self.track: 
+      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+      fd.write('      <gx:coord>%f %f 0</gx:coord>\n' % (lon, lat))
+    fd.write('    </gx:Track>\n')
+    fd.write('  </Placemark>\n')
+    fd.write('</Folder>\n')
+    fd.write('</kml>')
+    fd.close() 
 
 
 class trackall (track): 
@@ -513,11 +533,18 @@ class trackall (track):
 
   
 
+def tx_name(db_con):
+  cur = db_con.cursor()
+  cur.execute('SELECT id, name FROM qraat.txlist')
+  d = {}
+  for (id, name) in cur.fetchall():
+    d[id] = name
+  return d
 
 
 if __name__ == '__main__': 
   
-  tx_id = 9 
+  tx_id = 6 
   M = track.maxspeed_exp((10, 1), (300, 0.1), 0.05)
   #M = track.maxspeed_linear((10, 1), (180, 0.1), 0.05)
   C = 1
@@ -533,7 +560,7 @@ if __name__ == '__main__':
   # and stitching them together in post processing. Could I prove the optimality 
   # of this approach? 
   fella = trackall(db_con, tx_id, M, C) 
-  fella.insert_db(db_con)
+  fella.export_kml(tx_name(db_con)[tx_id])
 
   t = time.localtime(fella[0][1])
   s = time.localtime(fella[-1][1])
