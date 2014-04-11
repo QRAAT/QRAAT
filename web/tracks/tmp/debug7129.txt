@@ -1,0 +1,13 @@
+Tue, 25 Mar 14 21:45:04 -0700: === start
+Tue, 25 Mar 14 21:45:04 -0700: Start=2012_03_14_00_01_40
+Tue, 25 Mar 14 21:45:04 -0700: Stop=2012_03_17_04_01_12
+Tue, 25 Mar 14 21:45:04 -0700: Options=YYYY
+Tue, 25 Mar 14 21:45:04 -0700: Track=C2V1186_
+Tue, 25 Mar 14 21:45:04 -0700: Query=SELECT * from track WHERE datetime between '2012_03_14_00_01_40' and '2012_03_17_04_01_12' and transmitter like 'C2V1186_' ORDER BY transmitter, datetime ASC ;
+Tue, 25 Mar 14 21:45:04 -0700: Got 45 of track data
+Tue, 25 Mar 14 21:45:04 -0700: options: trace=1 unique=1 markstart=1 markend=1
+Tue, 25 Mar 14 21:45:04 -0700: numberoflines=45
+Tue, 25 Mar 14 21:45:04 -0700: writing kml file '7129.kml'
+Tue, 25 Mar 14 21:45:04 -0700: colorcode=9900FF00
+Tue, 25 Mar 14 21:45:04 -0700: finished writing kml file
+Tue, 25 Mar 14 21:45:04 -0700: === finish

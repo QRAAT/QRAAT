@@ -1,0 +1,27 @@
+Tue, 25 Mar 14 21:44:09 -0700: === start
+Tue, 25 Mar 14 21:44:09 -0700: Start=2012_03_14_00_01_40
+Tue, 25 Mar 14 21:44:09 -0700: Stop=2012_03_17_04_01_12
+Tue, 25 Mar 14 21:44:09 -0700: Options=YYYY
+Tue, 25 Mar 14 21:44:09 -0700: Track=All
+Tue, 25 Mar 14 21:44:09 -0700: Query=SELECT * from track WHERE datetime between '2012_03_14_00_01_40' and '2012_03_17_04_01_12' ORDER BY transmitter, datetime ASC ;
+Tue, 25 Mar 14 21:44:09 -0700: Got 664 of track data
+Tue, 25 Mar 14 21:44:09 -0700: options: trace=1 unique=1 markstart=1 markend=1
+Tue, 25 Mar 14 21:44:09 -0700: numberoflines=664
+Tue, 25 Mar 14 21:44:09 -0700: writing kml file '3995.kml'
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=9900FF00
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99999900
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99000099
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99CCCC00
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99CCCC00
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=9900CCCC
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99333300
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99000099
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99009900
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99000033
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99000066
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=9900FF00
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99006666
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99009999
+Tue, 25 Mar 14 21:44:09 -0700: colorcode=99003333
+Tue, 25 Mar 14 21:44:09 -0700: finished writing kml file
+Tue, 25 Mar 14 21:44:09 -0700: === finish
