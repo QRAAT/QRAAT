@@ -15,7 +15,7 @@ var requesting = false ;			// flag set when an AJAX request is in progress
 var KmlFilename = null ;			// the filename for the current kml file, resulting from a doMakeKML()
 var KmlUrl = null ;				// the URL for the kml file
 var geoXmlKml = null ;				// object for the KML overlay
-var KMLURLROOT = "localhost/tracks/tmp/" ;	// The root part of the URL at which the drifter trajectory KML file is stored
+var KMLURLROOT = "qraat.ucdavis.edu/tracking-prototype/tmp/" ;	// The root part of the URL at which the drifter trajectory KML file is stored
 
 var DebugSelectedTrack = "" ;
 
