@@ -15,12 +15,47 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# NOTE Where I'm going next. 
 #
-# TODO 
-# - Look at velocity distribution for all transitions. 
-# - track2: construct DAG from all transitions. 
-# - For real time implementation, use overlapping windows and stitch
-#   critcal paths together. 
+# The algorihm
+# 
+#   I'm commiting to building the graph from all valid transitions, drawing
+#   an edge when the observed speed is less than the maximum given the 
+#   interval length. The quadratic factor here is reasonable for the tests
+#   I've done thus far. For example:
+#
+#     2013-07-27  04:06 - 2013-08-05  23:06  txID=9
+#     Length of critical path: 1768 (out of 6118)
+#
+#   This finishes in less than a minute and used about 4% of my 8GB of 
+#   memory at its peak. The nice thing is that the solution is optimal, 
+#   at least for the given time window. I've kept the old approach around
+#   in track.graph_alt(). 
+#
+#   TODO Compute critical paths of overlapping windows and tie them 
+#        together. The window should be something like 1000 positions. 
+#        Of course, if there are more candidates for the times of the 
+#        first and last positions, they should be included in the window. 
+# 
+# Feasibility metric
+# 
+#   Assume the transition speed is exponentially distributed, paramterized 
+#   by the maximum speed given the time interval. Since the observed speed
+#   is calculated from a straight line drawn between the two points, it 
+#   is the minimum speed that the target could have traveled. Thus, the 
+#   probability of the transition is prob. mass function integratedd from
+#   S to infinity. 
+# 
+#   TODO [track.transition_distribution()] Verify that the transition
+#        speeds are indeed approximately exponential. 
+# 
+#   TODO [track.graph()] A more sophisticated feasibility metric would 
+#        calculate the probability of the observed speed. If the event is
+#        is probable, than add its edge to the graph. 
+#
+#   TODO Think about composing this probability with the position 
+#        likelihood. These would need to be normalized (see notes.)  
 
 import numpy as np
 import time, os, sys
@@ -67,6 +102,7 @@ class Node:
     # Connected component analysis. 
     self.c_size   = 1
     self.c_height = 0
+    self.c_parent = None
   
     # Topological sorting. 
     self.t_visited = False
@@ -82,6 +118,7 @@ class Node:
     ''' Reset algorithm paramaters. ''' 
     self.c_size   = 1
     self.c_height = 0
+    self.c_parent = None
     self.dist     = 0 
     self.parent   = None
 
@@ -92,8 +129,8 @@ class Node:
   def c_find(self):
     ''' Disjoint-set find operation for CC-analysis. ''' 
     p = self
-    while (p.parent != None): 
-      p = p.parent
+    while (p.c_parent != None): 
+      p = p.c_parent
     return p
 
   def c_union(self, u):
@@ -106,21 +143,21 @@ class Node:
       p = x
     
     elif (x.c_height == y.c_height): # x and y have the same height.
-      y.parent  = x
+      y.c_parent  = x
       x.c_height += 1
       x.c_size   += y.c_size
       p = x
 
     elif (x.c_height > y.c_height): # x is taller than y.
-      y.parent = x
+      y.c_parent = x
       x.c_size  += y.c_size
       p = x
 
     else: # y is taller than x.
-      x.parent = y
+      x.c_parent = y
       y.c_size  += x.c_size
       p = y
-      
+    
     return p
 
 
@@ -199,7 +236,36 @@ class track:
       :return: The roots of the graph. 
       :rtype: Node list
     '''
+    
+    nodes = []
+    for i in range(len(pos)): 
+      (P, t, ll) = (np.complex(pos[i][0], pos[i][1]), float(pos[i][2]), float(pos[i][3]))
+      nodes.append(Node(P, t, ll)) 
+
+    for i in range(len(nodes)):
+      for j in range(i+1, len(nodes)):
+        if nodes[i].t < nodes[j].t and speed(nodes[i], nodes[j]) < M(nodes[j].t - nodes[i].t): 
+          nodes[i].adj_out.append(nodes[j])
+          nodes[j].adj_in.append(nodes[i]) 
   
+    roots = [] 
+    for u in nodes:
+      if len(u.adj_in) == 0:
+        roots.append(u) 
+   
+    return roots
+  
+  
+  def graph_alt(self, pos): 
+    ''' Alternative DAG-building algorithm. 
+    
+      This is an attempt to reduce the complexity of the graph. The number 
+      of possible edges is O(n choose 2). We test a new node for a feasible
+      transition from a set of graph leaves. The problem is that segments of
+      the true track of the target can be orphaned by the process. More
+      thinking is required. **TODO** 
+    '''
+
     roots = []; leaves = []
     i = 0 
     while i < len(pos) - 1:
@@ -217,7 +283,7 @@ class track:
             ok = True
             w.adj_in.append(v)
             v.adj_out.append(w)
-            # TODO Union
+            w.c_union(v)
         
         if not ok: # New root. 
           roots.append(w) 
@@ -237,7 +303,14 @@ class track:
       leaves = newLeaves
 
       i = j 
-  
+
+    # Exclude isolated nodes.
+    #retRoots = []
+    #for node in roots:
+    #  if node.c_find().c_size > 1:
+    #    retRoots.append(node)
+    #return retRoots
+    
     return roots
   
 
@@ -281,10 +354,9 @@ class track:
       :param C: Constant hop cost. 
       :type C: float
     '''
-    # TODO map : CC -> (cost, node) 
 
     cost = 0
-    node = None 
+    node = None
     for v in sorted_nodes: 
       mdist = 0
       mparent = None
@@ -294,12 +366,13 @@ class track:
           mparent = u
       v.parent = mparent
       v.dist = mdist + C + v.ll 
-      
+     
       if v.dist > cost:
         cost = v.dist
         node = v
-      
+
     path = []
+    
     while node != None:
       path.append((node.P, node.t))
       node = node.parent
@@ -352,11 +425,9 @@ class track:
     pos = cur.fetchall()
     return [] # TODO 
 
-  def
-
   @classmethod
-  def maxspeed_linear(cls, burst, sustained):
-    return lambda (t) : max(0.01, (t - burst[0]) * (
+  def maxspeed_linear(cls, burst, sustained, limit):
+    return lambda (t) : max(limit, (t - burst[0]) * (
             float(sustained[1] - burst[1]) / (sustained[0] - burst[0])) + burst[1])
 
   @classmethod
@@ -425,74 +496,16 @@ class trackall (track):
     self._fetchall(db_con, tx_id)
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
+
   
-
-
-class trackall2 (track): 
- 
-  ''' Test all possible transitions, i.e. overload graph(). ''' 
-
-  def __init__(self, db_con, tx_id, M):
-    self._fetchall(db_con, tx_id)
-    roots = self.graph(self.pos)
-    self.track = self.critical_path(self.toposort(roots), M)
-
-  def graph(self, pos): 
-    
-    nodes = []
-    for i in range(min(len(pos),100)): # FIXME stop gap
-      (P, t, ll) = (np.complex(pos[i][0], pos[i][1]), float(pos[i][2]), float(pos[i][3]))
-      nodes.append(Node(P, t, ll)) 
-
-    for i in range(len(nodes)):
-      for j in range(i+1, len(nodes)):
-        if nodes[i].t < nodes[j].t: # and speed(nodes[i], nodes[j]) < M(nodes[j].t - nodes[i].t): 
-          nodes[i].adj_out.append(nodes[j])
-          nodes[j].adj_in.append(nodes[i]) 
-  
-    roots = [] 
-    for u in nodes:
-      if len(u.adj_in) == 0:
-        roots.append(u) 
-   
-    return roots
-  
-  def critical_path(self, sorted_nodes, M): 
-    cost = 0
-    node = None 
-
-    for v in sorted_nodes: 
-      mdist = 0
-      mparent = None
-      for u in v.adj_in:
-        if u.dist > mdist:
-          mdist = u.dist
-          mparent = u
-      v.parent = mparent
-      if mparent:
-        ll = v.ll / sum(map(lambda(w) : w.ll, mparent.adj_out))
-        v.dist = mdist + (ll * np.exp((-1) * M(v.t - mparent.t) * speed(mparent, v))) 
-      else: v.dist = mdist + 0.01
-      if v.dist > cost:
-        cost = v.dist
-        node = v
-      
-    path = []
-    while node != None:
-      path.append((node.P, node.t))
-      node = node.parent
-    
-    path.reverse()
-    return path
-
-
 
 
 
 if __name__ == '__main__': 
   
-  tx_id = 6
-  M = track.maxspeed_exp((10, 1), (180, 0.1), 0)
+  tx_id = 8 
+  M = track.maxspeed_exp((10, 1), (300, 0.1), 0.05)
+  #M = track.maxspeed_linear((10, 1), (180, 0.1), 0.05)
   C = 1
 
   db_con = util.get_db('reader')
