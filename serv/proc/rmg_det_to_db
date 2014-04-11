@@ -66,14 +66,14 @@ try:
 
     site_dir = '%s/%s' % (det_dir, site)
     
-    # Don't process sites currently being fetched. 
-    if not os.path.isfile('%s/fetching.site' % (site_dir)):
+    # Don't process sites currently being fetched or that don't have files in them. 
+    if os.path.isdir(site_dir) and not os.path.isfile('%s/fetching.site' % (site_dir)):
               
       (status, output) = commands.getstatusoutput(
-        '/usr/bin/find %s/%s/????/??/??/??/?? -type d' % (
-          det_dir, site))
+        '/usr/bin/find %s/????/??/??/??/?? -type d' % site_dir )
+
            
-      if status == 0:
+      if status == 0 and output:
     
         # Batch process only the newest 20 directories that were created.
         leaf_dirs = sorted(output.split('\n'), reverse=True)
@@ -84,40 +84,54 @@ try:
 
         for leaf_dir in leaf_dirs:
 
-          # Process det files, store signals in the databse. 
-          try:
-            table = qraat.est(dets=qraat.det.read_dir(leaf_dir))
-          except IOError:
-            m = leaf_regex.search(leaf_dir)
+          #get directories
+          date_tuple = leaf_regex.search(leaf_dir).groups(0)
+
+          # Process det files, store signals in the database. 
+          det_list, bad_list = qraat.det.read_dir(leaf_dir)
+                    
+          if bad_list: #there are non-readable det files
+            
             det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
             q_dir = ("%s/%s_" % (det_q, site)) +\
-                       ("%s.%s.%s.%s.%s/" % m.groups(0))
-            commands.getstatusoutput("mv {0} {1}".format(leaf_dir,q_dir))
-            continue
-            
+                       ("%s.%s.%s.%s.%s/" % date_tuple)
+            os.makedirs(q_dir)
+            for f in bad_list:
+              commands.getstatusoutput("mv {0} {1}".format(f,q_dir))
+          
+          table = qraat.est(dets=det_list)
+  
           cur = db_con.cursor()
           for row in table: 
             try:
               table.write_db_row(cur, row, site)
             except qraat.ResolveIdError, e:
               print >>sys.stderr, "det_to_db: warning: skipping est corresponding to '%s'" % e.filename
-#          cur.execute('COMMIT')
+              det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
+              q_dir = ("%s/%s_" % (det_q, site)) +\
+                       ("%s.%s.%s.%s.%s/" % date_tuple)
+              try:
+                os.makedirs(q_dir)
+              except OSError, e:            # Catch if directory exists;
+                if e.errno != errno.EEXIST: # otherwise, throw exception.  
+                  raise e
+              commands.getstatusoutput("mv {0} {1}".format(e.filename,q_dir))
+          
                   
           # Archive table as est file. 
-          m = leaf_regex.search(leaf_dir) 
           table.write(("%s/%s/" % (est_arch, site)) +\
-                       ("%s/%s/%s/%s/%s/" % m.groups(0)))
+                       ("%s/%s/%s/%s/%s/" % date_tuple))
           
           # Archive processed det files.
           arch_fn = ("%s/%s/" % (det_arch, site)) +\
-                     ("%s/%s/%s/%s/%s/" % m.groups(0))
+                     ("%s/%s/%s/%s/%s/" % date_tuple)
           try:
             os.makedirs(arch_fn)
           except OSError, e:            # Catch if directory exists;
             if e.errno != errno.EEXIST: # otherwise, throw exception.  
               raise e
 
-          arch_fn += site + (".%s.%s.%s.%s.%s.tar" % m.groups(0))
+          arch_fn += site + (".%s.%s.%s.%s.%s.tar" % date_tuple)
           if os.path.isfile(arch_fn): 
             (status, output) = commands.getstatusoutput(
               '/bin/tar -rf %s -C %s .' % (arch_fn, leaf_dir))
@@ -126,12 +140,14 @@ try:
               '/bin/tar -cf %s -C %s .' % (arch_fn, leaf_dir))
 
           # Delete processed det files. 
-          # TODO prune empty directories? 
           if status != 0: 
             print >>sys.stderr, "det_to_db: error: archiving %s: %s" % (
               site, output)
           else:  
             commands.getstatusoutput('rm -fr %s' % leaf_dir)
+
+      else:# error in find or it returned nothing
+        print >>sys.stderr, "det_to_db: error: {2}: find returned \"{0}\" with status {1}".format(output,status,site_dir)
 
 except mdb.Error, e: 
   print >>sys.stderr, "det_to_db: error: [%d] %s" % (e.args[0], e.args[1])

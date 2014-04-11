@@ -1,5 +1,5 @@
-# est.py - Structure for holding processed .det files. Output 
-# formats: .csv and .est. This file is part of QRAAT, an automated 
+# est.py - Structure for processing .det files. Output to file 
+# (.csv) or database. This file is part of QRAAT, an automated 
 # animal tracking system based on GNU Radio. 
 #
 # Copyright (C) 2013 Todd Borrowman, Christopher Patton
@@ -16,10 +16,14 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# 
+# TODO 
+#  - Deal with legacy headers in reading .csv files. 
 
+from error import ResolveIdError
 from csv import csv, pretty_printer
 from det import det
-import os, time, errno
+import sys, os, time, errno
 import numpy as np
 from string import Template
 
@@ -27,10 +31,7 @@ try:
   import MySQLdb as mdb
 except ImportError: pass
 
-  
-  # TODO find a better home for these queries. It was suggested 
-  # that we move all of our queries to a single, controlled 
-  # file. 
+# Some SQL queries. 
 
 query_insert_est = Template(
   '''INSERT INTO est 
@@ -70,20 +71,6 @@ query_update_est = Template(
       nc41r=$nc41r, nc41i=$nc41i, nc42r=$nc42r, nc42i=$nc42i, nc43r=$nc43r, nc43i=$nc43i, nc44r=$nc44r, nc44i=$nc44i, 
       fdsnr=$fdsnr, edsnr=$edsnr, timezone='$timezone', txid=$txid
      WHERE ID=$ID''')
-
-
-
-class ResolveIdError (Exception):
-  """ Exception class for resolving database IDs for est entries. """
-
-  def __init__(self, row):
-    self.filename = row.fn
-    self.txid     = row.txid
-    self.siteid   = row.siteid
-     
-  def __str__(self):
-    return "could not resolve foreign key(s) for est table row (txid='%s', siteid='%s')" % (
-      self.txid, self.siteid)
 
 
 class est (csv):
@@ -160,7 +147,7 @@ class est (csv):
     self._row_template = "%10s " * len(self.headers)
 
     if fn: 
-      self.read(fn)
+      self.read(fn, build_header=False)
 
     if det:
       self.append(det)
@@ -287,7 +274,7 @@ class est (csv):
     tagname_index = { row['id'] : row['name'] for row in cur.fetchall() }
 
     # Select pulses produced over the specified range and populate table. 
-    cur.execute('''SELECT * 
+    cur.execute('''SELECT *
                      FROM est 
                     WHERE (%f <= timestamp) AND (timestamp <= %f)''' % (i, j))
     for row in cur.fetchall():
@@ -296,7 +283,6 @@ class est (csv):
         setattr(new_row, col, val)
       new_row.tagname = tagname_index[new_row.txid]
       self.table.append(new_row)
-
     
   def write_db(self, db_con, site=None):
     """ Write rows to the database and commit. 
@@ -310,7 +296,6 @@ class est (csv):
     cur = db_con.cursor()
     for row in self.table: 
       self.write_db_row(cur, row, site) 
-    cur.execute('COMMIT')
 
   def write_db_row(self, cur, row, site=None):
     """ Write a row to the database. 
@@ -339,8 +324,11 @@ class est (csv):
     if row.siteid == None:
       row.siteid = self.siteid_index.get(site)
 
-    if row.txid == None or row.siteid == None:
-      raise ResolveIdError(row)
+    if row.txid == None:
+      raise ResolveIdError('txid',row.tagname,row.fn)
+
+    if row.siteid == None:
+      raise ResolveIdError('siteid',site,row.fn)
 
     query = query_insert_est if row.ID == None else query_update_est
     # When the template string performs the substitution, it casts 
@@ -351,20 +339,37 @@ class est (csv):
     row.timestamp = repr(row.timestamp) 
     row.datetime = pretty_printer(row.datetime)
     cur.execute(query.substitute(row))
-  
-
 
 
 if __name__=="__main__":
 
   try:
-    #db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
-    #fella = est()
-    #fella.read_db(db_con, time.time() - 3600000, time.time())
-    #fella.write_db(db_con, site='site2')
-    fella = est(det=det('test.det'))
-    print repr(fella[0].timestamp)
-    print str(fella[0].timestamp)
+    db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
+
+    guy = est()
+    guy.read_db(db_con, 1376420800.0, 1376427800.0)
+    print np.array( [
+      [ np.complex(guy[23].nc11r, guy[23].nc11i), 
+        np.complex(guy[23].nc12r, guy[23].nc12i), 
+        np.complex(guy[23].nc13r, guy[23].nc13i), 
+        np.complex(guy[23].nc14r, guy[23].nc14i) ],
+      [ np.complex(guy[23].nc21r, guy[23].nc21i), 
+        np.complex(guy[23].nc22r, guy[23].nc22i), 
+        np.complex(guy[23].nc23r, guy[23].nc23i), 
+        np.complex(guy[23].nc24r, guy[23].nc24i) ],
+      [ np.complex(guy[23].nc31r, guy[23].nc31i), 
+        np.complex(guy[23].nc32r, guy[23].nc32i), 
+        np.complex(guy[23].nc33r, guy[23].nc33i), 
+        np.complex(guy[23].nc34r, guy[23].nc34i) ],
+      [ np.complex(guy[23].nc41r, guy[23].nc41i), 
+        np.complex(guy[23].nc42r, guy[23].nc42i), 
+        np.complex(guy[23].nc43r, guy[23].nc43i), 
+        np.complex(guy[23].nc44r, guy[23].nc44i) ],
+        ] )
+
+    fella = est2(db_con, 1376420800.0, 1376427800.0)
+    print fella.nc[23]
+
 
   except mdb.Error, e:
     print sys.stderr, "error (%d): %s" % (e.args[0], e.args[1])

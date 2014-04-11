@@ -1,14 +1,13 @@
 #!/bin/bash
-#rmg_process
+#rmg_zapflags
 #
 # This script is part of the QRAAT system.
 #
-# Copyright (C) 2013 Christopher Patton
+# Copyright (C) 2013 Marcel Losekoot
 #
-# This is a wrapper script for the processing .det files into the 
-# database and archiving them. Eventually, we'll have additional 
-# processing steps, such as filtering the est rows. In cron:
-#	* * * * * rmg_process >>/var/log/rmg/rmg_process 2>&1
+# This script is responsible for deleting flag files upon reboot.
+# Call this script from cron:
+#	@reboot rmg_zapflags
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,29 +23,21 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# Check for attempted reentry
-name=`basename $0`
-count=`pgrep -c $name`
-if [ "$count" -gt "1" ]
+# Dispense with the usual check for reentry
+
+echo
+echo Starting $0 at `date`
+# Set RMG environment variables
+source rmg_env
+
+# Check that environment variables are actually set
+echo Checking environment variables are set
+if [ -z "$RMG_SERVER_DET_DIR" ]
 then
-	echo $name already running, bye!
+	echo ERROR: environment variable RMG_SERVER_DET_DIR is not set, bailing out
 	exit 1
 fi
 
-source rmg_env
+find $RMG_SERVER_DET_DIR -maxdepth 2 -type f -iname fetching.site -exec rm -f {} \;
 
-echo Starting `date`
-echo
-echo det_to_db
-rmg_det_to_db
-#remove empty directories
-find $RMG_SERVER_DET_DIR -mindepth 1 -depth -empty -delete
-echo 
-echo rmg_position_auto
-rmg_position_auto
-#echo
-#echo rmg_filterest
-#rmg_filterest
-echo
-echo Finished `date`
-echo
+#END

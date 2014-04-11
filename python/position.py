@@ -17,12 +17,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import MySQLdb as mdb
 import numpy as np
 import time, os, sys
+import random
 
 import util
 from csv import csv
+
+try:
+  import MySQLdb as mdb
+except ImportError: pass
 
 #: Center of Quail Ridge reserve (northing, easting). This is the first
 #: "candidate point" used to construct the search space grid. TODO: 
@@ -30,24 +34,19 @@ from csv import csv
 #:  ~ Chris 1/2/14
 center = np.complex(4260500, 574500)
 
-class bearing_likelihoods:
+class steering_vectors:
+  ''' Encapsulate steering vectors. 
+    
+    The bearings and their corresponding steering vectors are stored
+    in dictionaries indexed by site ID. This class also stores 
+    provenance information for bearing likelihood calculation and 
+    position estimation. 
+
+    :param cal_id: Calibration ID. 
+    :type cal_id: int
+  ''' 
   
-  def __init__(self, db_con, cal_id, tx_id=None, t_start=None, t_end=None):
-    ''' Encapsulate bearings and their likelihoods for a range of ESTs. 
-
-      *TODO*
-    ''' 
-    self.get_site_data(db_con, cal_id)
-    if tx_id != None: 
-      self.get_est_data(db_con, t_start, t_end, tx_id)
-      self.calc_likelihoods()
-    else: self.likelihoods = None
-
-  def get_site_data(self, db_con, cal_id):
-    ''' Get steering vectors for likelihood calculations. ''' 
-
-    print "position: fetching site and cal data"
-
+  def __init__(self, db_con, cal_id):
     deps = []
 
     # Get site locations.
@@ -86,97 +85,144 @@ class bearing_likelihoods:
     for site in sites:
       setattr(site, 'pos', np.complex(site.northing, site.easting))
 
-    # FIXME Minimizing code changes until I can verify prov workflow. 
     (self.sites, self.bearings, self.steering_vectors, 
      self.prov_sv_ids, self.deps, self.sv_deps_by_site) = (sites, bearings, steering_vectors, 
                                                            prov_sv_ids, deps, sv_deps_by_site)
 
 
-  def get_est_data(self, db_con, t_start, t_end, tx_id):
-    ''' Get signals for transmitter in time range. ''' 
-    
-    print "position: fetching pulses for transmitter and time range"
-    
+class signal:
+  ''' Encapsulate pulse signal data. 
+  
+    I'm evaluating what functionality I want from the est object so 
+    that the data is more chewable in bearing and position calculation.
+    My thinking now is that this could replace est entirely and be 
+    the interface between det's, DB, and file. For now, it will serve
+    useful for exploring. 
+  ''' 
+
+  #: Number of channels. 
+  N = 4
+
+  
+  # FIXME band_filter option is a temporary solution. 
+
+  def __init__(self, db_con, t_start, t_end, tx_id=None, band_filter=False):
+
+    # Store eigenvalue decomposition vectors and noise covariance
+    # matrices in NumPy arrays. 
     cur = db_con.cursor()
-
-    # Get pulses in time range.
-    cur.execute('''SELECT ID, siteid, timestamp,
-                          ed1r, ed1i, ed2r, ed2i,
-                          ed3r, ed3i, ed4r, ed4i
+    cur.execute('''SELECT ID, siteid, txid, timestamp, edsp, 
+                          ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
+                          nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+                          nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+                          nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+                          nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
                      FROM est
-                    WHERE timestamp >= %s
-                      AND timestamp <= %s
-                      AND txid = %s
-                    ORDER BY timestamp ASC''', (t_start,
-                                                t_end,
-                                                tx_id))
+                    WHERE (%f <= timestamp) AND (timestamp <= %f) 
+                          %s %s''' % (
+                            t_start, t_end, 
+                           ('AND txid=%d' % tx_id) if tx_id else '',
+                           ('AND (band3 < 150) AND (band10 < 900)' if band_filter else '')))
+  
+    raw = np.array(cur.fetchall(), dtype=float)
 
-    raw_data = cur.fetchall()
-    prov_est_ids = util.get_field(raw_data, 0)
-    signal_data = np.array(raw_data, dtype=float)
-    est_ct = signal_data.shape[0]
-    if est_ct == 0:
-      print >>sys.stderr, "position: fatal: no est records for selected time range."
-      sys.exit(1)
-    else: print "position: processing %d records" % est_ct
+    if raw.shape[0] == 0: 
+      self.id = self.site_id = self.tx_id = self.timestamp = np.array([])
+      self.edsp = self.ed = self.nc = np.array([])
+      self.signal_ct = 0
+   
+    else:
+      # Metadata. 
+      (self.id, 
+       self.site_id, 
+       self.tx_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
+      self.timestamp = raw[:,3]
+      raw = raw[:,4:]
 
-    sig_id =   np.array(signal_data[:,0], dtype=int)
-    site_id =  np.array(signal_data[:,1], dtype=int)
-    est_time = signal_data[:,2]
-    signal =   signal_data[:,3::2]+np.complex(0,-1)*signal_data[:,4::2]
+      # Signal power. 
+      self.edsp = raw[:,0]
+      raw = raw[:,1:]
 
-    # FIXME
-    (self.sig_id, self.site_id, self.est_time, 
-     self.signal, self.est_ids) = (sig_id, site_id, est_time, 
-                                        signal, prov_est_ids)
+      # Signal vector, N x 1.
+      self.ed = raw[:,0:8:2] + np.complex(0,-1) * raw[:,1:8:2]
+      raw = raw[:,8:]
+
+      # Noise covariance matrix, N x N. 
+      self.nc = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
+      self.nc = self.nc.reshape(raw.shape[0], self.N, self.N)
+
+      self.signal_ct = self.id.shape[0]
+
+  def __len__(self): 
+    return self.signal_ct
 
 
-  def calc_likelihoods(self): 
-    ''' Calculate the likelihood of each bearing for each pulse. ''' 
+
+
+class bearing: 
+  ''' Calculate and store bearing likelihood distributions for a signal window.
+
+    The likelihoods calculated for the bearings are based on Bartlet's estimator. 
+
+    :param sv: Steering vectors per site. 
+    :type sv: qraat.position.steering_vectors
+    :param sig: A set of signals for a given transmitter and time window.  
+    :type qraat.position.signal: 
+  ''' 
+
+  def __init__(self, sv, sig): 
+  
+    self.sites   = sv.sites
+    self.id      = sig.id
+    self.site_id = sig.site_id
+    self.time    = sig.timestamp
 
     record_provenance_from_site_data = False
 
-    print "position: calculating pulse bearing likelihoods"
-
-    likelihoods = np.zeros((self.signal.shape[0],360))
-    for i in range(self.signal.shape[0]):
+    likelihoods = np.zeros((len(sig), 360))
+    for i in range(len(sig)):
       try:
-        sv =  self.steering_vectors[self.site_id[i]]
-        sv_deps = self.sv_deps_by_site[self.site_id[i]]
+        G      = sv.steering_vectors[self.site_id[i]]
+        G_deps = sv.sv_deps_by_site[self.site_id[i]]
       except KeyError:
         print >>sys.stderr, "position: error: no steering vectors for site ID=%d" % self.site_id[i]
         sys.exit(1)
 
-      sig = self.signal[i,np.newaxis,:]
-      sig_dep = self.est_ids[i]
-      left_half = np.dot(sig, np.conj(np.transpose(sv)))
+      V     = sig.ed[i, np.newaxis,:]
+      V_dep = sig.id[i]
+
+      # Bartlet's estimator. 
+      left_half = np.dot(V, np.conj(np.transpose(G)))
       bearing_likelihood = (left_half * np.conj(left_half)).real
-      bearing_likelihood_deps = [('Steering_Vectors', x) for x in sv_deps]
-      bearing_likelihood_deps.append(('est', sig_dep))
+
+      bearing_likelihood_deps = [('Steering_Vectors', x) for x in G_deps]
+      bearing_likelihood_deps.append(('est', V_dep))
 
       likelihood_deps = {}
-      for j, value in enumerate(self.bearings[self.site_id[i]]):
-        likelihoods[i, value] = bearing_likelihood[0, j]
-        likelihood_deps[i, value] = bearing_likelihood_deps
+      for j, theta in enumerate(sv.bearings[self.site_id[i]]):
+        likelihoods[i, theta] = bearing_likelihood[0, j]
+        likelihood_deps[i, theta] = bearing_likelihood_deps
 
-    # FIXME
     self.likelihoods = likelihoods
     if record_provenance_from_site_data:
       self.likelihood_deps = likelihood_deps
     else:
       self.likelihood_deps = [] 
-    return (self.likelihoods, self.likelihood_deps)
 
 
-  def position_estimation(self, index_list, center, scale, half_span=15):
-    ''' Estimate the position of a transmitter over time interval ``[i, j]``.
+  def __len__(self): 
+    return self.likelihoods.shape[0]
+
+  def position_estimator(self, index_list, center, scale, half_span=15):
+    ''' Estimate the position of a transmitter over time interval.
 
       Generate a set of candidate points centered around ``center``.
       Calculate the bearing to the receiver sites from each of this points.
       The log likelihood of a candidate corresponding to the actual location
       of the target transmitter over the time window is equal to the sum of
-      the likelihoods of each of these bearings given the signal characteristics
-      of the ESTs in the window. This method uses Bartlet's estimator. 
+      the likelihoods of each of these bearings given the signals in the 
+      window. Return an estimate of the maximal point along with its 
+      likelihood.
     '''
 
     #: Generate candidate points centered around ``center``.
@@ -189,9 +235,7 @@ class bearing_likelihoods:
     #: candidate point to each receiver site.
     site_bearings = {}
     for site in self.sites:
-      #site_bearings[:,:,sv_index] = np.angle(grid - site.pos) * 180 / np.pi
       site_bearings[site.ID] = np.angle(grid - site.pos) * 180 / np.pi
-    #site_bearings = np.zeros(np.hstack((grid.shape,len(self.sites))))
 
     #: Based on bearing self.likelihoods for EST's in time range, calculate
     #: the log likelihood of each candidate point.
@@ -209,52 +253,109 @@ class bearing_likelihoods:
              # TODO perhaps there should be a row in qraat.sitelist that 
              # designates sites as qraat nodes. ~ Chris 1/2/14 
 
-    return grid.flat[np.argmax(pos_likelihood)]
+    max_index = np.argmax(pos_likelihood)
+    return (grid.flat[max_index], round(pos_likelihood.flat[max_index], 6))
+
+  def jitter_estimator(self, index_list, center, scale, half_span=15):
+    ''' Position estimator with a little jitter around the center. 
+    
+      Vary the northing and easting of the center uniformly plus 
+      or minus the scaling factor. 
+    ''' 
+
+    (j_neg, j_pos) = (scale / -2, scale / 2)
+    j_center = center + np.complex(round(random.uniform(j_neg, j_pos), 2), 
+                                   round(random.uniform(j_neg, j_pos), 2))
+    
+    return self.position_estimator(index_list, j_center, scale, half_span) 
 
 
 
+class mle_bearing (bearing): 
+  ''' Calculate bearing distribution with the minimum likelihood estimator. ''' 
 
-def calc_positions(bearing_likelihoods, t_window, t_delta, verbose=False):
+  def __init__(self, sv, sig): 
+    self.sites   = sv.sites
+    self.id      = sig.id
+    self.site_id = sig.site_id
+    self.time    = sig.timestamp
+
+    record_provenance_from_site_data = False
+
+    self.likelihoods = np.zeros((len(sig), 360)) # TODO 
+    self.likelihood_deps = []                    # TODO 
+
+
+
+def calc_windows(bl, t_window, t_delta):
+  ''' Divide est data into uniform time windows. 
+
+    Return a tuple with the timestamp of the start of the window 
+    and a list of indices corresponding to the est's wihtin the 
+    window. 
+
+    :param bl: Bearing likelihoods for time range. 
+    :type bl: qraat.position.bearing
+    :param t_window: Number of seconds for each time window. 
+    :type t_window: int
+    :param t_delta: Interval of time between each position calculation.
+    :type t_delta: int
+  '''
+
+  start_step = np.ceil(bl.time[0] / t_delta)
+  while start_step*t_delta - (t_window / 2.0) < bl.time[0]:
+    start_step += 1
+  start_step -= 1
+
+  end_step = np.floor(bl.time[-1] / t_delta)
+  while end_step*t_delta + (t_window / 2.0) > bl.time[-1]:
+    end_step -= 1
+  end_step += 1
+  
+  for time_step in range(int(start_step),int(end_step)):
+
+    # Find the indexes corresponding to the time window.
+    est_index_list = np.where(
+      np.abs(bl.time - time_step*t_delta - t_window / 2.0) 
+        <= t_window / 2.0)[0]
+
+    if len(est_index_list) > 0:
+      yield (time_step * t_delta, est_index_list)
+
+
+
+def calc_positions(bl, t_window, t_delta, verbose=False):
   ''' Calculate positions of a transmitter over a time interval. 
   
-    The calculation is based on Bartlet's estimator. '''
+    :param bl: Bearing likelihoods for time range. 
+    :type bl: qraat.position.bearing
+    :param t_window: Number of seconds for each time window. 
+    :type t_window: int
+    :param t_delta: Interval of time between each position calculation.
+    :type t_delta: int
+    :param verbose: Output some debugging information. 
+    :type verbose: bool
+  '''
   pos_est = []
   pos_est_deps = []
-  est_ct = bearing_likelihoods.likelihoods.shape[0]
 
-  print "position: calculating position"
   if verbose:
     print "%15s %-19s %-19s %-19s" % ('time window',
               '100 meters', '10 meters', '1 meter')
 
-  start_step = np.ceil(bearing_likelihoods.est_time[0] / t_delta)
-  while start_step*t_delta - (t_window / 2.0) < bearing_likelihoods.est_time[0]:
-    start_step += 1
-  start_step -= 1
-
-  end_step = np.floor(bearing_likelihoods.est_time[-1] / t_delta)
-  while end_step*t_delta + (t_window / 2.0) > bearing_likelihoods.est_time[-1]:
-    end_step -= 1
-  end_step += 1
-
   try:
-    for time_step in range(int(start_step),int(end_step)):
+    for (t, index_list) in calc_windows(bl, t_window, t_delta): 
 
-      # Find the indexes corresponding to the time window.
-      est_index_list = np.where(
-        np.abs(bearing_likelihoods.est_time - time_step*t_delta - t_window / 2.0) 
-          <= t_window / 2.0)[0]
-
-      if len(est_index_list) > 0 and len(set(bearing_likelihoods.site_id[est_index_list])) > 1:
+      if (len(set(bl.site_id[index_list])) > 1): 
 
         if verbose: 
           print "Time window {0} - {1}".format(
-            time_step*t_delta - t_window / 2.0, time_step*t_delta + t_window)
+            t - t_window / 2.0, t + t_window)
 
         scale = 100
         pos = center
         while scale >= 1: # 100, 10, 1 meters ...
-          pos = bearing_likelihoods.position_estimation(est_index_list, pos, scale)
+          (pos, ll) = bl.jitter_estimator(index_list, pos, scale)
           if verbose:
             print "%8dn,%de" % (pos.real, pos.imag),
           scale /= 10
@@ -262,14 +363,20 @@ def calc_positions(bearing_likelihoods, t_window, t_delta, verbose=False):
         pos_deps = []
 
         # Determine components of est that contribute to the computed position.
-        for est_index in est_index_list:
-          pos_deps.append(bearing_likelihoods.est_ids[est_index])
-        pos_est.append((time_step*t_delta,
-                        pos.imag,  # easting
-                        pos.real)) # northing
+        for est_index in index_list:
+          pos_deps.append(bl.id[est_index])
+
+        pos_est.append((t,        # timestamp
+                        pos.imag, # easting
+                        pos.real, # northing
+                        ll))      # likelihood
 
         pos_est_deps.append({'est':tuple(pos_deps)})
         if verbose: print
+
+      # else: pos_est.append((t, nil, nil)) 
+      # NOTE Perhaps we should insert a "nil" position if there wasn't 
+      #  enough data to calculate a position. ~Chris 2/12/14
 
   except KeyboardInterrupt: 
     pass
@@ -283,8 +390,8 @@ def insert_positions(db_con, pos_est, pos_est_deps, tx_id):
     cur = db_con.cursor()
 
     query = '''INSERT INTO Position
-                (txid, timestamp, easting, northing)
-               VALUES (%s, %s, %s, %s)'''
+                (txid, timestamp, easting, northing, likelihood)
+               VALUES (%s, %s, %s, %s, %s)'''
     #cur.executemany(, [(tx_id, pe[0], pe[1], pe[2]) for pe in pos_est])
 
     # Insert results into database.
@@ -292,7 +399,7 @@ def insert_positions(db_con, pos_est, pos_est_deps, tx_id):
     for pos_est_index in range(len(pos_est)):
       this_pos_est = pos_est[pos_est_index]
       this_pos_est_deps = pos_est_deps[pos_est_index]
-      cur.execute(query, (tx_id, this_pos_est[0], this_pos_est[1], this_pos_est[2]))
+      cur.execute(query, (tx_id, this_pos_est[0], this_pos_est[1], this_pos_est[2], this_pos_est[3]))
       pos_est_insertion_id = cur.lastrowid
       all_insertions.append(pos_est_insertion_id)
       handle_provenance_insertion(cur, this_pos_est_deps, {'Position':(pos_est_insertion_id,)})
@@ -345,3 +452,65 @@ def handle_provenance_insertion(cur, depends_on, obj):
           prov_args.append(args)
   cur.executemany(query, prov_args) 
 
+
+class halfplane: 
+  ''' A two-dimensional linear inequality. 
+
+    Compute the slope and y-intercept of the line defined by point ``p`` 
+    and bearing ``theta``. Format of ``p`` is np.complex(real=northing, 
+    imag=easting). Also, ``pos`` is set to True if the vector theta goes 
+    in a positive direction along the x-axis. 
+  ''' 
+  
+  #: The types of plane constrains:
+  #: greater than, less than, greater than
+  #: or equal to, less than or equal to. 
+  plane_t = util.enum('GT', 'LT', 'GE', 'LE')
+  plane_string = { plane_t.GT : '>', 
+                   plane_t.LT : '<', 
+                   plane_t.GE : '>=', 
+                   plane_t.LE : '<=' }
+
+  def __init__ (self, p, theta):
+
+    self.x_p = p.imag
+    self.y_p = p.real
+    self.m = np.tan(np.pi * theta / 180) 
+    self.plane = None
+
+    if (0 <= theta and theta <= 90) or (270 <= theta and theta <= 360):
+      self.pos = True
+    else: self.pos = False 
+
+    if (0 <= theta and theta <= 180):
+      self.y_pos = True
+    else: self.y_pos = False
+
+  def __repr__ (self): 
+    s = 'y %s %.02f(x - %.02f) + %.02f' % (self.plane_string[self.plane], 
+                                           self.m, self.x_p, self.y_p)
+    return '%-37s' % s
+
+  def __call__ (self, x): 
+    return self.m * (x - self.x_p) + self.y_p
+
+  def inverse(self, y): 
+    return ((y - self.y_p) + (self.m * self.x_p)) / self.m
+
+  @classmethod
+  def from_bearings(cls, p, theta_i, theta_j):
+    Ti = cls(p, theta_i)
+    Tj = cls(p, theta_j) 
+    if Ti.pos:
+      Ti.plane = cls.plane_t.GT
+      if not Tj.pos:
+        Tj.plane = cls.plane_t.GT 
+      else: Tj.plane = cls.plane_t.LT
+    else:
+      Ti.plane = cls.plane_t.LT
+      if Tj.pos:
+        Tj.plane = cls.plane_t.LT
+      else: Tj.plane = cls.plane_t.GT
+    return (Ti, Tj)    
+
+  

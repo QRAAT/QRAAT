@@ -31,12 +31,13 @@ endif()
 GR_PYTHON_INSTALL(
     FILES
     __init__.py
+    error.py
     det.py
     est.py
     csv.py
     gps.py
     position.py
-    rmg_position_lib.py
+    track.py
     util.py
     DESTINATION ${GR_PYTHON_DIR}/qraat
 )
