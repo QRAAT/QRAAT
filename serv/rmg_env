@@ -123,7 +123,7 @@ export RMG_POS_TIME_WINDOW=30
 export RMG_POS_TIME_STEP=15
 
 # Calibration data to use in auto position calculation
-export RMG_POS_CAL_ID=1
+export RMG_POS_CAL_ID=3
 
 # Quarantine directory for bad files
 export RMG_QUARANTINE_DIR=/rmg_server/quarantine
