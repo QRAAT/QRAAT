@@ -95,7 +95,12 @@ try:
             det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
             q_dir = ("%s/%s_" % (det_q, site)) +\
                        ("%s.%s.%s.%s.%s/" % date_tuple)
-            os.makedirs(q_dir)
+            try:
+              os.makedirs(q_dir)
+            except OSError:
+              if not os.path.isdir(q_dir):
+                raise
+            
             for f in bad_list:
               commands.getstatusoutput("mv {0} {1}".format(f,q_dir))
           
