@@ -37,6 +37,7 @@ peak_detect::peak_detect(float rise_in, int confirmation_time_in, float alpha_in
   }
   if (alpha_in >= 0 && alpha_in <= 1){
     alpha=alpha_in;
+    time_constant = 1/alpha;
   }
   else{
     throw std::invalid_argument("alpha must be between 0 and 1 inclusive");
@@ -45,6 +46,7 @@ peak_detect::peak_detect(float rise_in, int confirmation_time_in, float alpha_in
   noise_floor=0.0;
   peak_value=0.0;
   confirmation_counter = 0;
+  samples_in_noise_floor=0;
   
 }
 
@@ -75,6 +77,7 @@ void peak_detect::set_alpha(float alpha_in){
 
   if (alpha_in >= 0 && alpha_in <= 1){
     alpha=alpha_in;
+    time_constant = 1/alpha;
   }
   else{
     throw std::invalid_argument("alpha must be between 0 and 1 inclusive");
@@ -83,13 +86,19 @@ void peak_detect::set_alpha(float alpha_in){
 }
 
 
-void peak_detect::set_noise_floor(float noise_floor_in){
+void peak_detect::set_noise_floor(float noise_floor_in, int samples){
 
   if (noise_floor_in > 0.0){
     noise_floor=noise_floor_in;
   }
   else{
     throw std::invalid_argument("noise_floor must be greater than zero");
+  }
+  if (samples > 0){
+    samples_in_noise_floor = samples;
+  }
+  else{
+    throw std::invalid_argument("samples must be a positive integer");
   }
 }
 
@@ -116,7 +125,13 @@ detect_state_t peak_detect::detect(const float data){
         peak_value=data;
       }
       else{                   //update noise_floor
-        noise_floor=alpha*data+(1-alpha)*noise_floor;
+        if (samples_in_noise_floor < time_constant){
+          noise_floor = noise_floor*samples_in_noise_floor/(samples_in_noise_floor + 1.0) + data/(samples_in_noise_floor + 1.0);
+          samples_in_noise_floor++;
+        }
+        else{
+          noise_floor=alpha*data+(1-alpha)*noise_floor;
+        }
       }
     break;
   

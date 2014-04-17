@@ -237,7 +237,7 @@ detectmod_detect::work (int noutput_items,
           if (save_holder_index == (save_length-1)){
             state = DETECT;
                     //initial estimate of the noise floor for detector
-            pkdet->set_noise_floor(acc_total);
+            pkdet->set_noise_floor(acc_total,acc_length);
             printf("%s Seed: %e\n",directory,acc_total);
           }
         break;

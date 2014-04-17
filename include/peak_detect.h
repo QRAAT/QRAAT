@@ -39,6 +39,8 @@ private:
   float rise;       //! Rise trigger
   int confirmation_time;  //! Number of samples after peak to wait before triggering
   float alpha;      //! Alpha factor
+  int time_constant;  //! Time constant in samples, =1/alpha
+  int samples_in_noise_floor; //! Number of samples in noise_floor estimation
   float peak_value; //! Current peak value
   float noise_floor;        //! Noise floor running average
   int confirmation_counter; //! Number of samples since event
@@ -114,6 +116,6 @@ public:
    * \brief Set noise floor value
    * \param noise_floor_in - New noise_floor estimate.
    */
-  void set_noise_floor(float noise_floor_in);
+  void set_noise_floor(float noise_floor_in, int samples);
 
 };
