@@ -55,6 +55,7 @@ if options.t_start == 0.0 and options.t_end == float("+inf"):
 else:
   track = qraat.track(db_con, options.t_start, options.t_end, options.tx_id, M, C)
 
+print len(track)
 # We then calculate statistics on the transition speeds in the 
 # critical path. Plotting the tracks might reveal spurious points
 # that we want to filter out. 
@@ -90,8 +91,8 @@ if overlay:
 
   # Plot tracks. 
   pp.scatter( 
-   map(lambda (P, t): E(P.imag), track), 
-   map(lambda (P, t): N(P.real), track), alpha=0.2, s=2, c='k', 
+   map(lambda (P, t, pos_id): E(P.imag), track), 
+   map(lambda (P, t, pos_id): N(P.real), track), alpha=0.2, s=2, c='k', 
      label='Transmitter tracks')
 
   # Plot sites. 
@@ -132,8 +133,8 @@ else:
   
   # Plot locations. 
   pp.plot( 
-   map(lambda (P, t): P.imag, track), 
-   map(lambda (P, t): P.real, track), '.', alpha=0.3)
+   map(lambda (P, t, pos_id): P.imag, track), 
+   map(lambda (P, t, pos_id): P.real, track), '.', alpha=0.3)
 
   pp.savefig('tx%d.png' % options.tx_id)
 
