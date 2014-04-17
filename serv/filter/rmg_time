@@ -47,6 +47,9 @@ CONFIG_DELTA_AWAY = 3
 # Distance to look for neighbors while scoring
 CONFIG_ERROR_ALLOWANCE = 0.2
 
+# False if actually apply changes to database, True if just write script to file (update.sql in cwd)
+CONFIG_JUST_STAGE_CHANGES = True
+
 def filter_site(s):
 	sites = s.split(',')
 	sites = [int(x.strip()) for x in sites]
@@ -162,8 +165,20 @@ def main():
 	print 'all sites ({}): {}'.format(len(all_sites), all_sites)
 	print 'all txids ({}): {}'.format(len(all_txids), all_txids)
 
-	sql_output_filename = 'update.sql'
-	sql_w = open(sql_output_filename, 'w')
+	change_handler = None
+	if CONFIG_JUST_STAGE_CHANGES:
+		sql_output_filename = 'update.sql'
+		sql_w = open(sql_output_filename, 'w')
+		change_handler = changes.ChangeHandler(sql_w, 'file')
+	else:
+		db_con = qraat.util.get_db('writer')
+		change_handler = changes.ChangeHandler(db_con, 'db')
+		
+	if just_stage_changes
+	change_handler = changes.ChangeHandler(
+
+	# Setting up connection to database...
+
 
 	# Only processing one
 
@@ -212,7 +227,8 @@ def main():
 			good_xs = [x['timestamp'] for x in good_stuff]
 			bad_xs = [x['timestamp'] for x in bad_stuff]
 			for bad_id in bad_ids:
-				sql_w.write('update est set score = -1 where ID = {};\n'.format(bad_id))
+				change_handler.add_score(bad_id, -1)
+				#sql_w.write('update est set score = -1 where ID = {};\n'.format(bad_id))
 
 		if use_time_filter:
 			points_under_consideration = []
@@ -240,7 +256,8 @@ def main():
 				scored_points = apply_time_filtering(points_under_consideration, txid)
 
 			for (id, score) in scored_points.items():
-				sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
+				change_handler.add_score(id, score)
+				#sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
 
 
 
