@@ -31,8 +31,8 @@ import sys, time
 
 #: 1 to use pulse_shape_discriminator in pulse detector, 0 to not
 #: use it. **TODO:** this shouldn't be hardcoded here. It should be 
-#: set in a top-level porgram.
-USE_PSD = 1 
+#: set in a top-level program.
+USE_PSD = 0 
 
 
 class usrp_top_block(gr.top_block):
@@ -48,26 +48,26 @@ class usrp_top_block(gr.top_block):
         :type channels: int
         """ 
 
-	def __init__(self, fpga_frequency = -10.7e6, decim_factor = 250, channels = 4):
-		gr.top_block.__init__(self)
+    def __init__(self, fpga_frequency = -10.7e6, decim_factor = 250, channels = 4):
+        gr.top_block.__init__(self)
 
-		self.channels = channels
-		
-		#: The USRP source block. 
-		self.u = uhd.usrp_source(device_addr="fpga=usrp1_fpga_4rx.rbf",
-                                         stream_args=uhd.stream_args('fc32', 
-                                         channels=range(self.channels)))
-		self.u.set_subdev_spec("A:A A:B B:A B:B")
+        self.channels = channels
 
-                # Set USB transfer rate to the bandwidth of the USRP. 
-                self.usrp_rate = self.u.get_clock_rate()
-		self.usb_rate = self.usrp_rate / decim_factor
-                self.u.set_samp_rate(self.usb_rate)
-                print "USB Rate: ", self.usb_rate
+        #: The USRP source block. 
+        self.u = uhd.usrp_source(device_addr="fpga=usrp1_fpga_4rx.rbf",
+                                 stream_args=uhd.stream_args('fc32', 
+                                     channels=range(self.channels)))
+        self.u.set_subdev_spec("A:A A:B B:A B:B")
+
+        # Set USB transfer rate to the bandwidth of the USRP. 
+        self.usrp_rate = self.u.get_clock_rate()
+        self.usb_rate = self.usrp_rate / decim_factor
+        self.u.set_samp_rate(self.usb_rate)
+        print "USB Rate: ", self.usb_rate
 
                 # All input channels should be set to the FPGA frequency.  
-		for j in range(self.channels):
-	                self.u.set_center_freq(fpga_frequency, j)
+        for j in range(self.channels):
+            self.u.set_center_freq(fpga_frequency, j)
                               
                
 class no_usrp_top_block(gr.top_block):
@@ -76,19 +76,19 @@ class no_usrp_top_block(gr.top_block):
           Replaces :class:`qraat. rmg.rmg_graphs.usrp_top_block`. 
         """
 
-	def __init__(self, fpga_frequency = -10.7e6, decim_factor = 250, channels = 4, variance = 0.0):
-		gr.top_block.__init__(self)
+    def __init__(self, fpga_frequency = -10.7e6, decim_factor = 250, channels = 4, variance = 0.0):
+        gr.top_block.__init__(self)
 
-                # Gaussian distributed signal source. 
-                noise_src = gr.noise_source_c(gr.GR_GAUSSIAN, variance, int(time.time()))
+        # Gaussian distributed signal source. 
+        noise_src = gr.noise_source_c(gr.GR_GAUSSIAN, variance, int(time.time()))
 
-                # Throttle signal to the same sampling rate as the USRP. 
-                throttle  = gr.throttle(gr.sizeof_gr_complex, 
-                  params.usrp_sampling_rate / float(decim_factor) * channels)
+        # Throttle signal to the same sampling rate as the USRP. 
+        throttle  = gr.throttle(gr.sizeof_gr_complex, 
+                                params.usrp_sampling_rate / float(decim_factor) * channels)
                 
-                #: Gaussian distributed signal source, deinterleaved to the number of channels. 
-                self.u = gr.deinterleave(gr.sizeof_gr_complex)
-                self.connect(noise_src,throttle,self.u)
+        #: Gaussian distributed signal source, deinterleaved to the number of channels. 
+        self.u = gr.deinterleave(gr.sizeof_gr_complex)
+        self.connect(noise_src,throttle,self.u)
 
 
 class software_backend(gr.hier_block2):
@@ -130,7 +130,7 @@ class software_backend(gr.hier_block2):
 
         band_rate = be_param.bw
         print "Number of Bands :", be_param.num_bands
-	print "Band sampling rate :",band_rate
+        print "Band sampling rate :",band_rate
 
         if be_param.num_bands > 1:
 
@@ -143,7 +143,7 @@ class software_backend(gr.hier_block2):
             print "Band filter has", len(taps), "taps"
 
             for j in range(channels):
-	        self.pp_filter.append(blks2.analysis_filterbank(be_param.num_bands,taps))
+                self.pp_filter.append(blks2.analysis_filterbank(be_param.num_bands,taps))
                 self.connect((self,j), self.pp_filter[j])
 
         for j in range(be_param.num_bands):
@@ -157,7 +157,7 @@ class software_backend(gr.hier_block2):
             # Connect filter outputs to each detector.             
             for k in range(channels):
                 if be_param.num_bands > 1:
-		    self.connect((self.pp_filter[k],j),(new_det,k))
+                    self.connect((self.pp_filter[k],j),(new_det,k))
                 else:
                     self.connect((self,k),(new_det,k))
 
