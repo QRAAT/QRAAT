@@ -213,8 +213,6 @@ def main():
 
 		print 'Partitioning {} points'.format(len(buckets[site_and_txid]))
 		if use_time_filter or hide_bad_points:
-			# Must compute the good bad points stuff.
-			good_stuff, bad_stuff = registry.screen_bad(registry.points)
 			print 'Got {} good items and {} bad items'.format(len(good_stuff), len(bad_stuff))
 
 			good_ids = [x['ID'] for x in good_stuff]
@@ -251,7 +249,18 @@ def main():
 			score_unclean_data = False
 
 			if score_unclean_data:
-				scored_points = apply_time_filtering(all_points_data, txid, interval_computation_only_data=points_under_consideration)
+				scored_points_dirty = apply_time_filtering(all_points_data, txid, interval_computation_only_data=points_under_consideration)
+				scored_points_clean = apply_time_filtering(points_under_consideration, txid)
+				assert scored_points_dirty.keys() == scored_points_clean.keys()
+				def bad_score(x):
+					return x < 2
+				agree = 0
+				for (pid, dirty_score) in scored_points_dirty.items():
+					clean_score = scored_points_clean[pid]
+					if not (bad_score(clean_score) ^ bad_score(dirty_score)):
+						agree += 1
+				disagree = len(scored_points_dirty) - agree
+				print 'Comparing dirty points scored with interval timing with leaving them out: {} agree, {} disagree'.format(agree, disagree)
 			else:
 				scored_points = apply_time_filtering(points_under_consideration, txid)
 
@@ -259,10 +268,6 @@ def main():
 				change_handler.add_score(id, score)
 				#sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
 
-
-
-
-	sql_w.close()
 
 
 def apply_time_filtering(points_under_consideration, txid, interval_computation_only_data=None):
