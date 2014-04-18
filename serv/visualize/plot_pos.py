@@ -46,90 +46,98 @@ overlay = True
 db_con = qraat.util.get_db('reader')
 
 cur = db_con.cursor()
-cur.execute('''SELECT northing, easting, timestamp, likelihood
-                 FROM Position
-                WHERE (%f <= timestamp) 
-                  AND (timestamp <= %f)
-                  AND txid = %d
-                ORDER BY timestamp ASC''' % (options.t_start, options.t_end, options.tx_id))
-      
-track = []
-for pos in cur.fetchall():
-  track.append((np.complex(pos[0], pos[1]), float(pos[2])))
-
-if len(track) == 0: 
-  print >>sys.stderr, "plot_pos: skipping: no data."
-  sys.exit(0)
-
-if overlay: 
-
-  # FIXME Where/how to install this file? 
-  bg = mpimg.imread('/home/christopher/continuum/work/QRAAT/QRAAT/serv/visualize/qr-overlay.png') 
-
-  e0 = 572599.5 - 150
-  e1 = 577331.4 - 150
-
-  n0 = 4259439.5 + 110 + 60 - 20 - 500 
-  n1 = 4259483.7 + 210 + 85 -  20 - 500 
-
-  E = lambda(x) : float(bg.shape[1]) * (x - e0) /  (e1 - e0)
-  N = lambda(y) : bg.shape[0] - (y - n0) / float(bg.shape[0]) * (n1 - n0)
-
-
-  sites = qraat.csv(db_con=db_con, db_table='sitelist')
-
-  fig = pp.figure()
-  ax = fig.add_subplot(1,1,1)
-
-  #pp.text(E(track[0][0].imag) + 10, N(track[0][0].real) + 10, "Start", color='gray', size='smaller')
-  #pp.text(E(track[-1][0].imag) + 10, N(track[-1][0].real) + 10, "End", color='gray', size='smaller')
-
-  # Plot tracks. 
-  pp.scatter( 
-   map(lambda (P, t): E(P.imag), track), 
-   map(lambda (P, t): N(P.real), track), alpha=0.2, s=2, c='k', 
-     label='Transmitter tracks')
-
-  # Plot sites. 
-  pp.plot(
-   [E(float(s.easting)) for s in sites], 
-   [N(float(s.northing)) for s in sites], 'ro', 
-      label='QRAAT receiver sites')
-
-  t = time.localtime(track[0][1])
-  s = time.localtime(track[-1][1])
-  pp.title('%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  txID=%d' % (
-       t.tm_year, t.tm_mon, t.tm_mday,
-       t.tm_hour, t.tm_min,
-       s.tm_year, s.tm_mon, s.tm_mday,
-       s.tm_hour, s.tm_min,
-       options.tx_id), size='smaller')
-
-  pp.grid(b=True, which='both', color='gray', linestyle='-')
-
-  pp.imshow(bg)
-  pp.legend( prop={'size':'smaller'} )
-
-  ax.set_xticks([ int(E(x)) for x in range(int(e0), int(e1), 500)])
-  ax.set_xticklabels([])
-  ax.set_xlabel("Easting (0.5 km step)", size='smaller')
-
-  ax.set_yticks([ int(N(y)) for y in range(int(n0), int(n1+5000), 500)])
-  ax.set_yticklabels([])
-  ax.set_ylabel("Northing (0.5 km step)", size='smaller')
-
-  #pp.savefig('tx%d_%04d.%02d.%02d_%02d.%02d.%02d.png' % (options.tx_id, 
-  #   t.tm_year, t.tm_mon, t.tm_mday,
-  #   t.tm_hour, t.tm_min, t.tm_sec))
-
-  pp.savefig('tx%d.png' % options.tx_id)
-
-else: 
   
-  # Plot locations. 
-  pp.plot( 
-   map(lambda (P, t): P.imag, track), 
-   map(lambda (P, t): P.real, track), '.', alpha=0.3)
 
-  pp.savefig('tx%d.png' % options.tx_id)
+T = options.t_start
+T_step = 60 * 60 * 24 * 3 # three days
 
+while T < options.t_end:  
+  cur.execute('''SELECT northing, easting, timestamp, likelihood
+                   FROM Position
+                  WHERE (%f <= timestamp) 
+                    AND (timestamp <= %f)
+                    AND txid = %d
+                  ORDER BY timestamp ASC''' % (T, T + T_step, options.tx_id))
+  
+  print T, T+ T_step
+  T += T_step
+  track = []
+  for pos in cur.fetchall():
+    track.append((np.complex(pos[0], pos[1]), float(pos[2])))
+
+  if len(track) == 0: 
+    print >>sys.stderr, "plot_pos: skipping: no data."
+    continue
+
+  if overlay: 
+
+    # FIXME Where/how to install this file? 
+    bg = mpimg.imread('/home/christopher/continuum/work/QRAAT/QRAAT/serv/visualize/qr-overlay.png') 
+
+    e0 = 572599.5 - 150
+    e1 = 577331.4 - 150
+
+    n0 = 4259439.5 + 110 + 60 - 20 - 500 
+    n1 = 4259483.7 + 210 + 85 -  20 - 500 
+
+    E = lambda(x) : float(bg.shape[1]) * (x - e0) /  (e1 - e0)
+    N = lambda(y) : bg.shape[0] - (y - n0) / float(bg.shape[0]) * (n1 - n0)
+
+
+    sites = qraat.csv(db_con=db_con, db_table='sitelist')
+
+    fig = pp.figure()
+    ax = fig.add_subplot(1,1,1)
+
+    #pp.text(E(track[0][0].imag) + 10, N(track[0][0].real) + 10, "Start", color='gray', size='smaller')
+    #pp.text(E(track[-1][0].imag) + 10, N(track[-1][0].real) + 10, "End", color='gray', size='smaller')
+
+    # Plot tracks. 
+    pp.scatter( 
+     map(lambda (P, t): E(P.imag), track), 
+     map(lambda (P, t): N(P.real), track), alpha=0.2, s=2, c='k', 
+       label='Transmitter positions')
+
+    # Plot sites. 
+    pp.plot(
+     [E(float(s.easting)) for s in sites], 
+     [N(float(s.northing)) for s in sites], 'ro', 
+        label='QRAAT receiver sites')
+
+    t = time.localtime(track[0][1])
+    s = time.localtime(track[-1][1])
+    pp.title('%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  txID=%d' % (
+         t.tm_year, t.tm_mon, t.tm_mday,
+         t.tm_hour, t.tm_min,
+         s.tm_year, s.tm_mon, s.tm_mday,
+         s.tm_hour, s.tm_min,
+         options.tx_id), size='smaller')
+
+    pp.grid(b=True, which='both', color='gray', linestyle='-')
+
+    pp.imshow(bg)
+    pp.legend( prop={'size':'smaller'} )
+
+    ax.set_xticks([ int(E(x)) for x in range(int(e0), int(e1), 500)])
+    ax.set_xticklabels([])
+    ax.set_xlabel("Easting (0.5 km step)", size='smaller')
+
+    ax.set_yticks([ int(N(y)) for y in range(int(n0), int(n1+5000), 500)])
+    ax.set_yticklabels([])
+    ax.set_ylabel("Northing (0.5 km step)", size='smaller')
+
+    #pp.savefig('tx%d_%04d.%02d.%02d_%02d.%02d.%02d.png' % (options.tx_id, 
+    #   t.tm_year, t.tm_mon, t.tm_mday,
+    #   t.tm_hour, t.tm_min, t.tm_sec))
+
+    pp.savefig('tx%d_%04d-%02d-%02d.png' % (options.tx_id, t.tm_year, t.tm_mon, t.tm_mday))
+
+  else: 
+    
+    # Plot locations. 
+    pp.plot( 
+     map(lambda (P, t): P.imag, track), 
+     map(lambda (P, t): P.real, track), '.', alpha=0.3)
+
+    pp.savefig('tx%d.png' % options.tx_id)
+  

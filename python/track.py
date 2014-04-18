@@ -210,6 +210,7 @@ class track:
   def __init__(self, db_con, t_start, t_end, tx_id, M, C=1):
     self.tx_id = tx_id
     self._fetch(db_con, t_start, t_end, tx_id)
+    print "positions: %d" % len(self.pos)
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
   
@@ -533,6 +534,27 @@ class trackall (track):
     self._fetchall(db_con, tx_id)
     roots = self.graph(self.pos, M)
     self.track = self.critical_path(self.toposort(roots), C)
+  
+
+class track2 (track): # Windowed version 
+  
+  window_length = 1000 
+  overlap_length = 300 
+
+  def __init__(self, db_con, t_start, t_end, tx_id, M, C=1):
+    self.track = []
+    self.tx_id = tx_id
+    self._fetch(db_con, t_start, t_end, tx_id)
+    i = 0; j = self.window_length 
+
+    while j <= len(self.pos): 
+      j = i + self.window_length
+
+      # TODO fix for candidate positions at end points. 
+      roots = self.graph(self.pos[i:j], M)
+      self.track += self.critical_path(self.toposort(roots), C)
+
+      i += self.window_length - self.overlap_length
 
   
 
@@ -547,23 +569,21 @@ def tx_name(db_con):
 
 if __name__ == '__main__': 
   
-  tx_id = 5
-  M = track.maxspeed_exp((10, 1), (300, 0.1), 0.05)
+  tx_id = 54
+  
+  import commands
+  t_start = int(commands.getoutput('date --date="20140204 0000" +%s'))
+  t_end   = int(commands.getoutput('date --date="20140205 0000" +%s'))
+  
+  print t_start, t_end
+  M = track.maxspeed_exp((25, 1), (900, 0.1), 0.05)
   #M = track.maxspeed_linear((10, 1), (180, 0.1), 0.05)
   C = 1
 
   db_con = util.get_db('writer')
   
-  # NOTE still experimenting with this. 
-  #(t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165 - (3600 * 6), 1391396399.840252 + (3600 * 6), 54)
-  #fella = track2(db_con, t_start_feb2, t_end_feb2, tx_id_feb2, M) 
-
-  # Testing track output ... 
-  # NOTE I'm experimenting now with calculating the critical path for each CC 
-  # and stitching them together in post processing. Could I prove the optimality 
-  # of this approach? 
-  fella = trackall(db_con, tx_id, M, C) 
-  fella.export_kml(tx_name(db_con)[tx_id], tx_id)
+  fella = track(db_con, t_start, t_end, tx_id, M, C) 
+  #fella.export_kml(tx_name(db_con)[tx_id], tx_id)
 
   t = time.localtime(fella[0][1])
   s = time.localtime(fella[-1][1])
