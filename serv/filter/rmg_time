@@ -19,6 +19,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import bisect
+import changes
 from collections import defaultdict
 import cProfile
 import csv
@@ -122,7 +123,9 @@ def main():
 	site_data = {}
 
 	if past_score:
-		cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), arg_t_start, arg_t_end, arg_txid, arg_siteid))
+		rows = cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), arg_t_start, arg_t_end, arg_txid, arg_siteid))
+		print 'Query:', 'SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), arg_t_start, arg_t_end, arg_txid, arg_siteid)
+		print 'Rows processed:', rows
 	else:
 		cur.execute('SELECT {} FROM est where blah and txid = {} and siteid = {};'.format(', '.join(fields), arg_txid, arg_siteid))
 
@@ -150,10 +153,13 @@ def main():
 	# Bucket site_data by (siteid, txid).
 	#bucketed = {}
 	buckets = defaultdict(list)
+	assert len(site_data) > 0
 	for v in site_data.values():
 		k = (v['siteid'], v['txid'])
 		#print 'iterating through:', k
 		buckets[k].append(v)
+
+	print 'Buckets:', buckets
 
 	assert len(buckets) == 1
 
@@ -220,6 +226,7 @@ def main():
 
 		print 'Partitioning {} points'.format(len(buckets[site_and_txid]))
 		if use_time_filter or hide_bad_points:
+			good_stuff, bad_stuff = registry.screen_bad(registry.points)
 			print 'Got {} good items and {} bad items'.format(len(good_stuff), len(bad_stuff))
 
 			good_ids = [x['ID'] for x in good_stuff]
@@ -326,7 +333,11 @@ def apply_time_filtering(points_under_consideration, txid, interval_computation_
 		# get appropriate interval
 		interval = interval_windows.get_property_for_point(tstamp, 'interval')
 		if interval < CONFIG_MIN_INTERVAL:
-			raise Exception('Found interval abnormally low: {}'.format(interval))
+			# Skipping for now
+			#raise Exception('Found interval abnormally low: {}'.format(interval))
+			print 'Found interval abnormally low: {}'.format(interval)
+			scores[ident] = -2
+			continue
 
 		# calculate possible center points to investigate
 		factors = [x for x in range(-CONFIG_DELTA_AWAY, CONFIG_DELTA_AWAY + 1) if x != 0]
