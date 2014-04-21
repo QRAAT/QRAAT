@@ -91,10 +91,12 @@ def main():
 
 	arguments = parse_arguments(sys.argv[1:])
 
+	past_score = True
 	if 't_start' not in arguments or 't_end' not in arguments:
-		print 'Please provide arguments t_start and t_end to specify appropriate time range to process. ' + \
-				'Eg., --t_start 345 --t_end 700'
-		sys.exit(1)
+		print 'Please provide arguments t_start and t_end to specify appropriate time range to process ' + \
+				'(e.g., --t_start 345 --t_end 700) to compute static scores.'
+		past_score = False
+		#sys.exit(1)
 
 	if 'txid' not in arguments:
 		print 'Please provide argument txid for transmitter ID to process'
@@ -117,7 +119,12 @@ def main():
 
 	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
 
-	cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), arg_t_start, arg_t_end, arg_txid, arg_siteid))
+	site_data = {}
+
+	if past_score:
+		cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), arg_t_start, arg_t_end, arg_txid, arg_siteid))
+	else:
+		cur.execute('SELECT {} FROM est where blah and txid = {} and siteid = {};'.format(', '.join(fields), arg_txid, arg_siteid))
 
 	site_data = {}
 	row = -1
@@ -174,8 +181,8 @@ def main():
 		db_con = qraat.util.get_db('writer')
 		change_handler = changes.ChangeHandler(db_con, 'db')
 		
-	if just_stage_changes
-	change_handler = changes.ChangeHandler(
+	#if just_stage_changes:
+	#change_handler = changes.ChangeHandler(
 
 	# Setting up connection to database...
 
