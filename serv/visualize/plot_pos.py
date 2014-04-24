@@ -49,7 +49,8 @@ cur = db_con.cursor()
   
 
 T = options.t_start
-T_step = 60 * 60 * 24 * 3 # three days
+T_step = options.t_end# 60 * 60 * 24 * 3 # three days
+# FIXME doing some tests. 
 
 while T < options.t_end:  
   cur.execute('''SELECT northing, easting, timestamp, likelihood
@@ -57,7 +58,7 @@ while T < options.t_end:
                   WHERE (%f <= timestamp) 
                     AND (timestamp <= %f)
                     AND txid = %d
-                  ORDER BY timestamp ASC''' % (T, T + T_step, options.tx_id))
+                  ORDER BY timestamp ASC''' % (T, T_step, options.tx_id))
   
   print T, T+ T_step
   T += T_step
@@ -68,6 +69,16 @@ while T < options.t_end:
   if len(track) == 0: 
     print >>sys.stderr, "plot_pos: skipping: no data."
     continue
+
+  cur.execute('SELECT northing, easting FROM qraat.sitelist WHERE name="site34"')
+  (n, e) = cur.fetchone()
+  beacon = np.complex(n, e)
+  a = open('dist.txt', 'w') 
+  a.write('distance\n')
+  for (pos, t) in track:
+    a.write('%f\n' % np.abs(pos - beacon))
+  a.close()
+
 
   if overlay: 
 

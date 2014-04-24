@@ -65,6 +65,10 @@ parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800.0
 parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0,#1376427800 yields 302 rows
                   help="End time in secondes after the epoch (UNIX time).")
 
+
+parser.add_option('--band-filter', action='store_true', default=False,  
+                  help="Apply band filter to signal data. DEPRECATE.") # FIXME deprecatue
+
 (options, args) = parser.parse_args()
 
 
@@ -177,7 +181,8 @@ print "plot_search_space: fetching signal data."
 sig = qraat.position.signal(db_con, 
                             options.t_start, 
                             options.t_end, 
-                            options.tx_id)
+                            options.tx_id,
+                            options.band_filter)
 
 print "plot_search_space: calculating bearing likelihoods (%d records)." % len(sig)
 bl = qraat.position.bearing(sv, sig)

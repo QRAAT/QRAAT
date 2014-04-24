@@ -285,9 +285,9 @@ class track:
       Ti = Tj = float(pos[i][2])
       newLeaves = []
       while j < len(pos) - 1 and Ti == Tj: # Candidates for next time interval. 
-        (P, ll) = (np.complex(pos[j][0], pos[j][1]), float(pos[j][3]))
+        (P, ll, pos_id) = (np.complex(pos[j][0], pos[j][1]), float(pos[j][3]), pos[j][4])
 
-        w = Node(P, Tj, ll)
+        w = Node(P, Tj, ll, pos_id)
         ok = False
         for v in leaves:
           if speed(v, w) < M(w.t - v.t):
@@ -538,24 +538,48 @@ class trackall (track):
 
 class track2 (track): # Windowed version 
   
-  window_length = 1000 
-  overlap_length = 300 
-
+  window_length = 100 
+  overlap_length = 10
   def __init__(self, db_con, t_start, t_end, tx_id, M, C=1):
+    fella = {}
     self.track = []
     self.tx_id = tx_id
     self._fetch(db_con, t_start, t_end, tx_id)
     i = 0; j = self.window_length 
 
-    while j <= len(self.pos): 
-      j = i + self.window_length
+    while i < len(self.pos):
+      
+      t = self.pos[i][2]
+      while self.pos[i-1][2] == t:
+        i -= 1
 
-      # TODO fix for candidate positions at end points. 
-      roots = self.graph(self.pos[i:j], M)
-      self.track += self.critical_path(self.toposort(roots), C)
+      j =  min(len(self.pos) - 1, i + self.window_length)
+      
+      t = self.pos[j][2]
+      while self.pos[j-1][2] == t:
+        j -= 1
+      
+      print i, j, "win=", j - i
+      roots = self.graph(self.pos[i:j+1], M)
+      guy = self.critical_path(self.toposort(roots), C)
+      self.track += guy
+      
+      for (P, t, pos_id) in guy: 
+        if not fella.get(t):
+          fella[t] = set()
+        fella[t].add((P, pos_id))
 
       i += self.window_length - self.overlap_length
 
+    guy = fella.items() 
+    guy = sorted(guy, key=lambda(m) : m[0])
+    for (key, val) in guy:
+      print "%-12d" % key, val
+    # TODO Still multiple candidates: head and tails of tracks. 
+    # Decide which one to eliminate at this stage. Who ever has
+    # higher likelihood? 
+    
+     
   
 
 def tx_name(db_con):
@@ -572,17 +596,17 @@ if __name__ == '__main__':
   tx_id = 54
   
   import commands
-  t_start = int(commands.getoutput('date --date="20140204 0000" +%s'))
-  t_end   = int(commands.getoutput('date --date="20140205 0000" +%s'))
-  
+  t_start = int(commands.getoutput('date --date="20140202 1200" +%s'))
+  t_end   = int(commands.getoutput('date --date="20140202 1600" +%s'))
+
   print t_start, t_end
-  M = track.maxspeed_exp((25, 1), (900, 0.1), 0.05)
+  M = track.maxspeed_exp((10, 1), (360, 0.1), 0.05)
   #M = track.maxspeed_linear((10, 1), (180, 0.1), 0.05)
   C = 1
 
   db_con = util.get_db('writer')
   
-  fella = track(db_con, t_start, t_end, tx_id, M, C) 
+  fella = track2(db_con, t_start, t_end, tx_id, M, C) 
   #fella.export_kml(tx_name(db_con)[tx_id], tx_id)
 
   t = time.localtime(fella[0][1])
