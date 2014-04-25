@@ -37,7 +37,7 @@ USE_PSD = 0
 
 class usrp_top_block(gr.top_block):
     
-        """ The USRP interface for GNU Radio. 
+    """ The USRP interface for GNU Radio. 
         
         :param fpga_frequency: Intermediate frequency to which the 
                                FPGA should be tuned to. 
@@ -71,7 +71,7 @@ class usrp_top_block(gr.top_block):
                               
                
 class no_usrp_top_block(gr.top_block):
-        """ A noisy signal source used for testing. 
+    """ A noisy signal source used for testing. 
               
           Replaces :class:`qraat. rmg.rmg_graphs.usrp_top_block`. 
         """

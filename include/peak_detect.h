@@ -23,8 +23,11 @@ typedef enum
   BELOW_THRESHOLD, //!< below threshold
   ABOVE_THRESHOLD, //!< above threshold
   PEAK,            //!< peak
-  TRIGGER          //!< trigger
+  TRIGGER,         //!< trigger
+  POST_TRIGGER     //!< post trigger
 } detect_state_t;
+
+static float FALL_RATIO = 0.9;
 
 class detectmod_detect;
 

@@ -113,11 +113,6 @@ detect_state_t peak_detect::detect(const float data){
 
   switch(state){
 
-    case TRIGGER:
-
-      state = BELOW_THRESHOLD;
-      //continue to below_threshold code
-
     case BELOW_THRESHOLD:
 
       if(data > noise_floor*rise){    //possible peak
@@ -152,6 +147,26 @@ detect_state_t peak_detect::detect(const float data){
         state=TRIGGER;
       }
     
+    break;
+
+    case TRIGGER:
+
+      state = POST_TRIGGER;
+      //continue to post_trigger code
+
+    case POST_TRIGGER:
+
+      if(data < noise_floor*rise*FALL_RATIO){
+        state = BELOW_THRESHOLD;
+      }
+
+      if (samples_in_noise_floor < time_constant){
+        noise_floor = noise_floor*samples_in_noise_floor/(samples_in_noise_floor + 1.0) + data/(samples_in_noise_floor + 1.0);
+        samples_in_noise_floor++;
+      }
+      else{
+        noise_floor=alpha*data+(1-alpha)*noise_floor;
+      }
     break;
 
   }
