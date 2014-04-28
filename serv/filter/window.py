@@ -28,6 +28,8 @@ class WindowIterator:
 		assert False
 
 	def get_window_count(self):
+		if len(self.points) == 0:
+			return 0
 		((min_x, min_id), (max_x, max_id)) = self.points[0], self.points[-1]
 		total_range = max_x - min_x
 
