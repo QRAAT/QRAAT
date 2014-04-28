@@ -42,6 +42,7 @@ class WindowIterator:
 		for window in self:
 			if point in window:
 				# found the window
+				pass
 			w = window.get_window_for_point(point, offset=-1)
 
 	def init_windows(self):
