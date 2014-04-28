@@ -10,7 +10,6 @@ class ChangeHandler:
 		self.mode = mode
 		assert self.mode in VALID_MODES
 		if self.mode == 'db':
-			self.cursor = self.obj.cursor()
 			self.buffer = []
 		print 'Object of type {} being handled in mode {}'.format(self.obj.__class__, self.mode)
 
@@ -48,7 +47,8 @@ class ChangeHandler:
 	def add_score_db(self, estid, score):
 		if ADD_EVERY == 0:
 			# Apply update immediately
-			self.cursor.execute(QUERY_TEMPLATE, (estid, score))
+			cursor = self.obj.cursor()
+			cursor.execute(QUERY_TEMPLATE, (estid, score))
 		else:
 			self.buffer.append((estid, score))
 			if len(self.buffer) >= ADD_EVERY:
@@ -59,5 +59,6 @@ class ChangeHandler:
 			print 'Unnecessary flush call on DB'
 		else:
 			print 'Flushing {} scores to DB'.format(len(self.buffer))
-			self.cursor.executemany(self.buffer)
+			cursor = self.obj.cursor()
+			cursor.executemany(self.buffer)
 			self.buffer.clear()
