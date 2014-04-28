@@ -51,7 +51,7 @@ CONFIG_DELTA_AWAY = 3
 CONFIG_ERROR_ALLOWANCE = 0.2
 
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
-CONFIG_JUST_STAGE_CHANGES = True
+CONFIG_JUST_STAGE_CHANGES = False
 
 def filter_site(s):
 	sites = s.split(',')
@@ -317,7 +317,7 @@ def main():
 			#intervals = []
 			for i in range(len(good_xs)):
 				x = good_xs[i]
-				id = Agood_ids[i]
+				id = good_ids[i]
 				points_under_consideration.append((x, id))
 
 			# Generate ALL points struct
