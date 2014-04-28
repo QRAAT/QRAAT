@@ -36,6 +36,15 @@ class WindowIterator:
 		interval_window_count = int(math.ceil(total_range / self.window_size))
 		return interval_window_count
 
+	def get_window_for_point(self, point, offset=0):
+		# Return the Window object of index i+offset, where i is the index of
+		# the window within which point falls.
+		for window in self:
+			if point in window:
+				# found the window
+				pass
+			w = window.get_window_for_point(point, offset=-1)
+
 	def init_windows(self):
 		#print 'Called iter generator'
 		inds = []
@@ -83,6 +92,13 @@ class Window:
 			return (self.points[self.start_ind][0], self.points[self.end_ind][0])
 		else:
 			return (self.points[self.start_ind][0], None)
+
+	def __contains__(self, v):
+		t_start = self.points[self.start_ind][0]
+		t_end = self.points[self.end_ind][0]
+
+		print 'performing contains {}...{}...{}'.format(v, t_start, t_end)
+		return v >= t_start and v <= t_end
 
 	def calculate_interval_from(self, txid='(unknown)', slice_id='(unknown)'):
 		v = self.value()

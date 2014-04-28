@@ -194,6 +194,7 @@ def main():
 
 		for point in out_of_order:
 			w = window.get_window_for_point(point, offset=-1)
+			
 				
 		
 		
