@@ -48,7 +48,7 @@ class ChangeHandler:
 	def add_score_db(self, estid, score):
 		if ADD_EVERY == 0:
 			# Apply update immediately
-			self.cursor.execute(QUERY_TEMPLATE, estid, score)
+			self.cursor.execute(QUERY_TEMPLATE, (estid, score))
 		else:
 			self.buffer.append((estid, score))
 			if len(self.buffer) >= ADD_EVERY:
