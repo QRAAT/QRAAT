@@ -76,8 +76,8 @@ parser.add_option('--t-chunk', type='float', metavar='SEC', default=60 * 60 * 4,
 parser.add_option('-v', '--verbose', action='store_true', default=False, 
                   help="Print the progression of the algorithm to the terminal.")
 
-parser.add_option('--band-filter', action='store_true', default=False,  
-                  help="Apply band filter to signal data. DEPRECATE.") # FIXME deprecatue
+parser.add_option('--thresh', type='float', metavar='[0 .. 1]', default=0, 
+                  help="Lower threshold for EST score.")
 
 (options, args) = parser.parse_args()
 
@@ -99,7 +99,7 @@ try:
                                 chunks[i], 
                                 chunks[i] + options.t_chunk,
                                 options.tx_id,
-                                options.band_filter) # FIXME deprecate
+                                options.thresh)
 
     if len(sig) == 0:
       print "position: skipping empty chunk."
