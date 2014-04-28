@@ -234,8 +234,6 @@ def main():
 		#print 'iterating through:', k
 		buckets[k].append(v)
 
-	print 'Buckets:', buckets
-
 	assert len(buckets) == 1
 
 	filter_txid_f, filter_txid_simple_f = pass_all, pass_all
