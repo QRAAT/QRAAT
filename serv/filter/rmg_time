@@ -212,8 +212,8 @@ def main():
 		sql_w = open(sql_output_filename, 'w')
 		change_handler = changes.ChangeHandler(sql_w, 'file')
 	else:
-		db_con = qraat.util.get_db('writer')
-		change_handler = changes.ChangeHandler(db_con, 'db')
+		#db_con = qraat.util.get_db('writer')
+		change_handler = changes.ChangeHandler(None, 'db')
 
 
 

@@ -1,3 +1,5 @@
+import qraat
+
 VALID_MODES = ('file', 'db')
 QUERY_TEMPLATE = 'insert into estscore (estid, absscore, relscore) values (%s, %s, %s);\n'
 
@@ -11,6 +13,8 @@ class ChangeHandler:
 		assert self.mode in VALID_MODES
 		if self.mode == 'db':
 			self.buffer = []
+			db_con = qraat.util.get_db('writer')
+			self.obj = db_con
 		print 'Object of type {} being handled in mode {}'.format(self.obj.__class__, self.mode)
 
 	def close(self):
