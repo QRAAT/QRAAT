@@ -190,7 +190,7 @@ def main():
 		# It gets populated somehow.
 		
 		# Sort of half mark those things because we are doing the intervals with them in mind
-		change_handler.add_score(bad_id, -2)
+		change_handler.add_score(bad_id, 0, 0)
 
 		for point in out_of_order:
 			w = window.get_window_for_point(point, offset=-1)
@@ -306,7 +306,7 @@ def main():
 			good_xs = [x['timestamp'] for x in good_stuff]
 			bad_xs = [x['timestamp'] for x in bad_stuff]
 			for bad_id in bad_ids:
-				change_handler.add_score(bad_id, -1)
+				change_handler.add_score(bad_id, 0, 0)
 				#sql_w.write('update est set score = -1 where ID = {};\n'.format(bad_id))
 
 		if use_time_filter:
@@ -317,7 +317,7 @@ def main():
 			#intervals = []
 			for i in range(len(good_xs)):
 				x = good_xs[i]
-				id = good_ids[i]
+				id = Agood_ids[i]
 				points_under_consideration.append((x, id))
 
 			# Generate ALL points struct
@@ -346,7 +346,7 @@ def main():
 				scored_points = apply_time_filtering(points_under_consideration, txid)
 
 			for (id, score) in scored_points.items():
-				change_handler.add_score(id, score)
+				change_handler.add_score(id, score, float(score) / CONFIG_DELTA_AWAY * 2)
 				#sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
 
 

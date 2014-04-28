@@ -1,5 +1,5 @@
 VALID_MODES = ('file', 'db')
-QUERY_TEMPLATE = 'insert into estscore (estid, score) values (%s, %s);\n'
+QUERY_TEMPLATE = 'insert into estscore (estid, absscore, relscore) values (%s, %s, %s);\n'
 
 #ADD_EVERY = 100
 ADD_EVERY = 0
@@ -16,8 +16,8 @@ class ChangeHandler:
 	def close(self):
 		getattr(self, 'close_' + self.mode)()
 	
-	def add_score(self, estid, score):
-		getattr(self, 'add_score_' + self.mode)(estid, score)
+	def add_score(self, estid, absscore, relscore):
+		getattr(self, 'add_score_' + self.mode)(estid, absscore, relscore)
 
 	def flush(self):
 		getattr(self, 'flush_' + self.mode)()
@@ -27,8 +27,8 @@ class ChangeHandler:
 	def close_file(self):
 		self.obj.close()
 
-	def add_score_file(self, estid, score):
-		s = QUERY_TEMPLATE % (estid, score)
+	def add_score_file(self, estid, absscore, relscore):
+		s = QUERY_TEMPLATE % (estid, absscore, relscore)
 		self.obj.write(s)
 
 	def flush_file(self):
@@ -44,13 +44,13 @@ class ChangeHandler:
 	def close_db(self):
 		self.obj.close()
 
-	def add_score_db(self, estid, score):
+	def add_score_db(self, estid, absscore, relscore):
 		if ADD_EVERY == 0:
 			# Apply update immediately
 			cursor = self.obj.cursor()
-			cursor.execute(QUERY_TEMPLATE, (estid, score))
+			cursor.execute(QUERY_TEMPLATE, (estid, absscore, relscore))
 		else:
-			self.buffer.append((estid, score))
+			self.buffer.append((estid, absscore, relscore))
 			if len(self.buffer) >= ADD_EVERY:
 				self.flush_db()
 
