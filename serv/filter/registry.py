@@ -271,7 +271,7 @@ class Registry:
 		#print 'I think there are {} good points, like: {}'.format(len(good_point_ids), good_point_ids[:10])
 		bad_ids = bad_point_map.keys()
 		print 'bad ids ({}): {}'.format(len(bad_ids), bad_ids[:10])
-		print 'type is:', bad_ids[0].__class__
+		if len(bad_ids) > 0: print 'type is:', bad_ids[0].__class__
 		#good_ids = [x[0] for x in points if x[0] not in bad_ids]
 
 		good_point_data, bad_point_data = [], []
