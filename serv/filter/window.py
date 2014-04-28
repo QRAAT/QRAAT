@@ -39,18 +39,21 @@ class WindowIterator:
 		inds = []
 		#print 'The window count is:', self.get_window_count()
 		#print 'A selection from xs:', self.xs[:50]
-		offset = self.points[0][0]
-		for i in range(self.get_window_count()):
-			#print 'iter'
-			start = i * self.window_size + offset
-			end = (i + 1) * self.window_size + offset
-			start_ind = bisect.bisect_left(self.xs, start)
-			print 'Index nearest (left) to {} is {}'.format(start, start_ind)
-			end_ind = bisect.bisect_right(self.xs, end)
-			print 'Index nearest (right) to {} is {}'.format(end, end_ind)
-			inds.append((start_ind, end_ind))
-		self.windows = [Window(self.points, x, y) for (x, y) in inds]
-		#return iter([Window(self.points, x, y) for (x, y) in inds])
+		if len(self.points) == 0:
+			self.windows = []
+		else:
+			offset = self.points[0][0]
+			for i in range(self.get_window_count()):
+				#print 'iter'
+				start = i * self.window_size + offset
+				end = (i + 1) * self.window_size + offset
+				start_ind = bisect.bisect_left(self.xs, start)
+				print 'Index nearest (left) to {} is {}'.format(start, start_ind)
+				end_ind = bisect.bisect_right(self.xs, end)
+				print 'Index nearest (right) to {} is {}'.format(end, end_ind)
+				inds.append((start_ind, end_ind))
+			self.windows = [Window(self.points, x, y) for (x, y) in inds]
+			#return iter([Window(self.points, x, y) for (x, y) in inds])
 
 
 	def __iter__(self):
