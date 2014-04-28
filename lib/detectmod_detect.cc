@@ -167,15 +167,15 @@ void detectmod_detect::initialize_variables(
   acc = new accumulator(acc_length);
   save_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
 
-  float temp_alpha;
+  int time_constant;
   if (_alpha < 1){
-    temp_alpha = _alpha;
+    time_constant = (int)(1.0/_alpha);
   }
   else{
-    temp_alpha = 1/(_alpha*rate);
+    time_constant = _alpha*rate;
   }
 
-  pkdet = new peak_detect(_rise, fill_length, temp_alpha);
+  pkdet = new peak_detect(_rise, fill_length, time_constant);
 
   psd = _psd;
 
@@ -456,11 +456,11 @@ void detectmod_detect::set_alpha_factor(float alpha_in)
 {
   float temp_alpha;
   if (alpha_in < 1){
-    temp_alpha = alpha_in;
+    pkdet->set_alpha(alpha_in);
   }
   else{
-    temp_alpha = 1/(alpha_in*rate);
-  }pkdet->set_alpha(temp_alpha);
+    pkdet->set_time_constant((int)(alpha_in*rate));
+  }
 }
 
 void detectmod_detect::reset()

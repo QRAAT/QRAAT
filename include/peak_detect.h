@@ -57,9 +57,9 @@ public:
    * \param rise_in - Rise trigger
    * \param confirmation_time_in - period to wait to confirm peak
    * \param wait_time_in - period to wait to restart detect
-   * \param alpha_in - Alpha factor
+   * \param time_constant_in - time constant for exponential filter
    */
-  peak_detect(float rise_in, int confirmation_time_in, float alpha_in);
+  peak_detect(float rise_in, int confirmation_time_in, int time_constant_in);
 
   /*!
    * \brief Run state machine. 
@@ -84,6 +84,12 @@ public:
    *
    */
   float get_alpha() { return alpha; }
+
+  /*!
+   * \brief Get time constant value
+   *
+   */
+  int get_time_constant() { return time_constant; }
 
   /*!
    * \brief Get noise floor value
@@ -114,6 +120,13 @@ public:
    * \param alpha_in - New alpha value.
    */
   void set_alpha(float alpha_in);
+
+  /*!
+   * \brief Set time constant value
+   * \param time_constant_in - New time constant value.
+   */
+  void set_time_constant(int time_constant_in);
+
 
   /*!
    * \brief Set noise floor value

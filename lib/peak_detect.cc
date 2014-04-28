@@ -21,7 +21,7 @@
 #include <peak_detect.h>
 #include <stdexcept>
 
-peak_detect::peak_detect(float rise_in, int confirmation_time_in, float alpha_in){
+peak_detect::peak_detect(float rise_in, int confirmation_time_in, int time_constant_in){
 
   if (rise_in > 1){
     rise=rise_in;
@@ -35,12 +35,12 @@ peak_detect::peak_detect(float rise_in, int confirmation_time_in, float alpha_in
   else{
     throw std::invalid_argument("confirmation_time must not be negative");
   }
-  if (alpha_in >= 0 && alpha_in <= 1){
-    alpha=alpha_in;
-    time_constant = 1/alpha;
+  if (time_constant_in > 0){
+    alpha=1/(float)time_constant_in;
+    time_constant = time_constant_in;
   }
   else{
-    throw std::invalid_argument("alpha must be between 0 and 1 inclusive");
+    throw std::invalid_argument("time constant must be greater than 0");
   }
   state=BELOW_THRESHOLD;
   noise_floor=0.0;
@@ -77,10 +77,22 @@ void peak_detect::set_alpha(float alpha_in){
 
   if (alpha_in >= 0 && alpha_in <= 1){
     alpha=alpha_in;
-    time_constant = 1/alpha;
+    time_constant = (int)(1/alpha);
   }
   else{
     throw std::invalid_argument("alpha must be between 0 and 1 inclusive");
+  }
+
+}
+
+void peak_detect::set_time_constant(int time_constant_in){
+
+  if (time_constant_in > 0){
+    alpha=1/(float)time_constant;
+    time_constant = time_constant;
+  }
+  else{
+    throw std::invalid_argument("time constant must be greater than 0");
   }
 
 }

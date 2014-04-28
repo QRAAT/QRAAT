@@ -43,7 +43,7 @@ class qa_rmg (gr_unittest.TestCase):
         di = gr.deinterleave(gr.sizeof_gr_complex)
         
         self.fg.connect(src_file, di)
-        pd = qraat.rmg.detect(4,8000,160,480,0,"results", tx_name, 0,1.5,.0001)
+        pd = qraat.rmg.detect(4,8000,160,480,0,"results", tx_name, 0,1.5,10)
         pd.enable()
         self.fg.connect((di,0),(pd,0))
         self.fg.connect((di,1),(pd,1))
