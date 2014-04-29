@@ -187,9 +187,9 @@ class software_backend(gr.hier_block2):
             if (j.tx_type == params.det_type.PULSE):
                 self.det[j.band_num].enable(j.filter_length, 
                                             j.filter_length*3, 
-                                            j.cf,
                                             str(j.directory), 
                                             str(j.name), 
+                                            j.cf,
                                             USE_PSD,
                                             j.rise,
                                             j.alpha)
