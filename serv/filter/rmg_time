@@ -138,9 +138,22 @@ def main():
 	else:
 		signal.signal(signal.SIGINT, exit)
 		db_con = qraat.util.get_db('writer')
+		change_handler = init_change_handler()
 		while True:
-			score_new_things(db_con, arg_txid, arg_siteid)
+			score_new_things(db_con, arg_txid, arg_siteid, change_handler)
 		# Add unscored points to a queue for scoring
+
+def init_change_handler():
+	change_handler = None
+	if CONFIG_JUST_STAGE_CHANGES:
+		sql_output_filename = 'update.sql'
+		sql_w = open(sql_output_filename, 'w')
+		change_handler = changes.ChangeHandler(sql_w, 'file')
+	else:
+		# NOTE: I don't declare the db connection here, because passing it
+		# between modules seems to mess things up.
+		change_handler = changes.ChangeHandler(None, 'db')
+	return change_handler
 
 def score_the_past(arguments, t_start, t_end, txid, siteid):
 
@@ -168,16 +181,7 @@ def score_the_past(arguments, t_start, t_end, txid, siteid):
 				named_row[k] = float(named_row[k])
 		site_data[named_row['ID']] = named_row
 
-	change_handler = None
-	if CONFIG_JUST_STAGE_CHANGES:
-		sql_output_filename = 'update.sql'
-		sql_w = open(sql_output_filename, 'w')
-		change_handler = changes.ChangeHandler(sql_w, 'file')
-	else:
-		# NOTE: I don't declare the db connection here, because passing it
-		# between modules seems to mess things up.
-		change_handler = changes.ChangeHandler(None, 'db')
-
+	change_handler = init_change_handler()
 
 
 
@@ -548,7 +552,7 @@ def are_points_in_radius(point, points, radius):
 	print 'There is nothing there'
 	return False
 
-def score_new_things(db_con, txid, siteid):
+def score_new_things(db_con, txid, siteid, change_handler):
 
 	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
 
@@ -598,7 +602,8 @@ def score_new_things(db_con, txid, siteid):
 	# It gets populated somehow.
 	
 	# Sort of half mark those things because we are doing the intervals with them in mind
-	change_handler.add_score(bad_id, 0, 0)
+	for new_id in ids:
+		change_handler.add_score(new_id, 0, 0)
 
 	# for point in out_of_order:
 	# 	w = window.get_window_for_point(point, offset=-1)

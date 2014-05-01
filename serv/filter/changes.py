@@ -1,6 +1,6 @@
 import qraat
 
-VALID_MODES = ('file', 'db')
+VALID_MODES = ('file', 'db', 'fileinc')
 QUERY_TEMPLATE = 'insert into estscore (estid, absscore, relscore) values (%s, %s, %s);\n'
 
 #ADD_EVERY = 100
@@ -15,7 +15,26 @@ class ChangeHandler:
 			self.buffer = []
 			db_con = qraat.util.get_db('writer')
 			self.obj = db_con
+		elif self.mode == 'fileinc':
+			self.obj = obj # A filename is this case
+			self.current_index = 1
+			self.set_file_handle()
 		print 'Object of type {} being handled in mode {}'.format(self.obj.__class__, self.mode)
+
+	def set_file_handle(self):
+		assert self.mode == 'fileinc'
+		
+		filename = '{}{}'.format(self.obj, self.current_index)
+		self.current_file_handle = open(filename, 'w')
+		
+	def increment(self):
+		if self.mode != 'fileinc':
+			print 'WARNING: Increment noop'
+			return
+		else:
+			self.current_file_handle.close()
+			self.current_index += 1
+			self.set_file_handle()
 
 	def close(self):
 		getattr(self, 'close_' + self.mode)()
@@ -37,6 +56,18 @@ class ChangeHandler:
 
 	def flush_file(self):
 		self.obj.flush()
+
+	# Fileinc operations
+
+	def close_fileinc(self):
+		self.current_file_handle.close()
+
+	def add_score_fileinc(self, estid, absscore, relscore):
+		s = QUERY_TEMPLATE % (estid, absscore, relscore)
+		self.current_file_handle.write(s)
+
+	def flush_score_fileinc(self):
+		self.current_file_handle.flush()
 
 	# Database operations - Not sure if these are correct calls, will have to
 	# verify tomorrow.
