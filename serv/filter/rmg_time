@@ -374,7 +374,7 @@ def apply_time_filtering(points_under_consideration, txid, interval_computation_
 		# Scoring this point (with id=ident)
 		score = 0
 		# get appropriate interval
-		interval = interval_windows.get_property_for_point(tstamp, 'interval')
+		interval = interval_windows.get_property_for_point(tstamp, 'interval', window_offset=-1)
 		if interval < CONFIG_MIN_INTERVAL:
 			# Skipping for now
 			#raise Exception('Found interval abnormally low: {}'.format(interval))

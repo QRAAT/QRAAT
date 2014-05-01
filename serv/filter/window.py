@@ -103,7 +103,7 @@ class Window:
 			return (self.points[self.start_ind][0], None)
 
 	def __contains__(self, v):
-		print 'Window starts {}, ends {}, length {}'.format(self.start_ind, self.end_ind, len(self.points))
+		# print 'Window starts {}, ends {}, length {}'.format(self.start_ind, self.end_ind, len(self.points))
 		t_start = self.points[self.start_ind][0]
 		t_end = self.points[self.end_ind - 1][0]
 
