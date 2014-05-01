@@ -36,6 +36,7 @@ GR_PYTHON_INSTALL(
     est.py
     csv.py
     gps.py
+    signal_filter.py
     position.py
     track.py
     util.py
