@@ -124,6 +124,19 @@ def main():
 	arg_siteid = int(arguments['siteid'])
 
 
+
+	site_data = {}
+
+	if past_score:
+		score_the_past(arguments, arg_t_start, arg_t_end, arg_txid, arg_siteid)
+	else:
+		signal.signal(signal.SIGINT, exit)
+		while True:
+			score_new_things()
+		# Add unscored points to a queue for scoring
+
+def score_the_past(arguments, t_start, t_end, txid, siteid):
+
 	db_con = qraat.util.get_db('reader')
 
 	# Something ...
@@ -131,33 +144,22 @@ def main():
 
 	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
 
+	rows = cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), t_start, t_end, txid, siteid))
+	
+	print 'Rows processed:', rows
 	site_data = {}
-
-	if past_score:
-		rows = cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), arg_t_start, arg_t_end, arg_txid, arg_siteid))
-		
-		print 'Rows processed:', rows
-		site_data = {}
-		row = -1
-		while True:
-			row = cur.fetchone()
-			if row is None:
-				break
-			else:
-				row = tuple(row)
-			named_row = dict(zip(fields, row))
-			for k in named_row:
-				if named_row[k].__class__ == decimal.Decimal:
-					named_row[k] = float(named_row[k])
-			site_data[named_row['ID']] = named_row
-	else:
-		signal.signal(signal.SIGINT, exit)
-		while True:
-			score_new_things()
-		# Add unscored points to a queue for scoring
-
-
-
+	row = -1
+	while True:
+		row = cur.fetchone()
+		if row is None:
+			break
+		else:
+			row = tuple(row)
+		named_row = dict(zip(fields, row))
+		for k in named_row:
+			if named_row[k].__class__ == decimal.Decimal:
+				named_row[k] = float(named_row[k])
+		site_data[named_row['ID']] = named_row
 
 	change_handler = None
 	if CONFIG_JUST_STAGE_CHANGES:
@@ -260,7 +262,8 @@ def main():
 			for bad_id in bad_ids:
 				change_handler.add_score(bad_id, 0, 0)
 				#sql_w.write('update est set score = -1 where ID = {};\n'.format(bad_id))
-if use_time_filter:
+
+		if use_time_filter:
 			points_under_consideration = []
 			print 'Attempting temporal alignment'
 			print 'Got {} good points'.format(len(good_ids))

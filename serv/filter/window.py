@@ -15,17 +15,20 @@ class WindowIterator:
 		self.windows = None
 		self.init_windows()
 
-	def get_property_for_point(self, point, prop):
-		for window in self.windows:
-			lower, upper = window.get_bounds()
-			#print 'Checking {} against window ({}, {})'.format(point, lower, upper)
-			if upper is None:
-				assert point >= lower
-				return window.attributes[prop]
-			else:
-				if point >= lower and point < upper:
-					return window.attributes[prop]
-		assert False
+	def get_property_for_point(self, point, prop, window_offset=0):
+		window = self.get_window_for_point(point, offset=window_offset)
+		return window.attributes[prop]
+
+		# for window in self.windows:
+		# 	lower, upper = window.get_bounds()
+		# 	#print 'Checking {} against window ({}, {})'.format(point, lower, upper)
+		# 	if upper is None:
+		# 		assert point >= lower
+		# 		return window.attributes[prop]
+		# 	else:
+		# 		if point >= lower and point < upper:
+		# 			return window.attributes[prop]
+		# assert False
 
 	def get_window_count(self):
 		if len(self.points) == 0:
@@ -37,13 +40,19 @@ class WindowIterator:
 		return interval_window_count
 
 	def get_window_for_point(self, point, offset=0):
+		found_window = False
+		the_window = None
 		# Return the Window object of index i+offset, where i is the index of
 		# the window within which point falls.
-		for window in self:
+		for i, window in enumerate(self):
 			if point in window:
 				# found the window
-				pass
-			w = window.get_window_for_point(point, offset=-1)
+				assert not found_window
+				found_window = True
+				the_window = self.windows[i + offset]
+		assert found_window
+		return the_window
+			#w = window.get_window_for_point(point, offset=-1)
 
 	def init_windows(self):
 		#print 'Called iter generator'
@@ -94,10 +103,11 @@ class Window:
 			return (self.points[self.start_ind][0], None)
 
 	def __contains__(self, v):
+		print 'Window starts {}, ends {}, length {}'.format(self.start_ind, self.end_ind, len(self.points))
 		t_start = self.points[self.start_ind][0]
-		t_end = self.points[self.end_ind][0]
+		t_end = self.points[self.end_ind - 1][0]
 
-		print 'performing contains {}...{}...{}'.format(v, t_start, t_end)
+		# print 'performing contains {}...{}...{}'.format(v, t_start, t_end)
 		return v >= t_start and v <= t_end
 
 	def calculate_interval_from(self, txid='(unknown)', slice_id='(unknown)'):
