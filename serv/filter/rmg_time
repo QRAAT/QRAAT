@@ -156,56 +156,6 @@ def main():
 			score_new_things()
 		# Add unscored points to a queue for scoring
 
-	def score_new_things():
-
-		time_starts_at = 1398124800
-		cap_at = 10
-		
-		# get all unscored points
-		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and timestamp >= {} and txid = {} and siteid = {};'.format(time_starts_at, arg_txid, arg_siteid)
-		rows = cur.execute(q)
-		print 'Got {} rows back'.format(rows)
-		ids = []
-		while True:
-			row = cur.fetchone()
-			if row is None:
-				break
-			else:
-				row = tuple(row)
-				assert len(row) == 1
-				ids.append(row[0])
-		print 'Parsed {} IDs.'.format(len(ids))
-		
-		if cap_at is not None:
-			ids = ids[:cap_at]
-		print 'Parsed {} IDs (possible truncated): {}'.format(len(ids), ids)
-		in_ids = ', '.join(map(lambda x : '{}', ids))
-		id_string = in_ids.format(*ids)
-		field_string = ', '.join(fields)
-		rows = cur.execute('SELECT {} FROM est where ID in ({});'.format(field_string, id_string))
-		print 'Got {} records returned.'.format(rows)
-
-		print 'Preparing to score {} EST records...'.format(rows)
-
-		# A batch of things arrives, some of which may be late arriving
-		out_of_order = []
-		# It gets populated somehow.
-		
-		# Sort of half mark those things because we are doing the intervals with them in mind
-		change_handler.add_score(bad_id, 0, 0)
-
-		for point in out_of_order:
-			w = window.get_window_for_point(point, offset=-1)
-			
-				
-		
-		
-		# Find invalidated intervals: what is in batch within a computed interval
-		# For each invalidated interval, recompute and update
-		# Add all points affected by an invalidated interval to the queue for scoring
-		# Score each point in the queue for scoring
-
-		#cur.execute('SELECT {} FROM est where txid = {} and siteid = {};'.format(', '.join(fields), arg_txid, arg_siteid))
 
 
 
@@ -310,8 +260,7 @@ def main():
 			for bad_id in bad_ids:
 				change_handler.add_score(bad_id, 0, 0)
 				#sql_w.write('update est set score = -1 where ID = {};\n'.format(bad_id))
-
-		if use_time_filter:
+if use_time_filter:
 			points_under_consideration = []
 			print 'Attempting temporal alignment'
 			print 'Got {} good points'.format(len(good_ids))
@@ -589,6 +538,56 @@ def are_points_in_radius(point, points, radius):
 	print 'There is nothing there'
 	return False
 
+def score_new_things():
+
+	time_starts_at = 1398124800
+	cap_at = 10
+	
+	# get all unscored points
+	q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and timestamp >= {} and txid = {} and siteid = {};'.format(time_starts_at, arg_txid, arg_siteid)
+	rows = cur.execute(q)
+	print 'Got {} rows back'.format(rows)
+	ids = []
+	while True:
+		row = cur.fetchone()
+		if row is None:
+			break
+		else:
+			row = tuple(row)
+			assert len(row) == 1
+			ids.append(row[0])
+	print 'Parsed {} IDs.'.format(len(ids))
+	
+	if cap_at is not None:
+		ids = ids[:cap_at]
+	print 'Parsed {} IDs (possible truncated): {}'.format(len(ids), ids)
+	in_ids = ', '.join(map(lambda x : '{}', ids))
+	id_string = in_ids.format(*ids)
+	field_string = ', '.join(fields)
+	rows = cur.execute('SELECT {} FROM est where ID in ({});'.format(field_string, id_string))
+	print 'Got {} records returned.'.format(rows)
+
+	print 'Preparing to score {} EST records...'.format(rows)
+
+	# A batch of things arrives, some of which may be late arriving
+	out_of_order = []
+	# It gets populated somehow.
+	
+	# Sort of half mark those things because we are doing the intervals with them in mind
+	change_handler.add_score(bad_id, 0, 0)
+
+	for point in out_of_order:
+		w = window.get_window_for_point(point, offset=-1)
+		
+			
+	
+	
+	# Find invalidated intervals: what is in batch within a computed interval
+	# For each invalidated interval, recompute and update
+	# Add all points affected by an invalidated interval to the queue for scoring
+	# Score each point in the queue for scoring
+
+	#cur.execute('SELECT {} FROM est where txid = {} and siteid = {};'.format(', '.join(fields), arg_txid, arg_siteid))
 
 if __name__ == '__main__':
 	#cProfile.run('main()')
