@@ -42,7 +42,7 @@ import window
 CONFIG_MIN_INTERVAL = 0.8
 
 # How long a period the interval should be calculated over
-CONFIG_INTERVAL_WINDOW_SIZE = float(60 * 60) # One hour (given in seconds)
+CONFIG_INTERVAL_WINDOW_SIZE = float(3 * 60) # Three minutes (given in seconds)
 
 # Search this many interval distances in both directions of a point for corroborating neighbors
 CONFIG_DELTA_AWAY = 3
@@ -51,7 +51,7 @@ CONFIG_DELTA_AWAY = 3
 CONFIG_ERROR_ALLOWANCE = 0.2
 
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
-CONFIG_JUST_STAGE_CHANGES = True
+CONFIG_JUST_STAGE_CHANGES = False
 
 def filter_site(s):
 	sites = s.split(',')
