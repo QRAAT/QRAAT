@@ -21,7 +21,6 @@
 # Testing with: txid=52 --siteid 2 or 3
 
 import bisect
-import changes
 from collections import defaultdict
 import cProfile
 import csv
@@ -31,12 +30,11 @@ import itertools
 import math
 import numpy
 import pickle
-import qraat
 import re
-import registry as reg
 import sys
 import time
-import window
+
+import qraat
 
 # Minimum legitimate value before an exception is raised
 CONFIG_MIN_INTERVAL = 0.8
@@ -193,7 +191,8 @@ def main():
 		change_handler.add_score(bad_id, 0, 0)
 
 		for point in out_of_order:
-			w = window.get_window_for_point(point, offset=-1)
+			w = qraat.signal_filter.get_window_for_point(point, offset=-1)
+			
 				
 		
 		
@@ -210,10 +209,10 @@ def main():
 	if CONFIG_JUST_STAGE_CHANGES:
 		sql_output_filename = 'update.sql'
 		sql_w = open(sql_output_filename, 'w')
-		change_handler = changes.ChangeHandler(sql_w, 'file')
+		change_handler = qraat.signal_filter.ChangeHandler(sql_w, 'file')
 	else:
 		#db_con = qraat.util.get_db('writer')
-		change_handler = changes.ChangeHandler(None, 'db')
+		change_handler = qraat.signal_filter.ChangeHandler(None, 'db')
 
 
 
@@ -253,7 +252,7 @@ def main():
 
 		
 	#if just_stage_changes:
-	#change_handler = changes.ChangeHandler(
+	#change_handler = qraat.signal_filter.ChangeHandler(
 
 	# Setting up connection to database...
 
@@ -270,7 +269,7 @@ def main():
 			#print 'Filtering bucket by txid'
 			continue
 
-		registry = reg.Registry(arguments)
+		registry = qraat.signal_filter.Registry(arguments)
 		for point in buckets[site_and_txid]:
 			registry.register_point(point)
 
@@ -362,9 +361,9 @@ def apply_time_filtering(points_under_consideration, txid, interval_computation_
 
 	interval_windows = None
 	if interval_computation_only_data is None:
-		interval_windows = window.WindowIterator(sorted_points, interval_window_size)
+		interval_windows = qraat.signal_filter.WindowIterator(sorted_points, interval_window_size)
 	else:
-		interval_windows = window.WindowIterator(interval_computation_only_data, interval_window_size)
+		interval_windows = qraat.signal_filter.WindowIterator(interval_computation_only_data, interval_window_size)
 
 	print 'Window count: {}'.format(interval_windows.get_window_count())
 
