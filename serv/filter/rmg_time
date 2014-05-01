@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # rmg_filter
 # Script to filter records both by parametric properties and time-based ones.
 #
@@ -51,7 +51,7 @@ CONFIG_DELTA_AWAY = 3
 CONFIG_ERROR_ALLOWANCE = 0.2
 
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
-CONFIG_JUST_STAGE_CHANGES = False
+CONFIG_JUST_STAGE_CHANGES = True
 
 def filter_site(s):
 	sites = s.split(',')
@@ -185,6 +185,8 @@ def main():
 		rows = cur.execute('SELECT {} FROM est where ID in ({});'.format(field_string, id_string))
 		print 'Got {} records returned.'.format(rows)
 
+		print 'Preparing to score {} EST records...'.format(rows)
+
 		# A batch of things arrives, some of which may be late arriving
 		out_of_order = []
 		# It gets populated somehow.
@@ -213,7 +215,8 @@ def main():
 		sql_w = open(sql_output_filename, 'w')
 		change_handler = changes.ChangeHandler(sql_w, 'file')
 	else:
-		#db_con = qraat.util.get_db('writer')
+		# NOTE: I don't declare the db connection here, because passing it
+		# between modules seems to mess things up.
 		change_handler = changes.ChangeHandler(None, 'db')
 
 
@@ -345,7 +348,7 @@ def main():
 				scored_points = apply_time_filtering(points_under_consideration, txid)
 
 			for (id, score) in scored_points.items():
-				change_handler.add_score(id, score, float(score) / CONFIG_DELTA_AWAY * 2)
+				change_handler.add_score(id, score, float(score) / (CONFIG_DELTA_AWAY * 2))
 				#sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
 
 
