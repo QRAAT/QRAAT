@@ -34,6 +34,7 @@ import pickle
 import qraat
 import re
 import registry as reg
+import signal
 import sys
 import time
 import window
@@ -52,6 +53,9 @@ CONFIG_ERROR_ALLOWANCE = 0.2
 
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
 CONFIG_JUST_STAGE_CHANGES = False
+
+# Defines the amount of time in seconds (fractional is fine, it is passed to time.sleep()) to wait between polling for new points.
+CONFIG_NEW_STUFF_POLLING_PERIOD = 5
 
 def filter_site(s):
 	sites = s.split(',')
@@ -90,7 +94,7 @@ def pass_all(x):
 
 MOUSE = False
 
-def exit():
+def exit(signal, frame):
 	print 'Exiting.'
 	sys.exit(0)
 
@@ -102,8 +106,10 @@ def main():
 
 	past_score = True
 	if 't_start' not in arguments or 't_end' not in arguments:
-		print 'Please provide arguments t_start and t_end to specify appropriate time range to process ' + \
-				'(e.g., --t_start 345 --t_end 700) to compute static scores.'
+		print 'Please provide arguments t_start and t_end to specify appropriate ' + \
+				'time range to process (e.g., --t_start 345 --t_end 700) to compute ' + \
+				'static scores. The program will periodically poll and score new ' + \
+				'incoming data.'
 		past_score = False
 
 
@@ -131,13 +137,14 @@ def main():
 		score_the_past(arguments, arg_t_start, arg_t_end, arg_txid, arg_siteid)
 	else:
 		signal.signal(signal.SIGINT, exit)
+		db_con = qraat.util.get_db('writer')
 		while True:
-			score_new_things()
+			score_new_things(db_con, arg_txid, arg_siteid)
 		# Add unscored points to a queue for scoring
 
 def score_the_past(arguments, t_start, t_end, txid, siteid):
 
-	db_con = qraat.util.get_db('reader')
+	db_con = qraat.util.get_db('writer')
 
 	# Something ...
 	cur = db_con.cursor()
@@ -541,15 +548,25 @@ def are_points_in_radius(point, points, radius):
 	print 'There is nothing there'
 	return False
 
-def score_new_things():
+def score_new_things(db_con, txid, siteid):
 
-	time_starts_at = 1398124800
-	cap_at = 10
-	
+	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
+
+	cur = db_con.cursor()
+
+	# NOTE: Set a timestamp here to only score unscored points whose timestamp is newer than this.
+	time_starts_at = None
 	# get all unscored points
-	q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and timestamp >= {} and txid = {} and siteid = {};'.format(time_starts_at, arg_txid, arg_siteid)
+	q = None
+	if time_starts_at is None:
+		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and txid = {} and siteid = {};'.format(txid, siteid)
+	else:
+		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and timestamp >= {} and txid = {} and siteid = {};'.format(time_starts_at, txid, siteid)
 	rows = cur.execute(q)
-	print 'Got {} rows back'.format(rows)
+	if rows == 0:
+		print 'Nothing new yet.'
+	else:
+		print 'There are {} new rows'.format(rows)
 	ids = []
 	while True:
 		row = cur.fetchone()
@@ -559,15 +576,19 @@ def score_new_things():
 			row = tuple(row)
 			assert len(row) == 1
 			ids.append(row[0])
-	print 'Parsed {} IDs.'.format(len(ids))
+	print 'New IDs:', ids
+
+	if len(ids) == 0:
+		print 'No new points found yet.'
+		polling_delay()
+		return
 	
-	if cap_at is not None:
-		ids = ids[:cap_at]
-	print 'Parsed {} IDs (possible truncated): {}'.format(len(ids), ids)
-	in_ids = ', '.join(map(lambda x : '{}', ids))
-	id_string = in_ids.format(*ids)
+	ids_template = ', '.join(map(lambda x : '{}', ids))
+	id_string = ids_template.format(*ids)
 	field_string = ', '.join(fields)
-	rows = cur.execute('SELECT {} FROM est where ID in ({});'.format(field_string, id_string))
+	query = 'SELECT {} FROM est where ID in ({});'.format(field_string, id_string)
+	print 'About to execute query "{}"'.format(query)
+	rows = cur.execute(query)
 	print 'Got {} records returned.'.format(rows)
 
 	print 'Preparing to score {} EST records...'.format(rows)
@@ -579,8 +600,14 @@ def score_new_things():
 	# Sort of half mark those things because we are doing the intervals with them in mind
 	change_handler.add_score(bad_id, 0, 0)
 
-	for point in out_of_order:
-		w = window.get_window_for_point(point, offset=-1)
+	# for point in out_of_order:
+	# 	w = window.get_window_for_point(point, offset=-1)
+
+
+
+
+	# Configurable delay between subsequent calls happens here.
+	polling_delay()
 		
 			
 	
@@ -591,6 +618,13 @@ def score_new_things():
 	# Score each point in the queue for scoring
 
 	#cur.execute('SELECT {} FROM est where txid = {} and siteid = {};'.format(', '.join(fields), arg_txid, arg_siteid))
+
+def polling_delay():
+	print 'Zzz...'
+	time.sleep(CONFIG_NEW_STUFF_POLLING_PERIOD)
+	print 'Wha!'
+	
+	
 
 if __name__ == '__main__':
 	#cProfile.run('main()')
