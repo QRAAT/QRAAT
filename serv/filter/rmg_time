@@ -57,6 +57,9 @@ CONFIG_JUST_STAGE_CHANGES = False
 # Defines the amount of time in seconds (fractional is fine, it is passed to time.sleep()) to wait between polling for new points.
 CONFIG_NEW_STUFF_POLLING_PERIOD = 5
 
+AWAKE = True
+EXIT_REQUESTED = False
+
 def filter_site(s):
 	sites = s.split(',')
 	sites = [int(x.strip()) for x in sites]
@@ -95,7 +98,15 @@ def pass_all(x):
 MOUSE = False
 
 def exit(signal, frame):
-	print 'Exiting.'
+	global EXIT_REQUESTED
+	if AWAKE:
+		print 'Can\'t right now, sleeping.'
+		EXIT_REQUESTED = True
+	else:
+		actually_exit()
+
+def actually_exit():
+	print 'Exiting'
 	sys.exit(0)
 
 def main():
@@ -625,8 +636,14 @@ def score_new_things(db_con, txid, siteid, change_handler):
 	#cur.execute('SELECT {} FROM est where txid = {} and siteid = {};'.format(', '.join(fields), arg_txid, arg_siteid))
 
 def polling_delay():
+	global AWAKE
+	AWAKE = False
 	print 'Zzz...'
+	if EXIT_REQUESTED:
+		print 'Processing earlier exit request.'
+		actually_exit()
 	time.sleep(CONFIG_NEW_STUFF_POLLING_PERIOD)
+	AWAKE = True
 	print 'Wha!'
 	
 	
