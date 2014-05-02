@@ -357,6 +357,8 @@ def apply_time_filtering(points_under_consideration, txid, interval_computation_
 		w.attach_property('interval', interval)
 		print 'attached attribute "interval"'
 
+	interval_windows.report()
+
 	# Interval values are calculated.
 	# Go over these windows with a sub-window, a scoring window centered around
 	# each point. Must be able to access the interval of a point falling within
@@ -374,7 +376,7 @@ def apply_time_filtering(points_under_consideration, txid, interval_computation_
 		# Scoring this point (with id=ident)
 		score = 0
 		# get appropriate interval
-		interval = interval_windows.get_property_for_point(tstamp, 'interval', window_offset=-1)
+		interval = interval_windows.get_property_for_point(tstamp, 'interval')
 		if interval < CONFIG_MIN_INTERVAL:
 			# Skipping for now
 			#raise Exception('Found interval abnormally low: {}'.format(interval))
@@ -399,6 +401,8 @@ def apply_time_filtering(points_under_consideration, txid, interval_computation_
 		scores[ident] = score
 
 	print 'Calculated scores for {} points'.format(len(scores))
+	unscored_because_low = [x for (x, y) in scores.items() if y == 2]
+	print '{} points were not totally processed because an interval could not be calculated (the calculated value is not reasonable)'.format(len(unscored_because_low))
 	return scores
 
 

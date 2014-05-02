@@ -16,19 +16,16 @@ class WindowIterator:
 		self.init_windows()
 
 	def get_property_for_point(self, point, prop, window_offset=0):
-		window = self.get_window_for_point(point, offset=window_offset)
+		match_ind, orig_match_ind, window = self.get_window_for_point(point, offset=window_offset)
+		if window.attributes[prop] is None:
+			print 'For requested window offset {} it\'s messed up. Actual index = {}, original request = {}'.format(window_offset, match_ind, orig_match_ind)
 		return window.attributes[prop]
 
-		# for window in self.windows:
-		# 	lower, upper = window.get_bounds()
-		# 	#print 'Checking {} against window ({}, {})'.format(point, lower, upper)
-		# 	if upper is None:
-		# 		assert point >= lower
-		# 		return window.attributes[prop]
-		# 	else:
-		# 		if point >= lower and point < upper:
-		# 			return window.attributes[prop]
-		# assert False
+	def report(self):
+		print 'There are a total of {} windows'.format(len(self.windows))
+		for i, window in enumerate(self.windows):
+			if 'interval' in window.attributes and window.attributes['interval'] is None:
+				print 'Window {} interval malformed'.format(i)
 
 	def get_window_count(self):
 		if len(self.points) == 0:
@@ -44,15 +41,22 @@ class WindowIterator:
 		the_window = None
 		# Return the Window object of index i+offset, where i is the index of
 		# the window within which point falls.
+		match_ind = None
+		original_match_ind = None
 		for i, window in enumerate(self):
 			if point in window:
+				original_match_ind = i
 				# found the window
 				assert not found_window
 				found_window = True
-				the_window = self.windows[i + offset]
+				ind = i + offset
+				if ind < 0:
+					print 'Correcting negative window index Original {} + offset {}'.format(i, offset)
+					ind = 0
+				match_ind = ind
+				the_window = self.windows[ind]
 		assert found_window
-		return the_window
-			#w = window.get_window_for_point(point, offset=-1)
+		return match_ind, original_match_ind, the_window
 
 	def init_windows(self):
 		#print 'Called iter generator'
