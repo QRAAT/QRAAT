@@ -1,0 +1,7 @@
+Marcel's original tracking interface prototype, modified for the 
+QRAAT implementation. This is meant only as a proof of concept. 
+It uses a deprecated version of the Google Maps JavaScript API
+(need to update to v3). 
+
+test.txt -- a DB of the qraat.Track table. Tracks for the mice
+experiment 7/27 - 8/6/13. 

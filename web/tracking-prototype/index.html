@@ -1,0 +1,173 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+		<title>RMG Prototype</title>
+		<script src="http://maps.google.com/maps?file=api&amp;v=2&amp;key=AIzaSyChbow-b__qPIiENLEXxm9oa7Mo4FdJsMI" type="text/javascript"></script>
+		<script src="rmgmap.js" type="text/javascript"></script>
+		<script src="formcontrols.js" type="text/javascript"></script>
+		<style>
+			.overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:#444444; opacity:.50; filter:Alpha(Opacity=50); z-index:1001; }
+			.overlaydialog { border:3px solid #555; position:absolute; padding:.2em; overflow:hidden; background:#ffffff ; color:#434343; -moz-border-radius: 10px; -webkit-border-radius: 10px; border-radius: 10px; width: 400px; top: 230px; left: 455px; display: block; z-index: 1002; }
+		</style>
+	</head>
+	<body onload="load()" onunload="GUnload()">
+		<noscript>
+			<b>JavaScript must be enabled in order for you to use Google Maps.</b><br/>
+			However, it seems JavaScript is either disabled or not supported by your browser.<br/>
+			To view Google Maps, enable JavaScript by changing your browser options, and then try again.<br/>
+		</noscript>
+		<div id="timezonetext">
+			Your local time is ...
+		</div>
+		<form name="controls">
+			<table noborder>
+				<tr>
+					<td>
+						Start at 
+					</td>
+					<td>
+						<select class="normal8" name="startyear" id="controlform_startyear" onChange="changestartyear()">
+							<option disabled value="">Year</option>
+						</select>
+					</td>
+					<td>
+						<select class="normal8" name="startmonth" id="controlform_startmonth" onChange="changestartmonth()">
+							<option selected disabled value="">Month</option>
+						</select>
+					</td>
+					<td>
+						<select class="normal8" name="startday" id="controlform_startday" onChange="changestartday()">
+							<option selected disabled value="">Day</option>
+						</select>
+					</td>
+					<td>
+						<select class="normal8" name="starthour" id="controlform_starthour" onChange="changestarthour()">
+							<option selected disabled value="">Hour</option>
+						</select>
+					</td>
+					<td>
+						<select class="normal8" name="startmin" id="controlform_startmin" onChange="changestartmin()">
+							<option selected disabled value="">Minute</option>
+						</select>
+					</td>
+					<td>
+						<select class="normal8" name="startsec" id="controlform_startsec" onChange="changestartsec()">
+							<option selected disabled value="">Second</option>
+						</select>
+					</td>
+					<td>
+						UTC
+					</td>
+					<td>
+						<input type=text name="localstart" id="controlform_localstart" size="29" value="">
+					</td>
+				</tr>
+				<tr>
+					<td>
+						Stop at 
+					</td>
+					<td>
+						<select class="normal8" name="stopyear" id="controlform_stopyear" onChange="changestopyear()">
+							<option disabled value="">Year</option>
+						</select>
+					</td>
+					<td>
+						<select class="normal8" name="stopmonth" id="controlform_stopmonth" onChange="changestopmonth()">
+							<option selected disabled value="">Month</option>
+						</select>
+					</td>
+					<td>
+						<select class="normal8" name="stopday" id="controlform_stopday" onChange="changestopday()">
+							<option selected disabled value="">Day</option>
+						</select>
+					</td>
+					<td>
+						<select class="normal8" name="stophour" id="controlform_stophour" onChange="changestophour()">
+							<option selected disabled value="">Time</option>
+						</select>
+					</td>
+					<td>
+						<select class="normal8" name="stopmin" id="controlform_stopmin" onChange="changestopmin()">
+							<option selected disabled value="">Minute</option>
+						</select>
+					</td>
+					<td>
+						<select class="normal8" name="stopsec" id="controlform_stopsec" onChange="changestopsec()">
+							<option selected disabled value="">Second</option>
+						</select>
+					</td>
+					<td>
+						UTC
+					</td>
+					<td>
+						<input type=text name="localstop" id="controlform_localstop" size="29" value="">
+					</td>
+				</tr>
+			</table>
+			Cursor 
+			Lon <input type=text id="lon" name="lon" size="11" value="">
+			Lat <input type=text id="lat" name="lat" size="9" value="">
+			<select class="normal8" name="track" id="controlform_track" onChange="changetrack()">
+			<input class="bold10" type=button id="controlform_doplot" name="doplot" value="Plot" style="background-color:#C0C0C0;" onclick="doMakeKML();">
+			<input class="bold10" type=button id="controlform_dofit" name="dofit" value="Fit" style="background-color:#C0C0C0;" onclick="doFit();">
+			<input type=text id="message" name="message" size="40" value="">
+			<input type="hidden" name="selectedstartyear" id="controlform_selectedstartyear" value="">
+			<input type="hidden" name="selectedstartmonth" id="controlform_selectedstartmonth" value="">
+			<input type="hidden" name="selectedstartday" id="controlform_selectedstartday" value="">
+			<input type="hidden" name="selectedstarthour" id="controlform_selectedstarthour" value="">
+			<input type="hidden" name="selectedstartmin" id="controlform_selectedstartmin" value="">
+			<input type="hidden" name="selectedstartsec" id="controlform_selectedstartsec" value="">
+			<input type="hidden" name="selectedstopyear" id="controlform_selectedstopyear" value="">
+			<input type="hidden" name="selectedstopmonth" id="controlform_selectedstopmonth" value="">
+			<input type="hidden" name="selectedstopday" id="controlform_selectedstopday" value="">
+			<input type="hidden" name="selectedstophour" id="controlform_selectedstophour" value="">
+			<input type="hidden" name="selectedstopmin" id="controlform_selectedstopmin" value="">
+			<input type="hidden" name="selectedstopsec" id="controlform_selectedstopsec" value="">
+			<input type="hidden" name="selectedoptions" id="controlform_selectedoptions" value="">
+			<input type="hidden" name="selectedtrack" id="controlform_selectedtrack" value="">
+		</form>
+		<table noborder>
+			<tr>
+				<td>
+					<div id="map" style="width: 700px; height: 500px"></div>
+					<input type=text id="debug_text" name="debugtext" size="135" value="">
+				</td>
+				<td>
+					<form name="options">
+						<br>
+						Display options:
+						<table noborder>
+							<tr>
+								<td> Show the track lines </td>
+								<td> <input type="radio" name="showtrace" id="optionsform_showtrace" value="yes" onclick="doChangeOptions();" checked/>yes </td>
+								<td> <input type="radio" name="showtrace" id="optionsform_showtrace" value="no" onclick="doChangeOptions();"/>no </td>
+							</tr>
+							<tr>
+								<td> Use a different color for each track line </td>
+								<td> <input type="radio" name="coloreach" id="optionsform_coloreach" value="yes" onclick="doChangeOptions();" checked/>yes </td>
+								<td> <input type="radio" name="coloreach" id="optionsform_coloreach" value="no" onclick="doChangeOptions();"/>no </td>
+							</tr>
+							<tr>
+								<td> Show track starting point markers </td>
+								<td> <input type="radio" name="markstart" id="optionsform_markstart" value="yes" onclick="doChangeOptions();" checked/>yes </td>
+								<td> <input type="radio" name="markstart" id="optionsform_markstart" value="no" onclick="doChangeOptions();"/>no </td>
+								<td>
+							</tr>
+							<tr>
+								<td> Show track end point markers </td>
+								<td> <input type="radio" name="markend" id="optionsform_markend" value="yes" onclick="doChangeOptions();" checked/>yes </td>
+								<td> <input type="radio" name="markend" id="optionsform_markend" value="no" onclick="doChangeOptions();"/>no </td>
+								<td>
+							</tr>
+						</table>
+					</form>
+					<input class="bold10" type=button id="controlform_download" name="download" value="Download KML" style="background-color:#C0C0C0;" onclick="doDownloadKML();">
+					<input class="bold10" type=button id="controlform_export" name="export" value="Export" style="background-color:#C0C0C0;" onclick="doExport();">
+					<input class="bold10" type=button id="controlform_debug" name="debug" value="debug" style="background-color:#C0C0C0;" onclick="doDebug();">
+				</td>
+			</tr>
+		</table>	
+		<iframe id="iframe_downloadkml" src="" style="width:0;height:0;visibility:hidden"></iframe>
+	</body>
+</html>
