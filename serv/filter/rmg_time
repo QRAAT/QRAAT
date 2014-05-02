@@ -132,7 +132,7 @@ def main():
 	site_data = {}
 
 	if past_score:
-		rows = cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), arg_t_start, arg_t_end, arg_txid, arg_siteid))
+		rows = cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), arg_t_start, arg_t_end, arg_txid, arg_siteid)) # FIXME memory hog. Query should be limited to effective window. 
 		
 		print 'Rows processed:', rows
 		site_data = {}
