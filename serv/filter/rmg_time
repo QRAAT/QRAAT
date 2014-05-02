@@ -21,7 +21,6 @@
 # Testing with: txid=52 --siteid 2 or 3
 
 import bisect
-import changes
 from collections import defaultdict
 import cProfile
 import csv
@@ -33,11 +32,11 @@ import numpy
 import pickle
 import qraat
 import re
-import registry as reg
 import signal
 import sys
 import time
-import window
+
+import qraat
 
 # Minimum legitimate value before an exception is raised
 CONFIG_MIN_INTERVAL = 0.8
@@ -52,7 +51,7 @@ CONFIG_DELTA_AWAY = 3
 CONFIG_ERROR_ALLOWANCE = 0.2
 
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
-CONFIG_JUST_STAGE_CHANGES = False
+CONFIG_JUST_STAGE_CHANGES = True
 
 # Defines the amount of time in seconds (fractional is fine, it is passed to time.sleep()) to wait between polling for new points.
 CONFIG_NEW_STUFF_POLLING_PERIOD = 5
@@ -159,11 +158,11 @@ def init_change_handler():
 	if CONFIG_JUST_STAGE_CHANGES:
 		sql_output_filename = 'update.sql'
 		sql_w = open(sql_output_filename, 'w')
-		change_handler = changes.ChangeHandler(sql_w, 'file')
+		change_handler = qraat.signal_filter.ChangeHandler(sql_w, 'file')
 	else:
 		# NOTE: I don't declare the db connection here, because passing it
 		# between modules seems to mess things up.
-		change_handler = changes.ChangeHandler(None, 'db')
+		change_handler = qraat.signal_filter.ChangeHandler(None, 'db')
 	return change_handler
 
 def score_the_past(arguments, t_start, t_end, txid, siteid):
@@ -231,7 +230,7 @@ def score_the_past(arguments, t_start, t_end, txid, siteid):
 
 		
 	#if just_stage_changes:
-	#change_handler = changes.ChangeHandler(
+	#change_handler = qraat.signal_filter.ChangeHandler(
 
 	# Setting up connection to database...
 
@@ -248,7 +247,7 @@ def score_the_past(arguments, t_start, t_end, txid, siteid):
 			#print 'Filtering bucket by txid'
 			continue
 
-		registry = reg.Registry(arguments)
+		registry = qraat.signal_filter.Registry(arguments)
 		for point in buckets[site_and_txid]:
 			registry.register_point(point)
 
@@ -340,9 +339,9 @@ def apply_time_filtering(points_under_consideration, txid, interval_computation_
 
 	interval_windows = None
 	if interval_computation_only_data is None:
-		interval_windows = window.WindowIterator(sorted_points, interval_window_size)
+		interval_windows = qraat.signal_filter.WindowIterator(sorted_points, interval_window_size)
 	else:
-		interval_windows = window.WindowIterator(interval_computation_only_data, interval_window_size)
+		interval_windows = qraat.signal_filter.WindowIterator(interval_computation_only_data, interval_window_size)
 
 	print 'Window count: {}'.format(interval_windows.get_window_count())
 
@@ -362,7 +361,7 @@ def apply_time_filtering(points_under_consideration, txid, interval_computation_
 	# Interval values are calculated.
 	# Go over these windows with a sub-window, a scoring window centered around
 	# each point. Must be able to access the interval of a point falling within
-	# a particular interval window.
+	# a particular interval qraat.signal_filter.
 
 	#interval = interval_windows.get_property_for_point(point, 'interval')
 
@@ -407,7 +406,7 @@ def apply_time_filtering(points_under_consideration, txid, interval_computation_
 
 
 
-	#interval_windows = window.WindowIterator(sorted_points, interval_window_size)
+	#interval_windows = qraat.signal_filter.WindowIterator(sorted_points, interval_window_size)
 
 	for (i, w) in enumerate(interval_windows):
 		v = w.value()
@@ -621,7 +620,7 @@ def score_new_things(db_con, txid, siteid, change_handler):
 		change_handler.add_score(new_id, 0, 0)
 
 	# for point in out_of_order:
-	# 	w = window.get_window_for_point(point, offset=-1)
+	# 	w = qraat.signal_filter.get_window_for_point(point, offset=-1)
 
 
 

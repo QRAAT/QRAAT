@@ -13,8 +13,6 @@ import util
 
 
 
-
-
 THRESHOLD_BAND3 = 150
 THRESHOLD_BAND10 = 900
 
@@ -457,8 +455,7 @@ def filter_hist(histo):
 current_count = 0
 
 
-
-VALID_MODES = ('file', 'db')
+VALID_MODES = ('file', 'db', 'fileinc')
 QUERY_TEMPLATE = 'insert into estscore (estid, absscore, relscore) values (%s, %s, %s);\n'
 
 #ADD_EVERY = 100
@@ -473,7 +470,26 @@ class ChangeHandler:
 			self.buffer = []
 			db_con = util.get_db('writer')
 			self.obj = db_con
+		elif self.mode == 'fileinc':
+			self.obj = obj # A filename is this case
+			self.current_index = 1
+			self.set_file_handle()
 		print 'Object of type {} being handled in mode {}'.format(self.obj.__class__, self.mode)
+
+	def set_file_handle(self):
+		assert self.mode == 'fileinc'
+		
+		filename = '{}{}'.format(self.obj, self.current_index)
+		self.current_file_handle = open(filename, 'w')
+		
+	def increment(self):
+		if self.mode != 'fileinc':
+			print 'WARNING: Increment noop'
+			return
+		else:
+			self.current_file_handle.close()
+			self.current_index += 1
+			self.set_file_handle()
 
 	def close(self):
 		getattr(self, 'close_' + self.mode)()
@@ -495,6 +511,18 @@ class ChangeHandler:
 
 	def flush_file(self):
 		self.obj.flush()
+
+	# Fileinc operations
+
+	def close_fileinc(self):
+		self.current_file_handle.close()
+
+	def add_score_fileinc(self, estid, absscore, relscore):
+		s = QUERY_TEMPLATE % (estid, absscore, relscore)
+		self.current_file_handle.write(s)
+
+	def flush_score_fileinc(self):
+		self.current_file_handle.flush()
 
 	# Database operations - Not sure if these are correct calls, will have to
 	# verify tomorrow.
@@ -525,8 +553,6 @@ class ChangeHandler:
 			cursor.executemany(self.buffer)
 			self.buffer.clear()
 
-
-
 class WindowIterator:
 	#def __init__(self, points, window_size, min_ind=0, max_ind=len(points)):
 	def __init__(self, points, window_size):
@@ -538,17 +564,17 @@ class WindowIterator:
 		self.windows = None
 		self.init_windows()
 
-	def get_property_for_point(self, point, prop):
-		for window in self.windows:
-			lower, upper = window.get_bounds()
-			#print 'Checking {} against window ({}, {})'.format(point, lower, upper)
-			if upper is None:
-				assert point >= lower
-				return window.attributes[prop]
-			else:
-				if point >= lower and point < upper:
-					return window.attributes[prop]
-		assert False
+	def get_property_for_point(self, point, prop, window_offset=0):
+		match_ind, orig_match_ind, window = self.get_window_for_point(point, offset=window_offset)
+		if window.attributes[prop] is None:
+			print 'For requested window offset {} it\'s messed up. Actual index = {}, original request = {}'.format(window_offset, match_ind, orig_match_ind)
+		return window.attributes[prop]
+
+	def report(self):
+		print 'There are a total of {} windows'.format(len(self.windows))
+		for i, window in enumerate(self.windows):
+			if 'interval' in window.attributes and window.attributes['interval'] is None:
+				print 'Window {} interval malformed'.format(i)
 
 	def get_window_count(self):
 		if len(self.points) == 0:
@@ -560,13 +586,26 @@ class WindowIterator:
 		return interval_window_count
 
 	def get_window_for_point(self, point, offset=0):
+		found_window = False
+		the_window = None
 		# Return the Window object of index i+offset, where i is the index of
 		# the window within which point falls.
-		for window in self:
+		match_ind = None
+		original_match_ind = None
+		for i, window in enumerate(self):
 			if point in window:
+				original_match_ind = i
 				# found the window
-				pass
-			w = window.get_window_for_point(point, offset=-1)
+				assert not found_window
+				found_window = True
+				ind = i + offset
+				if ind < 0:
+					print 'Correcting negative window index Original {} + offset {}'.format(i, offset)
+					ind = 0
+				match_ind = ind
+				the_window = self.windows[ind]
+		assert found_window
+		return match_ind, original_match_ind, the_window
 
 	def init_windows(self):
 		#print 'Called iter generator'
@@ -593,6 +632,7 @@ class WindowIterator:
 	def __iter__(self):
 		return iter(self.windows)
 
+
 class Window:
 	def __init__(self, points, start_ind, end_ind):
 		self.points = points
@@ -617,10 +657,11 @@ class Window:
 			return (self.points[self.start_ind][0], None)
 
 	def __contains__(self, v):
+		# print 'Window starts {}, ends {}, length {}'.format(self.start_ind, self.end_ind, len(self.points))
 		t_start = self.points[self.start_ind][0]
-		t_end = self.points[self.end_ind][0]
+		t_end = self.points[self.end_ind - 1][0]
 
-		print 'performing contains {}...{}...{}'.format(v, t_start, t_end)
+		# print 'performing contains {}...{}...{}'.format(v, t_start, t_end)
 		return v >= t_start and v <= t_end
 
 	def calculate_interval_from(self, txid='(unknown)', slice_id='(unknown)'):
