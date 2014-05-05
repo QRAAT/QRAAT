@@ -319,17 +319,17 @@ void detectmod_detect::write_data(pulse_data *data_holder){
   int int_useconds = (int)tp.tv_usec;
 
   // Create diretory tree. 
-  char *filename = (char *)malloc(256*sizeof(char));
-  char *directory_time_string = (char *)malloc(24*sizeof(char));
+  char filename[256];
+  char directory_time_string[24];
   strftime(directory_time_string, 24, "/%Y/%m/%d/%H/%M/", time_struct);
   strcpy(filename, directory);
   strcat(filename,directory_time_string);
   boost::filesystem::create_directories(filename);
 
   // Create file name.
-  char *time_string = (char *)malloc(40*sizeof(char));
+  char time_string[40];
   strftime(time_string,40,"%S",time_struct);
-  char *u_sec = (char *)malloc(10*sizeof(char));
+  char u_sec[10];
   sprintf(u_sec,"%.6d",int_useconds);
   strncat(time_string,u_sec,6);
   strcat(filename, tx_name); 
@@ -343,10 +343,6 @@ void detectmod_detect::write_data(pulse_data *data_holder){
   if (data_holder->write(filename) == -1)
   {
     printf("Can't open file \"%s\"\n",filename);
-    free(u_sec); 
-    free(time_string); 
-    free(filename);
-    free(directory_time_string);
     return;
   }
 
@@ -358,11 +354,6 @@ void detectmod_detect::write_data(pulse_data *data_holder){
   printf("pulse %s,%d,%f,%f\n", tx_name, int_seconds, noise_db, snr);  
   printf("%s\n\t%s\n\t\tNoise Floor: %.2f dB, SNR: %.2f dB\n",time_string, filename, noise_db, snr);
   
-  // Close file and free string variables.
-  free(time_string);
-  free(filename);
-  free(u_sec);
-  free(directory_time_string);
 
 }
 
@@ -412,7 +403,7 @@ bool detectmod_detect::pulse_shape_discriminator(pulse_data *data_holder){
  */
 
   const float MAX_PERCENTAGE = 0.20;
-  const int SHAPE_THREASHOLD = 14;
+  const float SHAPE_THREASHOLD_PERCENTAGE = 0.0875;
 
   gr_complex *pulse_buffer = data_holder->get_buffer();
   int index = data_holder->get_index();
@@ -439,7 +430,7 @@ bool detectmod_detect::pulse_shape_discriminator(pulse_data *data_holder){
     if(pulse_pwr[j] > max_value)
       count++;
   }
-  if(count>SHAPE_THREASHOLD)
+  if(count > (SHAPE_THREASHOLD_PERCENTAGE*acc_length))
     result = true;
 
   delete[] pulse_pwr;
