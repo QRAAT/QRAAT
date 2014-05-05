@@ -89,16 +89,14 @@ class band:
     :type band_cf: float
     :param filter_length: (?) 
     :type filter_length: int 
-    :param directory: Target directory for detector output.  
-    :type directory: string
+
     """
 
-    def __init__(self, tx, band_num, band_cf, filter_length, directory):
+    def __init__(self, tx, band_num, band_cf, filter_length):
         self.name = tx.name        #: Transmitter name. 
         self.tx_type = tx.type     #: Transmitter type. 
         self.band_num = band_num   #: Index of band in pulse detector array. 
         self.cf = band_cf          #: Band center frequency. 
-        self.directory = directory # ref upstream
         
         if (self.tx_type == det_type.PULSE):
             self.filter_length = filter_length #: (?) 
@@ -175,7 +173,6 @@ class tuning:
 
       self.num_possible_bands = backend.num_bands # ref up stream
       self.bw = backend.bw # ref upstream
-      self.directory = backend.directory # ref upstream
 
       #: Detector bands of type :class:`qraat.rmg.params.band`.  
       self.bands = [] 
@@ -218,7 +215,7 @@ class tuning:
       # Otherwise, add the band. 
       band_cf = baseband_band_num*self.bw+self.cf
       self.bands.append(
-        band(tx, band_num, band_cf, filter_length, self.directory))
+        band(tx, band_num, band_cf, filter_length))
 
 
     def __str__(self):
@@ -242,8 +239,6 @@ class backend:
     :type path: string
     :param num_bands: Number of detector bands
     :type num_bands: int
-    :param directory: target directory for .det files produced by detector. 
-    :type directory: string
     """ 
 
     pa_min = 148000000 #: Lower bound frequency (Hz) for the pre amps output. 
@@ -285,14 +280,8 @@ class backend:
     #: Receiver tuning groups of type :class:`qraat.rmg.params.tuning`. 
     tunings = [] 
 
-    def __init__(self, path, num_bands = 1, directory = "./det_files"):
+    def __init__(self, path, num_bands = 1):
 
-      # TODO put this somewhere else? This class should be dedicated 
-      # to RF stuff. 
-      self.directory = directory
-      if self.directory[-1] == "/":
-        self.directory = self.directory[:-1]
-     
       #: The bandwidth of the digital signal produced by the USRP is 
       #: divided into bands. A pulse detector is instantiated for 
       #: each of these bands. 
@@ -317,12 +306,7 @@ class backend:
       self.backend_calc()
         
     def add_tuning(self, cf = 0.0, lo1 = 0.0):
-      """ Add tuning. 
-        
-        **TODO**: This is only called once in the code in backend_calc. 
-        The is only necesary because the for-loops use the variable 
-        ``tuning``, which conflicts with the class name.  
-      """ 
+      """ Add tuning. """ 
       self.tunings.append(tuning(self, cf, lo1))
 
     def __str__(self):
@@ -459,8 +443,8 @@ class backend:
             set_of_missing_freqs.difference_update(dict_of_freqs_per_tuning[max_key])
 
         #builds optimized tuning parameters
-        for tuning in set_of_needed_tunings:#for each tuning required
-            lo1 = tuning*self.pv_step
+        for t in set_of_needed_tunings:#for each tuning required
+            lo1 = t*self.pv_step
             #calculate tuning center frequency
             if self.high_lo:
                 center_freq = lo1 + self.pv_offset - (self.lo2 - self.if2_cf)
@@ -471,7 +455,7 @@ class backend:
             self.add_tuning(center_freq, lo1)
             print "{0:.1f} MHz - RMG Center Frequency".format(center_freq/1000000.0)
 
-            for tx_freq in dict_of_freqs_per_tuning[tuning]:#for each transmitter tunable
+            for tx_freq in dict_of_freqs_per_tuning[t]:#for each transmitter tunable
                 tx_index = list_of_tx_freqs.index(tx_freq)
 
                 #get transmitter data

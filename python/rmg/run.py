@@ -67,6 +67,8 @@ class detector_array:
         self.decim = 250
         self.filename = filename
         self.directory = directory
+        if self.directory[-1] == "/":
+          self.directory = self.directory[:-1]
         self.num_bands = num_bands
         self.backend_param = None
         self.frontend = None
@@ -111,7 +113,7 @@ class detector_array:
     # the USRP tuning parameters.  Chris ~18 Sep 2012
     #
         
-        self.backend_param = params.backend(self.filename, self.num_bands, self.directory)
+        self.backend_param = params.backend(self.filename, self.num_bands)
         self.high_lo       = self.backend_param.high_lo
         self.decim         = self.backend_param.decim
 
@@ -155,7 +157,7 @@ class detector_array:
 
     def run(self,sleep_sec = 10):
         timestr = "Starting RMG at {0}\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
-        with open(self.backend_param.directory + '/status.txt','a') as status_file:
+        with open(self.directory + '/status.txt','a') as status_file:
             status_file.write(timestr)
             status_file.write(str(self.backend_param) + '\n')
 
@@ -170,7 +172,7 @@ class detector_array:
                     self.next()
                 except KeyboardInterrupt:
                     timestr = "Stopping RMG for Keyboard Interrupt at {0}\n\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
-                    with open(self.backend_param.directory + '/status.txt','a') as status_file:
+                    with open(self.directory + '/status.txt','a') as status_file:
                         status_file.write(timestr)
 
                     if self.sc != None:
@@ -178,7 +180,7 @@ class detector_array:
                     break
                 except:
                     timestr = "Stopping RMG for Exception at {0}\n\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
-                    with open(self.backend_param.directory + '/status.txt','a') as status_file:
+                    with open(self.directory + '/status.txt','a') as status_file:
                         status_file.write(timestr)
                     print "Exception "
                     raise
@@ -188,7 +190,7 @@ class detector_array:
 
                 except KeyboardInterrupt:
                     timestr = "Stopping RMG for Keyboard Interrupt at {0}\n\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
-                    with open(self.backend_param.directory + '/status.txt','a') as status_file:
+                    with open(self.directory + '/status.txt','a') as status_file:
                         status_file.write(timestr)
 
                     if self.sc != None:

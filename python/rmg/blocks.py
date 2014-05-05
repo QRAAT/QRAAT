@@ -117,7 +117,7 @@ class software_backend(gr.hier_block2):
     #: (See :class:`qraat.rmg.detect`.) 
     det = []
       
-    def __init__(self, channels, be_param):
+    def __init__(self, channels, be_param, directory = "./det_files"):
 
         gr.hier_block2.__init__(self, "software_backend",
                                 gr.io_signature(4, 4, gr.sizeof_gr_complex), # Input signature
@@ -126,6 +126,8 @@ class software_backend(gr.hier_block2):
         band_rate = be_param.bw
         print "Number of Bands :", be_param.num_bands
         print "Band sampling rate :",band_rate
+
+        self.directory = directory
 
         if be_param.num_bands > 1:
 
@@ -182,8 +184,8 @@ class software_backend(gr.hier_block2):
             if (j.tx_type == params.det_type.PULSE):
                 self.det[j.band_num].enable(j.filter_length, 
                                             j.filter_length*3, 
-                                            str(j.directory), 
-                                            str(j.name), 
+                                            self.directory, 
+                                            j.name, 
                                             j.cf,
                                             j.rise,
                                             j.alpha)
