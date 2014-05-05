@@ -51,7 +51,7 @@ CONFIG_DELTA_AWAY = 3
 CONFIG_ERROR_ALLOWANCE = 0.2
 
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
-CONFIG_JUST_STAGE_CHANGES = True
+CONFIG_JUST_STAGE_CHANGES = False
 
 # Defines the amount of time in seconds (fractional is fine, it is passed to time.sleep()) to wait between polling for new points.
 CONFIG_NEW_STUFF_POLLING_PERIOD = 5
@@ -570,17 +570,37 @@ def score_new_things(db_con, txid, siteid, change_handler):
 
 	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
 
-	cur = db_con.cursor()
+	use_cursor = True
+	rows = None
 
-	# NOTE: Set a timestamp here to only score unscored points whose timestamp is newer than this.
-	time_starts_at = None
-	# get all unscored points
-	q = None
-	if time_starts_at is None:
-		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and txid = {} and siteid = {};'.format(txid, siteid)
+	if use_cursor:
+		cur = db_con.cursor()
+		q = 'select value from `cursor` where name = %s;'
+		rows_back = cur.execute(q, ('estscore',))
+		assert rows_back == 1
+		r = cur.fetchone()
+		r = tuple(r)
+		assert len(r) == 1
+		max_val = r[0]
+		print 'Got max val: {} ({})'.format(r, r.__class__)
+		# raw_input()
+		cur = db_con.cursor()
+		q = 'select ID from est where ID > %s;'
+		rows = cur.execute(q, (max_val,))
 	else:
-		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and timestamp >= {} and txid = {} and siteid = {};'.format(time_starts_at, txid, siteid)
-	rows = cur.execute(q)
+
+		cur = db_con.cursor()
+
+
+		# NOTE: Set a timestamp here to only score unscored points whose timestamp is newer than this.
+		time_starts_at = None
+		# get all unscored points
+		q = None
+		if time_starts_at is None:
+			q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and txid = {} and siteid = {};'.format(txid, siteid)
+		else:
+			q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and timestamp >= {} and txid = {} and siteid = {};'.format(time_starts_at, txid, siteid)
+		rows = cur.execute(q)
 	if rows == 0:
 		print 'Nothing new yet.'
 	else:
