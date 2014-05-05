@@ -29,11 +29,6 @@ import params
 
 import sys, time
 
-#: 1 to use pulse_shape_discriminator in pulse detector, 0 to not
-#: use it. **TODO:** this shouldn't be hardcoded here. It should be 
-#: set in a top-level program.
-USE_PSD = 0 
-
 
 class usrp_top_block(gr.top_block):
     
@@ -190,7 +185,6 @@ class software_backend(gr.hier_block2):
                                             str(j.directory), 
                                             str(j.name), 
                                             j.cf,
-                                            USE_PSD,
                                             j.rise,
                                             j.alpha)
 

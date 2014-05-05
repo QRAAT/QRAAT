@@ -51,7 +51,6 @@ detectmod_make_detect (
     float band_center_freq,
     const char *directory, 
     const char *tx_name,
-    char psd,
     float rise,
     float alpha)
 /**
@@ -66,7 +65,6 @@ detectmod_make_detect (
                           band_center_freq,
                           directory, 
                           tx_name,
-                          psd,
                           rise,
                           alpha)
   );
@@ -87,7 +85,6 @@ RMG_API detectmod_detect_sptr detectmod_make_detect (
                           0.0,
                           "", 
                           "",
-                          1,
                           1.5,
                           0.01)
   );
@@ -104,7 +101,6 @@ detectmod_detect::detectmod_detect (
     float _band_center_freq,
     const char *_directory, 
     const char *_tx_name,
-    char _psd,
     float _rise,
     float _alpha)
   : gr_sync_block ("detectmod_detect",
@@ -121,7 +117,6 @@ detectmod_detect::detectmod_detect (
                        _band_center_freq,
                        _directory, 
                        _tx_name,
-                       _psd,
                        _rise,
                        _alpha);
 
@@ -134,7 +129,6 @@ void detectmod_detect::initialize_variables(
     float _band_center_freq,
     const char *_directory, 
     const char *_tx_name,
-    char _psd,
     float _rise,
     float _alpha)
 {
@@ -176,8 +170,6 @@ void detectmod_detect::initialize_variables(
   }
 
   pkdet = new peak_detect(_rise, fill_length, time_constant);
-
-  psd = _psd;
 
   enable_detect = 0;
 
@@ -397,46 +389,6 @@ detectmod_detect::close()
   
 }
 
-bool detectmod_detect::pulse_shape_discriminator(pulse_data *data_holder){
-/** 
- * determines whether the detected pulse looks like a rectangle or not
- */
-
-  const float MAX_PERCENTAGE = 0.20;
-  const float SHAPE_THREASHOLD_PERCENTAGE = 0.0875;
-
-  gr_complex *pulse_buffer = data_holder->get_buffer();
-  int index = data_holder->get_index();
-
-  float *pulse_pwr = new float[acc_length];
-  int pulse_start = data_holder->params.pulse_index;
-  int j,k;
-  float r,i;
-  float max_value = 0;
-  int count = 0;
-  bool result = false;
-  for(j = 0; j < acc_length; j++){
-    pulse_pwr[j] = 0;
-    for(k = 0; k < ch; k++){
-      r = pulse_buffer[((j+pulse_start+index)%save_length)*ch+k].real();
-      i = pulse_buffer[((j+pulse_start+index)%save_length)*ch+k].imag();
-      pulse_pwr[j] += r*r+i*i;
-    }
-    if(pulse_pwr[j] > max_value)
-      max_value = pulse_pwr[j];
-  }
-  max_value = max_value*MAX_PERCENTAGE;
-  for(j = 0; j < acc_length; j++){
-    if(pulse_pwr[j] > max_value)
-      count++;
-  }
-  if(count > (SHAPE_THREASHOLD_PERCENTAGE*acc_length))
-    result = true;
-
-  delete[] pulse_pwr;
-  return result;
-
-}
 
 void detectmod_detect::set_rise_factor(float rise_in)
 {
@@ -458,9 +410,7 @@ void detectmod_detect::reset()
 {
   //write data out if state = FILL_BUFFER or CONFIRM_PEAK
   if (state == CONFIRM_PEAK){
-    if(psd == 0 || pulse_shape_discriminator(save_holder)){
-      write_data(save_holder);
-    }
+    write_data(save_holder);
   }
   state = FILL_ACCUMULATOR;
 }
@@ -478,7 +428,6 @@ void detectmod_detect::enable(int _pulse_width,
                               const char *_directory, 
                               const char *_tx_name,
                               float _center_freq, 
-                              char _use_psd,
                               float _rise,
                               float _alpha)
 {
@@ -490,7 +439,6 @@ void detectmod_detect::enable(int _pulse_width,
                        _center_freq,
                        _directory, 
                        _tx_name,
-                       _use_psd,
                        _rise,
                        _alpha);
   

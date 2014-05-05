@@ -62,7 +62,6 @@ RMG_API detectmod_detect_sptr detectmod_make_detect (
     float c_freq,
     const char *directory, 
     const char *tx_name,
-    char psd,
     float rise,
     float alpha);
 
@@ -93,7 +92,6 @@ private:
     float c_freq,
     const char *directory, 
     const char *tx_name,
-    char psd,
     float rise,
     float alpha);
 
@@ -145,17 +143,9 @@ private:
 
   //! A file descriptor used for data output (pulses or continuous). 
   void	       *d_fp;
-
-  //! Use pulse discriminator flag.
-  char psd;
   
   //! Enable detector flag.
   char enable_detect;
-
-  /*!
-   * filter based on the shape of the pulse
-   */ 
-  bool pulse_shape_discriminator(pulse_data *);
 
   /*!
    * \brief Output a pulse data record to file. 
@@ -184,7 +174,6 @@ private:
                     float c_freq,
                     const char *directory, 
                     const char *tx_name,
-                    char psd,
                     float rise,
                     float alpha);
 
@@ -194,7 +183,6 @@ private:
     float _band_center_freq,
     const char *_directory, 
     const char *_tx_name,
-    char _psd,
     float _rise,
     float _alpha);
 
@@ -229,7 +217,6 @@ public:
               const char *_directory, 
               const char *_tx_name,
               float _center_freq, 
-              char _use_psd,
               float _rise,
               float _alpha);
 
