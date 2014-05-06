@@ -110,7 +110,7 @@ class csv:
     self.__build_row_template(lengths)
 
 
-  def read_db(self, db_con, table): 
+  def read_db(self, db_con, table, fields=['*']): 
     """ Read a small database table. 
 
       :param db_con: DB connector. 
@@ -120,13 +120,11 @@ class csv:
     """
     
     cur = db_con.cursor()
-    cur.execute('''SELECT `COLUMN_NAME`
-                     FROM `INFORMATION_SCHEMA`.`COLUMNS`
-                    wHERE `TABLE_NAME` = '%s' ''' % table)
-    lengths = self.__build_header(map(lambda val: val[0], cur.fetchall()))
 
     # Populate the table. 
-    cur.execute('SELECT * FROM %s' % table)
+    cur.execute('SELECT %s FROM %s', (str(fields)[1:-1], table))
+    lengths = self.__build_header([ d[0] for d in cur.description ])
+
     for row in cur.fetchall(): 
       self.table.append(self.Row())
       for i in range(len(row)): 
