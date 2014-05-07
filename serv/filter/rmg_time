@@ -166,6 +166,20 @@ def init_change_handler():
 		change_handler = qraat.signal_filter.ChangeHandler(None, 'db')
 	return change_handler
 
+def score_the_past_chunking(arguments, t_start, t_end, txid, siteid):
+
+	context_length = 3 * 60			# Three minutes of context is assumed in the chunk (thus the middle 54 minutes of data will actually be scored
+	#t_start = t_start - context_length
+	#t_end = t_end + context_length
+
+	chunk_size = int(60 * 60)		# One hour (in seconds)
+	total_chunks = int((t_end - t_start) / float(chunk_size)) + 1
+	start_times = [(t_start + (i * chunk_size)) for i in range(total_chunks)]
+	intervals = [(x, x + chunk_size) for x in start_times]
+	for start, end in intervals:
+		# Score all data between start and end using all data from start-3m to end+3m
+		score_the_past(arguments, start, end, txid, siteid)
+
 def score_the_past(arguments, t_start, t_end, txid, siteid):
 
 	db_con = qraat.util.get_db('writer')
@@ -325,7 +339,7 @@ def score_the_past(arguments, t_start, t_end, txid, siteid):
 				change_handler.add_score(id, score, float(score) / (CONFIG_DELTA_AWAY * 2))
 				#sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
 
-	if USE_CURSOR:
+	if CURSOR_ENABLED:
 		all_ts = [x['timestamp'] for x in registry.points]
 		max_just_processed = max(all_ts)
 
