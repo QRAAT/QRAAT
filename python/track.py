@@ -18,26 +18,6 @@
 
 # NOTE Where I'm going next. 
 #
-# The algorihm
-# 
-#   I'm commiting to building the graph from all valid transitions, drawing
-#   an edge when the observed speed is less than the maximum given the 
-#   interval length. The quadratic factor here is reasonable for the tests
-#   I've done thus far. For example:
-#
-#     2013-07-27  04:06 - 2013-08-05  23:06  txID=9
-#     Length of critical path: 1768 (out of 6118)
-#
-#   This finishes in less than a minute and used about 4% of my 8GB of 
-#   memory at its peak. The nice thing is that the solution is optimal, 
-#   at least for the given time window. I've kept the old approach around
-#   in track.graph_alt(). 
-#
-#   TODO Compute critical paths of overlapping windows and tie them 
-#        together. The window should be something like 1000 positions. 
-#        Of course, if there are more candidates for the times of the 
-#        first and last positions, they should be included in the window. 
-# 
 # Feasibility metric
 # 
 #   Assume the transition speed is exponentially distributed, paramterized 
@@ -183,11 +163,82 @@ class track:
     :type M: lambda (t) -> float
     :param C: Constant hop cost in critical path calculation.
     :type C: float
+    :param optimal: If False, use windowed tracking algorithm. 
+    :type optiomal: bool
   '''
   
   (zone, letter) = 10, 'S' # TODO Add UTM zone to position table, modify 
                            # code to insert it automatically. 
 
+  window_length = 250  
+  overlap_length = 25 
+
+  def __init__(self, db_con, t_start, t_end, tx_id, M, C=1, optimal=False):
+    self.tx_id = tx_id
+    
+    # Get positions. 
+    self._fetch(db_con, t_start, t_end, tx_id)
+    
+    # Calculate tracks. 
+    if optimal:
+      self._calc_tracks(M, C)
+    else:
+      self._calc_tracks_windowed(M, C)
+    
+
+  def _calc_tracks_windowed(self, M, C):
+    ''' Calculate tracks over overlapping windows of positions. 
+    
+      Note that the solution may be sub-optimal over the entire time window. 
+      The optimal algorithm necessarily has a quadratic factor, which we 
+      mitigate here by running it over a small, fixed number of positions. 
+    '''
+    fella = {}
+    self.track = []
+    i = 0; j = self.window_length 
+
+    while i < len(self.pos):
+      
+      t = self.pos[i][2]
+      while self.pos[i-1][2] == t:
+        i -= 1
+
+      j =  min(len(self.pos) - 1, i + self.window_length)
+      
+      t = self.pos[j][2]
+      while self.pos[j-1][2] == t:
+        j -= 1
+      
+      print i, j, "win=", j - i
+      roots = self.graph(self.pos[i:j+1], M)
+      guy = self.critical_path(self.toposort(roots), C)
+      
+      for (P, t, pos_id, ll) in guy: 
+        if not fella.get(t):
+          fella[t] = set()
+        fella[t].add((P, pos_id, ll))
+
+      i += self.window_length - self.overlap_length
+
+    # When there are many possibilities for a timestep, choose the
+    # position with higher likelihood. (NOTE that it may be better 
+    # to rerun the critical path algorithm over the tree created 
+    # in this process.)
+    guy = fella.items() 
+    guy = sorted(guy, key=lambda(m) : m[0])
+    for (key, val) in guy:
+      (P, pos_id, ll) = min(val, key=lambda(row) : row[2])
+      self.track.append((P, key, pos_id))
+    
+  def _calc_tracks(self, M, C):
+    ''' Calculate optimal tracks over all positions. 
+    
+      This track algorithm considers all possible transitions, 
+      resulting in a quadratic factor in the running time. However,
+      the solution is optimal for the time window.
+    ''' 
+    roots = self.graph(self.pos, M)
+    self.track = map(lambda(row) : row[:3], self.critical_path(self.toposort(roots), C))
   
   def _fetch(self, db_con, t_start, t_end, tx_id): 
     cur = db_con.cursor()
@@ -207,17 +258,6 @@ class track:
                     ORDER BY timestamp ASC''' % tx_id)
     self.pos = cur.fetchall()
 
-  def __init__(self, db_con, t_start, t_end, tx_id, M, C=1):
-    self.tx_id = tx_id
-    self._fetch(db_con, t_start, t_end, tx_id)
-    print "positions: %d" % len(self.pos)
-    roots = self.graph(self.pos, M)
-    self.track = self.critical_path(self.toposort(roots), C)
-  
-  def recompute(self, M, C=1):
-    roots = self.graph(self.pos, M)
-    self.track = self.critical_path(self.toposort(roots), C)
-
   def __getiter__(self): 
     return self.track
 
@@ -226,6 +266,10 @@ class track:
   
   def __len__(self):
     return len(self.track)
+  
+  #
+  # DAG-building algorithms. 
+  #
 
   def graph(self, pos, M): 
     ''' Create a graph from positions. 
@@ -264,8 +308,7 @@ class track:
         roots.append(u) 
    
     return roots
-  
-  
+    
   def graph_alt(self, pos): 
     ''' Alternative DAG-building algorithm. 
     
@@ -324,6 +367,9 @@ class track:
     
     return roots
   
+  #
+  # Methods for calculating the critical path over the graph.
+  #
 
   def toposort(self, roots): 
     ''' Compute a topological sorting of the track graph. Return None if 
@@ -356,7 +402,6 @@ class track:
     sorted_nodes.reverse()
     return sorted_nodes
 
-
   def critical_path(self, sorted_nodes, C): 
     ''' Calculate the critical path of the track graph.
 
@@ -385,14 +430,15 @@ class track:
     path = []
     
     while node != None:
-      path.append((node.P, node.t, node.pos_id))
+      path.append((node.P, node.t, node.ll, node.pos_id))
       node = node.parent
     
     path.reverse()
     return path
-  
 
-
+  #
+  # Some statistical features of the tracks. 
+  #
 
   def speed(self):
     ''' Calculate mean and standard deviation of the target's speed. 
@@ -423,18 +469,9 @@ class track:
 
     return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
 
-  @classmethod
-  def transition_distribution(cls, db_con, t_start, t_end, tx_id):
-    ''' TODO '''
-    cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp
-                     FROM Position
-                    WHERE (%f <= timestamp) 
-                      AND (timestamp <= %f)
-                      AND txid = %d
-                    ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
-    pos = cur.fetchall()
-    return [] # TODO 
+  # 
+  # A few families of max speed given time interval functions. 
+  #
 
   @classmethod
   def maxspeed_linear(cls, burst, sustained, limit):
@@ -456,6 +493,10 @@ class track:
   def maxspeed_const(cls, m):
     return lambda (t) : m
 
+  #
+  # Export tracks to file / database. 
+  #
+
   def insert_db(self, db_con): 
     ''' Insert tracks into datbase. ''' 
     cur = db_con.cursor()
@@ -468,7 +509,6 @@ class track:
                             (txID, posId, lon, lat, datetime, timezone) 
                      VALUES (%d, %d, %f, %f, '%s', '%s')''' % (self.tx_id, 
                      pos_id, lon, lat, t, 'UTC'))
-
 
   def export_kml(self, name, tx_id):
 
@@ -524,61 +564,24 @@ class track:
     fd.close() 
 
 
+
 class trackall (track): 
   
   ''' Transmitter tracks over the entire position table. '''
-    
 
-  def __init__(self, db_con, tx_id, M, C=1):
+  def __init__(self, db_con, tx_id, M, C=1, optimal=False):
     self.tx_id = tx_id
+    
+    # Get positions. 
     self._fetchall(db_con, tx_id)
-    roots = self.graph(self.pos, M)
-    self.track = self.critical_path(self.toposort(roots), C)
-  
-
-class track2 (track): # Windowed version 
-  
-  window_length = 100 
-  overlap_length = 10
-  def __init__(self, db_con, t_start, t_end, tx_id, M, C=1):
-    fella = {}
-    self.track = []
-    self.tx_id = tx_id
-    self._fetch(db_con, t_start, t_end, tx_id)
-    i = 0; j = self.window_length 
-
-    while i < len(self.pos):
-      
-      t = self.pos[i][2]
-      while self.pos[i-1][2] == t:
-        i -= 1
-
-      j =  min(len(self.pos) - 1, i + self.window_length)
-      
-      t = self.pos[j][2]
-      while self.pos[j-1][2] == t:
-        j -= 1
-      
-      print i, j, "win=", j - i
-      roots = self.graph(self.pos[i:j+1], M)
-      guy = self.critical_path(self.toposort(roots), C)
-      self.track += guy
-      
-      for (P, t, pos_id) in guy: 
-        if not fella.get(t):
-          fella[t] = set()
-        fella[t].add((P, pos_id))
-
-      i += self.window_length - self.overlap_length
-
-    guy = fella.items() 
-    guy = sorted(guy, key=lambda(m) : m[0])
-    for (key, val) in guy:
-      print "%-12d" % key, val
-    # TODO Still multiple candidates: head and tails of tracks. 
-    # Decide which one to eliminate at this stage. Who ever has
-    # higher likelihood? 
     
+    # Calculate tracks. 
+    if optimal:
+      self._calc_tracks(M, C)
+    else:
+      self._calc_tracks_windowed(M, C)
+  
+
      
   
 
@@ -606,7 +609,8 @@ if __name__ == '__main__':
 
   db_con = util.get_db('writer')
   
-  fella = track2(db_con, t_start, t_end, tx_id, M, C) 
+  fella = track(db_con, t_start, t_end, tx_id, M, C, optimal=True) 
+  #fella = trackall(db_con, tx_id, M, C) 
   #fella.export_kml(tx_name(db_con)[tx_id], tx_id)
 
   t = time.localtime(fella[0][1])
