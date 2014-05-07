@@ -175,7 +175,7 @@ def score_the_past(arguments, t_start, t_end, txid, siteid):
 
 	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
 
-	rows = cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), t_start, t_end, txid, siteid))
+	rows = cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), t_start, t_end, txid, siteid)) # Oink oink
 	
 	print 'Rows processed:', rows
 	site_data = {}
