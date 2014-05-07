@@ -142,6 +142,7 @@ class Node:
     return p
 
 
+
 class track:
 
   ''' Transmitter tracks. 
@@ -193,7 +194,7 @@ class track:
       The optimal algorithm necessarily has a quadratic factor, which we 
       mitigate here by running it over a small, fixed number of positions. 
     '''
-    fella = {}
+    pos_dict = {}
     self.track = []
     i = 0; j = self.window_length 
 
@@ -209,14 +210,13 @@ class track:
       while self.pos[j-1][2] == t:
         j -= 1
       
-      print i, j, "win=", j - i
       roots = self.graph(self.pos[i:j+1], M)
       guy = self.critical_path(self.toposort(roots), C)
       
       for (P, t, pos_id, ll) in guy: 
-        if not fella.get(t):
-          fella[t] = set()
-        fella[t].add((P, pos_id, ll))
+        if not pos_dict.get(t):
+          pos_dict[t] = set()
+        pos_dict[t].add((P, pos_id, ll))
 
       i += self.window_length - self.overlap_length
 
@@ -224,12 +224,11 @@ class track:
     # position with higher likelihood. (NOTE that it may be better 
     # to rerun the critical path algorithm over the tree created 
     # in this process.)
-    guy = fella.items() 
-    guy = sorted(guy, key=lambda(m) : m[0])
-    for (key, val) in guy:
+    for (t, val) in sorted(pos_dict.items(), key=lambda(m) : m[0]):
       (P, pos_id, ll) = min(val, key=lambda(row) : row[2])
-      self.track.append((P, key, pos_id))
-    
+      self.track.append((P, t, pos_id))
+  
+
   def _calc_tracks(self, M, C):
     ''' Calculate optimal tracks over all positions. 
     
@@ -240,6 +239,7 @@ class track:
     roots = self.graph(self.pos, M)
     self.track = map(lambda(row) : row[:3], self.critical_path(self.toposort(roots), C))
   
+
   def _fetch(self, db_con, t_start, t_end, tx_id): 
     cur = db_con.cursor()
     cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
@@ -257,6 +257,7 @@ class track:
                     WHERE txid = %d
                     ORDER BY timestamp ASC''' % tx_id)
     self.pos = cur.fetchall()
+
 
   def __getiter__(self): 
     return self.track
@@ -609,7 +610,7 @@ if __name__ == '__main__':
 
   db_con = util.get_db('writer')
   
-  fella = track(db_con, t_start, t_end, tx_id, M, C, optimal=True) 
+  fella = track(db_con, t_start, t_end, tx_id, M, C) 
   #fella = trackall(db_con, tx_id, M, C) 
   #fella.export_kml(tx_name(db_con)[tx_id], tx_id)
 
