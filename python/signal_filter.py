@@ -19,6 +19,7 @@ import itertools
 import matplotlib.pyplot
 from numpy import histogram
 import numpy
+import qraat
 import random
 import sys
 import bisect
@@ -36,6 +37,7 @@ class Registry:
 	def __init__(self, args):
 		self.points = []
 		self.arguments = args
+		self.txlist = None
 
 	def __len__(self):
 		return len(self.points)
@@ -65,7 +67,24 @@ class Registry:
 	def optionally_highlight_all_points(self, ids):
 		self.optionally_highlight_some_points(self.points)
 
+	def read_txlist_thresholds(self):
+
+		if self.txlist is None:
+			d = {}
+			db_con = qraat.util.get_db('reader')
+			cur = db_con.cursor()
+			q = 'select ID, thresh_band3, thresh_band10 from txlist;'
+			rows = cur.execute(q)
+			for row in cur.fetchall():
+				row = tuple(row)
+				d[row[0]] = {'band3':row[1], 'band10':row[2]}
+			self.txlist = d
+			
+			
+
 	def get_matching_points(self, points, **kw):
+
+		self.read_txlist_thresholds()
 		print 'Getting matching points out of {}'.format(len(points))
 		#counts = defaultdict(int)
 		counts = defaultdict(list)
@@ -108,7 +127,7 @@ class Registry:
 		elif enable_prefiltering:
 			print 'Would have prefiltered by rate, but no violations'
 
-		filter_band3 = filter_values_over('band3', THRESHOLD_BAND3)
+		filter_band3 = filter_values_over('band3', self.txlist)
 
 		highlighted = get_matching_points_op(points, filter_band3)
 		if enable_prefiltering and highlighted is not None:
@@ -121,7 +140,7 @@ class Registry:
 		elif enable_prefiltering:
 			print 'Would have prefiltered by band3, but no violations'
 
-		filter_band10 = filter_values_over('band10', THRESHOLD_BAND10)
+		filter_band10 = filter_values_over('band10', self.txlist)
 
 		highlighted = get_matching_points_op(points, filter_band10)
 		if enable_prefiltering and highlighted is not None:
@@ -451,8 +470,11 @@ def filter_range(field_name, center, delta):
 			return False
 	return filter_func
 
-def filter_values_over(field_name, threshold):
+def filter_values_over(field_name, threshold_dict):
 	def filter_func(point, points):
+		print 'Threshold dict has keys:', threshold_dict.keys()
+		threshold = threshold_dict[point['txid']][field_name]
+		print 'Got filter threshold of {} for TXID {} (fieldname={})'.format(threshold, point['txid'], field_name)
 		return point[field_name] > threshold
 	return filter_func
 
@@ -508,6 +530,9 @@ class ChangeHandler:
 
 	def close(self):
 		getattr(self, 'close_' + self.mode)()
+
+	def add_sql(self, sql_text, sql_args):
+		getattr(self, 'add_sql_' + self.mode)(sql_text, sql_args)
 	
 	def add_score(self, estid, absscore, relscore):
 		getattr(self, 'add_score_' + self.mode)(estid, absscore, relscore)
@@ -524,6 +549,10 @@ class ChangeHandler:
 		s = QUERY_TEMPLATE % (estid, absscore, relscore)
 		self.obj.write(s)
 
+	def add_sql_file(self, sql_text, sql_args):
+		self.obj.write((sql_text % sql_args) + '\n')
+		return -1
+
 	def flush_file(self):
 		self.obj.flush()
 
@@ -535,6 +564,9 @@ class ChangeHandler:
 	def add_score_fileinc(self, estid, absscore, relscore):
 		s = QUERY_TEMPLATE % (estid, absscore, relscore)
 		self.current_file_handle.write(s)
+
+	def add_sql_fileinc(self, sql_text, sql_args):
+		self.current_file_handle.write((sql_text % sql_args) + '\n')
 
 	def flush_score_fileinc(self):
 		self.current_file_handle.flush()
@@ -558,6 +590,11 @@ class ChangeHandler:
 			self.buffer.append((estid, absscore, relscore))
 			if len(self.buffer) >= ADD_EVERY:
 				self.flush_db()
+
+	def add_sql_db(self, sql_text, sql_args):
+		cursor = self.obj.cursor()
+		print 'Running query:', sql_text % sql_args
+		return cursor.execute(sql_text, sql_args)
 
 	def flush_db(self):
 		if len(self.buffer) == 0:

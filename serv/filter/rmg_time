@@ -30,7 +30,6 @@ import itertools
 import math
 import numpy
 import pickle
-import qraat
 import re
 import signal
 import sys
@@ -58,6 +57,8 @@ CONFIG_NEW_STUFF_POLLING_PERIOD = 5
 
 AWAKE = True
 EXIT_REQUESTED = False
+
+CURSOR_ENABLED = True
 
 def filter_site(s):
 	sites = s.split(',')
@@ -324,6 +325,21 @@ def score_the_past(arguments, t_start, t_end, txid, siteid):
 				change_handler.add_score(id, score, float(score) / (CONFIG_DELTA_AWAY * 2))
 				#sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
 
+	if USE_CURSOR:
+		all_ts = [x['timestamp'] for x in registry.points]
+		max_just_processed = max(all_ts)
+
+		sql = 'select * from `cursor` where name = %s and value > %s;'
+		rows = change_handler.add_sql(sql, ('estscore', max_just_processed))
+		if rows > 0:
+			# noop
+			print 'No need to update cursor'
+		else:
+			sql = 'delete from `cursor` where name = %s;'
+			change_handler.add_sql(sql, ('estscore',))
+			sql = 'insert into `cursor` (name, value) values (%s, %s);'
+			change_handler.add_sql(sql, ('estscore', max_just_processed))
+
 
 
 def apply_time_filtering(points_under_consideration, txid, interval_computation_only_data=None):
@@ -570,10 +586,11 @@ def score_new_things(db_con, txid, siteid, change_handler):
 
 	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
 
-	use_cursor = True
 	rows = None
 
-	if use_cursor:
+	cur = None
+
+	if CURSOR_ENABLED:
 		cur = db_con.cursor()
 		q = 'select value from `cursor` where name = %s;'
 		rows_back = cur.execute(q, ('estscore',))
@@ -585,7 +602,7 @@ def score_new_things(db_con, txid, siteid, change_handler):
 		print 'Got max val: {} ({})'.format(r, r.__class__)
 		# raw_input()
 		cur = db_con.cursor()
-		q = 'select ID from est where ID > %s;'
+		q = 'select ID from est where timestamp > %s;'
 		rows = cur.execute(q, (max_val,))
 	else:
 
@@ -605,6 +622,7 @@ def score_new_things(db_con, txid, siteid, change_handler):
 		print 'Nothing new yet.'
 	else:
 		print 'There are {} new rows'.format(rows)
+
 	ids = []
 	while True:
 		row = cur.fetchone()
@@ -619,6 +637,7 @@ def score_new_things(db_con, txid, siteid, change_handler):
 	if len(ids) == 0:
 		print 'No new points found yet.'
 		polling_delay()
+		print 'ddcc:', dir(cur)
 		return
 	
 	ids_template = ', '.join(map(lambda x : '{}', ids))
@@ -631,12 +650,30 @@ def score_new_things(db_con, txid, siteid, change_handler):
 
 	print 'Preparing to score {} EST records...'.format(rows)
 
+	new_rows = []
+
+	for row in cur.fetchall():
+		
+		named_row = dict(zip(fields, row))
+		print 'Processing row:', named_row
+		new_rows.append(named_row)
+
+
+	# Re-calculate intervals for windows that have new data	
+	invalidated_windows = set()
+	for row in new_rows:
+		window_starts = int(float(row['timestamp']) / CONFIG_INTERVAL_WINDOW_SIZE)
+		invalidated_windows.add(window_starts)
+
+	print '{} new points trigger the recomputation of {} interval windows'.format(len(new_rows), len(invalidated_windows))
+
 	# A batch of things arrives, some of which may be late arriving
 	out_of_order = []
 	# It gets populated somehow.
 	
 	# Sort of half mark those things because we are doing the intervals with them in mind
 	for new_id in ids:
+		print 'Adding score'
 		change_handler.add_score(new_id, 0, 0)
 
 	# for point in out_of_order:
