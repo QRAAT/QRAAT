@@ -83,7 +83,7 @@ class csv:
       fd = open(fn, 'r')
     elif type(fn) == file: 
       fd = fn
-    else: raise TypeError # Provide a message. 
+    else: raise TypeError('the read method requires either the file path as a str or a open file object')
 
     headers = fd.readline().strip().split(',')
     if build_header:
@@ -146,6 +146,24 @@ class csv:
         if lengths[i] < len(str(row[i])):
           lengths[i] = len(str(row[i]))
         setattr(self.table[-1], self.headers[i], row[i])
+    self.__build_row_template(lengths)
+
+
+  def initialize_from_data(self, headers_in, table_in):
+
+    lengths = self.__build_header(headers_in)
+
+    for line in table_in:
+
+      if len(line) != len(self.headers): # Malformed line
+        raise QraatError("line: {0}: has a different number of fields than header: {1}".format(line,self.headers))
+
+      self.table.append(self.Row())
+      for i in range(len(self.headers)): 
+        if lengths[i] < len(str(line[i])):
+          lengths[i] = len(str(line[i]))
+        setattr(self.table[-1], self.headers[i], line[i])
+
     self.__build_row_template(lengths)
 
 
