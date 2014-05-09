@@ -204,7 +204,7 @@ function do_update() {
 function export_txlist() {
 python -c "
 import qraat, MySQLdb as mdb
-db_config = qraat.csv('$RMG_SERVER_DIR/db_auth').get(view='reader')
+db_config = qraat.csv('$RMG_SERVER_DB_AUTH').get(view='reader')
 db_con = mdb.connect(db_config.host, db_config.user,
                      db_config.password, db_config.name)
 txlist = qraat.csv(db_con=db_con, db_table='txlist',

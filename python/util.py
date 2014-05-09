@@ -46,7 +46,7 @@ def get_db(view):
   ''' Get database credentials. ''' 
 
   try:
-    db_config = csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view=view)
+    db_config = csv(s.environ['RMG_SERVER_DB_AUTH']).get(view=view)
     
     # Connect to the database.
     db_con = mdb.connect(db_config.host,

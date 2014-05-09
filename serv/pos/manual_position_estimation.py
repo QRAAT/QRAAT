@@ -14,7 +14,7 @@ stop_time = time.mktime(time.strptime(stop_time_str,'%Y%m%d%H%M%S'))
 #stop_time =  1376442000.0
 # Get database credentials. 
 try: 
-  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='reader')
+  db_config = qraat.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='reader')
 
 except KeyError: 
   print >>sys.stderr, "position: error: undefined environment variables. Try `source rmg_env.`" 
