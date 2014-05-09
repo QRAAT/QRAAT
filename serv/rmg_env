@@ -135,5 +135,12 @@ export RMG_QUARANTINE_DIR=$RMG_SERVER_DIR/quarantine
 # Quarantine directory for bad det files
 export RMG_SERVER_DET_QUARANTINE=$RMG_QUARANTINE_DIR/det_files
 
+# RMG pulse detector default rise theshold trigger
+export RMG_PULSE_RISE=1.5
+
+# RMG pulse detector default time constant
+export RMG_PULSE_TIME_CONSTANT=10.0
+
+
 #END
 
