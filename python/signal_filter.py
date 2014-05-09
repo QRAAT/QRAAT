@@ -472,10 +472,12 @@ def filter_range(field_name, center, delta):
 
 def filter_values_over(field_name, threshold_dict):
 	def filter_func(point, points):
-		print 'Threshold dict has keys:', threshold_dict.keys()
 		threshold = threshold_dict[point['txid']][field_name]
-		print 'Got filter threshold of {} for TXID {} (fieldname={})'.format(threshold, point['txid'], field_name)
-		return point[field_name] > threshold
+		#print 'Got filter threshold of {} for TXID {} (fieldname={})'.format(threshold, point['txid'], field_name)
+		if threshold is None:
+			return False
+		else:
+			return threshold point[field_name] > threshold
 	return filter_func
 
 FREQUENCY_THRESHOLD = 400
