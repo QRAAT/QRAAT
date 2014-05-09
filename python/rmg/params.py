@@ -87,27 +87,31 @@ class band:
     :type band_num: int
     :param band_cf: Band center frequency.
     :type band_cf: float
-    :param filter_length: (?) 
+    :param filter_length: detector time matched filter length in samples
     :type filter_length: int 
 
     """
 
     def __init__(self, tx, band_num, band_cf, filter_length):
-        self.name = tx.name        #: Transmitter name. 
+        if 'name' in tx.headers:
+          self.name = tx.name        #: Transmitter name. 
+        else:
+          self.name = tx.ID
         self.tx_type = tx.type     #: Transmitter type. 
         self.band_num = band_num   #: Index of band in pulse detector array. 
         self.cf = band_cf          #: Band center frequency. 
         
         if (self.tx_type == det_type.PULSE):
-            self.filter_length = filter_length #: (?) 
+            self.filter_length = filter_length #: matched filter length in samples
             self.rise = tx.rise_trigger        #: Rise trigger (pulse detector paramater).
-            self.fall = tx.fall_trigger        #: Fall trigger (pulse detector paramater).
-            self.alpha = tx.filter_alpha       #: Alpha factor (pulse detector paramater).
+            if 'filter_alpha' in tx.headers:
+              self.alpha = tx.filter_alpha
+            else:
+              self.alpha = tx.time_constant #: time constant
         
         else:
             self.filter_length = 0
             self.rise = 0.0
-            self.fall = 0.0
             self.alpha = 0.0
 
 
@@ -117,8 +121,12 @@ class band:
           It's impossible to avoid false positives in this situation in general, 
           so we'll pick up pulses from any tranmmitter on this frequency. The 
           idea is that there may be a way to uniquely identify them downstream. 
-        """ 
-        self.name = self.name + tx.name + '_'
+        """
+        if 'name' in tx.headers: 
+          self.name = self.name + '_' + tx.name
+        else:
+          self.name = self.name  + '_' + tx.ID
+
         if (self.tx_type != CONT):
         
             if (tx.type == CONT):
@@ -128,10 +136,12 @@ class band:
                     self.filter_length = filter_length
                 if (tx.rise_trigger < self.rise):
                     self.rise = tx.rise_trigger
-                if (tx.fall_trigger > self.fall  and self.rise > tx.fall_trigger):
-                    self.fall = tx.fall_trigger
-                if (tx.filter_alpha < self.alpha):
+                if 'filter_alpha' in tx.headers:
+                  if (tx.filter_alpha < self.alpha):
                     self.alpha = tx.filter_alpha
+                else:
+                  if (tx.time_constant > self.alpha):
+                    self.alpha = tx.time_constant
 
 
     def __str__(self):
@@ -290,17 +300,19 @@ class backend:
       self.transmitters = qraat.csv(path) #: Transmitter data.
       print 'Transmitters from {0}'.format(path)
     
-      for tx in self.transmitters.table: 
-        if tx.use in ['Y', 'y', 'yes', 'Yes', 'YES']: 
-          tx.use = True
-        else:
-          tx.use = False 
-        tx.frequency = float(tx.frequency) 
-        tx.pulse_width = float(tx.pulse_width) 
-        tx.rise_trigger = float(tx.rise_trigger) 
-        tx.fall_trigger = float(tx.fall_trigger) 
-        tx.filter_alpha = float(tx.filter_alpha) 
-        tx.type = tx_type[tx.type.lower()]
+      if 'use' in self.transmitters.headers:
+        to_be_removed = []
+        for tx in self.transmitters.table: 
+          if tx.use in ['Y', 'y', 'yes', 'Yes', 'YES']: 
+            tx.frequency = float(tx.frequency) 
+            tx.pulse_width = float(tx.pulse_width) 
+            tx.rise_trigger = float(tx.rise_trigger) 
+            tx.time_constant = float(tx.time_constant)
+            tx.type = tx_type[tx.type.lower()]
+          else:
+            to_be_removed.append(tx)
+        for j in to_be_removed:
+          self.transmitters.table.remove(j)
       
       self.lo_calc()
       self.backend_calc()
@@ -363,13 +375,10 @@ class backend:
         list_of_tx_freqs = []#list of frequencys
         dict_of_tunings_per_freq = dict()#dictionary of sets of tunings for a given frequency
         set_of_needed_tunings = set()#list of tunings to get all the transmitters
-        data_index = []
         for j in range(num_freqs):
-            if self.transmitters[j].use:
-                curr_freq = int(self.transmitters[j].frequency*1000000)
-                list_of_tx_freqs.append(curr_freq)
-                data_index.append(j)
-
+            curr_freq = int(self.transmitters[j].frequency*1000000)
+            list_of_tx_freqs.append(curr_freq)
+            
         #Calculate all tunings which will receive at least one transmitter
         for freq in list_of_tx_freqs:
             if not self.high_lo:
@@ -459,8 +468,11 @@ class backend:
                 tx_index = list_of_tx_freqs.index(tx_freq)
 
                 #get transmitter data
-                tx_data = self.transmitters[data_index[tx_index]]
-                print "\t{0} {1:.3f} MHz".format(tx_data.name, tx_data.frequency)
+                tx_data = self.transmitters[tx_index]
+                if 'name' in tx_data.headers:
+                  print "\t{0} {1:.3f} MHz".format(tx_data.name, tx_data.frequency)
+                else:
+                  print "\t{0} {1:.3f} MHz".format(tx_data.ID, tx_data.frequency)
                 self.tunings[-1].add_tx(tx_data)
 
 
