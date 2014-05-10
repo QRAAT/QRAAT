@@ -27,10 +27,6 @@ import sys, os, time, errno
 import numpy as np
 from string import Template
 
-try:
-  import MySQLdb as mdb
-except ImportError: pass
-
 # Some SQL queries. 
 
 query_insert_est = Template(
@@ -173,9 +169,6 @@ class est (csv):
       if e.errno != errno.EEXIST: 
         raise e
   
-    # Exclude some headers when writing to file. 
-    headers = [col for col in self.headers if col not in [
-      'ID', 'txid', 'siteid', 'timezone']]
     fds = {} # tagname -> file descriptor index
 
     for row in self.table:
@@ -186,11 +179,11 @@ class est (csv):
           fds[row.tagname] = fd = open(fn, 'a')
         else: 
           fds[row.tagname] = fd = open(fn, 'w')
-          fd.write(','.join(headers) + '\n')
+          fd.write(','.join(self.headers) + '\n')
           
       fd.write( 
         ','.join(pretty_printer(getattr(row, col))
-          for col in headers) + '\n')
+          for col in self.headers) + '\n')
 
   
   def append(self, det):
@@ -245,7 +238,10 @@ class est (csv):
     # Eigenvalue decomposition SNR
     new_row.edsnr = 10 * np.log10(det.e_pwr / new_row.tnp)
 
-    new_row.txid = None  
+    if new_row.tagname[:2] = "ID":
+      new_row.txid = int(new_row.tagname[2:])
+    else:
+      new_row.txid = None  
     new_row.siteid = None
 
     self.table.append(new_row)
@@ -266,6 +262,8 @@ class est (csv):
       :param j: Time end (Unix).
       :type j: float
     """
+
+    import MySQLdb as mdb
     cur = db_con.cursor(mdb.cursors.DictCursor)
 
     # Create tagname index. 
@@ -310,27 +308,25 @@ class est (csv):
       :type row: est.Row
     """
 
-    if self.txid_index == None: 
-      cur.execute('SELECT id, name FROM txlist')
-      self.txid_index = { name : id for (id, name) in cur.fetchall() }
+    if row.txid is None: 
+      if self.txid_index is None: 
+        cur.execute('SELECT id, name FROM txlist')
+        self.txid_index = { name : id for (id, name) in cur.fetchall() }
+      try:
+        row.txid = self.txid_index[row.tagname]
+      except KeyError:
+        raise ResolveIdError('txid',row.tagname,row.fn)  
 
-    if self.siteid_index == None: 
-      cur.execute('SELECT id, name FROM sitelist')
-      self.siteid_index = { name : id for (id, name) in cur.fetchall() }
+    if row.siteid is None:
+      if self.siteid_index == None: 
+        cur.execute('SELECT id, name FROM sitelist')
+        self.siteid_index = { name : id for (id, name) in cur.fetchall() }
+      try:
+        row.siteid = self.siteid_index[site]
+      except KeyError:
+        raise ResolveIdError('siteid',site,row.fn)
 
-    if row.txid == None: 
-      row.txid = self.txid_index.get(row.tagname)
-
-    if row.siteid == None:
-      row.siteid = self.siteid_index.get(site)
-
-    if row.txid == None:
-      raise ResolveIdError('txid',row.tagname,row.fn)
-
-    if row.siteid == None:
-      raise ResolveIdError('siteid',site,row.fn)
-
-    query = query_insert_est if row.ID == None else query_update_est
+    query = query_insert_est if row.ID is None else query_update_est
     # When the template string performs the substitution, it casts 
     # floats to strings with `str(val)`. This rounds the decimal 
     # value if the string is too long. This screws with our precision 
@@ -342,6 +338,8 @@ class est (csv):
 
 
 if __name__=="__main__":
+
+  import MySQLdb as mdb
 
   try:
     db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')

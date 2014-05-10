@@ -96,7 +96,7 @@ class band:
         if 'name' in tx.headers:
           self.name = tx.name        #: Transmitter name. 
         else:
-          self.name = tx.ID
+          self.name = 'ID' + tx.ID
         self.tx_type = tx.type     #: Transmitter type. 
         self.band_num = band_num   #: Index of band in pulse detector array. 
         self.cf = band_cf          #: Band center frequency. 
@@ -125,7 +125,7 @@ class band:
         if 'name' in tx.headers: 
           self.name = self.name + '_' + tx.name
         else:
-          self.name = self.name  + '_' + tx.ID
+          self.name = self.name  + '_ID' + tx.ID
 
         if (self.tx_type != CONT):
         
