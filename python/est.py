@@ -263,13 +263,7 @@ class est (csv):
       :type j: float
     """
 
-    import MySQLdb as mdb
-    cur = db_con.cursor(mdb.cursors.DictCursor)
-
-    # Create tagname index. 
-    cur.execute('''SELECT id, name 
-                     FROM txlist''')
-    tagname_index = { row['id'] : row['name'] for row in cur.fetchall() }
+    cur = db_con.cursor()
 
     # Select pulses produced over the specified range and populate table. 
     cur.execute('''SELECT *
@@ -277,9 +271,9 @@ class est (csv):
                     WHERE (%f <= timestamp) AND (timestamp <= %f)''' % (i, j))
     for row in cur.fetchall():
       new_row = self.Row()
-      for (col, val) in row.iteritems():
-        setattr(new_row, col, val)
-      new_row.tagname = tagname_index[new_row.txid]
+      for j in range(len(row)):
+        setattr(new_row, cur.description[j][0], row[j])
+      new_row.tagname = 'ID' + new_row.txid
       self.table.append(new_row)
     
   def write_db(self, db_con, site=None):
