@@ -477,7 +477,7 @@ def filter_values_over(field_name, threshold_dict):
 		if threshold is None:
 			return False
 		else:
-			return threshold point[field_name] > threshold
+			return point[field_name] > threshold
 	return filter_func
 
 FREQUENCY_THRESHOLD = 400
