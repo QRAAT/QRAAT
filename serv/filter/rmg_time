@@ -147,7 +147,7 @@ def main():
 	site_data = {}
 
 	if past_score:
-		score_the_past(arguments, arg_t_start, arg_t_end, arg_txid, arg_siteid)
+		score_the_past_chunking(arguments, arg_t_start, arg_t_end, arg_txid, arg_siteid)
 	else:
 		signal.signal(signal.SIGINT, exit)
 		db_con = qraat.util.get_db('writer')
@@ -931,7 +931,7 @@ def get_intervals_for(db_con, id_data):
 		timestamp = v['timestamp']
 		siteid = v['siteid']
 		txid = v['txid']
-		q = 'select `interval` from interval_cache where start <= %s and (start + valid_duration) >= %s and siteid = %s and txid = %s;'
+		q = 'select period from interval_cache where start <= %s and (start + valid_duration) >= %s and siteid = %s and txid = %s;'
 		rows = cur.execute(q, (timestamp, timestamp, siteid, txid))
 		assert rows <= 1
 		interval = None
@@ -940,7 +940,7 @@ def get_intervals_for(db_con, id_data):
 			start = d * CONFIG_INTERVAL_WINDOW_SIZE # Could also be timestamp - m
 			valid_duration = CONFIG_INTERVAL_WINDOW_SIZE
 			interval = calculate_interval(db_con, start, start + valid_duration, siteid, txid)
-			q = 'insert into interval_cache (txid, siteid, start, valid_duration, interval) values (%s, %s, %s, %s, %s);'
+			q = 'insert into interval_cache (txid, siteid, start, valid_duration, period) values (%s, %s, %s, %s, %s);'
 			cur = db_con.cursor()
 			cur.execute(q, (txid, siteid, start, valid_duration, interval))
 			print 'Performed insertion!'
@@ -956,17 +956,22 @@ def get_intervals_for(db_con, id_data):
 	
 
 def calculate_interval(db_con, start, end, siteid, txid):
+	print 'Calculating one-off interval between {} and {} - {} seconds...'.format(start, end, (end - start))
 
 	cur = db_con.cursor()
 
 	# Get all data in this window that is not parametrically bad
-	q = 'select est.ID, timestamp from est LEFT JOIN estscore ON est.ID = ' + \
+	q = 'select est.ID, timestamp from est JOIN estscore ON est.ID = ' + \
 		'estscore.estid where timestamp >= %s and timestamp <= %s and ' + \
 		'absscore != -2 and siteid = %s and txid = %s;'
 		# Note the use of the sentinel value for parametrically bad stuff in estscore.
 
 	rows = cur.execute(q, (start, start + end, siteid, txid))
 	print 'Calculating interval from {} values...'.format(rows)
+
+	print 'Exiting.'
+	sys.exit(1)
+
 	# Have to format the data as a sequence of (timestamp, id) 2-tuples...
 
 	pairs = []
