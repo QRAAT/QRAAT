@@ -52,6 +52,10 @@ CONFIG_ERROR_ALLOWANCE = 0.2
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
 CONFIG_JUST_STAGE_CHANGES = False
 
+# Number of seconds to give as leeway before we assume that we can score
+# everything exactly X minutes 
+CONFIG_ARRIVAL_FUZZING = 10
+
 # Defines the amount of time in seconds (fractional is fine, it is passed to time.sleep()) to wait between polling for new points.
 CONFIG_NEW_STUFF_POLLING_PERIOD = 5
 
@@ -94,8 +98,6 @@ def parse_arguments(argv):
 
 def pass_all(x):
 	return True
-
-MOUSE = False
 
 def exit(signal, frame):
 	global EXIT_REQUESTED
@@ -151,7 +153,21 @@ def main():
 		db_con = qraat.util.get_db('writer')
 		change_handler = init_change_handler()
 		while True:
-			score_new_things(db_con, arg_txid, arg_siteid, change_handler)
+			# Everything that has not been scored at all (even new stuff will be parametrically filtered)
+			print 'frontier_parametric_score()'
+			ids = frontier_parametric_score(db_con, arg_txid, arg_siteid, change_handler, arguments)
+
+			# If there are intervals that have not been calculated yet - indicated by 
+			# print 'maybe_measure_new_interval()'
+			# maybe_measure_new_interval(ids, db_con, arg_txid, arg_siteid, change_handler)
+
+			# print 'Shutting down agreeably...'
+			# sys.exit(1)
+
+			print 'score_new_things()'
+			score_new_things(ids, db_con, change_handler)
+
+			polling_delay()
 		# Add unscored points to a queue for scoring
 
 def init_change_handler():
@@ -410,7 +426,7 @@ def apply_time_filtering(points_under_consideration, txid, interval_computation_
 			# Skipping for now
 			#raise Exception('Found interval abnormally low: {}'.format(interval))
 			print 'Found interval abnormally low: {}'.format(interval)
-			scores[ident] = -2
+			scores[ident] = 0
 			continue
 
 		# calculate possible center points to investigate
@@ -596,7 +612,12 @@ def are_points_in_radius(point, points, radius):
 	print 'There is nothing there'
 	return False
 
-def score_new_things(db_con, txid, siteid, change_handler):
+# def maybe_measure_new_interval(ids, db_con, txid, siteid, change_handler):
+# 	# Score last completed one if it isn't already scored.
+# 	CONFIG_INTERVAL_WINDOW_SIZE
+# 	pass
+
+def frontier_parametric_score(db_con, txid, siteid, change_handler, arguments):
 
 	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
 
@@ -604,34 +625,156 @@ def score_new_things(db_con, txid, siteid, change_handler):
 
 	cur = None
 
-	if CURSOR_ENABLED:
-		cur = db_con.cursor()
-		q = 'select value from `cursor` where name = %s;'
-		rows_back = cur.execute(q, ('estscore',))
-		assert rows_back == 1
-		r = cur.fetchone()
-		r = tuple(r)
-		assert len(r) == 1
-		max_val = r[0]
-		print 'Got max val: {} ({})'.format(r, r.__class__)
-		# raw_input()
-		cur = db_con.cursor()
-		q = 'select ID from est where timestamp > %s;'
-		rows = cur.execute(q, (max_val,))
+	# if CURSOR_ENABLED:
+	# 	cur = db_con.cursor()
+	# 	q = 'select value from `cursor` where name = %s;'
+	# 	rows_back = cur.execute(q, ('paramscore',))
+	# 	assert rows_back == 1 or rows_back == 0
+	# 	r = cur.fetchone()
+	# 	r = tuple(r)
+	# 	assert len(r) == 1
+	# 	max_val = r[0]
+	# 	print 'Got max val: {} ({})'.format(r, r.__class__)
+	# 	# raw_input()
+	# 	cur = db_con.cursor()
+	# 	q = 'select ID from est where timestamp > %s;'
+	# 	rows = cur.execute(q, (max_val,))
+	# else:
+
+	cur = db_con.cursor()
+
+
+	# NOTE: Set a timestamp here to only score unscored points whose timestamp is newer than this.
+	time_starts_at = None
+	# get all unscored points
+	q = None
+	if time_starts_at is None:
+		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and txid = {} and siteid = {};'.format(txid, siteid)
+	else:
+		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and timestamp >= {} and txid = {} and siteid = {};'.format(time_starts_at, txid, siteid)
+	rows = cur.execute(q)
+
+
+
+	if rows == 0:
+		print 'Nothing new yet.'
+	else:
+		print 'There are {} new rows'.format(rows)
+	pass
+
+	if rows == 0:
+		print 'Nothing new...'
+		return
+	else:
+
+		ids = []
+
+		while True:
+			r = cur.fetchone()
+			if r is None:
+				break
+			else:
+				r = tuple(r)
+				assert len(r) == 1
+				ids.append(r[0])
+
+
+
+		ids_template = ', '.join(map(lambda x : '{}', ids))
+		id_string = ids_template.format(*ids)
+		field_string = ', '.join(fields)
+		query = 'SELECT {} FROM est where ID in ({});'.format(field_string, id_string)
+		print 'About to execute query "{}"'.format(query)
+		rows = cur.execute(query)
+		print 'Got {} records returned.'.format(rows)
+
+
+		all_rows = []
+
+		while True:
+			r = cur.fetchone()
+			if r is None:
+				 break
+			else:
+				named_row = dict(zip(fields, r))
+				named_row['timestamp'] = float(named_row['timestamp'])
+				all_rows.append(named_row)
+		print 'Parsed {} rows'.format(len(all_rows))
+
+		registry = qraat.signal_filter.Registry(arguments)
+		for point in all_rows:
+			print 'Registering point:', point
+			registry.register_point(point)
+
+
+
+
+
+
+		
+		good_stuff, bad_stuff = registry.screen_bad(registry.points)
+		for good_item in good_stuff:
+			change_handler.add_score(good_item['ID'], -1, 0)
+			print 'Setting score to -1'
+		for bad_item in bad_stuff:
+			change_handler.add_score(bad_item['ID'], -2, 0)
+			print 'Setting score to -2'
+
+		return ids
+		
+
+def score_new_things(ids, db_con, change_handler):
+
+	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
+
+	rows = None
+
+	cur = None
+
+	# if CURSOR_ENABLED:
+	# 	cur = db_con.cursor()
+	# 	q = 'select value from `cursor` where name = %s;'
+	# 	rows_back = cur.execute(q, ('estscore',))
+	# 	assert rows_back == 1
+	# 	r = cur.fetchone()
+	# 	r = tuple(r)
+	# 	assert len(r) == 1
+	# 	max_val = r[0]
+	# 	print 'Got max val: {} ({})'.format(r, r.__class__)
+	# 	# raw_input()
+	# 	cur = db_con.cursor()
+	# 	q = 'select ID from est where timestamp > %s;'
+	# 	rows = cur.execute(q, (max_val,))
+	if False:
+		pass
 	else:
 
 		cur = db_con.cursor()
 
+		# Get all timestamp data for non-time scored things yet
+		#timestamp_data = get_fields_for(db_con, ids, 'timestamp')
 
-		# NOTE: Set a timestamp here to only score unscored points whose timestamp is newer than this.
-		time_starts_at = None
-		# get all unscored points
-		q = None
-		if time_starts_at is None:
-			q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and txid = {} and siteid = {};'.format(txid, siteid)
-		else:
-			q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and timestamp >= {} and txid = {} and siteid = {};'.format(time_starts_at, txid, siteid)
-		rows = cur.execute(q)
+		latest_timestamp = get_latest_timestamp(db_con)
+		print 'Got latest timestamp:', latest_timestamp
+		id_data = get_time_filter_eligible_unscored(db_con, latest_timestamp)
+		interval_data = get_intervals_for(db_con, id_data)
+
+		print 'Reporting...'
+		for id, interval in interval_data.items():
+			print 'For ID {} - interval = {}'.format(id, interval)
+
+def get_fields_for(db_con, ids, fields):
+
+	# NOTE: Set a timestamp here to only score unscored points whose timestamp is newer than this.
+	time_starts_at = None
+	# get all unscored points
+	q = None
+	if time_starts_at is None:
+		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and txid = {} and siteid = {};'.format(txid, siteid)
+	else:
+		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and timestamp >= {} and txid = {} and siteid = {};'.format(time_starts_at, txid, siteid)
+	rows = cur.execute(q)
+
 	if rows == 0:
 		print 'Nothing new yet.'
 	else:
@@ -650,7 +793,7 @@ def score_new_things(db_con, txid, siteid, change_handler):
 
 	if len(ids) == 0:
 		print 'No new points found yet.'
-		polling_delay()
+		# polling_delay()
 		print 'ddcc:', dir(cur)
 		return
 	
@@ -697,7 +840,7 @@ def score_new_things(db_con, txid, siteid, change_handler):
 
 
 	# Configurable delay between subsequent calls happens here.
-	polling_delay()
+	# polling_delay()
 		
 			
 	
@@ -720,7 +863,141 @@ def polling_delay():
 	AWAKE = True
 	print 'Wha!'
 	
+
+def get_fields_for(db_con, ids, fields):
+
+	cur = db_con.cursor()
+
+	ids_template = ', '.join(map(lambda x : '{}', ids))
+	id_string = ids_template.format(*ids)
+	field_string = ', '.join(fields)
+	query = 'SELECT {} FROM est where ID in ({});'.format(field_string, id_string)
+	print 'About to execute query "{}"'.format(query)
+	rows = cur.execute(query)
 	
+	all_rows = []
+	for row in rows:
+		row = tuple(row)
+		named_row = dict(zip(fields, row))
+		all_rows.append(named_rows)
+	
+	keyed_by_id = {}
+	for row in all_rows:
+		keyed_by_id[row['ID']] = row
+
+	return keyed_by_id
+	
+def get_latest_timestamp(db_con):
+
+	cur = db_con.cursor()
+
+	query = 'select max(timestamp) from est;'
+	rows = cur.execute(query)
+	assert rows == 1
+
+	row = cur.fetchone()
+	val = row[0]
+
+	return float(val)
+
+def get_time_filter_eligible_unscored(db_con, latest_timestamp):
+	nothing_newer_than = latest_timestamp - CONFIG_INTERVAL_WINDOW_SIZE - CONFIG_ARRIVAL_FUZZING
+	cur = db_con.cursor()
+	query = 'select est.ID, est.timestamp, est.siteid, est.txid from est left join estscore on est.id = estscore.estid where estscore.absscore < 0 and timestamp <= %s'
+	rows = cur.execute(query, (nothing_newer_than,))
+	print 'Trying to get filter eligible unprocessed, got {} rows'.format(rows)
+
+	ids = {}
+
+	while True:
+		row = cur.fetchone()
+		if row is None:
+			break
+		else:
+			row = tuple(row)
+			d = {'ID':int(row[0]), 'timestamp':float(row[1]), 'siteid':int(row[2]), 'txid':int(row[3])}
+			ids[d['ID']] = d
+			# ids.append((row[0], row[1]))
+
+	print 'Got {} values'.format(len(ids))
+	return ids
+
+def get_intervals_for(db_con, id_data):
+
+	intervals = {}
+
+	for id, v in id_data.items():
+		cur = db_con.cursor()
+		timestamp = v['timestamp']
+		siteid = v['siteid']
+		txid = v['txid']
+		q = 'select `interval` from interval_cache where start <= %s and (start + valid_duration) >= %s and siteid = %s and txid = %s;'
+		rows = cur.execute(q, (timestamp, timestamp, siteid, txid))
+		assert rows <= 1
+		interval = None
+		if rows == 0:
+			d, m = divmod(timestamp, CONFIG_INTERVAL_WINDOW_SIZE)
+			start = d * CONFIG_INTERVAL_WINDOW_SIZE # Could also be timestamp - m
+			valid_duration = CONFIG_INTERVAL_WINDOW_SIZE
+			interval = calculate_interval(db_con, start, start + valid_duration, siteid, txid)
+			q = 'insert into interval_cache (txid, siteid, start, valid_duration, interval) values (%s, %s, %s, %s, %s);'
+			cur = db_con.cursor()
+			cur.execute(q, (txid, siteid, start, valid_duration, interval))
+			print 'Performed insertion!'
+			# Calculate interval and store in database
+		else:
+			r = cur.fetchone()
+			r = tuple(r)
+			interval = r[0]
+			
+		intervals[id] = interval
+		
+	return intervals
+	
+
+def calculate_interval(db_con, start, end, siteid, txid):
+
+	cur = db_con.cursor()
+
+	# Get all data in this window that is not parametrically bad
+	q = 'select est.ID, timestamp from est LEFT JOIN estscore ON est.ID = ' + \
+		'estscore.estid where timestamp >= %s and timestamp <= %s and ' + \
+		'absscore != -2 and siteid = %s and txid = %s;'
+		# Note the use of the sentinel value for parametrically bad stuff in estscore.
+
+	rows = cur.execute(q, (start, start + end, siteid, txid))
+	print 'Calculating interval from {} values...'.format(rows)
+	# Have to format the data as a sequence of (timestamp, id) 2-tuples...
+
+	pairs = []
+
+	while True:
+		r = cur.fetchone()
+		if r is None:
+			break
+		else:
+			r = tuple(r)
+			id = int(r[0])
+			timestamp = float(r[1])
+			t = (timestamp, id)
+			pairs.append(t)
+
+	sorted_pairs = sorted(pairs)
+	
+	interval_windows = qraat.signal_filter.WindowIterator(sorted_pairs, None)
+
+	intervals = []
+
+	# There should only be one.
+	for (i, w) in enumerate(interval_windows):
+		print 'Processed interval window:', (i+1)
+		interval = w.calculate_interval_from()
+		intervals.append(interval)
+	assert len(intervals) == 1
+	return intervals[0]
+
+
+
 
 if __name__ == '__main__':
 	#cProfile.run('main()')

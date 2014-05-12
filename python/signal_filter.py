@@ -432,6 +432,10 @@ def highlight_if(point, points, filter_func):
 	else:
 		return None
 
+def already_calculated_interval(siteid, txid, tstamp):
+	# Look for records (siteid, txid, tstamp', duration') st. tstamp' <= tstamp <= tstamp' + duration'
+	pass
+
 cached_stds = {}
 cached_means = {}
 
@@ -662,6 +666,11 @@ class WindowIterator:
 		return match_ind, original_match_ind, the_window
 
 	def init_windows(self):
+		if self.window_size is None:
+			# One gigantic window.
+			self.windows = [Window(self.points, 0, len(self.points))]
+			return
+
 		#print 'Called iter generator'
 		inds = []
 		#print 'The window count is:', self.get_window_count()
