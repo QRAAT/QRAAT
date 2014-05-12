@@ -58,7 +58,7 @@ CONFIG_NEW_STUFF_POLLING_PERIOD = 5
 AWAKE = True
 EXIT_REQUESTED = False
 
-CURSOR_ENABLED = True
+CURSOR_ENABLED = False
 
 def filter_site(s):
 	sites = s.split(',')
