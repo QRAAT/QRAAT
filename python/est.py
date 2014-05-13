@@ -312,7 +312,7 @@ class est (csv):
         raise ResolveIdError('txid',row.tagname,row.fn)  
 
     if row.siteid is None:
-      if self.siteid_index == None: 
+      if self.siteid_index is None: 
         cur.execute('SELECT id, name FROM sitelist')
         self.siteid_index = { name : id for (id, name) in cur.fetchall() }
       try:
