@@ -44,9 +44,9 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=float("+inf"),
 
 db_con = qraat.util.get_db('reader')
 
-M = 5 
-C = 1
 overlay = True
+M = qraat.track.maxspeed_exp((10, 1), (300, 0.1),0.05)
+C = 1
 
 # A possible way to calculate good tracks. Compute the tracks
 # with some a priori maximum speed that's on the high side. 
@@ -55,21 +55,21 @@ if options.t_start == 0.0 and options.t_end == float("+inf"):
 else:
   track = qraat.track(db_con, options.t_start, options.t_end, options.tx_id, M, C)
 
+print len(track)
 # We then calculate statistics on the transition speeds in the 
 # critical path. Plotting the tracks might reveal spurious points
 # that we want to filter out. 
 (mean, std) = track.speed()
 print "speed        (mu=%.4f, sigma=%.4f)" % (mean, std)
-(mean, std) = track.acceleration()
-print "acceleration (mu=%.4f, sigma=%.4f)" % (mean, std)
 
 # Recompute the tracks, using the mean + one standard deviation as
 # the maximum speed. 
-track.recompute(mean + std, C)
+#track.recompute(lambda(t) : mean + std, C)
 
 if overlay: 
 
-  bg = mpimg.imread('qr-overlay.png')
+  # FIXME Where/how to install this file? 
+  bg = mpimg.imread('/home/christopher/continuum/work/QRAAT/QRAAT/serv/visualize/qr-overlay.png') 
 
   e0 = 572599.5 - 150
   e1 = 577331.4 - 150
@@ -91,8 +91,8 @@ if overlay:
 
   # Plot tracks. 
   pp.scatter( 
-   map(lambda (P, t): E(P.imag), track.track), 
-   map(lambda (P, t): N(P.real), track.track), alpha=0.2, s=2, c='k', 
+   map(lambda (P, t, pos_id): E(P.imag), track), 
+   map(lambda (P, t, pos_id): N(P.real), track), alpha=0.2, s=2, c='k', 
      label='Transmitter tracks')
 
   # Plot sites. 
@@ -103,9 +103,10 @@ if overlay:
 
   t = time.localtime(track[0][1])
   s = time.localtime(track[-1][1])
-  pp.title('%04d-%02d-%02d  %02d:%02d - %02d:%02d  txID=%d' % (
+  pp.title('%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  txID=%d' % (
        t.tm_year, t.tm_mon, t.tm_mday,
        t.tm_hour, t.tm_min,
+       s.tm_year, s.tm_mon, s.tm_mday,
        s.tm_hour, s.tm_min,
        options.tx_id), size='smaller')
 
@@ -132,8 +133,8 @@ else:
   
   # Plot locations. 
   pp.plot( 
-   map(lambda (P, t): P.imag, track.track), 
-   map(lambda (P, t): P.real, track.track), '.', alpha=0.3)
+   map(lambda (P, t, pos_id): P.imag, track), 
+   map(lambda (P, t, pos_id): P.real, track), '.', alpha=0.3)
 
   pp.savefig('tx%d.png' % options.tx_id)
 

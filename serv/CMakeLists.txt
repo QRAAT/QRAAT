@@ -5,4 +5,6 @@ INSTALL(PROGRAMS
 add_subdirectory(proc)
 add_subdirectory(cal)
 add_subdirectory(pos)
+add_subdirectory(filter)
 add_subdirectory(telemetry)
+add_subdirectory(visualize)

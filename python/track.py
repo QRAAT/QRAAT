@@ -15,9 +15,27 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# NOTE Where I'm going next. 
+#
+# Feasibility metric
 # 
-# TODOs
-#  - Look at acceleration for determining if a transition is feasible. 
+#   Assume the transition speed is exponentially distributed, paramterized 
+#   by the maximum speed given the time interval. Since the observed speed
+#   is calculated from a straight line drawn between the two points, it 
+#   is the minimum speed that the target could have traveled. Thus, the 
+#   probability of the transition is prob. mass function integratedd from
+#   S to infinity. 
+# 
+#   TODO [track.transition_distribution()] Verify that the transition
+#        speeds are indeed approximately exponential. 
+# 
+#   TODO [track.graph()] A more sophisticated feasibility metric would 
+#        calculate the probability of the observed speed. If the event is
+#        is probable, than add its edge to the graph. 
+#
+#   TODO Think about composing this probability with the position 
+#        likelihood. These would need to be normalized (see notes.)  
 
 import numpy as np
 import time, os, sys
@@ -31,8 +49,17 @@ try:
 except ImportError: pass
 
 def distance(Pi, Pj):
-  ''' Calculate Euclidean distance between two points. ''' 
-  return np.sqrt((Pi.real - Pj.real)**2 + (Pi.imag - Pj.imag)**2)
+  return np.abs(Pj - Pi)
+
+def speed(v, w):
+  return np.abs((w.P - v.P) / (w.t - v.t))
+
+def acceleration(u, v, w): 
+  V1 = (v.P - u.P) / (v.t - u.t) 
+  V2 = (w.P - v.P) / (w.t - v.t) 
+  t1 = (v.t + u.t) / 2
+  t2 = (w.t + v.t) / 2  
+  return np.abs((V2 - V1) / (t2 - t1))
 
 class Node:
 
@@ -46,15 +73,17 @@ class Node:
     :type ll: float
   '''
 
-  def __init__(self, P, t, ll): 
+  def __init__(self, P, t, ll, pos_id): 
     # Position.  
     self.P = P
     self.t = t
     self.ll = ll
+    self.pos_id = pos_id
 
     # Connected component analysis. 
     self.c_size   = 1
     self.c_height = 0
+    self.c_parent = None
   
     # Topological sorting. 
     self.t_visited = False
@@ -70,6 +99,7 @@ class Node:
     ''' Reset algorithm paramaters. ''' 
     self.c_size   = 1
     self.c_height = 0
+    self.c_parent = None
     self.dist     = 0 
     self.parent   = None
 
@@ -80,8 +110,8 @@ class Node:
   def c_find(self):
     ''' Disjoint-set find operation for CC-analysis. ''' 
     p = self
-    while (p.parent != None): 
-      p = p.parent
+    while (p.c_parent != None): 
+      p = p.c_parent
     return p
 
   def c_union(self, u):
@@ -94,22 +124,23 @@ class Node:
       p = x
     
     elif (x.c_height == y.c_height): # x and y have the same height.
-      y.parent  = x
+      y.c_parent  = x
       x.c_height += 1
       x.c_size   += y.c_size
       p = x
 
     elif (x.c_height > y.c_height): # x is taller than y.
-      y.parent = x
+      y.c_parent = x
       x.c_size  += y.c_size
       p = x
 
     else: # y is taller than x.
-      x.parent = y
+      x.c_parent = y
       y.c_size  += x.c_size
       p = y
-      
+    
     return p
+
 
 
 class track:
@@ -128,33 +159,118 @@ class track:
     :type t_end: float
     :param tx_id: Transmitter ID. 
     :type tx_id: int
-    :param M: Maximum foot speed of target (m/s). 
-    :type M: float
+    :param M: Maximum foot speed of target (m/s), given
+              transition time
+    :type M: lambda (t) -> float
     :param C: Constant hop cost in critical path calculation.
     :type C: float
+    :param optimal: If False, use windowed tracking algorithm. 
+    :type optiomal: bool
   '''
+  
+  (zone, letter) = 10, 'S' # TODO Add UTM zone to position table, modify 
+                           # code to insert it automatically. 
 
-  def __init__(self, db_con, t_start, t_end, tx_id, M, C=1):
+  window_length = 250  
+  overlap_length = 25 
+
+  def __init__(self, db_con, t_start, t_end, tx_id, M, C=1, optimal=False):
+    self.tx_id = tx_id
+    
+    # Get positions. 
+    self._fetch(db_con, t_start, t_end, tx_id)
+    
+    # Calculate tracks. 
+    if optimal:
+      self._calc_tracks(M, C)
+    else:
+      self._calc_tracks_windowed(M, C)
+    
+
+  def _calc_tracks_windowed(self, M, C):
+    ''' Calculate tracks over overlapping windows of positions. 
+    
+      Note that the solution may be sub-optimal over the entire time window. 
+      The optimal algorithm necessarily has a quadratic factor, which we 
+      mitigate here by running it over a small, fixed number of positions. 
+    '''
+    pos_dict = {}
+    self.track = []
+    i = 0; j = self.window_length 
+
+    while i < len(self.pos):
+      
+      t = self.pos[i][2]
+      while self.pos[i-1][2] == t:
+        i -= 1
+
+      j =  min(len(self.pos) - 1, i + self.window_length)
+      
+      t = self.pos[j][2]
+      while self.pos[j-1][2] == t:
+        j -= 1
+      
+      roots = self.graph(self.pos[i:j+1], M)
+      guy = self.critical_path(self.toposort(roots), C)
+      
+      for (P, t, pos_id, ll) in guy: 
+        if not pos_dict.get(t):
+          pos_dict[t] = set()
+        pos_dict[t].add((P, pos_id, ll))
+
+      i += self.window_length - self.overlap_length
+
+    # When there are many possibilities for a timestep, choose the
+    # position with higher likelihood. (NOTE that it may be better 
+    # to rerun the critical path algorithm over the tree created 
+    # in this process.)
+    for (t, val) in sorted(pos_dict.items(), key=lambda(m) : m[0]):
+      (P, pos_id, ll) = min(val, key=lambda(row) : row[2])
+      self.track.append((P, t, pos_id))
+  
+
+  def _calc_tracks(self, M, C):
+    ''' Calculate optimal tracks over all positions. 
+    
+      This track algorithm considers all possible transitions, 
+      resulting in a quadratic factor in the running time. However,
+      the solution is optimal for the time window.
+    ''' 
+    roots = self.graph(self.pos, M)
+    self.track = map(lambda(row) : row[:3], self.critical_path(self.toposort(roots), C))
+  
+
+  def _fetch(self, db_con, t_start, t_end, tx_id): 
     cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood
+    cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
                      FROM Position
                     WHERE (%f <= timestamp) 
                       AND (timestamp <= %f)
                       AND txid = %d
                     ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
     self.pos = cur.fetchall()
-    roots = self.graph(self.pos, M)
-    self.track = self.critical_path(self.toposort(roots), C)
   
-  def recompute(self, M, C=1):
-    roots = self.graph(self.pos, M)
-    self.track = self.critical_path(self.toposort(roots), C)
+  def _fetchall(self, db_con, tx_id):
+    cur = db_con.cursor()
+    cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
+                     FROM Position
+                    WHERE txid = %d
+                    ORDER BY timestamp ASC''' % tx_id)
+    self.pos = cur.fetchall()
 
-  def __iter__(self):
+
+  def __getiter__(self): 
     return self.track
 
   def __getitem__(self, i):
     return self.track[i]
+  
+  def __len__(self):
+    return len(self.track)
+  
+  #
+  # DAG-building algorithms. 
+  #
 
   def graph(self, pos, M): 
     ''' Create a graph from positions. 
@@ -172,7 +288,39 @@ class track:
       :return: The roots of the graph. 
       :rtype: Node list
     '''
+    
+    nodes = []
+    for i in range(len(pos)): 
+      (P, t, ll, pos_id) = (np.complex(pos[i][0], pos[i][1]), 
+                            float(pos[i][2]), 
+                            float(pos[i][3]), 
+                            int(pos[i][4]))
+      nodes.append(Node(P, t, ll, pos_id)) 
+
+    for i in range(len(nodes)):
+      for j in range(i+1, len(nodes)):
+        if nodes[i].t < nodes[j].t and speed(nodes[i], nodes[j]) < M(nodes[j].t - nodes[i].t): 
+          nodes[i].adj_out.append(nodes[j])
+          nodes[j].adj_in.append(nodes[i]) 
   
+    roots = [] 
+    for u in nodes:
+      if len(u.adj_in) == 0:
+        roots.append(u) 
+   
+    return roots
+    
+  def graph_alt(self, pos): 
+    ''' Alternative DAG-building algorithm. 
+    
+      This is an attempt to reduce the complexity of the graph. The number 
+      of possible edges is O(n choose 2). We test a new node for a feasible
+      transition from a set of graph leaves. The problem is that segments of
+      the true track of the target can be orphaned by the process. More
+      thinking is required. **TODO** 
+    '''
+    
+    # TODO update this code to include posID in Node() constructor. 
     roots = []; leaves = []
     i = 0 
     while i < len(pos) - 1:
@@ -181,19 +329,20 @@ class track:
       Ti = Tj = float(pos[i][2])
       newLeaves = []
       while j < len(pos) - 1 and Ti == Tj: # Candidates for next time interval. 
-        (P, ll) = (np.complex(pos[j][0], pos[j][1]), float(pos[j][3]))
+        (P, ll, pos_id) = (np.complex(pos[j][0], pos[j][1]), float(pos[j][3]), pos[j][4])
 
-        node = Node(P, Tj, ll)
+        w = Node(P, Tj, ll, pos_id)
         ok = False
-        for k in range(len(leaves)):
-          if leaves[k].distance(node) / (node.t - leaves[k].t) < M: 
+        for v in leaves:
+          if speed(v, w) < M(w.t - v.t):
             ok = True
-            node.adj_in.append(leaves[k])
-            leaves[k].adj_out.append(node)
+            w.adj_in.append(v)
+            v.adj_out.append(w)
+            w.c_union(v)
         
         if not ok: # New root. 
-          roots.append(node) 
-          newLeaves.append(node)
+          roots.append(w) 
+          newLeaves.append(w)
 
         j += 1
         Tj = float(pos[j][2])
@@ -209,8 +358,19 @@ class track:
       leaves = newLeaves
 
       i = j 
-   
+
+    # Exclude isolated nodes.
+    #retRoots = []
+    #for node in roots:
+    #  if node.c_find().c_size > 1:
+    #    retRoots.append(node)
+    #return retRoots
+    
     return roots
+  
+  #
+  # Methods for calculating the critical path over the graph.
+  #
 
   def toposort(self, roots): 
     ''' Compute a topological sorting of the track graph. Return None if 
@@ -243,7 +403,6 @@ class track:
     sorted_nodes.reverse()
     return sorted_nodes
 
-
   def critical_path(self, sorted_nodes, C): 
     ''' Calculate the critical path of the track graph.
 
@@ -251,9 +410,10 @@ class track:
       :type sorted_nodes: NOde list
       :param C: Constant hop cost. 
       :type C: float
-    ''' 
+    '''
+
     cost = 0
-    node = None 
+    node = None
     for v in sorted_nodes: 
       mdist = 0
       mparent = None
@@ -263,26 +423,29 @@ class track:
           mparent = u
       v.parent = mparent
       v.dist = mdist + C + v.ll 
-      
+     
       if v.dist > cost:
         cost = v.dist
         node = v
-      
+
     path = []
+    
     while node != None:
-      path.append((node.P, node.t))
+      path.append((node.P, node.t, node.ll, node.pos_id))
       node = node.parent
     
     path.reverse()
     return path
-    
+
+  #
+  # Some statistical features of the tracks. 
+  #
 
   def speed(self):
     ''' Calculate mean and standard deviation of the target's speed. 
     
       :return: (mean, std) tuple. 
     '''
-
     if len(self.track) > 0: 
       speeds = []
       for i in range(len(self.track)-1): 
@@ -291,41 +454,10 @@ class track:
       return (np.mean(speeds), np.std(speeds))
     
     else: return (np.nan, np.nan)
-    
-  def acceleration(self): 
-    ''' Calculate mean and standard deviation of the target's acceleration. 
-
-      :return: (mean, std) tuple. 
-    ''' 
-
-    if len(self.track) > 0: 
-      
-      V = []
-      for i in range(len(self.track)-1):
-        v = (self.track[i+1][0] - self.track[i][0]) / (self.track[i+1][1] - self.track[i][1])
-        V.append((v, (self.track[i][1] + self.track[i+1][1]) / 2))
-
-      A = []
-      for i in range(len(V)-1):
-        a = (V[i+1][0] - V[i][0]) / (V[i+1][1] - V[i][1])
-        A.append((a, (V[i][1] + V[i+1][1]) / 2))
-
-      # Keeping V and A around like this just in case I want to get at the
-      # timestamp or generate plots. For reporting, using magnitude of the 
-      # acceleration. 
-      A_mag = map(lambda(a, t) : np.abs(a), A) 
-
-      #fd = open('acceleration.csv', 'w')
-      #fd.write('accel\n')
-      #for a in A_mag:
-      #  fd.write('%f\n' % a)
-
-      return (np.mean(A_mag), np.std(A_mag))
-
-    else: return (np.nan, np.nan) 
 
   def stats(self):
-      
+    ''' Piecewise velocity and acceleration along critcal path. '''   
+    
     V = []
     for i in range(len(self.track)-1):
       v = (self.track[i+1][0] - self.track[i][0]) / (self.track[i+1][1] - self.track[i][1])
@@ -338,168 +470,178 @@ class track:
 
     return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
 
-  def insert_db(self, db_con): 
-    pass # TODO
+  # 
+  # A few families of max speed given time interval functions. 
+  #
 
-  def export_kml(self, fn):
+  @classmethod
+  def maxspeed_linear(cls, burst, sustained, limit):
+    return lambda (t) : max(limit, (t - burst[0]) * (
+            float(sustained[1] - burst[1]) / (sustained[0] - burst[0])) + burst[1])
+
+  @classmethod
+  def maxspeed_exp(cls, burst, sustained, limit):
+    (t1, y1) = burst; (t2, y2) = sustained
+    C = limit
+
+    r = np.log((y2 - C) / (y1 - C)) / (t1 - t2) 
+    B = np.exp(r * t2) * (y2 - C)
+    r *= -1
+    
+    return lambda (t) : (B * np.exp(r * t) + C)
+
+  @classmethod
+  def maxspeed_const(cls, m):
+    return lambda (t) : m
+
+  #
+  # Export tracks to file / database. 
+  #
+
+  def insert_db(self, db_con): 
+    ''' Insert tracks into datbase. ''' 
+    cur = db_con.cursor()
+    for (P, t, pos_id) in self.track: 
+      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+      tm = time.gmtime(t)
+      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                             tm.tm_hour, tm.tm_min, tm.tm_sec)
+      cur.execute('''INSERT INTO qraat.Track 
+                            (txID, posId, lon, lat, datetime, timezone) 
+                     VALUES (%d, %d, %f, %f, '%s', '%s')''' % (self.tx_id, 
+                     pos_id, lon, lat, t, 'UTC'))
+
+  def export_kml(self, name, tx_id):
 
     # E.g.: https://developers.google.com/kml/documentation/kmlreference#gxtrack 
-    # <?xml version="1.0" encoding="UTF-8"?>
-    # <kml xmlns="http://www.opengis.net/kml/2.2"
-    #  xmlns:gx="http://www.google.com/kml/ext/2.2">
-    # <Folder>
-    #   <Placemark>
-    #     <gx:Track>
-    #       <when>2010-05-28T02:02:09Z</when>
-    #       <when>2010-05-28T02:02:35Z</when>
-    #       <when>2010-05-28T02:02:44Z</when>
-    #       <when>2010-05-28T02:02:53Z</when>
-    #       <when>2010-05-28T02:02:54Z</when>
-    #       <when>2010-05-28T02:02:55Z</when>
-    #       <when>2010-05-28T02:02:56Z</when>
-    #       <gx:coord>-122.207881 37.371915 156.000000</gx:coord>
-    #       <gx:coord>-122.205712 37.373288 152.000000</gx:coord>
-    #       <gx:coord>-122.204678 37.373939 147.000000</gx:coord>
-    #       <gx:coord>-122.203572 37.374630 142.199997</gx:coord>
-    #       <gx:coord>-122.203451 37.374706 141.800003</gx:coord>
-    #       <gx:coord>-122.203329 37.374780 141.199997</gx:coord>
-    #       <gx:coord>-122.203207 37.374857 140.199997</gx:coord>
-    #     </gx:Track>
-    #   </Placemark>
-    # </Folder>
-    # </kml>
+    # TODO The file is way longer than it needs to be, since I wanted to display
+    # the coordinates and datetime in the tooltip that appears in Google Earth.
+    # Perhaps what we want is not a gx:track, but something fucnctionally 
+    # similar. 
 
-    (zone, letter) = 10, 'S' # TODO Add UTM zone to position table, modify 
-                             # code to insert it automatically. 
-
-    for (P, t) in self.track: 
-      (lat, lon) = utm.to_latlon(P.imag, P.real, zone, letter) 
-      tm = time.localtime(t)
+    fd = open('%s.kml' % name, 'w')
+    fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+    fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
+    fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
+    fd.write('<Folder>\n')
+    fd.write('  <Placemark>\n')
+    fd.write('    <name>%s (txID=%d)</name>\n' % (name, tx_id))
+    fd.write('    <gx:Track>\n')
+    for (P, t, pos_id) in self.track: 
+      tm = time.gmtime(t)
       t = '%04d-%02d-%02dT%02d:%02d:%02dZ' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
                                               tm.tm_hour, tm.tm_min, tm.tm_sec)
+      fd.write('      <when>%s</when>\n' % t)
+    for (P, t, pos_id) in self.track: 
+      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+      fd.write('      <gx:coord>%f %f 0</gx:coord>\n' % (lon, lat))
+    fd.write('      <ExtendedData>\n')
+    fd.write('        <SchemaData schemaUrl="#schema">\n')
+    fd.write('          <gx:SimpleArrayData name="Time">\n')
+    for (P, t, pos_id) in self.track: 
+      tm = time.gmtime(t)
+      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
+      fd.write('          <gx:value>%s</gx:value>\n' % t)
+    fd.write('          </gx:SimpleArrayData>\n')
+    fd.write('          <gx:SimpleArrayData name="(lat, long)">\n')
+    for (P, t, pos_id) in self.track: 
+      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+      fd.write('          <gx:value>%fN, %fW</gx:value>\n' % (lat, lon))
+    fd.write('          </gx:SimpleArrayData>\n')
+    fd.write('          <gx:SimpleArrayData name="posID">\n')
+    for (P, t, pos_id) in self.track: 
+      tm = time.gmtime(t)
+      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
+      fd.write('          <gx:value>%d</gx:value>\n' % pos_id)
+    fd.write('          </gx:SimpleArrayData>\n')
+    fd.write('        </SchemaData>\n')
+    fd.write('      </ExtendedData>\n')
+    fd.write('    </gx:Track>\n')
+    fd.write('  </Placemark>\n')
+    fd.write('</Folder>\n')
+    fd.write('</kml>')
+    fd.close() 
 
 
 
 class trackall (track): 
   
-  ''' Transmitter tracks over the entire position table. 
+  ''' Transmitter tracks over the entire position table. '''
 
-    A subset of positions. Feasible transitions between positions
-    are modeled as a directed, acycle graph, from which we compute
-    the critical path. 
-
-    :param db_con: DB connector for MySQL. 
-    :type db_con: MySQLdb.connections.Connection
-    :param tx_id: Transmitter ID. 
-    :type tx_id: int
-    :param M: Maximum foot speed of target (m/s). 
-    :type M: float
-    :param C: Constant hop cost in critical path calculation.
-    :type C: float
-  '''
-
-  def __init__(self, db_con, tx_id, M, C=1):
-    cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood
-                     FROM Position
-                    WHERE txid = %d
-                    ORDER BY timestamp ASC''' % tx_id)
-    self.pos = cur.fetchall()
-    roots = self.graph(self.pos, M)
-    self.track = self.critical_path(self.toposort(roots), C)
+  def __init__(self, db_con, tx_id, M, C=1, optimal=False):
+    self.tx_id = tx_id
+    
+    # Get positions. 
+    self._fetchall(db_con, tx_id)
+    
+    # Calculate tracks. 
+    if optimal:
+      self._calc_tracks(M, C)
+    else:
+      self._calc_tracks_windowed(M, C)
   
-    
 
-class trackraw (track):
+     
+  
 
-  ''' Unfiltered positions. 
-
-    For times with multiple candidates, choose the one with
-    highest likelihood. 
-
-    :param db_con: DB connector for MySQL. 
-    :type db_con: MySQLdb.connections.Connection
-    :param t_start: Time start (Unix). 
-    :type t_start: float 
-    :param t_end: Time end (Unix).
-    :type t_end: float
-    :param tx_id: Transmitter ID. 
-    :type tx_id: int
-    :param M: Maximum foot speed of target (m/s). 
-    :type M: float
-    :param C: Constant hop cost in critical path calculation.
-    :type C: float
-  '''
-
-  def __init__(self, db_con, t_start, t_end, tx_id):
-    cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood
-                     FROM Position
-                    WHERE (%f <= timestamp) 
-                      AND (timestamp <= %f)
-                      AND txid = %d
-                    ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
-    
-    self.pos = cur.fetchall()
-    self.track = []
-    i = 0
-    while i < len(self.pos):
-      t = self.pos[i][2]
-      j = i
-      while i < len(self.pos) and t == self.pos[i][2]:
-        if self.pos[i][3] > self.pos[j][3]: 
-          j = i
-        i += 1
-      self.track.append((np.complex(float(self.pos[j][0]), 
-                      float(self.pos[j][1])), float(self.pos[j][2])))
+def tx_name(db_con):
+  cur = db_con.cursor()
+  cur.execute('SELECT id, name FROM qraat.txlist')
+  d = {}
+  for (id, name) in cur.fetchall():
+    d[id] = name
+  return d
 
 
 if __name__ == '__main__': 
- 
-  M = 4
+  
+  tx_id = 54
+  
+  import commands
+  t_start = int(commands.getoutput('date --date="20140202 1200" +%s'))
+  t_end   = int(commands.getoutput('date --date="20140202 1600" +%s'))
+
+  print t_start, t_end
+  M = track.maxspeed_exp((10, 1), (360, 0.1), 0.05)
+  #M = track.maxspeed_linear((10, 1), (180, 0.1), 0.05)
   C = 1
 
-  db_con = util.get_db('reader')
-
-  (t_start, t_end, tx_id) = (1376420800.0, 1376442000.0, 51)
-  t_end_short = 1376427650.0 # short
-
-  (t_start_feb2, t_end_feb2, tx_id_feb2) = (1391390700.638165, 1391396399.840252, 54)
-
-  # A possible way to calculate good tracks. Compute the tracks
-  # with some a priori maximum speed that's on the high side. For
-  # the calibration data, we could safely assume that the gator 
-  # won't exceed 10 m/s. 
+  db_con = util.get_db('writer')
+  
   fella = track(db_con, t_start, t_end, tx_id, M, C) 
+  #fella = trackall(db_con, tx_id, M, C) 
+  #fella.export_kml(tx_name(db_con)[tx_id], tx_id)
 
-  # We then calculate statistics on the transition speeds in the 
-  # critical path. Plotting the tracks might reveal spurious points
-  # that we want to filter out. 
-  (mean, std) = fella.speed()
-  print "(mu=%.4f, sigma=%.4f)" % (mean, std)
+  t = time.localtime(fella[0][1])
+  s = time.localtime(fella[-1][1])
+  print '%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  txID=%d' % (
+       t.tm_year, t.tm_mon, t.tm_mday,
+       t.tm_hour, t.tm_min,
+       s.tm_year, s.tm_mon, s.tm_mday,
+       s.tm_hour, s.tm_min,
+       tx_id)
 
-  # Recompute the tracks, using the mean + one standard deviation as
-  # the maximum speed. 
-  fella.recompute(mean + (std), C)
-  fella.export_kml("fella.kml")
+  print 'Length of critical path: %d (out of %d)' % (len(fella), len(fella.pos))
 
-  import matplotlib.pyplot as pp
+  if True:
 
-  # Plot sites.
-  sites = csv(db_con=db_con, db_table='sitelist')
-  pp.plot(
-   [s.easting for s in sites], 
-   [s.northing for s in sites], 'ro')
+    import matplotlib.pyplot as pp
 
-  # Plot locations. 
-  pp.plot( 
-   map(lambda (P, t): P.imag, fella.track), 
-   map(lambda (P, t): P.real, fella.track), '.', alpha=0.3)
+    # Plot sites.
+    sites = csv(db_con=db_con, db_table='sitelist')
+    pp.plot(
+     [s.easting for s in sites], 
+     [s.northing for s in sites], 'ro')
 
-  pp.show()
+    # Plot locations. 
+    pp.plot( 
+     map(lambda (P, t, pos_id): P.imag, fella), 
+     map(lambda (P, t, pos_id): P.real, fella), '.', alpha=0.3)
 
-
-        
+    pp.savefig("test.png")
+ 
      
 
 

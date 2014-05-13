@@ -103,10 +103,7 @@ class signal:
   #: Number of channels. 
   N = 4
 
-  
-  # FIXME band_filter option is a temporary solution. 
-
-  def __init__(self, db_con, t_start, t_end, tx_id=None, band_filter=False):
+  def __init__(self, db_con, t_start, t_end, tx_id=None, score_threshold=0): 
 
     # Store eigenvalue decomposition vectors and noise covariance
     # matrices in NumPy arrays. 
@@ -118,11 +115,12 @@ class signal:
                           nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
                           nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
                      FROM est
+                     JOIN estscore AS s ON s.estID = ID
                     WHERE (%f <= timestamp) AND (timestamp <= %f) 
-                          %s %s''' % (
-                            t_start, t_end, 
-                           ('AND txid=%d' % tx_id) if tx_id else '',
-                           ('AND (band3 < 150) AND (band10 < 900)' if band_filter else '')))
+                      AND relscore >= %f 
+                          %s''' % (
+                            t_start, t_end, score_threshod, 
+                           ('AND txid=%d' % tx_id) if tx_id else ''))
   
     raw = np.array(cur.fetchall(), dtype=float)
 
