@@ -238,7 +238,7 @@ class est (csv):
     # Eigenvalue decomposition SNR
     new_row.edsnr = 10 * np.log10(det.e_pwr / new_row.tnp)
 
-    if new_row.tagname[:2] = "ID":
+    if new_row.tagname[:2] == "ID":
       new_row.txid = int(new_row.tagname[2:])
     else:
       new_row.txid = None  
