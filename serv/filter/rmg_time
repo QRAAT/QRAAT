@@ -236,6 +236,10 @@ def score_the_past(arguments, t_start, t_end, txid, siteid):
 	# Bucket site_data by (siteid, txid).
 	#bucketed = {}
 	buckets = defaultdict(list)
+	if len(site_data) == 0:
+		print 'No data in this chunk'
+		return
+
 	assert len(site_data) > 0
 	for v in site_data.values():
 		k = (v['siteid'], v['txid'])
@@ -312,7 +316,7 @@ def score_the_past(arguments, t_start, t_end, txid, siteid):
 			good_xs = [x['timestamp'] for x in good_stuff]
 			bad_xs = [x['timestamp'] for x in bad_stuff]
 			for bad_id in bad_ids:
-				change_handler.add_score(bad_id, 0, 0)
+				change_handler.add_score(bad_id, -2, 0)
 				#sql_w.write('update est set score = -1 where ID = {};\n'.format(bad_id))
 
 		if use_time_filter:
@@ -968,9 +972,6 @@ def calculate_interval(db_con, start, end, siteid, txid):
 
 	rows = cur.execute(q, (start, start + end, siteid, txid))
 	print 'Calculating interval from {} values...'.format(rows)
-
-	print 'Exiting.'
-	sys.exit(1)
 
 	# Have to format the data as a sequence of (timestamp, id) 2-tuples...
 
