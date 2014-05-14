@@ -138,7 +138,7 @@ class detector_array:
 
     def __create_backend(self):
 
-        self.backend = blocks.software_backend(CHANNELS, self.backend_param)
+        self.backend = blocks.software_backend(CHANNELS, self.backend_param, self.directory)
      
     ## public runnables ##
 
