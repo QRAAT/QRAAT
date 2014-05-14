@@ -1,0 +1,42 @@
+#!/bin/python2
+import qraat
+import MySQLdb as mdb
+import os
+
+db_auth_file = os.environ('RMG_SERVER_DB_AUTH')
+tx_file_path = os.getenv('RMG_SERVER_TXLIST', './tx.csv')
+default_rise = os.getenv('RMG_PULSE_RISE', '1.5')
+default_time_constant = os.getenv('RMG_PULSE_TIME_CONSTANT','10.0')
+
+default_type = 'pulse'
+
+db_config = qraat.csv(db_auth_file).get(view='reader')
+db_con = mdb.connect(db_config.host, db_config.user,
+                     db_config.password, db_config.name)
+
+db_cursor = db_con.cursor()
+
+db_cursor.execute("SELECT ID, tx_table_name from tx_type where RMG_type=%s",default_type)
+pulse_tuple = db_cursor.fetch()
+pulse_ID = pulse_tuple[0]
+pulse_table = pulse_tuple[1]
+
+db_cursor.execute('''SELECT tx_ID.ID, {0}.frequency, {0}.pulse_width 
+                   FROM tx_ID, {0}, tx_info
+                   WHERE tx_ID.active=TRUE 
+                     AND tx_info.tx_type_ID=%s
+                     AND tx_ID.tx_info_ID=tx_info.ID
+                     AND tx_ID.ID={0}.tx_ID'''.format(pulse_table),pulse_ID)
+                   
+tx_data = db_cursor.fetchall()
+
+csv_headers = ['ID', 'frequency', 'type', 'pulse_width', 'rise_trigger', 'time_constant']
+
+csv_table = []
+
+for j in tx_data:
+  csv_table.append((j[0], j[1], default_type, j[2], default_rise, default_time_constant))
+
+txlist = qraat.csv()
+txlist.initialize_from_data(csv_headers, csv_table)
+txlist.write(tx_file_path)
