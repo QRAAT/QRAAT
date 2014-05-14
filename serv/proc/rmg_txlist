@@ -1,9 +1,13 @@
-#!/bin/python2
+#!/usr/bin/python2
 import qraat
 import MySQLdb as mdb
-import os
+import os, sys
 
-db_auth_file = os.environ('RMG_SERVER_DB_AUTH')
+try:
+  db_auth_file = os.environ['RMG_SERVER_DB_AUTH']
+except KeyError:
+  print "RMG environment variables not set. Please run `source rmg_env`"
+  sys.exit(1)
 tx_file_path = os.getenv('RMG_SERVER_TXLIST', './tx.csv')
 default_rise = os.getenv('RMG_PULSE_RISE', '1.5')
 default_time_constant = os.getenv('RMG_PULSE_TIME_CONSTANT','10.0')
@@ -17,7 +21,7 @@ db_con = mdb.connect(db_config.host, db_config.user,
 db_cursor = db_con.cursor()
 
 db_cursor.execute("SELECT ID, tx_table_name from tx_type where RMG_type=%s",default_type)
-pulse_tuple = db_cursor.fetch()
+pulse_tuple = db_cursor.fetchone()
 pulse_ID = pulse_tuple[0]
 pulse_table = pulse_tuple[1]
 
@@ -35,7 +39,7 @@ csv_headers = ['ID', 'frequency', 'type', 'pulse_width', 'rise_trigger', 'time_c
 csv_table = []
 
 for j in tx_data:
-  csv_table.append((j[0], j[1], default_type, j[2], default_rise, default_time_constant))
+  csv_table.append((j[0], float(j[1]), default_type, j[2], default_rise, default_time_constant))
 
 txlist = qraat.csv()
 txlist.initialize_from_data(csv_headers, csv_table)

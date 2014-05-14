@@ -302,20 +302,22 @@ class backend:
     
       if 'use' in self.transmitters.headers:
         to_be_removed = []
-        for tx in self.transmitters.table: 
-          if tx.use in ['Y', 'y', 'yes', 'Yes', 'YES']: 
-            tx.frequency = float(tx.frequency) 
-            tx.pulse_width = float(tx.pulse_width) 
-            tx.rise_trigger = float(tx.rise_trigger) 
-            try:
-              tx.time_constant = float(tx.time_constant)
-            except AttributeError:
-              tx.filter_alpha = float(tx.filter_alpha)
-            tx.type = tx_type[tx.type.lower()]
-          else:
+        for tx in self.transmitters: 
+          if not tx.use in ['Y', 'y', 'yes', 'Yes', 'YES']: 
             to_be_removed.append(tx)
+
         for j in to_be_removed:
           self.transmitters.table.remove(j)
+          
+      for tx in self.transmitters:
+        tx.frequency = float(tx.frequency) 
+        tx.pulse_width = float(tx.pulse_width) 
+        tx.rise_trigger = float(tx.rise_trigger) 
+        try:
+          tx.time_constant = float(tx.time_constant)
+        except AttributeError:
+          tx.filter_alpha = float(tx.filter_alpha)
+        tx.type = tx_type[tx.type.lower()]
       
       self.lo_calc()
       self.backend_calc()
