@@ -149,9 +149,9 @@ class band:
         if (self.tx_type == det_type.PULSE):
             band_str = ("Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: "
                         "{2}\n\tType: {3}\n\tFilter Length: {4:d} samples"
-                        "\n\tRise: {5:.2f}, Fall: {6:.2f}, Alpha: {7:.3f}").format(
+                        "\n\tRise: {5:.2f}, Alpha: {6:.3f}").format(
                 self.band_num, self.cf/1000000, self.name, det_type_str[self.tx_type], 
-                self.filter_length,self.rise,self.fall,self.alpha)
+                self.filter_length,self.rise,self.alpha)
         else:
             band_str = ("Band #: {0:d}\nBand Frequency: {1:f} MHz\n\tName: "
                         "{2}\n\tType: {3}").format(
@@ -307,7 +307,10 @@ class backend:
             tx.frequency = float(tx.frequency) 
             tx.pulse_width = float(tx.pulse_width) 
             tx.rise_trigger = float(tx.rise_trigger) 
-            tx.time_constant = float(tx.time_constant)
+            try:
+              tx.time_constant = float(tx.time_constant)
+            except AttributeError:
+              tx.filter_alpha = float(tx.filter_alpha)
             tx.type = tx_type[tx.type.lower()]
           else:
             to_be_removed.append(tx)
