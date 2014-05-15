@@ -45,9 +45,9 @@ June 14, 1999 to now, do "rmg_position --tx-id=12
 system based on GNU Radio.   
 '''
 
-parser.add_option('--cal-id', type='int', metavar='INT', default=1,
+parser.add_option('--cal-id', type='int', metavar='INT', default=3,
                   help="Calibration ID, the serial identifier in the database "
-                       "context identifying a calibration run. (Default is 1.)")
+                       "context identifying a calibration run. (Default is 3.)")
 
 parser.add_option('--tx-id', type='int', metavar='INT', default=51,
                   help="Serial ID of the target transmitter in the database "
@@ -109,13 +109,14 @@ try:
     bl = qraat.position.bearing(sv, sig)
 
     print "position: calculating positions."
-    (pos_est, pos_est_deps) = qraat.position.calc_positions(bl, 
-                                                            options.t_window, 
-                                                            options.t_delta, 
-                                                            options.verbose) 
+    pos_est = qraat.position.calc_positions(sig,
+                                            bl, 
+                                            options.t_window, 
+                                            options.t_delta, 
+                                            options.verbose) 
 
     print "position: inserting positions."
-    qraat.position.insert_positions(db_con, pos_est, pos_est_deps, options.tx_id)
+    qraat.position.insert_positions(db_con, pos_est, options.tx_id)
 
 except mdb.Error, e:
   print >>sys.stderr, "position: error: [%d] %s" % (e.args[0], e.args[1])
