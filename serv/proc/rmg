@@ -238,7 +238,7 @@ case $TASK in
       shift
       shift
     else     
-      TX_FILE="tx.csv"
+      TX_FILE=$RMG_SERVER_TXLIST
     fi
     if [ ! -e $TX_FILE ]
       then 
@@ -255,7 +255,7 @@ case $TASK in
       shift
       shift
     else     
-      TX_FILE="tx.csv"
+      TX_FILE=$RMG_SERVER_TXLIST
     fi
     export_txlist
     exit 0
