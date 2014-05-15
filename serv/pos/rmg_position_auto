@@ -65,8 +65,8 @@ for tx in tx_list:
                                 tx_id)
 
     bl = qraat.position.bearing(sv, sig)
-    (pos_est, pos_est_deps) = qraat.position.calc_positions(bl, time_window, time_delta)
-    qraat.position.insert_positions(db_con, pos_est, pos_est_deps, tx_id)
+    pos_est = qraat.position.calc_positions(sig, bl, time_window, time_delta)
+    qraat.position.insert_positions(db_con, pos_est, tx_id)
 
   temp_max_id = np.max(times[:,0])
   if temp_max_id > max_id:
