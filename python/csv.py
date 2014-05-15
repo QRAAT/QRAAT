@@ -59,7 +59,7 @@ class csv:
   #: to table columns are assigned. 
   Row = type('Row', (object,), {})
   
-  def __init__(self, fn=None, db_con=None, db_table=None):
+  def __init__(self, fn=None, db_con=None, db_table=None, db_fields=None, db_where=None):
 
     #: The CSV table.
     self.table = []
@@ -68,7 +68,8 @@ class csv:
       self.read(fn)
 
     elif db_con and db_table: 
-      self.read_db(db_con, db_table)
+      self.read_db(db_con, db_table, db_fields, db_where)
+
 
 
   def read(self, fn, build_header=True): 
@@ -82,7 +83,7 @@ class csv:
       fd = open(fn, 'r')
     elif type(fn) == file: 
       fd = fn
-    else: raise TypeError # Provide a message. 
+    else: raise TypeError('the read method requires either the file path as a str or a open file object')
 
     headers = fd.readline().strip().split(',')
     if build_header:
@@ -110,29 +111,59 @@ class csv:
     self.__build_row_template(lengths)
 
 
-  def read_db(self, db_con, table): 
+  def read_db(self, db_con, table, fields=None, where_clause=None): 
     """ Read a small database table. 
+        'fields' is a string that describes the fields to be selected,
+        formatted as SQL uses in the SELECT statement,
+        e.g. 'field1, field2, field3'.
+        'where_clause' is a string with SQL WHERE parameters,
+        e.g. 'field3=7 AND field2 > 2.4 OR field1<='a''
 
       :param db_con: DB connector. 
       :type db_con: MySQLdb.connections.Conneection
       :param table: Table name. 
       :type table: str
+      :param fields: table fields string
+      :type fields: str
+      :param where_clause: WHERE clause parameters
+      :type where_clause: str
     """
-    
+    if not fields:
+      fields = '*'
+    sql_select = 'SELECT {0} FROM {1}'.format(fields,table)
+    if where_clause:
+      sql_select += ' WHERE {0}'.format(where_clause)
+
     cur = db_con.cursor()
-    cur.execute('''SELECT `COLUMN_NAME`
-                     FROM `INFORMATION_SCHEMA`.`COLUMNS`
-                    wHERE `TABLE_NAME` = '%s' ''' % table)
-    lengths = self.__build_header(map(lambda val: val[0], cur.fetchall()))
 
     # Populate the table. 
-    cur.execute('SELECT * FROM %s' % table)
+    cur.execute(sql_select)
+    lengths = self.__build_header([ d[0] for d in cur.description ])
+
     for row in cur.fetchall(): 
       self.table.append(self.Row())
       for i in range(len(row)): 
         if lengths[i] < len(str(row[i])):
           lengths[i] = len(str(row[i]))
         setattr(self.table[-1], self.headers[i], row[i])
+    self.__build_row_template(lengths)
+
+
+  def initialize_from_data(self, headers_in, table_in):
+
+    lengths = self.__build_header(headers_in)
+
+    for line in table_in:
+
+      if len(line) != len(self.headers): # Malformed line
+        raise QraatError("line: {0}: has a different number of fields than header: {1}".format(line,self.headers))
+
+      self.table.append(self.Row())
+      for i in range(len(self.headers)): 
+        if lengths[i] < len(str(line[i])):
+          lengths[i] = len(str(line[i]))
+        setattr(self.table[-1], self.headers[i], line[i])
+
     self.__build_row_template(lengths)
 
 

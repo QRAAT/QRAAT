@@ -37,23 +37,20 @@ class qa_rmg (gr_unittest.TestCase):
         self.fg = None
 
     def test_001_detect (self):
-	src_file = gr.file_source(gr.sizeof_gr_complex, test_data)
-	#src_file = gr.file_source(gr.sizeof_gr_complex, "data_backup20070423/20070208164806.tdat")
+        src_file = gr.file_source(gr.sizeof_gr_complex, test_data)
+    #src_file = gr.file_source(gr.sizeof_gr_complex, "data_backup20070423/20070208164806.tdat")
         #src_file = gr.file_source(gr.sizeof_gr_complex, "20080911161545.tdat")
         di = gr.deinterleave(gr.sizeof_gr_complex)
-		
+        
         self.fg.connect(src_file, di)
-        pd = qraat.rmg.detect(160,480,4, "results", tx_name, 8000, 0, 0)
-	pd.rise_factor(1.5)
-	pd.fall_factor(1.3)
-        pd.alpha_factor(0.0001)
+        pd = qraat.rmg.detect(4,8000,160,480,0,"results", tx_name, 0,1.5,10)
         pd.enable()
         self.fg.connect((di,0),(pd,0))
         self.fg.connect((di,1),(pd,1))
         self.fg.connect((di,2),(pd,2))
         self.fg.connect((di,3),(pd,3))
         self.fg.run();
-        self.assertFloatTuplesAlmostEqual ([1],[1],1)
+        #self.assertFloatTuplesAlmostEqual ([1],[1],1)
 
 
 if __name__ == '__main__':

@@ -42,81 +42,135 @@
 #define	O_BINARY 0
 #endif 
 
-detectmod_detect_sptr 
-detectmod_make_detect (int pulse_width, 
-                       int save_width, 
-                       int channels, 
-                       const char *directory, 
-                       const char *tx_name,
-                       float rate, 
-                       float center_freq, 
-                       char use_psd)
+RMG_API detectmod_detect_sptr 
+detectmod_make_detect (
+    int num_channels, 
+    float rate, 
+    int pulse_width, 
+    int save_width, 
+    float band_center_freq,
+    const char *directory, 
+    const char *tx_name,
+    float rise,
+    float alpha)
 /**
  * Public constructor used by Gnu Radio 
  */
 {
   return detectmod_detect_sptr (
-    new detectmod_detect (pulse_width, 
+    new detectmod_detect (num_channels, 
+                          rate, 
+                          pulse_width, 
                           save_width, 
-                          channels, 
+                          band_center_freq,
                           directory, 
                           tx_name,
+                          rise,
+                          alpha)
+  );
+}
+
+RMG_API detectmod_detect_sptr detectmod_make_detect (
+    int num_channels, 
+    float rate)
+/**
+ * Public constructor used by Gnu Radio 
+ */
+{
+  return detectmod_detect_sptr (
+    new detectmod_detect (num_channels, 
                           rate, 
-                          center_freq, 
-                          use_psd));
+                          160, 
+                          480, 
+                          0.0,
+                          "", 
+                          "",
+                          1.5,
+                          0.01)
+  );
 }
 
 
-detectmod_detect::detectmod_detect (int pulse_width, 
-                                    int save_width, 
-                                    int _ch, 
-                                    const char *_directory, 
-                                    const char *_tx_name,
-                                    float _rate, 
-                                    float _c_freq, 
-                                    char  _psd)
+
+
+detectmod_detect::detectmod_detect (
+    int _num_channels, 
+    float _rate, 
+    int _pulse_width, 
+    int _save_width, 
+    float _band_center_freq,
+    const char *_directory, 
+    const char *_tx_name,
+    float _rise,
+    float _alpha)
   : gr_sync_block ("detectmod_detect",
-    gr_make_io_signature (_ch, _ch, sizeof (gr_complex)),
+    gr_make_io_signature (_num_channels, _num_channels, sizeof (gr_complex)),
     gr_make_io_signature (0,0,0))
 /**
  * Private constructor used internally 
  */
 {
   rate   = _rate;
-  c_freq = _c_freq;
-  ch     = _ch;
+  ch     = _num_channels;
+  initialize_variables(_pulse_width,
+                       _save_width,
+                       _band_center_freq,
+                       _directory, 
+                       _tx_name,
+                       _rise,
+                       _alpha);
 
-  acc_length = pulse_width;//size of the accumulator
-  
+}
+
+
+void detectmod_detect::initialize_variables(
+    int _pulse_width, 
+    int _save_width, 
+    float _band_center_freq,
+    const char *_directory, 
+    const char *_tx_name,
+    float _rise,
+    float _alpha)
+{
+  c_freq = _band_center_freq;
+  acc_length = _pulse_width;//size of the accumulator
   
   /* 
    * length of the file needs to be at least 3 times as long as 
    * the pulse to accomidate the noise covariance calculation
    */
-  if(save_width < 3*acc_length){
+  if(_save_width < 3*acc_length){
     save_length = 3*acc_length;
   }
   else{
-    save_length = save_width;
+    save_length = _save_width;
   }
 
-  directory = (char *)malloc((strlen(_directory) + 1) * sizeof(char));
+  clipping_factor = (2.0*_rise-1)/(float)acc_length;
+
+  directory = new char[strlen(_directory) + 1];
   strcpy(directory, _directory);
 
-  tx_name = (char *)malloc((strlen(_tx_name) + 1) * sizeof(char)); 
+  tx_name = new char[strlen(_tx_name) + 1]; 
   strcpy(tx_name, _tx_name); 
 
   state = FILL_ACCUMULATOR;
-  fill_counter = -7;
-  fill_length = ((int)(0.5*acc_length));
+  fill_length = ((int)(0.5*(save_length - 2*acc_length)));
   d_fp = 0;
   
   acc = new accumulator(acc_length);
   save_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
-  peak_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
-  pkdet = new peak_detect(1.1,1.05,.05);
 
-  psd = _psd;
+  int time_constant;
+  if (_alpha < 1){
+    time_constant = (int)(1.0/_alpha);
+  }
+  else{
+    time_constant = _alpha*rate;
+  }
+
+  pkdet = new peak_detect(_rise, fill_length, time_constant);
+
   enable_detect = 0;
 
 }
@@ -124,11 +178,15 @@ detectmod_detect::detectmod_detect (int pulse_width,
 detectmod_detect::~detectmod_detect(){
 
   close();
-  free(directory); 
-  free(tx_name);
+  free_dynamic_memory();
+}
+
+void detectmod_detect::free_dynamic_memory()
+{
+  delete[] directory; 
+  delete[] tx_name;
   delete acc;
   delete save_holder;
-  delete peak_holder;
   delete pkdet;
 }
 
@@ -139,9 +197,9 @@ detectmod_detect::work (int noutput_items,
 {
   
   gr_complex *current_sample; 
-  float r,i,sample_pwr,acc_total;
+  float r,i,sample_pwr,acc_total,noise_floor,max_pwr;
   detect_state_t det_state = BELOW_THRESHOLD;
-  int sh_index;
+  int save_holder_index;
 
   //added enable
   if (enable_detect==1){
@@ -157,75 +215,64 @@ detectmod_detect::work (int noutput_items,
         r = current_sample[m].real();
         i = current_sample[m].imag();
         sample_pwr += (r*r) + (i*i);
-        
       }
       save_holder->inc_index();
-      acc_total = acc->add(sample_pwr);
+
+
 
       switch(state){
         
             //initialize the time-matched filter and circular buffer
         case FILL_ACCUMULATOR:
-
-          sh_index = save_holder->get_index();
-          if (sh_index == (save_length-1)){
+          acc_total = acc->add(sample_pwr);
+          save_holder_index = save_holder->get_index();
+          if (save_holder_index == (save_length-1)){
             state = DETECT;
                     //initial estimate of the noise floor for detector
-            pkdet->avg = acc_total;
+            pkdet->set_noise_floor(acc_total,acc_length);
             printf("%s Seed: %e\n",directory,acc_total);
           }
         break;
       
             //Run detector
         case DETECT:
-
+          
+          noise_floor = pkdet->get_noise_floor();
+          max_pwr = clipping_factor*noise_floor;
+          if (sample_pwr > max_pwr){
+            acc_total = acc->add(max_pwr);
+          }
+          else{
+            acc_total = acc->add(sample_pwr);  
+          }
           det_state = pkdet->detect(acc_total);
-          if(det_state == PEAK){//new temporary peak found
-            fill_counter = fill_length+1;
-          }
-          else if(det_state == TRIGGER){
-            state = FILL_BUFFER;
-          }
-        
-          fill_counter--;
-                  //if the buffer is full but the peak isn't confirmed, save buffer state and confirm peak
-          if (fill_counter == 0 && state!=FILL_BUFFER){
-            *peak_holder = *save_holder;
+          if(det_state == PEAK){
+            save_holder->params.pulse_index = save_length - acc_length;
             state = CONFIRM_PEAK;
           }
+        
+        break;
 
-        break;      
-
-        //buffer is full, wait for the detector to trigger
         case CONFIRM_PEAK:
-
+          noise_floor = pkdet->get_noise_floor();
+          max_pwr = clipping_factor*noise_floor;
+          if (sample_pwr > max_pwr){
+            acc_total = acc->add(max_pwr);
+          }
+          else{
+            acc_total = acc->add(sample_pwr);  
+          }
           det_state = pkdet->detect(acc_total);
-          if(det_state == PEAK){//new temporary peak found
+          save_holder->params.pulse_index--;
+          if(det_state == TRIGGER){
+            write_data(save_holder);
             state = DETECT;
-            fill_counter = fill_length;
           }
-          else if(det_state == TRIGGER){//peak confirmed
-            if(psd == 0 || pulse_shape_discriminator(peak_holder)){
-              write_data(peak_holder);
-            }
-            state = DETECT;
+          else if(det_state == PEAK){
+            save_holder->params.pulse_index = save_length - acc_length;
           }
 
         break;
-
-            //confirmed peak, fill the buffer
-        case FILL_BUFFER:
-
-          fill_counter--;
-          if (fill_counter <= 0){
-            if(psd == 0 || pulse_shape_discriminator(save_holder)){
-              write_data(save_holder);
-            }
-            state = DETECT;
-          }
-
-        break;
-
       }//switch
     }//for
   }//enable if statement
@@ -248,7 +295,7 @@ detectmod_detect::work (int noutput_items,
 }
 
 /*
- * WRite pulse data as a .det file. 
+ * Write pulse data as a .det file. 
  */
 void detectmod_detect::write_data(pulse_data *data_holder){
 /** 
@@ -264,17 +311,17 @@ void detectmod_detect::write_data(pulse_data *data_holder){
   int int_useconds = (int)tp.tv_usec;
 
   // Create diretory tree. 
-  char *filename = (char *)malloc(256*sizeof(char));
-  char *directory_time_string = (char *)malloc(24*sizeof(char));
+  char filename[256];
+  char directory_time_string[24];
   strftime(directory_time_string, 24, "/%Y/%m/%d/%H/%M/", time_struct);
   strcpy(filename, directory);
   strcat(filename,directory_time_string);
   boost::filesystem::create_directories(filename);
 
   // Create file name.
-  char *time_string = (char *)malloc(40*sizeof(char));
+  char time_string[40];
   strftime(time_string,40,"%S",time_struct);
-  char *u_sec = (char *)malloc(10*sizeof(char));
+  char u_sec[10];
   sprintf(u_sec,"%.6d",int_useconds);
   strncat(time_string,u_sec,6);
   strcat(filename, tx_name); 
@@ -282,33 +329,23 @@ void detectmod_detect::write_data(pulse_data *data_holder){
   strcat(filename, time_string); 
   strcat(filename, ".det"); 
   
-  data_holder->params.pulse_index = save_length - acc_length - fill_length; 
   data_holder->params.t_sec = int_seconds; 
   data_holder->params.t_usec = int_useconds; 
 
   if (data_holder->write(filename) == -1)
   {
     printf("Can't open file \"%s\"\n",filename);
-    free(u_sec); 
-    free(time_string); 
-    free(filename);
-    free(directory_time_string);
     return;
   }
 
   // Print some stuff. 
-  float snr = 10.0*log10(pkdet->peak_value/pkdet->avg);
-  float noise_db = 10.0*log10(pkdet->avg/1e-5);
+  float snr = 10.0*log10(pkdet->get_peak()/pkdet->get_noise_floor());
+  float noise_db = 10.0*log10(pkdet->get_noise_floor()/1e-5);
   strftime(time_string,40,"%H:%M:%S %d %b %Y",time_struct);
   
   printf("pulse %s,%d,%f,%f\n", tx_name, int_seconds, noise_db, snr);  
   printf("%s\n\t%s\n\t\tNoise Floor: %.2f dB, SNR: %.2f dB\n",time_string, filename, noise_db, snr);
   
-  // Close file and free string variables.
-  free(time_string);
-  free(filename);
-  free(u_sec);
-  free(directory_time_string);
 
 }
 
@@ -352,78 +389,30 @@ detectmod_detect::close()
   
 }
 
-bool detectmod_detect::pulse_shape_discriminator(pulse_data *data_holder){
-/** 
- * determines whether the detected pulse looks like a rectangle or not
- */
 
-  const float MAX_PERCENTAGE = 0.20;
-  const int SHAPE_THREASHOLD = 14;
+void detectmod_detect::set_rise_factor(float rise_in)
+{
+  pkdet->set_rise(rise_in);
+}
 
-  gr_complex *pulse_buffer = data_holder->get_buffer();
-  int index = data_holder->get_index();
-
-  float *pulse_pwr = new float[acc_length];
-  int pulse_start = save_length - acc_length-fill_length;
-  int j,k;
-  float r,i;
-  float max_value = 0;
-  int count = 0;
-  bool result = false;
-  for(j = 0; j < acc_length; j++){
-    pulse_pwr[j] = 0;
-    for(k = 0; k < ch; k++){
-      r = pulse_buffer[((j+pulse_start+index)%save_length)*ch+k].real();
-      i = pulse_buffer[((j+pulse_start+index)%save_length)*ch+k].imag();
-      pulse_pwr[j] += r*r+i*i;
-    }
-    if(pulse_pwr[j] > max_value)
-      max_value = pulse_pwr[j];
+void detectmod_detect::set_alpha_factor(float alpha_in)
+{
+  float temp_alpha;
+  if (alpha_in < 1){
+    pkdet->set_alpha(alpha_in);
   }
-  max_value = max_value*MAX_PERCENTAGE;
-  for(j = 0; j < acc_length; j++){
-    if(pulse_pwr[j] > max_value)
-      count++;
+  else{
+    pkdet->set_time_constant((int)(alpha_in*rate));
   }
-  if(count>SHAPE_THREASHOLD)
-    result = true;
-
-  delete pulse_pwr;
-  return result;
-
-}
-
-
-void detectmod_detect::rise_factor(float r)
-{
-  pkdet->rise = r;
-}
-
-void detectmod_detect::fall_factor(float f)
-{
-  pkdet->fall = f;
-}
-
-void detectmod_detect::alpha_factor(float a)
-{
-  pkdet->alpha = a;
 }
 
 void detectmod_detect::reset()
 {
   //write data out if state = FILL_BUFFER or CONFIRM_PEAK
   if (state == CONFIRM_PEAK){
-    if(psd == 0 || pulse_shape_discriminator(peak_holder)){
-      write_data(peak_holder);
-    }
-  }
-  else if (state == FILL_BUFFER){
-    //psd won't look at correct place so just write out data
     write_data(save_holder);
   }
-
   state = FILL_ACCUMULATOR;
-  fill_counter = -7;
 }
 
 void detectmod_detect::enable()
@@ -434,55 +423,31 @@ void detectmod_detect::enable()
   return;
 }
 
-void detectmod_detect::enable(int pulse_width, 
-                              int save_width, 
+void detectmod_detect::enable(int _pulse_width, 
+                              int _save_width, 
                               const char *_directory, 
                               const char *_tx_name,
-                              float center_freq, 
-                              char use_psd)
+                              float _center_freq, 
+                              float _rise,
+                              float _alpha)
 {
-  free(tx_name); 
-  free(directory);
-  delete acc;
-  delete save_holder;
-  delete peak_holder;
+  reset();
 
-  c_freq = center_freq;
+  free_dynamic_memory();
+  initialize_variables(_pulse_width, 
+                       _save_width, 
+                       _center_freq,
+                       _directory, 
+                       _tx_name,
+                       _rise,
+                       _alpha);
   
-  acc_length = pulse_width;//size of the accumulator
-  
-  /** 
-   * length of the file needs to be at least 3 times as long as the
-   * pulse to accomidate the noise covariance calculation 
-   */
-  if(save_width < 3*acc_length){
-    save_length = 3*acc_length;
-  }
-  else{
-    save_length = save_width;
-  }
-
-  state = FILL_ACCUMULATOR;
-  fill_counter = -7;
-  fill_length = ((int)(0.5*acc_length));
-
-  psd = use_psd;
-  
-  directory = (char *)malloc((strlen(_directory) + 1) * sizeof(char));
-  strcpy(directory, _directory);
-
-  tx_name = (char *)malloc((strlen(_tx_name) + 1) * sizeof(char)); 
-  strcpy(tx_name, _tx_name); 
-
-  acc = new accumulator(acc_length);
-  save_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
-  peak_holder = new pulse_data(ch, save_length, acc_length, rate, c_freq);
-
   enable_detect = 1;
 }
 
 void detectmod_detect::enable_cont(char *filename)
 {
+  reset();
   enable_detect = 2;
   if(!open(filename)){
     printf("Can't open file \"%s\"\n",filename);
@@ -495,6 +460,7 @@ void detectmod_detect::enable_cont(char *filename)
 
 void detectmod_detect::disable()
 {
+  reset();
   if (enable_detect == 2){
     close();
   }

@@ -16,7 +16,7 @@
 #       of parameter values for all sites, e.g. statuses. 
 # rmg_csv --row site10 power_ip comp_ip <sitelist.csv ... Emit columns
 #       per row.
-# rmg_csv --row view=reader user password <$RMG_SERVER_DIR/db_auth 
+# rmg_csv --row view=reader user password <$RMG_SERVER_DB_AUTH
 #       ... get user/password for DB view. 
 #
 # Copyright (C) 2013 Christopher Patton

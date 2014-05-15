@@ -204,12 +204,13 @@ function do_update() {
 function export_txlist() {
 python -c "
 import qraat, MySQLdb as mdb
-db_config = qraat.csv('$RMG_SERVER_DIR/db_auth').get(view='reader')
+db_config = qraat.csv('$RMG_SERVER_DB_AUTH').get(view='reader')
 db_con = mdb.connect(db_config.host, db_config.user,
                      db_config.password, db_config.name)
-txlist = qraat.csv(db_con=db_con, db_table='txlist').filter(use='yes')
-txlist.write('$TX_FILE', exclude=['ID', 'start', 'stop', 'programid', 
-                                  'alias', 'serial', 'model', 'hertz'])
+txlist = qraat.csv(db_con=db_con, db_table='txlist',
+                   db_fields='\`use\`, name, frequency, type, pulse_width, rise_trigger, fall_trigger, filter_alpha',
+                   db_where='\`use\`=\'yes\'')
+txlist.write('$TX_FILE')
 "
 }
   

@@ -314,7 +314,7 @@ sub nudge($$$$)	# nudges the site from its current state towards action. returns
   {
 		if( $ping_computer )#computer is up and responding
 		{
-      if ( ($power_ip ne "") and ($voltage < $low_voltage) )#low voltage condition
+      if ( ($power_ip ne "") and ($voltage ne "") and ($voltage < $low_voltage) )#low voltage condition
       {
         if ( $Debug ) { print "debug: nudge: low power at $sitename\n" ; }
         if ( ! do_rmg_down_now($sitename) )
@@ -361,7 +361,7 @@ sub nudge($$$$)	# nudges the site from its current state towards action. returns
     elsif( $ping_power )#computer down, powerswitch responding
 		{
 			# computer off, power switch present, turn on the computer
-			if( ($site_status == 1) and ($power_ip ne "") and ($voltage > $operational_voltage) )
+			if( ($site_status == 1) and ($power_ip ne "") and ($voltage ne "") and ($voltage > $operational_voltage) )
 			{
 				print "$sitename is off\n" ;
 				if( $Debug ) { print "debug: nudge: rmg on $sitename\n" ; }
@@ -377,7 +377,7 @@ sub nudge($$$$)	# nudges the site from its current state towards action. returns
 				}
 			}
 			# abnormal state, power switch present: turn off the computer
-			elsif ( ($power_ip ne "") and ($voltage < $operational_voltage) )
+			elsif ( ($power_ip ne "") and ($voltage ne "") and ($voltage < $operational_voltage) )
 			{
 				print "$sitename is off but has low voltage\n" ;
 				if ( $Debug ) { print "debug: nudge: do nothing $sitename\n" ; }
