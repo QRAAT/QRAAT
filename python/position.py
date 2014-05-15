@@ -260,8 +260,7 @@ class bearing:
     return bearing
 
 
-        # TODO input ll_per_site
-  def position_estimator(self, index_list, center, scale, half_span=15):
+  def position_estimator(self, ll_per_site, center, scale, half_span=15):
     ''' Estimate the position of a transmitter over time interval.
 
       Generate a set of candidate points centered around ``center``.
@@ -288,25 +287,16 @@ class bearing:
     #: Based on bearing self.likelihoods for EST's in time range, calculate
     #: the log likelihood of each candidate point.
     pos_likelihood = np.zeros(site_bearings[self.sites[0].ID].shape[0:2])
-    for est_index in index_list:
-      sv_index = self.site_id[est_index]
-      try:
-        pos_likelihood += np.interp(site_bearings[sv_index],
+    for (site_id, ll) in ll_per_site.iteritems():
+      pos_likelihood += np.interp(site_bearings[site_id], 
                                   range(-360, 360),
-                                  np.hstack((self.likelihoods[est_index,:],
-                                  self.likelihoods[est_index,:])) )
-        # SEAN: Would use self.likelihood_deps right here if I was using them
-      except KeyError:
-        pass # Skip sites in the site list where we don't collect data. 
-             # TODO perhaps there should be a row in qraat.sitelist that 
-             # designates sites as qraat nodes. ~ Chris 1/2/14 
-
+                                  np.hstack((ll, ll)) )
+    
     max_index = np.argmax(pos_likelihood)
     return (grid.flat[max_index], round(pos_likelihood.flat[max_index], 6))
 
 
-        # TODO input ll_per_site
-  def jitter_estimator(self, index_list, center, scale, half_span=15):
+  def jitter_estimator(self, ll_per_site, center, scale, half_span=15):
     ''' Position estimator with a little jitter around the center. 
     
       Vary the northing and easting of the center uniformly plus 
@@ -317,7 +307,7 @@ class bearing:
     j_center = center + np.complex(round(random.uniform(j_neg, j_pos), 2), 
                                    round(random.uniform(j_neg, j_pos), 2))
     
-    return self.position_estimator(index_list, j_center, scale, half_span) 
+    return self.position_estimator(ll_per_site, j_center, scale, half_span) 
 
 
 
@@ -423,7 +413,7 @@ def calc_positions(signal, bl, t_window, t_delta, verbose=False):
       scale = 100
       pos = center
       while scale >= 1: # 100, 10, 1 meters ...
-        (pos, ll) = bl.jitter_estimator(index_list, pos, scale)
+        (pos, ll) = bl.jitter_estimator(ll_per_site, pos, scale)
         if verbose:
           print "%8dn,%de" % (pos.real, pos.imag),
         scale /= 10
