@@ -95,24 +95,24 @@ class Registry:
 
 		xs = [x['timestamp'] for x in points]
 		histo = histogram(xs, bins=(24 * 60))
-		print 'Calculated histogram'
+		# print 'Calculated histogram'
 
-		print '*****************************************'
-		print 'Reporting on histogram!'
-		print 'histo0:', histo[0]
-		print 'histo1:', histo[1]
+		# print '*****************************************'
+		# print 'Reporting on histogram!'
+		# print 'histo0:', histo[0]
+		# print 'histo1:', histo[1]
 
 		inds = [x for x in range(len(histo[0])) if histo[0][x] > 500]
-		print 'Got {} high value buckets!'.format(len(inds))
-		print '*****************************************'
+		# print 'Got {} high value buckets!'.format(len(inds))
+		# print '*****************************************'
 
 		bad_points = set()
 
 		enable_prefiltering = True
-		if enable_prefiltering:
-			print 'Performing prefiltering'
-		else:
-			print 'WARNING: Prefiltering disabled. Are you sure about this?'
+		# if enable_prefiltering:
+		# 	print 'Performing prefiltering'
+		# else:
+		# 	print 'WARNING: Prefiltering disabled. Are you sure about this?'
 
 		filter_overall_freq = filter_hist(histo)
 
