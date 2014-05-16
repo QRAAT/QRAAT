@@ -583,94 +583,6 @@ def score_new_things(ids, db_con, change_handler):
 def get_interval_range(id_data):
 	print 'get_interval_range({})'.format(id_data.__class__)
 
-def get_fields_for(db_con, ids, fields):
-
-	# NOTE: Set a timestamp here to only score unscored points whose timestamp is newer than this.
-	time_starts_at = None
-	# get all unscored points
-	q = None
-	if time_starts_at is None:
-		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and txid = {} and siteid = {};'.format(txid, siteid)
-	else:
-		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and timestamp >= {} and txid = {} and siteid = {};'.format(time_starts_at, txid, siteid)
-	rows = cur.execute(q)
-
-	if rows == 0:
-		print 'Nothing new yet.'
-	else:
-		print 'There are {} new rows'.format(rows)
-
-	ids = []
-	while True:
-		row = cur.fetchone()
-		if row is None:
-			break
-		else:
-			row = tuple(row)
-			assert len(row) == 1
-			ids.append(row[0])
-	print 'New IDs:', ids
-
-	if len(ids) == 0:
-		print 'No new points found yet.'
-		# polling_delay()
-		print 'ddcc:', dir(cur)
-		return
-	
-	ids_template = ', '.join(map(lambda x : '{}', ids))
-	id_string = ids_template.format(*ids)
-	field_string = ', '.join(fields)
-	query = 'SELECT {} FROM est where ID in ({});'.format(field_string, id_string)
-	print 'About to execute query "{}"'.format(query)
-	rows = cur.execute(query)
-	print 'Got {} records returned.'.format(rows)
-
-	print 'Preparing to score {} EST records...'.format(rows)
-
-	new_rows = []
-
-	for row in cur.fetchall():
-		
-		named_row = dict(zip(fields, row))
-		print 'Processing row:', named_row
-		new_rows.append(named_row)
-
-
-	# Re-calculate intervals for windows that have new data	
-	invalidated_windows = set()
-	for row in new_rows:
-		window_starts = int(float(row['timestamp']) / CONFIG_INTERVAL_WINDOW_SIZE)
-		invalidated_windows.add(window_starts)
-
-	print '{} new points trigger the recomputation of {} interval windows'.format(len(new_rows), len(invalidated_windows))
-
-	# A batch of things arrives, some of which may be late arriving
-	out_of_order = []
-	# It gets populated somehow.
-	
-	# Sort of half mark those things because we are doing the intervals with them in mind
-	for new_id in ids:
-		print 'Adding score'
-		change_handler.add_score(new_id, 0, 0)
-
-	# for point in out_of_order:
-	# 	w = qraat.signal_filter.get_window_for_point(point, offset=-1)
-
-
-
-
-	# Configurable delay between subsequent calls happens here.
-	# polling_delay()
-		
-			
-	
-	
-	# Find invalidated intervals: what is in batch within a computed interval
-	# For each invalidated interval, recompute and update
-	# Add all points affected by an invalidated interval to the queue for scoring
-	# Score each point in the queue for scoring
-
-	#cur.execute('SELECT {} FROM est where txid = {} and siteid = {};'.format(', '.join(fields), arg_txid, arg_siteid))
 
 def polling_delay():
 	global AWAKE
@@ -684,28 +596,6 @@ def polling_delay():
 	print 'Wha!'
 	
 
-def get_fields_for(db_con, ids, fields):
-
-	cur = db_con.cursor()
-
-	ids_template = ', '.join(map(lambda x : '{}', ids))
-	id_string = ids_template.format(*ids)
-	field_string = ', '.join(fields)
-	query = 'SELECT {} FROM est where ID in ({});'.format(field_string, id_string)
-	print 'About to execute query "{}"'.format(query)
-	rows = cur.execute(query)
-	
-	all_rows = []
-	for row in rows:
-		row = tuple(row)
-		named_row = dict(zip(fields, row))
-		all_rows.append(named_rows)
-	
-	keyed_by_id = {}
-	for row in all_rows:
-		keyed_by_id[row['ID']] = row
-
-	return keyed_by_id
 	
 def get_latest_timestamp(db_con):
 
