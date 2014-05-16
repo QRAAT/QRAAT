@@ -517,9 +517,11 @@ class track:
     # TODO The file is way longer than it needs to be, since I wanted to display
     # the coordinates and datetime in the tooltip that appears in Google Earth.
     # Perhaps what we want is not a gx:track, but something fucnctionally 
-    # similar. 
+    # similar.
 
-    fd = open('%s.kml' % name, 'w')
+    # TODO Add northing, easting to output. 
+
+    fd = open('%s_track.kml' % name, 'w')
     fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
     fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
     fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
@@ -563,6 +565,33 @@ class track:
     fd.write('</Folder>\n')
     fd.write('</kml>')
     fd.close() 
+
+    fd = open('%s_pos.kml' % name, 'w')
+    fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+    fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
+    fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
+    fd.write('<Folder>\n')
+    fd.write('  <Placemark>\n')
+    fd.write('  <MultiGeometry>\n')
+    fd.write('    <name>%s (txID=%d) position cloud</name>\n' % (name, tx_id))
+    for row in self.pos:
+      (P, t, ll, pos_id) = (np.complex(row[0], row[1]), 
+                            float(row[2]), 
+                            float(row[3]), 
+                            int(row[4]))
+      tm = time.gmtime(t)
+      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
+      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+      fd.write('    <Point id="%d">\n' % pos_id)
+      fd.write('      <coordinates>%f,%f,0</coordinates>\n' % (lon, lat))
+      fd.write('    </Point>\n')
+    fd.write('  </MultiGeometry>\n')
+    fd.write('  </Placemark>\n')
+    fd.write('</Folder>\n')
+    fd.write('</kml>')
+    fd.close() 
+
 
 
 

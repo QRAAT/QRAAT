@@ -45,7 +45,8 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=float("+inf"),
 db_con = qraat.util.get_db('reader')
 
 overlay = True
-M = qraat.track.maxspeed_exp((10, 1), (300, 0.1),0.05)
+#M = qraat.track.maxspeed_exp((10, 1), (300, 0.1),0.05)
+M = qraat.track.maxspeed_const(3)
 C = 1
 
 # A possible way to calculate good tracks. Compute the tracks
@@ -54,6 +55,8 @@ if options.t_start == 0.0 and options.t_end == float("+inf"):
   track = qraat.trackall(db_con, options.tx_id, M, C)
 else:
   track = qraat.track(db_con, options.t_start, options.t_end, options.tx_id, M, C)
+
+track.export_kml('tx%d' % options.tx_id, options.tx_id)
 
 print len(track)
 # We then calculate statistics on the transition speeds in the 

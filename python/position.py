@@ -444,9 +444,6 @@ def insert_positions(db_con, pos_est, tx_id):
                                (txID, siteID, posID, timestamp, bearing, likelihood, activity)
                               VALUES (%s, %s, %s, %s, %s, %s, %s)''' 
 
-    for guy in pos_est:
-      print guy
-
     # Insert results into database.
     for (t, bearing, pos, ll, activity, pos_deps) in pos_est:
         
