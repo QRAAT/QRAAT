@@ -169,7 +169,7 @@ def main():
 				l.append(r[0])
 			print 'Got {} items: {}'.format(len(l), l[:10])
 
-			process(l)
+			process(db_con, l)
 			
 			# Score all data between start and end using all data from start-3m to end+3m
 			# score_the_past(arguments, start, end, txid, siteid)
@@ -220,20 +220,19 @@ def process(db_con, ids):
 	# Insert scores for parametrically bad points...
 	for k in data.keys():
 		if k in passed_filter_ids: continue
-			change_handler.add_score(k, -2, 0)
+		change_handler.add_score(k, -2, 0)
 
 	interval_chunk = time_chunk_ids(db_con, passed_filter_ids, CONFIG_INTERVAL_WINDOW_SIZE)
 
 	# Calculate intervals from these points
 	for ((base, duration), chunk_ids) in interval_chunk.items():
 		interval = calculate_interval(db_con, chunk_ids)
-		store_interval_assume(interval, base, duration)
+		store_interval_assume(change_handler, interval, base, duration)
 		
 	# time filter
-	scores = time_filter(db_con, passed_filter_ids):
+	scores = time_filter(db_con, passed_filter_ids)
 
 	insert_scores(change_handler, scores)
-	calculate_interval
 
 def insert_scores(change_handler, scores):
 	for (id, score) in scores.items():
@@ -241,10 +240,31 @@ def insert_scores(change_handler, scores):
 		change_handler.add_score(id, score, float(rel_score_to_scale) / (CONFIG_DELTA_AWAY * 2))
 		#sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
 
+def store_interval_assume(change_handler, interval, base, duration):
+	print 'Storing interval={}, {}+{}'.format(interval, base, duration)
+	q = 'insert into interval_cache (period, start, valid_duration) values (%s, %s, %s);'
+	change_handler.add_sql(q, (interval, base, duration))
 
 def get_intervals_from_db(db_con, ids):
-	pass
-	# TODO
+
+	cur = db_con.cursor()
+
+	ids_template = ', '.join(map(lambda x : '{}', ids))
+	id_string = ids_template.format(*ids)
+	q = 'select t.ID, interval_cache.period from interval_cache RIGHT JOIN (select ID, timestamp, siteid, txid from est where ID in (%s)) as t ON (t.siteid = interval_cache.siteid and t.txid = interval_cache.txid and t.timestamp >= interval_cache.start and t.timestamp <= interval_cache.start + interval_cache.valid_duration) where interval_cache.start IS NOT NULL;'
+
+	row = cur.execute(q, (id_string,))
+
+	intervals = {}
+
+	while True:
+		r = cur.fetchone()
+		if r is None: break
+		r = tuple(r)
+		intervals[r[0]] = float(r[1])
+
+	return intervals
+	
 
 def time_filter(db_con, ids):
 
@@ -283,12 +303,12 @@ def time_chunk_ids(db_con, ids, duration):
 	chunks = defaultdict(list)
 	for (timestamp, id) in sorted_pairs:
 		# k = (basetime, duration)
-		d, m = divmod(basetime, duration)
+		d, m = divmod(timestamp, duration)
 		base = d * duration
 		k = (base, duration)
-		d[k].append(id)
+		chunks[k].append(id)
 
-	return d
+	return chunks
 
 	
 
@@ -296,8 +316,8 @@ def time_chunk_ids(db_con, ids, duration):
 # Returns a list of IDs which pass the filter
 def parametrically_filter(db_con, data):
 
-	registry = qraat.signal_filter.Registry(arguments)
-	for point in data:
+	registry = qraat.signal_filter.Registry(None)
+	for point in data.values():
 		registry.register_point(point)
 
 	ids = registry.get_all_ids()
@@ -334,27 +354,29 @@ def init_change_handler():
 
 
 
-def read_est_records(db_con, l):
+def read_est_records(db_con, ids):
 	cur = db_con.cursor()
 
 	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
 
-	rows = cur.execute('SELECT {} FROM est where timestamp >= {} and timestamp <= {} and txid = {} and siteid = {};'.format(', '.join(fields), t_start, t_end, txid, siteid)) # Oink oink
+	ids_template = ', '.join(map(lambda x : '{}', ids))
+	id_string = ids_template.format(*ids)
+	field_string = ', '.join(fields)
+	q = 'SELECT {} FROM est WHERE ID IN (%s);'.format(field_string)
+	rows = cur.execute(q, (id_string,))
 	
-	print 'Rows processed:', rows
 	site_data = {}
-	row = -1
+	r = None
 	while True:
-		row = cur.fetchone()
-		if row is None:
-			break
-		else:
-			row = tuple(row)
-		named_row = dict(zip(fields, row))
+		r = cur.fetchone()
+		if r is None: break
+		r = tuple(r)
+		named_row = dict(zip(fields, r))
 		for k in named_row:
 			if named_row[k].__class__ == decimal.Decimal:
 				named_row[k] = float(named_row[k])
 		site_data[named_row['ID']] = named_row
+
 	return site_data
 
 
@@ -379,162 +401,6 @@ def read_est_records(db_con, l):
 
 
 
-
-
-
-
-def get_bucket_for(x, bounds):
-	gap = bounds[1] - bounds[0]
-	curr_min, curr_max = None, None
-	for (b_ind, boundary) in enumerate(bounds):
-		if boundary > x:
-			curr_min = bounds[b_ind - 1]
-			curr_max = boundary
-			break
-	if curr_min is None and curr_max is None:
-		curr_min = bounds[-1]
-		curr_max = curr_min + gap
-	return curr_min, curr_max
-
-def get_center_points(x, min, max, interval):
-	points = []
-	if x is None: print 'x is none'
-	if interval is None: print 'interval is none'
-	i = x - interval
-	# Look down...
-	while i > min:
-		points.append(i)
-		i -= interval
-
-	i = x + interval
-	while i < max:
-		points.append(i)
-		i += interval
-
-	return points
-
-def interpolate_interval(interval_map, ident):
-	keys = interval_map.keys()
-	print 'interpolate_interval()'.format(ident, ', '.join([str(z) for z in keys]))
-	max_not_above = None
-	min_not_below = None
-	for k in keys:
-		if (max_not_above is None or k > max_not_above) and k < ident:
-			max_not_above = k
-		if (min_not_below is None or k < min_not_below) and k > ident:
-			min_not_below = k
-
-	if max_not_above is None and min_not_below is None:
-		print '!!!!!!!!!!!!\n!!!!!!!!!!!!\n!!!!!!!!!!!!\n!!!!!!!!!!!!\n'
-		raise Exception()
-
-	if max_not_above is None:
-		return interval_map[min_not_below]
-	if min_not_below is None:
-		return interval_map[max_not_above]
-
-	low_val = interval_map[max_not_above]
-	high_val = interval_map[min_not_below]
-
-	# get line defined by (max_not_above, low_val) and (min_not_below, high_val)
-
-	#(x1, y1)
-	#(x2, y2)
-
-	#slope = (y2 - y1) / (x2 - x1)
-	#y = mx + b
-	#y = ((y2 - y1) / (x2 - x1)) x + b
-
-	#y1 = ((y2 - y1) / (x2 - x1)) x1 + b
-	#b = y1 - ((y2 - y1) / (x2 - x1)) * x1
-
-	slope = (high_val - low_val) / float(min_not_below - max_not_above)
-	b = low_val - ((high_val - low_val) / float(min_not_below - max_not_above)) * max_not_above
-
-	# Sanity check
-	l = slope * max_not_above + b
-	h = slope * min_not_below + b
-	#print 'Started with {}, ended up with {}'.format(low_val, l)
-	#print 'Started with {}, ended up with {}'.format(high_val, h)
-
-	return slope * ident + b
-
-# point is a time float
-# points is a list of all point floats for the hour, in order
-
-SEARCH_START, SEARCH_END = None, None
-
-def reset_points_radius_search():
-	global SEARCH_START, SEARCH_END
-	SEARCH_START = None
-	SEARCH_END = None
-
-def are_points_in_radius(point, points, radius):
-	print 'are_points_in_radius()'
-	global SEARCH_START, SEARCH_END
-
-	low, high = point - radius, point + radius
-	print 'low thresh:', low
-	print 'high thresh:', high
-
-	if SEARCH_START is None and SEARCH_END is None:
-		print 'initializing vals'
-		# initialize the search points using bisect calls
-		SEARCH_START = bisect.bisect_left(points, low)
-		SEARCH_END = bisect.bisect_left(points, high)
-		pass
-	else:
-		assert SEARCH_START is not None and SEARCH_END is not None
-		# maintain SEARCH_START and SEARCH_END
-
-		###
-		# |---&------|---&
-		###
-		#print 'maintaining'
-
-		#print 'SEARCH_START={}, SEARCH_END={}, |points|={}'.format(SEARCH_START, SEARCH_END, len(points))
-
-		while points[SEARCH_START] <= low:
-			SEARCH_START += 1
-		SEARCH_START -= 1
-
-		while SEARCH_END < len(points) and points[SEARCH_END] <= high:
-			SEARCH_END += 1
-
-		#if SEARCH_END > 0:
-			#SEARCH_END -= 1
-		#else:
-			#print 'Asserted!'
-			#assert SEARCH_END == 0
-			#if SEARCH_START != 0:
-				#print 'This would have sent the SEARCH_END ({}) negative...{}'.format(SEARCH_END, SEARCH_START)
-			#assert SEARCH_START == 0
-
-	# both of SEARCH_START and SEARCH_END are set
-
-	print 'Searching a slice of size:', (SEARCH_END - SEARCH_START)
-
-	if (SEARCH_END - SEARCH_START) < 0:
-		print 'SEARCH_START={}, SEARCH_END={}, |points|={}'.format(SEARCH_START, SEARCH_END, len(points))
-
-	for i in range(SEARCH_START, SEARCH_END):
-		_point = points[i]
-		if _point == point:
-			print 'Skipping self point'
-			continue
-
-		if _point >= low and _point <= high:
-			print 'Yes, there\'s something in here'
-			return True
-	print 'There is nothing there'
-	return False
-
-# def maybe_measure_new_interval(ids, db_con, txid, siteid, change_handler):
-# 	# Score last completed one if it isn't already scored.
-# 	CONFIG_INTERVAL_WINDOW_SIZE
-# 	pass
-
-		
 
 def score_new_things(ids, db_con, change_handler):
 
@@ -711,9 +577,9 @@ def get_sorted_timestamps(db_con, ids):
 
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
-	query = 'SELECT est.ID, timestamp FROM est where ID in ({});'.format(id_string)
-	print 'About to execute query "{}"'.format(query)
-	rows = cur.execute(query)
+	query = 'SELECT ID, timestamp FROM est where ID IN (%s);'
+	# print 'About to execute query "{}"'.format(query)
+	rows = cur.execute(query, (id_string,))
 
 	# rows = cur.execute(q, (start, start + end, siteid, txid))
 	print 'Calculating interval from {} values...'.format(rows)
