@@ -376,9 +376,9 @@ class Registry:
 		for point in points:
 			if point['ID'] not in counts.keys():
 				good_points.append(point)
-		print '|counts| = {}'.format(len(counts))
-		for (k, v) in counts.items()[:10]:
-			print 'count {} -> {}'.format(k, v)
+		# print '|counts| = {}'.format(len(counts))
+		# for (k, v) in counts.items()[:10]:
+		# 	print 'count {} -> {}'.format(k, v)
 		return counts, good_points
 
 	def get_bad_points(self, ids, **kw):
@@ -388,8 +388,8 @@ class Registry:
 		#else:
 			#current_count += 1
 		points = [x for x in self.points if x['ID'] in ids]
-		print 'Got {} points that are about to be categorized'.format(len(points))
-		print 'get_bad_points() -> get_matching_points()'
+		# print 'Got {} points that are about to be categorized'.format(len(points))
+		# print 'get_bad_points() -> get_matching_points()'
 
 		good_points = []
 
