@@ -317,61 +317,6 @@ def parametrically_filter(db_con, data):
 
 	
 
-	if use_time_filter:
-		points_under_consideration = []
-		print 'Attempting temporal alignment'
-		print 'Got {} good points'.format(len(good_ids))
-		# Create list of intervals.
-		#intervals = []
-		for i in range(len(good_xs)):
-			x = good_xs[i]
-			id = good_ids[i]
-			points_under_consideration.append((x, id))
-
-		# Generate ALL points struct
-		all_points_data = list(points_under_consideration)
-		for i in range(len(bad_xs)):
-			x = bad_xs[i]
-			id = bad_ids[i]
-			all_points_data.append((x, id))
-
-		score_unclean_data = False
-
-		if score_unclean_data:
-			scored_points_dirty = apply_time_filtering(all_points_data, txid, interval_computation_only_data=points_under_consideration)
-			scored_points_clean = apply_time_filtering(points_under_consideration, txid)
-			assert scored_points_dirty.keys() == scored_points_clean.keys()
-			def bad_score(x):
-				return x < 2
-			agree = 0
-			for (pid, dirty_score) in scored_points_dirty.items():
-				clean_score = scored_points_clean[pid]
-				if not (bad_score(clean_score) ^ bad_score(dirty_score)):
-					agree += 1
-			disagree = len(scored_points_dirty) - agree
-			print 'Comparing dirty points scored with interval timing with leaving them out: {} agree, {} disagree'.format(agree, disagree)
-		else:
-			scored_points = apply_time_filtering(points_under_consideration, txid)
-
-		for (id, score) in scored_points.items():
-			change_handler.add_score(id, score, float(score) / (CONFIG_DELTA_AWAY * 2))
-			#sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -387,19 +332,6 @@ def init_change_handler():
 		change_handler = qraat.signal_filter.ChangeHandler(None, 'db')
 	return change_handler
 
-def score_the_past_chunking(arguments, t_start, t_end, txid, siteid):
-
-	context_length = 3 * 60			# Three minutes of context is assumed in the chunk (thus the middle 54 minutes of data will actually be scored
-	#t_start = t_start - context_length
-	#t_end = t_end + context_length
-
-	chunk_size = int(60 * 60)		# One hour (in seconds)
-	total_chunks = int((t_end - t_start) / float(chunk_size)) + 1
-	start_times = [(t_start + (i * chunk_size)) for i in range(total_chunks)]
-	intervals = [(x, x + chunk_size) for x in start_times]
-	for start, end in intervals:
-		# Score all data between start and end using all data from start-3m to end+3m
-		score_the_past(arguments, start, end, txid, siteid)
 
 
 def read_est_records(db_con, l):
@@ -429,256 +361,25 @@ def read_est_records(db_con, l):
 
 
 
-def score_the_past(arguments, t_start, t_end, txid, siteid):
 
-	db_con = qraat.util.get_db('writer')
+	# if CURSOR_ENABLED:
+	# 	all_ts = [x['timestamp'] for x in registry.points]
+	# 	max_just_processed = max(all_ts)
+    #
+	# 	sql = 'select * from `cursor` where name = %s and value > %s;'
+	# 	rows = change_handler.add_sql(sql, ('estscore', max_just_processed))
+	# 	if rows > 0:
+	# 		# noop
+	# 		print 'No need to update cursor'
+	# 	else:
+	# 		sql = 'delete from `cursor` where name = %s;'
+	# 		change_handler.add_sql(sql, ('estscore',))
+	# 		sql = 'insert into `cursor` (name, value) values (%s, %s);'
+	# 		change_handler.add_sql(sql, ('estscore', max_just_processed))
 
 
-	change_handler = init_change_handler()
 
 
-
-	# Just a test
-	db_con.close()
-
-
-
-
-
-	# Bucket site_data by (siteid, txid).
-	#bucketed = {}
-	buckets = defaultdict(list)
-	if len(site_data) == 0:
-		print 'No data in this chunk'
-		return
-
-	assert len(site_data) > 0
-	for v in site_data.values():
-		k = (v['siteid'], v['txid'])
-		#print 'iterating through:', k
-		buckets[k].append(v)
-
-	assert len(buckets) == 1
-
-	filter_txid_f, filter_txid_simple_f = pass_all, pass_all
-	if arguments['filter-txid'] is not None:
-		filter_txid_f, filter_txid_simple_f = filter_txid(arguments['filter-txid'])
-
-	filter_site_f, filter_site_simple_f = pass_all, pass_all
-	if arguments['filter-site'] is not None:
-		filter_site_f, filter_site_simple_f = filter_site(arguments['filter-site'])
-
-	all_sites = set()
-	all_sites.update([x[0] for x in buckets.keys()])
-	all_txids = set()
-	all_txids.update([x[1] for x in buckets.keys()])
-	print 'all sites ({}): {}'.format(len(all_sites), all_sites)
-	print 'all txids ({}): {}'.format(len(all_txids), all_txids)
-
-		
-	#if just_stage_changes:
-	#change_handler = qraat.signal_filter.ChangeHandler(
-
-	# Setting up connection to database...
-
-
-	# Only processing one
-
-	for i, site_and_txid in enumerate(buckets.keys()):
-		site_id, txid = site_and_txid
-		if not filter_site_simple_f(site_id):
-			#print 'Filtering bucket by site'
-			continue
-
-		if not filter_txid_simple_f(txid):
-			#print 'Filtering bucket by txid'
-			continue
-
-		registry = qraat.signal_filter.Registry(arguments)
-		for point in buckets[site_and_txid]:
-			registry.register_point(point)
-
-		#values = registry.get_all_ids()
-
-		#ids = [x[0] for x in values]
-
-		ids = registry.get_all_ids()
-
-		scored_points = None
-
-		#use_time_filter = arguments['time-filter'] is not None
-		#hide_bad_points = arguments['hide-bad'] is not None
-		# Eliminate unnecessary conditional when this all works, for now:
-		use_time_filter, hide_bad_points = True, False
-
-		good_stuff, bad_stuff, good_ids, bad_ids, good_points, bad_points, good_xs, bad_xs, = None, None, None, None, None, None, None, None
-
-		print 'Partitioning {} points'.format(len(buckets[site_and_txid]))
-		if use_time_filter or hide_bad_points:
-			good_stuff, bad_stuff = registry.screen_bad(registry.points)
-			print 'Got {} good items and {} bad items'.format(len(good_stuff), len(bad_stuff))
-
-			good_ids = [x['ID'] for x in good_stuff]
-			bad_ids = [x['ID'] for x in bad_stuff]
-			# TODO: Danger
-			#good_points = [(x['timestamp'], x[item_to_plot]) for x in good_stuff]
-			#bad_points = [(x['timestamp'], x[item_to_plot]) for x in bad_stuff]
-			#good_xs, good_ys = zip(*good_points)
-			#bad_xs, bad_ys = zip(*bad_points)
-			good_xs = [x['timestamp'] for x in good_stuff]
-			bad_xs = [x['timestamp'] for x in bad_stuff]
-			for bad_id in bad_ids:
-				change_handler.add_score(bad_id, -2, 0)
-				#sql_w.write('update est set score = -1 where ID = {};\n'.format(bad_id))
-
-		if use_time_filter:
-			points_under_consideration = []
-			print 'Attempting temporal alignment'
-			print 'Got {} good points'.format(len(good_ids))
-			# Create list of intervals.
-			#intervals = []
-			for i in range(len(good_xs)):
-				x = good_xs[i]
-				id = good_ids[i]
-				points_under_consideration.append((x, id))
-
-			# Generate ALL points struct
-			all_points_data = list(points_under_consideration)
-			for i in range(len(bad_xs)):
-				x = bad_xs[i]
-				id = bad_ids[i]
-				all_points_data.append((x, id))
-
-			score_unclean_data = False
-
-			if score_unclean_data:
-				scored_points_dirty = apply_time_filtering(all_points_data, txid, interval_computation_only_data=points_under_consideration)
-				scored_points_clean = apply_time_filtering(points_under_consideration, txid)
-				assert scored_points_dirty.keys() == scored_points_clean.keys()
-				def bad_score(x):
-					return x < 2
-				agree = 0
-				for (pid, dirty_score) in scored_points_dirty.items():
-					clean_score = scored_points_clean[pid]
-					if not (bad_score(clean_score) ^ bad_score(dirty_score)):
-						agree += 1
-				disagree = len(scored_points_dirty) - agree
-				print 'Comparing dirty points scored with interval timing with leaving them out: {} agree, {} disagree'.format(agree, disagree)
-			else:
-				scored_points = apply_time_filtering(points_under_consideration, txid)
-
-			for (id, score) in scored_points.items():
-				change_handler.add_score(id, score, float(score) / (CONFIG_DELTA_AWAY * 2))
-				#sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
-
-	if CURSOR_ENABLED:
-		all_ts = [x['timestamp'] for x in registry.points]
-		max_just_processed = max(all_ts)
-
-		sql = 'select * from `cursor` where name = %s and value > %s;'
-		rows = change_handler.add_sql(sql, ('estscore', max_just_processed))
-		if rows > 0:
-			# noop
-			print 'No need to update cursor'
-		else:
-			sql = 'delete from `cursor` where name = %s;'
-			change_handler.add_sql(sql, ('estscore',))
-			sql = 'insert into `cursor` (name, value) values (%s, %s);'
-			change_handler.add_sql(sql, ('estscore', max_just_processed))
-
-
-
-def apply_time_filtering(points_under_consideration, txid, interval_computation_only_data=None):
-	print 'begin apply_time_filtering()'
-
-	arguments = parse_arguments(sys.argv[1:])
-
-	sorted_points = sorted(points_under_consideration)
-
-	#((min_x, min_y, min_id), (max_x, max_y, max_id)) = sorted_points[0], sorted_points[-1]
-
-	interval_window_size = CONFIG_INTERVAL_WINDOW_SIZE
-
-	interval_windows = None
-	if interval_computation_only_data is None:
-		interval_windows = qraat.signal_filter.WindowIterator(sorted_points, interval_window_size)
-	else:
-		interval_windows = qraat.signal_filter.WindowIterator(interval_computation_only_data, interval_window_size)
-
-	print 'Window count: {}'.format(interval_windows.get_window_count())
-
-	total_data = 0
-
-
-
-	# Here's what to do...
-
-	for (i, w) in enumerate(interval_windows):
-		interval = w.calculate_interval_from(txid=txid, slice_id=i+1)
-		w.attach_property('interval', interval)
-		print 'attached attribute "interval"'
-
-	interval_windows.report()
-
-	# Interval values are calculated.
-	# Go over these windows with a sub-window, a scoring window centered around
-	# each point. Must be able to access the interval of a point falling within
-	# a particular interval qraat.signal_filter.
-
-	#interval = interval_windows.get_property_for_point(point, 'interval')
-
-
-
-	scores = {}
-
-	all_timestamps = [x[0] for x in sorted_points]
-
-	for (tstamp, ident) in sorted_points:
-		# Scoring this point (with id=ident)
-		score = 0
-		# get appropriate interval
-		interval = interval_windows.get_property_for_point(tstamp, 'interval')
-		if interval < CONFIG_MIN_INTERVAL:
-			# Skipping for now
-			#raise Exception('Found interval abnormally low: {}'.format(interval))
-			print 'Found interval abnormally low: {}'.format(interval)
-			scores[ident] = 0
-			continue
-
-		# calculate possible center points to investigate
-		factors = [x for x in range(-CONFIG_DELTA_AWAY, CONFIG_DELTA_AWAY + 1) if x != 0]
-		offsets = [x * interval for x in factors]
-		absolute = [tstamp + x for x in offsets]
-		search_space = [(x - CONFIG_ERROR_ALLOWANCE, x + CONFIG_ERROR_ALLOWANCE) for x in absolute]
-
-		for start, end in search_space:
-			start_ind = bisect.bisect_left(all_timestamps, start)
-			end_ind = bisect.bisect_right(all_timestamps, end)
-			if start_ind == end_ind:
-				# No points found
-				pass
-			else:
-				score += 1
-		scores[ident] = score
-
-	print 'Calculated scores for {} points'.format(len(scores))
-	unscored_because_low = [x for (x, y) in scores.items() if y == 2]
-	print '{} points were not totally processed because an interval could not be calculated (the calculated value is not reasonable)'.format(len(unscored_because_low))
-	return scores
-
-
-
-	#interval_windows = qraat.signal_filter.WindowIterator(sorted_points, interval_window_size)
-
-	for (i, w) in enumerate(interval_windows):
-		v = w.value()
-		print 'There are {} points in window {}:'.format(len(v), (i+1))
-		print 'There are {} attributes'.format(len(w.attributes))
-		total_data += len(v)
-		for (k, v) in w.attributes.items():
-			print '\t{} -> {}'.format(k, v)
-
-	assert total_data == len(sorted_points)
 
 
 
@@ -833,110 +534,6 @@ def are_points_in_radius(point, points, radius):
 # 	CONFIG_INTERVAL_WINDOW_SIZE
 # 	pass
 
-def frontier_parametric_score(db_con, txid, siteid, change_handler, arguments):
-
-	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
-
-	rows = None
-
-	cur = None
-
-	# if CURSOR_ENABLED:
-	# 	cur = db_con.cursor()
-	# 	q = 'select value from `cursor` where name = %s;'
-	# 	rows_back = cur.execute(q, ('paramscore',))
-	# 	assert rows_back == 1 or rows_back == 0
-	# 	r = cur.fetchone()
-	# 	r = tuple(r)
-	# 	assert len(r) == 1
-	# 	max_val = r[0]
-	# 	print 'Got max val: {} ({})'.format(r, r.__class__)
-	# 	# raw_input()
-	# 	cur = db_con.cursor()
-	# 	q = 'select ID from est where timestamp > %s;'
-	# 	rows = cur.execute(q, (max_val,))
-	# else:
-
-	cur = db_con.cursor()
-
-
-	# NOTE: Set a timestamp here to only score unscored points whose timestamp is newer than this.
-	time_starts_at = None
-	# get all unscored points
-	q = None
-	if time_starts_at is None:
-		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and txid = {} and siteid = {};'.format(txid, siteid)
-	else:
-		q = 'select est.ID from est LEFT JOIN estscore ON est.ID = estscore.estid where estscore.estid IS NULL and timestamp >= {} and txid = {} and siteid = {};'.format(time_starts_at, txid, siteid)
-	rows = cur.execute(q)
-
-
-
-	if rows == 0:
-		print 'Nothing new yet.'
-	else:
-		print 'There are {} new rows'.format(rows)
-	pass
-
-	if rows == 0:
-		print 'Nothing new...'
-		return
-	else:
-
-		ids = []
-
-		while True:
-			r = cur.fetchone()
-			if r is None:
-				break
-			else:
-				r = tuple(r)
-				assert len(r) == 1
-				ids.append(r[0])
-
-
-
-		ids_template = ', '.join(map(lambda x : '{}', ids))
-		id_string = ids_template.format(*ids)
-		field_string = ', '.join(fields)
-		query = 'SELECT {} FROM est where ID in ({});'.format(field_string, id_string)
-		print 'About to execute query "{}"'.format(query)
-		rows = cur.execute(query)
-		print 'Got {} records returned.'.format(rows)
-
-
-		all_rows = []
-
-		while True:
-			r = cur.fetchone()
-			if r is None:
-				 break
-			else:
-				named_row = dict(zip(fields, r))
-				named_row['timestamp'] = float(named_row['timestamp'])
-				all_rows.append(named_row)
-		print 'Parsed {} rows'.format(len(all_rows))
-
-		registry = qraat.signal_filter.Registry(arguments)
-		for point in all_rows:
-			print 'Registering point:', point
-			registry.register_point(point)
-
-
-
-
-
-
-		
-		good_stuff, bad_stuff = registry.screen_bad(registry.points)
-		for good_item in good_stuff:
-			change_handler.add_score(good_item['ID'], -1, 0)
-			print 'Setting score to -1'
-		for bad_item in bad_stuff:
-			change_handler.add_score(bad_item['ID'], -2, 0)
-			print 'Setting score to -2'
-
-		return ids
 		
 
 def score_new_things(ids, db_con, change_handler):
@@ -1197,16 +794,6 @@ def add_record_for_interval(db_con, timestamp, siteid, txid, recalculate=False):
 		siteid = v['siteid']
 		txid = v['txid']
 		interval = add_record_for_interval(db_con, timestamp, siteid, txid)
-		# q = 'select period from interval_cache where start <= %s and (start + valid_duration) >= %s and siteid = %s and txid = %s;'
-		# rows = cur.execute(q, (timestamp, timestamp, siteid, txid))
-		# assert rows <= 1
-		# interval = None
-		# if rows == 0:
-		# 	interval = add_record_for_interval(timestamp, siteid, txid)
-		# else:
-		# 	r = cur.fetchone()
-		# 	r = tuple(r)
-		# 	interval = r[0]
 			
 		intervals[id] = interval
 		
