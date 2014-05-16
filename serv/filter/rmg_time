@@ -155,7 +155,9 @@ def main():
 		total_chunks = int((arg_t_end - arg_t_start) / float(chunk_size)) + 1
 		start_times = [(arg_t_start + (i * chunk_size)) for i in range(total_chunks)]
 		intervals = [(x, x + chunk_size) for x in start_times]
+		change_handler = init_change_handler()
 		for start, end in intervals:
+			print '{} - {}'.format(start, end)
 			# Get all unscored IDs in this chunk
 			q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
 			#q = 'select est.ID from (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s left join estscore on est.ID = estscore.estid) where est where estscore.estid is null;'
@@ -169,7 +171,11 @@ def main():
 				l.append(r[0])
 			print 'Got {} items: {}'.format(len(l), l[:10])
 
-			process(db_con, l)
+			if len(l) == 0:
+				print 'Nothing in this chunk...skipping...'
+				continue
+
+			process(db_con, change_handler, l)
 			
 			# Score all data between start and end using all data from start-3m to end+3m
 			# score_the_past(arguments, start, end, txid, siteid)
@@ -207,15 +213,18 @@ def main():
 			polling_delay()
 		# Add unscored points to a queue for scoring
 
-def process(db_con, ids):
+def process(db_con, change_handler, ids):
+
+	print 'Proceeding to process {} items.'.format(len(ids))
 
 	# Processing list of new items.
 	data = read_est_records(db_con, ids)
 
-	change_handler = init_change_handler()
 
 	# param filter
 	passed_filter_ids = parametrically_filter(db_con, data)
+
+	print '{} items passed parametric filter'.format(len(passed_filter_ids))
 
 	# Insert scores for parametrically bad points...
 	for k in data.keys():
@@ -224,15 +233,25 @@ def process(db_con, ids):
 
 	interval_chunk = time_chunk_ids(db_con, passed_filter_ids, CONFIG_INTERVAL_WINDOW_SIZE)
 
+	print 'Calculating intervals for {} chunks'.format(len(interval_chunk))
+
 	# Calculate intervals from these points
 	for ((base, duration), chunk_ids) in interval_chunk.items():
+		print 'Processing chunk of {} items'.format(len(chunk_ids))
 		interval = calculate_interval(db_con, chunk_ids)
-		store_interval_assume(change_handler, interval, base, duration)
+		if interval is not None:
+			store_interval_assume(change_handler, interval, base, duration)
+		else:
+			print 'Interval could not be calculated'
 		
 	# time filter
 	scores = time_filter(db_con, passed_filter_ids)
 
+	print 'Remaining points scored'
+
 	insert_scores(change_handler, scores)
+
+	print 'Scores inserted.'
 
 def insert_scores(change_handler, scores):
 	for (id, score) in scores.items():
@@ -251,9 +270,9 @@ def get_intervals_from_db(db_con, ids):
 
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
-	q = 'select t.ID, interval_cache.period from interval_cache RIGHT JOIN (select ID, timestamp, siteid, txid from est where ID in (%s)) as t ON (t.siteid = interval_cache.siteid and t.txid = interval_cache.txid and t.timestamp >= interval_cache.start and t.timestamp <= interval_cache.start + interval_cache.valid_duration) where interval_cache.start IS NOT NULL;'
+	q = 'select t.ID, interval_cache.period from interval_cache RIGHT JOIN (select ID, timestamp, siteid, txid from est where ID in ({})) as t ON (t.siteid = interval_cache.siteid and t.txid = interval_cache.txid and t.timestamp >= interval_cache.start and t.timestamp <= interval_cache.start + interval_cache.valid_duration) where interval_cache.start IS NOT NULL;'
 
-	row = cur.execute(q, (id_string,))
+	row = cur.execute(q.format(id_string))
 
 	intervals = {}
 
@@ -268,37 +287,45 @@ def get_intervals_from_db(db_con, ids):
 
 def time_filter(db_con, ids):
 
+	if len(ids) == 0: return {}
+
 	data = read_est_records(db_con, ids)
 
-	all_timestamps = sorted([x['timestamp'] for x in data])
+	all_timestamps = sorted([x['timestamp'] for x in data.values()])
 
 	scores = defaultdict(int)
 
 	intervals = get_intervals_from_db(db_con, ids)
 
 	for id in ids:
-		# calculate possible center points to investigate
-		interval = intervals[id]
-		tstamp = data[id]['timestamp']
-		factors = [x for x in range(-CONFIG_DELTA_AWAY, CONFIG_DELTA_AWAY + 1) if x != 0]
-		offsets = [x * interval for x in factors]
-		absolute = [tstamp + x for x in offsets]
-		search_space = [(x - CONFIG_ERROR_ALLOWANCE, x + CONFIG_ERROR_ALLOWANCE) for x in absolute]
+		if id not in intervals:
+			scores[id] = -1
+		else:
+			# calculate possible center points to investigate
+			interval = intervals[id]
+			tstamp = data[id]['timestamp']
+			factors = [x for x in range(-CONFIG_DELTA_AWAY, CONFIG_DELTA_AWAY + 1) if x != 0]
+			offsets = [x * interval for x in factors]
+			absolute = [tstamp + x for x in offsets]
+			search_space = [(x - CONFIG_ERROR_ALLOWANCE, x + CONFIG_ERROR_ALLOWANCE) for x in absolute]
 
-		for start, end in search_space:
-			start_ind = bisect.bisect_left(all_timestamps, start)
-			end_ind = bisect.bisect_right(all_timestamps, end)
-			if start_ind == end_ind:
-				# No points found
-				pass
-			else:
-				score += 1
-		scores[ident] = score
+			for start, end in search_space:
+				start_ind = bisect.bisect_left(all_timestamps, start)
+				end_ind = bisect.bisect_right(all_timestamps, end)
+				if start_ind == end_ind:
+					# No points found
+					pass
+				else:
+					score += 1
+			scores[id] = score
 
 	return scores
 
 
 def time_chunk_ids(db_con, ids, duration):
+
+	if len(ids) == 0: return {}
+
 	sorted_pairs = get_sorted_timestamps(db_con, ids)
 	chunks = defaultdict(list)
 	for (timestamp, id) in sorted_pairs:
@@ -362,8 +389,8 @@ def read_est_records(db_con, ids):
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
 	field_string = ', '.join(fields)
-	q = 'SELECT {} FROM est WHERE ID IN (%s);'.format(field_string)
-	rows = cur.execute(q, (id_string,))
+	q = 'SELECT {} FROM est WHERE ID IN ({});'.format(field_string, id_string)
+	rows = cur.execute(q)
 	
 	site_data = {}
 	r = None
@@ -558,7 +585,10 @@ def add_record_for_interval(db_con, timestamp, siteid, txid, recalculate=False):
 
 def calculate_interval(db_con, ids):
 
+	print 'calculate_interval for {} values'.format(len(ids))
+
 	sorted_pairs = get_sorted_timestamps(db_con, ids)
+	print 'Got {} sorted pairs'.format(len(sorted_pairs))
 
 	interval_windows = qraat.signal_filter.WindowIterator(sorted_pairs, None)
 
@@ -568,6 +598,7 @@ def calculate_interval(db_con, ids):
 	for (i, w) in enumerate(interval_windows):
 		print 'Processed interval window:', (i+1)
 		interval = w.calculate_interval_from()
+		print 'Produced interval:', interval
 		intervals.append(interval)
 	assert len(intervals) == 1
 	return intervals[0]
@@ -577,9 +608,9 @@ def get_sorted_timestamps(db_con, ids):
 
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
-	query = 'SELECT ID, timestamp FROM est where ID IN (%s);'
-	# print 'About to execute query "{}"'.format(query)
-	rows = cur.execute(query, (id_string,))
+	query = 'SELECT ID, timestamp FROM est where ID IN ({});'.format(id_string)
+	print 'About to execute query "{}"'.format(query)
+	rows = cur.execute(query)
 
 	# rows = cur.execute(q, (start, start + end, siteid, txid))
 	print 'Calculating interval from {} values...'.format(rows)
