@@ -444,6 +444,9 @@ def insert_positions(db_con, pos_est, tx_id):
                                (txID, siteID, posID, timestamp, bearing, likelihood, activity)
                               VALUES (%s, %s, %s, %s, %s, %s, %s)''' 
 
+    for guy in pos_est:
+      print guy
+
     # Insert results into database.
     for (t, bearing, pos, ll, activity, pos_deps) in pos_est:
         
@@ -459,7 +462,7 @@ def insert_positions(db_con, pos_est, tx_id):
         pos_id = cur.lastrowid                               
         handle_provenance_insertion(cur, pos_deps, {'Position':(pos_id,)})
 
-      # Insert bearings. 
+      # Insert bearings.
       for (site_id, (theta, ll, activity)) in bearing.iteritems():
         cur.execute(query_insert_bearing, (tx_id, site_id, pos_id, 
                                            t, theta, 

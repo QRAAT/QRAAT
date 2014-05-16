@@ -26,6 +26,6 @@ from csv import csv, pretty_printer
 from gps import gps
 from det import det
 from est import est
-#import signal_filter
+import signal_filter
 import position
 from track import track, trackall
