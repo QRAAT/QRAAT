@@ -11,6 +11,7 @@ INSTALL(PROGRAMS
   rmg_filterest
   rmg_backup
   rmg_clean
+  rmg_txlist
   DESTINATION bin)
 
 
