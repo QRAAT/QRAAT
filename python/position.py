@@ -108,6 +108,21 @@ class signal:
     # Store eigenvalue decomposition vectors and noise covariance
     # matrices in NumPy arrays. 
     cur = db_con.cursor()
+# FIXME For now, est filter isn't running. Reverting to simple 
+#       band filter until it's done. 
+#    cur.execute('''SELECT ID, siteid, txid, timestamp, edsp, 
+#                          ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
+#                          nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+#                          nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+#                          nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+#                          nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
+#                     FROM est
+#                     JOIN estscore AS s ON s.estID = ID
+#                    WHERE (%f <= timestamp) AND (timestamp <= %f) 
+#                      AND relscore >= %f 
+#                          %s''' % (
+#                            t_start, t_end, score_threshold, 
+#                           ('AND txid=%d' % tx_id) if tx_id else ''))
     cur.execute('''SELECT ID, siteid, txid, timestamp, edsp, 
                           ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
                           nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
@@ -117,9 +132,9 @@ class signal:
                      FROM est
                      JOIN estscore AS s ON s.estID = ID
                     WHERE (%f <= timestamp) AND (timestamp <= %f) 
-                      AND relscore >= %f 
+                      AND (band3 <= 150) AND (band10 <= 900) 
                           %s''' % (
-                            t_start, t_end, score_threshold, 
+                            t_start, t_end, 
                            ('AND txid=%d' % tx_id) if tx_id else ''))
   
     raw = np.array(cur.fetchall(), dtype=float)
