@@ -63,7 +63,8 @@ for tx in tx_list:
                                 time_range[0]-time_window, 
                                 time_range[1]+time_window, 
                                 tx_id)
-
+    if len(sig) == 0: 
+      continue
     bl = qraat.position.bearing(sv, sig)
     pos_est = qraat.position.calc_positions(sig, bl, time_window, time_delta)
     qraat.position.insert_positions(db_con, pos_est, tx_id)
