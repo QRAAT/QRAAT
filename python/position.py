@@ -130,7 +130,7 @@ class signal:
                           nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
                           nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
                      FROM est
-                    WHERE (%f >= timestamp) AND (timestamp <= %f) 
+                    WHERE (%f <= timestamp) AND (timestamp <= %f) 
                       AND (band3 <= 150) AND (band10 <= 900) 
                           %s''' % (
                             t_start, t_end, 
