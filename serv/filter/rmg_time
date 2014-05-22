@@ -154,7 +154,7 @@ def main():
 		chunk_size = int(60 * 60)		# One hour (in seconds)
 		total_chunks = int((arg_t_end - arg_t_start) / float(chunk_size)) + 1
 		start_times = [(arg_t_start + (i * chunk_size)) for i in range(total_chunks)]
-		intervals = [(x, x + chunk_size) for x in start_times]
+		intervals = [(x, min(arg_t_end, x + chunk_size)) for x in start_times]
 		change_handler = init_change_handler()
 		for start, end in intervals:
 			# print '{} - {}'.format(start, end)
