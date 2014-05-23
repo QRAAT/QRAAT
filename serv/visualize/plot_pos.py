@@ -49,8 +49,7 @@ cur = db_con.cursor()
   
 
 T = options.t_start
-T_step = options.t_end# 60 * 60 * 24 * 3 # three days
-# FIXME doing some tests. 
+T_step =  60 * 60 * 24 * 1 / 6 # four hour chunks. 
 
 while T < options.t_end:  
   cur.execute('''SELECT northing, easting, timestamp, likelihood
@@ -58,9 +57,8 @@ while T < options.t_end:
                   WHERE (%f <= timestamp) 
                     AND (timestamp <= %f)
                     AND txid = %d
-                  ORDER BY timestamp ASC''' % (T, T_step, options.tx_id))
+                  ORDER BY timestamp ASC''' % (T, T + T_step, options.tx_id))
   
-  print T, T+ T_step
   T += T_step
   track = []
   for pos in cur.fetchall():
@@ -141,7 +139,7 @@ while T < options.t_end:
     #   t.tm_year, t.tm_mon, t.tm_mday,
     #   t.tm_hour, t.tm_min, t.tm_sec))
 
-    pp.savefig('tx%d_%04d-%02d-%02d.png' % (options.tx_id, t.tm_year, t.tm_mon, t.tm_mday))
+    pp.savefig('tx%d_%04d-%02d-%02d_%02d%02d.png' % (options.tx_id, t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min))
 
   else: 
     
