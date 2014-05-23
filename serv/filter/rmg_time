@@ -212,9 +212,11 @@ def main():
 
 			print 'Got the following unscored IDs:', ids
 
-			sys.exit(3)
-
 			data = read_est_records(db_con, ids)
+
+			out_of_order_ids, in_order_ids = partition_by_interval_calculation(db_con, ids, arg_siteid, arg_txid)
+
+			print 'Found {} out of order, {} in order'.format(len(out_of_order_ids), len(in_order_ids))
 
 
 			# param filter
@@ -260,6 +262,41 @@ def main():
 
 			polling_delay()
 		# Add unscored points to a queue for scoring
+
+
+def partition_by_interval_calculation(db_con, ids, siteid, txid):
+	print 'partition_by_interval_calculation()'
+
+	cur = db_con.cursor()
+
+	ids_template = ', '.join(map(lambda x : '{}', ids))
+	id_string = ids_template.format(*ids)
+
+	query_template = 'select t.ID as ID, interval_cache.period as period from (select ID, timestamp from est where ID in ({})) t LEFT JOIN interval_cache ON (t.timestamp >= interval_cache.start and t.timestamp <= interval_cache.start + interval_cache.valid_duration and interval_cache.txid = %s and interval_cache.siteid = %s)'
+	query = query_template.format(id_string)
+
+	print 'txid={}, siteid={}'.format(txid, siteid)
+	print 'Query about to be run: "{}"'.format(query)
+
+	cur.execute(query, (txid, siteid))
+
+	out_of_order_ids, in_order_ids = [], []
+
+	while True:
+		r = cur.fetchone()
+		if r is None: break
+		r = tuple(r)
+		id, period = r
+		print 'Raw:', r
+		print 'Period:', period
+		if period is None:
+			in_order_ids.append(id)
+		else:
+			out_of_order_ids.append(id)
+
+	print 'partition_by_interval_calculation() end'
+	return out_of_order_ids, in_order_ids
+
 
 PROCESS_GOOD = 0
 PROCESS_BAD = 0
@@ -794,12 +831,23 @@ def get_sorted_timestamps(db_con, ids):
 	return sorted_pairs
 	
 
+def different_main():
+	db_con = qraat.util.get_db('writer')
 
+	siteid = 2
+	txid = 59
+
+	in_ids = (214188049, 214188050, 214188051, 214188052, 214188053, 214188054)
+	out_ids = (214200952,)
+
+	all_ids = in_ids + out_ids
+
+	out_order, in_order = partition_by_interval_calculation(db_con, all_ids, siteid, txid)
+
+	print '{} out of order, {} in order'.format(len(out_order), len(in_order))
 
 
 if __name__ == '__main__':
-	#cProfile.run('main()')
-	main()
-	#succ = are_points_in_radius(1.3, (0.5, 1.7, 3.7), 0.2)
-	#print 'Returned true' if succ else 'Returned false'
+	different_main()
+	# main()
 
