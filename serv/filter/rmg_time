@@ -200,6 +200,9 @@ def main():
 
 			# Only look up to 5 minutes *before* the present
 			limit = current_timestamp - (60 * 5)
+			
+			# Make sure we only examine complete windows.
+			limit = limit - (limit % CONFIG_INTERVAL_WINDOW_SIZE)
 
 			# NOTE: To prevent gigantic joins, there is an option to
 			# limit the amount of time the "untimed" mode of operation
@@ -209,6 +212,11 @@ def main():
 			base = None
 
 			ids = get_unscored_est_ids_up_to(db_con, arg_siteid, arg_txid, limit, base=base)
+
+			if len(ids) == 0:
+				print 'There are no IDs currently unscored, back to sleep.'
+				polling_delay()
+				continue
 
 			print 'Got the following unscored IDs:', ids
 
@@ -230,9 +238,32 @@ def main():
 
 			interval_chunked = time_chunk_ids(db_con, passed_filter_ids, data, CONFIG_INTERVAL_WINDOW_SIZE)
 
-			interval_map = get_interval_map(interval_chunked, id_to_interval)
+			interval_map = get_interval_map(out_of_order_ids, interval_chunked, id_to_interval)
 
-			verify_chunking(passed_filter_ids, interval_chunked)
+			print '---------------------------------'
+			for (k, v) in interval_map.items():
+				print '{} -> {}'.format(k, v)
+			print '---------------------------------'
+
+			# Calculate brand new intervals for those which need it
+			print 'Here are the chunks requiring interval calculation:'
+			for k in interval_chunked:
+				if k not in interval_map:
+					print 'No interval for {} yet.'.format(k)
+					interval = calculate_interval(db_con, interval_chunked[k])
+					if interval is None:
+						print 'Problem with computing interval for this.'
+					else:
+						print 'Interval computed:', interval
+						base, duration, siteid, txid = k
+						store_interval_assume(change_handler, interval, base, duration, txid, siteid)
+
+			
+			scores = time_filter(db_con, passed_filter_ids)
+
+			insert_scores(change_handler, scores)
+
+			print 'Scores inserted.'
 
 			# For each 'out-of-order' (already computed interval value) chunk,
 			# re-compute the interval value and see if it changes very much. If
@@ -245,29 +276,6 @@ def main():
 			
 
 
-			# Find everything that has not been scored
-			# Partition between that which is in an interval-computed chunk and that which is not (out-of-order vs. in-order)
-
-			# Find everything that is unscored and at least CONFIG_INTERVAL_WINDOW_SIZE before that which was most recently observed.
-
-			
-
-
-
-
-			# Everything that has not been scored at all (even new stuff will be parametrically filtered)
-			print 'frontier_parametric_score()'
-			ids = frontier_parametric_score(db_con, arg_txid, arg_siteid, change_handler, arguments)
-
-			# If there are intervals that have not been calculated yet - indicated by 
-			# print 'maybe_measure_new_interval()'
-			# maybe_measure_new_interval(ids, db_con, arg_txid, arg_siteid, change_handler)
-
-			# print 'Shutting down agreeably...'
-			# sys.exit(1)
-
-			print 'score_new_things()'
-			score_new_things(ids, db_con, change_handler)
 
 			polling_delay()
 		# Add unscored points to a queue for scoring
@@ -276,8 +284,47 @@ def main():
 # interval that is given by id_to_interval for ids in value of interval_chunked
 # (should all be the same; this is checked through assertions).
 
-def get_interval_map(interval_chunked, id_to_interval):
-	pass
+def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
+
+	intervals = defaultdict(list)
+
+	for (k, ids) in interval_chunked.items():
+
+		# Assert in or out
+		is_eligible = [x in eligible_ids for x in ids]
+
+		all_eligible = all(is_eligible)
+		none_eligible = not any(is_eligible)
+		if all_eligible:
+			pass
+		elif none_eligible:
+			print 'None of these are eligible right now, no interval computed.'
+			continue
+		else:
+			print 'WARNING: Mixed up situation, some in, some out...problematic. Not processing these IDs.'
+			continue
+		
+		interval = None
+		try:
+			interval = _get_interval_map_entry(ids, id_to_interval)
+			assert interval is not None
+			intervals[k].extend(ids)
+		except NotAllSameValueError:
+			print 'Uh oh! Not all the same!'
+
+	return intervals
+
+class NotAllSameValueError(Exception):
+	def __init__(self):
+		pass
+
+def _get_interval_map_entry(ids, id_to_interval):
+	for id in ids:
+		assert id in id_to_interval
+	vals = [id_to_interval[x] if x in id_to_interval else None for x in ids]
+	if not all([x == vals[0] for x in vals]):
+		raise NotAllSameValueError()
+	return vals[0]
 
 def partition_by_interval_calculation(db_con, ids, siteid, txid):
 	print 'partition_by_interval_calculation()'
@@ -461,6 +508,7 @@ def time_filter(db_con, ids):
 		if id not in intervals:
 			score = -1
 			print 'No interval found for:', id
+			assert False
 		else:
 			score = 0
 			# sys.exit(-1)
@@ -572,6 +620,10 @@ def get_unscored_est_ids_up_to(db_con, siteid, txid, limit, base=None):
 
 
 def read_est_records(db_con, ids):
+
+	if len(ids) == 0:
+		return []
+
 	cur = db_con.cursor()
 
 	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
@@ -579,6 +631,8 @@ def read_est_records(db_con, ids):
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
 	field_string = ', '.join(fields)
+	print 'Going to read {} ids'.format(len(ids))
+
 	q = 'SELECT {} FROM est WHERE ID IN ({});'.format(field_string, id_string)
 	rows = cur.execute(q)
 	
