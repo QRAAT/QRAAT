@@ -64,24 +64,6 @@ EXIT_REQUESTED = False
 
 CURSOR_ENABLED = False
 
-def filter_site(s):
-	sites = s.split(',')
-	sites = [int(x.strip()) for x in sites]
-	def f(x):
-		return x['siteid'] in sites
-	def g(x):
-		return x in sites
-	return f, g
-
-def filter_txid(s):
-	txids = s.split(',')
-	txids = [int(x.strip()) for x in txids]
-	def f(x):
-		return x['txid'] in txids
-	def g(x):
-		return x in txids
-	return f, g
-
 def noneFactory():
 	return None
 
