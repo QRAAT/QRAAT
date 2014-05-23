@@ -214,10 +214,9 @@ def main():
 
 			data = read_est_records(db_con, ids)
 
-			out_of_order_ids, in_order_ids = partition_by_interval_calculation(db_con, ids, arg_siteid, arg_txid)
+			out_of_order_ids, in_order_ids, id_to_interval = partition_by_interval_calculation(db_con, ids, arg_siteid, arg_txid)
 
 			print 'Found {} out of order, {} in order'.format(len(out_of_order_ids), len(in_order_ids))
-
 
 			# param filter
 			passed_filter_ids = parametrically_filter(db_con, data)
@@ -229,9 +228,19 @@ def main():
 				if k in passed_filter_ids: continue
 				change_handler.add_score(k, -2, 0)
 
-			interval_chunk = time_chunk_ids(db_con, passed_filter_ids, data, CONFIG_INTERVAL_WINDOW_SIZE)
+			interval_chunked = time_chunk_ids(db_con, passed_filter_ids, data, CONFIG_INTERVAL_WINDOW_SIZE)
 
-			verify_chunking(passed_filter_ids, interval_chunk)
+			interval_map = get_interval_map(interval_chunked, id_to_interval)
+
+			verify_chunking(passed_filter_ids, interval_chunked)
+
+			# For each 'out-of-order' (already computed interval value) chunk,
+			# re-compute the interval value and see if it changes very much. If
+			# it does, recompute all time scores in this chunk, if it does not,
+			# simply compute new scores of unscored points in the chunk using
+			# the old interval value.
+
+			
 
 			
 
@@ -263,6 +272,12 @@ def main():
 			polling_delay()
 		# Add unscored points to a queue for scoring
 
+# Returns interval_map, which has keys from interval_chunked mapping to the
+# interval that is given by id_to_interval for ids in value of interval_chunked
+# (should all be the same; this is checked through assertions).
+
+def get_interval_map(interval_chunked, id_to_interval):
+	pass
 
 def partition_by_interval_calculation(db_con, ids, siteid, txid):
 	print 'partition_by_interval_calculation()'
@@ -282,6 +297,8 @@ def partition_by_interval_calculation(db_con, ids, siteid, txid):
 
 	out_of_order_ids, in_order_ids = [], []
 
+	id_to_interval = {}
+
 	while True:
 		r = cur.fetchone()
 		if r is None: break
@@ -293,9 +310,10 @@ def partition_by_interval_calculation(db_con, ids, siteid, txid):
 			in_order_ids.append(id)
 		else:
 			out_of_order_ids.append(id)
+			id_to_interval[id] = period
 
 	print 'partition_by_interval_calculation() end'
-	return out_of_order_ids, in_order_ids
+	return out_of_order_ids, in_order_ids, id_to_interval
 
 
 PROCESS_GOOD = 0
@@ -496,7 +514,7 @@ def parametrically_filter(db_con, data):
 	for point in data.values():
 		registry.register_point(point)
 
-	ids = registry.get_all_ids()
+	# ids = registry.get_all_ids()
 
 	scored_points = None
 
@@ -848,6 +866,6 @@ def different_main():
 
 
 if __name__ == '__main__':
-	different_main()
-	# main()
+	# different_main()
+	main()
 
