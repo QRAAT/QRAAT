@@ -245,9 +245,15 @@ def main():
 				print '{} -> {}'.format(k, v)
 			print '---------------------------------'
 
+
 			# Calculate brand new intervals for those which need it
-			print 'Here are the chunks requiring interval calculation:'
 			for k in interval_chunked:
+
+				a = interval_chunked[k]
+				b = get_parametric_passed_ids_in_chunk(db_con, k)
+				# all_chunk_ids = interval_chunked[k] + get_parametric_passed_ids_in_chunk(db_con, k)
+				all_chunk_ids = a + b
+
 				if k not in interval_map:
 					print 'No interval for {} yet.'.format(k)
 					interval = calculate_interval(db_con, interval_chunked[k])
@@ -257,6 +263,16 @@ def main():
 						print 'Interval computed:', interval
 						base, duration, siteid, txid = k
 						store_interval_assume(change_handler, interval, base, duration, txid, siteid)
+				else:
+					# For each 'out-of-order' (already computed interval value)
+					# chunk, re-compute the interval value and see if it
+					# changes very much. If it does, recompute all time scores
+					# in this chunk, if it does not, simply compute new scores
+					# of unscored points in the chunk using the old interval
+					# value.
+					old_interval = interval_map[k]
+					print 'Calculating out-of-order interval with {} items'.format(len(b))
+					new_interval = calculate_interval(db_con, b)
 
 			
 			scores = time_filter(db_con, passed_filter_ids)
@@ -265,12 +281,8 @@ def main():
 
 			print 'Scores inserted.'
 
-			# For each 'out-of-order' (already computed interval value) chunk,
-			# re-compute the interval value and see if it changes very much. If
-			# it does, recompute all time scores in this chunk, if it does not,
-			# simply compute new scores of unscored points in the chunk using
-			# the old interval value.
 
+			
 			
 
 			
@@ -279,6 +291,24 @@ def main():
 
 			polling_delay()
 		# Add unscored points to a queue for scoring
+
+
+def get_parametric_passed_ids_in_chunk(db_con, k):
+	cur = db_con.cursor()
+	base, duration, siteid, txid = k
+	q = 'select t.ID from (select ID from est where timestamp >= %s and timestamp <= %s and siteid = %s and txid = %s) t LEFT JOIN estscore ON t.ID = estscore.estid AND absscore < 0;'
+	cur.execute(q, (base, base + duration, siteid, txid))
+
+	ids = []
+
+	while True:
+		r = cur.fetchone()
+		if r is None: break
+		r = tuple(r)
+		ids.append(r[0])
+
+	return ids
+
 
 # Returns interval_map, which has keys from interval_chunked mapping to the
 # interval that is given by id_to_interval for ids in value of interval_chunked
@@ -298,7 +328,7 @@ def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
 		if all_eligible:
 			pass
 		elif none_eligible:
-			print 'None of these are eligible right now, no interval computed.'
+			print 'None of these are eligible right now, no interval found.'
 			continue
 		else:
 			print 'WARNING: Mixed up situation, some in, some out...problematic. Not processing these IDs.'
