@@ -963,3 +963,23 @@ def time_filter(db_con, ids):
 	print 'Currently {}/{}'.format(COUNT_GOOD, COUNT_ALL)
 
 	return scores
+
+
+
+
+def time_chunk_ids(db_con, ids, all_data, duration):
+
+	if len(ids) == 0: return {}
+
+	sorted_pairs = get_sorted_timestamps(db_con, ids)
+	chunks = defaultdict(list)
+	for (timestamp, id) in sorted_pairs:
+		datum = all_data[id]
+		# k = (basetime, duration)
+		d, m = divmod(timestamp, duration)
+		base = d * duration
+		k = (base, duration, datum['siteid'], datum['txid'])
+		# chunks[k].append(datum)
+		chunks[k].append(id)
+
+	return chunks
