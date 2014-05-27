@@ -899,3 +899,67 @@ def score(ids):
 	insert_scores(change_handler, scores, update=True)
 
 	print 'Scores inserted.'
+
+
+
+# Pre-condition: intervals must exist in the database covering all the items in ids
+
+def time_filter(db_con, ids):
+
+	global COUNT_GOOD, COUNT_ALL
+
+	if len(ids) == 0: return {}
+
+	data = read_est_records(db_con, ids)
+
+	all_timestamps = sorted([x['timestamp'] for x in data.values()])
+
+	scores = defaultdict(int)
+
+	intervals = get_intervals_from_db(db_con, ids)
+
+	COUNT_ALL += 1
+
+	if len(intervals) == 0:
+		COUNT_GOOD += 1
+
+	print 'Would write out data'
+	# for d in data.values():
+	# 	print '{} - {}'.format(d['ID'], d['timestamp'])
+
+	print 'Intervals computed for DB:', len(intervals)
+
+	# sys.exit(-1)
+
+	for id in ids:
+
+		score = None
+		
+		if id not in intervals:
+			score = -1
+			print 'No interval found for:', id
+			assert False
+		else:
+			score = 0
+			# sys.exit(-1)
+			# calculate possible center points to investigate
+			interval = intervals[id]
+			tstamp = data[id]['timestamp']
+			factors = [x for x in range(-CONFIG_DELTA_AWAY, CONFIG_DELTA_AWAY + 1) if x != 0]
+			offsets = [x * interval for x in factors]
+			absolute = [tstamp + x for x in offsets]
+			search_space = [(x - CONFIG_ERROR_ALLOWANCE, x + CONFIG_ERROR_ALLOWANCE) for x in absolute]
+
+			for start, end in search_space:
+				start_ind = bisect.bisect_left(all_timestamps, start)
+				end_ind = bisect.bisect_right(all_timestamps, end)
+				if start_ind == end_ind:
+					# No points found
+					pass
+				else:
+					score += 1
+			scores[id] = score
+
+	print 'Currently {}/{}'.format(COUNT_GOOD, COUNT_ALL)
+
+	return scores
