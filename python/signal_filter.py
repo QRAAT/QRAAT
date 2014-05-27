@@ -499,7 +499,8 @@ current_count = 0
 
 
 VALID_MODES = ('file', 'db', 'fileinc')
-QUERY_TEMPLATE = 'insert into estscore (estid, absscore, relscore) values (%s, %s, %s);\n'
+INSERT_TEMPLATE = 'insert into estscore (estid, absscore, relscore) values (%s, %s, %s);\n'
+UPDATE_TEMPLATE = 'update estscore set absscore = %s, relscore = %s where estid = %s;\n'
 
 #ADD_EVERY = 100
 ADD_EVERY = 0
@@ -537,6 +538,10 @@ class ChangeHandler:
 	def close(self):
 		getattr(self, 'close_' + self.mode)()
 
+	def db_execute_many(self, template, args):
+		cursor = self.obj.cursor()
+		cursor.executemany(template, args)
+
 	def add_sql(self, sql_text, sql_args):
 		getattr(self, 'add_sql_' + self.mode)(sql_text, sql_args)
 	
@@ -552,7 +557,7 @@ class ChangeHandler:
 		self.obj.close()
 
 	def add_score_file(self, estid, absscore, relscore):
-		s = QUERY_TEMPLATE % (estid, absscore, relscore)
+		s = INSERT_TEMPLATE % (estid, absscore, relscore)
 		self.obj.write(s)
 
 	def add_sql_file(self, sql_text, sql_args):
@@ -568,7 +573,7 @@ class ChangeHandler:
 		self.current_file_handle.close()
 
 	def add_score_fileinc(self, estid, absscore, relscore):
-		s = QUERY_TEMPLATE % (estid, absscore, relscore)
+		s = INSERT_TEMPLATE % (estid, absscore, relscore)
 		self.current_file_handle.write(s)
 
 	def add_sql_fileinc(self, sql_text, sql_args):
@@ -591,7 +596,7 @@ class ChangeHandler:
 		if ADD_EVERY == 0:
 			# Apply update immediately
 			cursor = self.obj.cursor()
-			cursor.execute(QUERY_TEMPLATE, (estid, absscore, relscore))
+			cursor.execute(INSERT_TEMPLATE, (estid, absscore, relscore))
 		else:
 			self.buffer.append((estid, absscore, relscore))
 			if len(self.buffer) >= ADD_EVERY:

@@ -109,6 +109,8 @@ def score(ids):
 		print 'score() with zero length input...'
 		return
 
+	id_set = set(ids)
+
 	data = read_est_records(db_con, ids, expanded=True)
 
 	out_of_order_ids, in_order_ids, id_to_interval = partition_by_interval_calculation(db_con, ids, arg_siteid, arg_txid)
@@ -117,6 +119,10 @@ def score(ids):
 
 	# param filter
 	passed_filter_ids = parametrically_filter(db_con, data)
+
+	passed_filter_ids_set = set(passed_filter_ids)
+
+	passed_filter_ids = id_set.intersection(passed_filter_ids_set)
 
 	print '{} items passed parametric filter'.format(len(passed_filter_ids))
 
@@ -167,16 +173,18 @@ def score(ids):
 			average = (old_interval + new_interval) / 2.
 			percentage_difference = math.abs(new_interval - old_interval) / average
 			if percentage_difference > CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD:
+				
 				pass
+			else:
+				# Add scores using the old_interval
+				# 
 
 	
 	scores = time_filter(db_con, passed_filter_ids)
 
-	insert_scores(change_handler, scores)
+	insert_scores(change_handler, scores, update=True)
 
 	print 'Scores inserted.'
-	
-	pass
 
 def main():
 
@@ -537,13 +545,61 @@ def verify_chunking(all_ids, chunked_ids):
 	for v in chunked_ids.values():
 		set2.update(v)
 	print '|1|: {}, |2|: {}, |1-2|: {}, |2-1|: {}, |1v2|: {}, |1^2|: {}'.format(len(set1), len(set2), len(set1.difference(set2)), len(set2.difference(set1)), len(set1.union(set2)), len(set1.intersection(set2)))
+
+def _rel_score(score):
+	rel_score_to_scale = score if score > 0 else 0
+	# change_handler.add_score(id, score, float(rel_score_to_scale) / (CONFIG_DELTA_AWAY * 2))
+	rel_score = float(rel_score_to_scale) / (CONFIG_DELTA_AWAY * 2)
+	return rel_score
+
 	
 
-def insert_scores(change_handler, scores):
+def insert_scores(change_handler, scores, update=False):
+
+	db_con = change_handler.obj
+
+	args = []
 	for (id, score) in scores.items():
-		rel_score_to_scale = score if score > 0 else 0
-		change_handler.add_score(id, score, float(rel_score_to_scale) / (CONFIG_DELTA_AWAY * 2))
-		#sql_w.write('update est set score = {} where ID = {};\n'.format(score, id))
+		rel_score = _rel_score(score)
+		args.append((id, score, rel_score))
+
+	if update:
+
+		all_to_insert = set(scores.keys())
+		cur = db_con.cursor()
+		ids_template = ', '.join(map(lambda x : '{}', ids))
+		id_string = ids_template.format(*ids)
+		q = 'SELECT estid in estscore WHERE estid IN ({})'.format(id_string)
+		rows = cur.execute(q)
+		already_there = set()
+		while True:
+			r = cur.fetchone()
+			if r is None: break
+			r = tuple(r)
+			already_there.add(r[0])
+
+		newly_there = all_to_insert.difference(already_there)
+
+		updates = []
+		for id in already_there:
+			score = scores[id]
+			rel_score = _rel_score(score)
+			updates.append((score, rel_score, id))
+		cur = db_con.cursor()
+		cur.executemany(qraat.signal_filter.UPDATE_TEMPLATE, updates)
+
+		inserts = []
+		for id in newly_there:
+			score = scores[id]
+			rel_score = _rel_score(score)
+			inserts.append((id, score, rel_score))
+		cur = db_con.cursor()
+		cur.executemany(qraat.signal_filter.INSERT_TEMPLATE, inserts)
+		
+
+		pass
+	else:
+		change_handler.db_execute_many(qraat.signal_filter.INSERT_TEMPLATE, args)
 
 def store_interval_assume(change_handler, interval, base, duration, txid, siteid):
 	print 'Storing interval={}, {}+{}'.format(interval, base, duration)
@@ -576,6 +632,8 @@ def get_intervals_from_db(db_con, ids):
 	
 COUNT_GOOD = 0
 COUNT_ALL = 0
+
+# Pre-condition: intervals must exist in the database covering all the items in ids
 
 def time_filter(db_con, ids):
 
