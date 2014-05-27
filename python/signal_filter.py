@@ -806,3 +806,96 @@ def overtone_vote(candidates):
 					votes[item] += 1
 
 	return votes
+
+
+
+
+
+
+# Input: a sequence of ids, each of which is the value of the ID field of an
+#	entry in the est table. Nothing in here should be brand new...a slight delay is applied in the higher-level program that makes sure there is context for scoring/interval calculation.
+# Output: none explicit - implicitly, score entries added for each id in ids
+
+def score(ids):
+	db_con = qraat.util.get_db('writer')
+
+	if len(ids) == 0:
+		print 'score() with zero length input...'
+		return
+
+	id_set = set(ids)
+
+	data = read_est_records(db_con, ids, expanded=True)
+
+	out_of_order_ids, in_order_ids, id_to_interval = partition_by_interval_calculation(db_con, ids, arg_siteid, arg_txid)
+
+	print 'Found {} out of order, {} in order'.format(len(out_of_order_ids), len(in_order_ids))
+
+	# param filter
+	passed_filter_ids = parametrically_filter(db_con, data)
+
+	passed_filter_ids_set = set(passed_filter_ids)
+
+	passed_filter_ids = id_set.intersection(passed_filter_ids_set)
+
+	print '{} items passed parametric filter'.format(len(passed_filter_ids))
+
+	# Insert scores for parametrically bad points...
+	for k in data.keys():
+		if k in passed_filter_ids: continue
+		change_handler.add_score(k, -2, 0)
+
+	interval_chunked = time_chunk_ids(db_con, passed_filter_ids, data, CONFIG_INTERVAL_WINDOW_SIZE)
+
+	interval_map = get_interval_map(out_of_order_ids, interval_chunked, id_to_interval)
+
+	print '---------------------------------'
+	for (k, v) in interval_map.items():
+		print '{} -> {}'.format(k, v)
+	print '---------------------------------'
+
+
+	# Calculate brand new intervals for those which need it
+	for k in interval_chunked:
+
+		a = interval_chunked[k]
+		b = get_parametric_passed_ids_in_chunk(db_con, k)
+		# all_chunk_ids = interval_chunked[k] + get_parametric_passed_ids_in_chunk(db_con, k)
+		all_chunk_ids = a + b
+
+		if k not in interval_map:
+			print 'No interval for {} yet.'.format(k)
+			interval = calculate_interval(db_con, interval_chunked[k])
+			if interval is None:
+				print 'Problem with computing interval for this.'
+			else:
+				print 'Interval computed:', interval
+				base, duration, siteid, txid = k
+				store_interval_assume(change_handler, interval, base, duration, txid, siteid)
+		else:
+			# For each 'out-of-order' (already computed interval value)
+			# chunk, re-compute the interval value and see if it
+			# changes very much. If it does, recompute all time scores
+			# in this chunk, if it does not, simply compute new scores
+			# of unscored points in the chunk using the old interval
+			# value.
+			old_interval = interval_map[k]
+			print 'Calculating out-of-order interval with {} items'.format(len(b))
+			new_interval = calculate_interval(db_con, b)
+
+			# Is new interval appreciably different from old interval?
+			average = (old_interval + new_interval) / 2.
+			percentage_difference = math.abs(new_interval - old_interval) / average
+			if percentage_difference > CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD:
+				
+				pass
+			else:
+				# Add scores using the old_interval
+				# 
+
+	
+	scores = time_filter(db_con, passed_filter_ids)
+
+	insert_scores(change_handler, scores, update=True)
+
+	print 'Scores inserted.'
