@@ -40,6 +40,11 @@ import qraat
 # Minimum legitimate value before an exception is raised
 CONFIG_MIN_INTERVAL = 0.8
 
+# Minimum interval percentage difference which must occur from old value to
+# trigger superceding of the interval with the new ones and re-scoring of
+# slice.
+CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD = 0.25
+
 # How long a period the interval should be calculated over
 CONFIG_INTERVAL_WINDOW_SIZE = float(3 * 60) # Three minutes (given in seconds)
 
@@ -92,6 +97,10 @@ def exit(signal, frame):
 def actually_exit():
 	print 'Exiting'
 	sys.exit(0)
+
+def score(ids):
+	db_con = qraat.util.get_db('writer')
+	pass
 
 def main():
 
@@ -255,6 +264,12 @@ def main():
 					old_interval = interval_map[k]
 					print 'Calculating out-of-order interval with {} items'.format(len(b))
 					new_interval = calculate_interval(db_con, b)
+
+					# Is new interval appreciably different from old interval?
+					average = (old_interval + new_interval) / 2.
+					percentage_difference = math.abs(new_interval - old_interval) / average
+					if percentage_difference > CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD:
+						pass
 
 			
 			scores = time_filter(db_con, passed_filter_ids)
