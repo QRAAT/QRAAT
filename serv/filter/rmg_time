@@ -880,36 +880,6 @@ def calculate_interval(db_con, ids):
 	assert len(intervals) == 1
 	return intervals[0]
 
-def get_sorted_timestamps(db_con, ids):
-	cur = db_con.cursor()
-
-	ids_template = ', '.join(map(lambda x : '{}', ids))
-	id_string = ids_template.format(*ids)
-	query = 'SELECT ID, timestamp FROM est where ID IN ({});'.format(id_string)
-	print 'About to execute query "{}"'.format(query)
-	rows = cur.execute(query)
-
-	# rows = cur.execute(q, (start, start + end, siteid, txid))
-	print 'Calculating interval from {} values...'.format(rows)
-
-	# Have to format the data as a sequence of (timestamp, id) 2-tuples...
-
-	pairs = []
-
-	while True:
-		r = cur.fetchone()
-		if r is None:
-			break
-		else:
-			r = tuple(r)
-			id = int(r[0])
-			timestamp = float(r[1])
-			t = (timestamp, id)
-			pairs.append(t)
-
-	sorted_pairs = sorted(pairs)
-
-	return sorted_pairs
 	
 
 def different_main():
