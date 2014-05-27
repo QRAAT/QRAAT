@@ -45,8 +45,6 @@ CONFIG_MIN_INTERVAL = 0.8
 # slice.
 CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD = 0.25
 
-# How long a period the interval should be calculated over
-CONFIG_INTERVAL_WINDOW_SIZE = float(3 * 60) # Three minutes (given in seconds)
 
 # Search this many interval distances in both directions of a point for corroborating neighbors
 CONFIG_DELTA_AWAY = 3
@@ -287,39 +285,6 @@ def main():
 
 
 
-# Returns interval_map, which has keys from interval_chunked mapping to the
-# interval that is given by id_to_interval for ids in value of interval_chunked
-# (should all be the same; this is checked through assertions).
-
-def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
-
-	intervals = defaultdict(list)
-
-	for (k, ids) in interval_chunked.items():
-
-		# Assert in or out
-		is_eligible = [x in eligible_ids for x in ids]
-
-		all_eligible = all(is_eligible)
-		none_eligible = not any(is_eligible)
-		if all_eligible:
-			pass
-		elif none_eligible:
-			print 'None of these are eligible right now, no interval found.'
-			continue
-		else:
-			print 'WARNING: Mixed up situation, some in, some out...problematic. Not processing these IDs.'
-			continue
-		
-		interval = None
-		try:
-			interval = _get_interval_map_entry(ids, id_to_interval)
-			assert interval is not None
-			intervals[k].extend(ids)
-		except NotAllSameValueError:
-			print 'Uh oh! Not all the same!'
-
-	return intervals
 
 class NotAllSameValueError(Exception):
 	def __init__(self):
@@ -333,41 +298,6 @@ def _get_interval_map_entry(ids, id_to_interval):
 		raise NotAllSameValueError()
 	return vals[0]
 
-def partition_by_interval_calculation(db_con, ids, siteid, txid):
-	print 'partition_by_interval_calculation()'
-
-	cur = db_con.cursor()
-
-	ids_template = ', '.join(map(lambda x : '{}', ids))
-	id_string = ids_template.format(*ids)
-
-	query_template = 'select t.ID as ID, interval_cache.period as period from (select ID, timestamp from est where ID in ({})) t LEFT JOIN interval_cache ON (t.timestamp >= interval_cache.start and t.timestamp <= interval_cache.start + interval_cache.valid_duration and interval_cache.txid = %s and interval_cache.siteid = %s)'
-	query = query_template.format(id_string)
-
-	print 'txid={}, siteid={}'.format(txid, siteid)
-	print 'Query about to be run: "{}"'.format(query)
-
-	cur.execute(query, (txid, siteid))
-
-	out_of_order_ids, in_order_ids = [], []
-
-	id_to_interval = {}
-
-	while True:
-		r = cur.fetchone()
-		if r is None: break
-		r = tuple(r)
-		id, period = r
-		print 'Raw:', r
-		print 'Period:', period
-		if period is None:
-			in_order_ids.append(id)
-		else:
-			out_of_order_ids.append(id)
-			id_to_interval[id] = period
-
-	print 'partition_by_interval_calculation() end'
-	return out_of_order_ids, in_order_ids, id_to_interval
 
 
 PROCESS_GOOD = 0
@@ -531,26 +461,6 @@ COUNT_ALL = 0
 	
 
 
-# Returns a list of IDs which pass the filter
-def parametrically_filter(db_con, data):
-
-	registry = qraat.signal_filter.Registry(None)
-	for point in data.values():
-		registry.register_point(point)
-
-	# ids = registry.get_all_ids()
-
-	scored_points = None
-
-	good_stuff, bad_stuff, good_ids, bad_ids, good_points, bad_points, good_xs, bad_xs, = None, None, None, None, None, None, None, None
-
-	good_stuff, bad_stuff = registry.screen_bad(registry.points)
-	print 'Got {} good items and {} bad items'.format(len(good_stuff), len(bad_stuff))
-
-	good_ids = [x['ID'] for x in good_stuff]
-	bad_ids = [x['ID'] for x in bad_stuff]
-
-	return good_ids
 
 
 	

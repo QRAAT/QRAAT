@@ -15,6 +15,7 @@
 
 from collections import defaultdict
 import collections
+import decimal
 import itertools
 import matplotlib.pyplot
 from numpy import histogram
@@ -35,6 +36,9 @@ THRESHOLD_BAND10 = 900
 
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
 CONFIG_JUST_STAGE_CHANGES = False
+
+# How long a period the interval should be calculated over
+CONFIG_INTERVAL_WINDOW_SIZE = float(3 * 60) # Three minutes (given in seconds)
 
 class Registry:
 
@@ -821,6 +825,7 @@ def overtone_vote(candidates):
 # Output: none explicit - implicitly, score entries added for each id in ids
 
 def score(ids):
+	change_handler = init_change_handler()
 	db_con = qraat.util.get_db('writer')
 
 	if len(ids) == 0:
@@ -831,7 +836,16 @@ def score(ids):
 
 	data = read_est_records(db_con, ids, expanded=True)
 
-	out_of_order_ids, in_order_ids, id_to_interval = partition_by_interval_calculation(db_con, ids, arg_siteid, arg_txid)
+	cur = db_con.cursor()
+	ids_template = ', '.join(map(lambda x : '{}', ids))
+	id_string = ids_template.format(*ids)
+	q = 'SELECT DISTINCT siteid, txid from est WHERE ID IN ({});'.format(id_string)
+	rows = cur.execute(q)
+	r = cur.fetchone()
+	assert rows == 1
+	siteid, txid = r
+
+	out_of_order_ids, in_order_ids, id_to_interval = partition_by_interval_calculation(db_con, ids, siteid, txid)
 
 	print 'Found {} out of order, {} in order'.format(len(out_of_order_ids), len(in_order_ids))
 
@@ -846,7 +860,7 @@ def score(ids):
 
 	# Insert scores for parametrically bad points...
 	for id in id_set.difference(all_that_passed_filter_ids):
-		change_handler.add_score(k, -2, 0)
+		change_handler.add_score(id, -2, 0)
 
 	interval_chunked = time_chunk_ids(db_con, data, CONFIG_INTERVAL_WINDOW_SIZE)
 
@@ -966,7 +980,7 @@ def time_chunk_ids(db_con, all_data, duration):
 
 	if len(all_data) == 0: return {}
 
-	sorted_pairs = get_sorted_timestamps(all_data)
+	sorted_pairs = get_sorted_timestamps(all_data.values())
 	chunks = defaultdict(list)
 	for (timestamp, id) in sorted_pairs:
 		datum = all_data[id]
@@ -983,7 +997,8 @@ def time_chunk_ids(db_con, all_data, duration):
 def get_sorted_timestamps(data):
 	pairs = []
 	for datum in data:
-		t = (data['timestamp'], data['ID'])
+		print 'datum:', datum
+		t = (datum['timestamp'], datum['ID'])
 		pairs.append(t)
 
 	sorted_pairs = sorted(pairs)
@@ -1023,6 +1038,7 @@ def calculate_interval(db_con, ids):
 
 	print 'calculate_interval for {} values'.format(len(ids))
 
+	assert False
 	sorted_pairs = get_sorted_timestamps(db_con, ids)
 	print 'Got {} sorted pairs'.format(len(sorted_pairs))
 	print '---'
@@ -1099,3 +1115,97 @@ def read_est_records(db_con, ids, expanded=False):
 		site_data[named_row['ID']] = named_row
 
 	return site_data
+
+
+def partition_by_interval_calculation(db_con, ids, siteid, txid):
+	print 'partition_by_interval_calculation()'
+
+	cur = db_con.cursor()
+
+	ids_template = ', '.join(map(lambda x : '{}', ids))
+	id_string = ids_template.format(*ids)
+
+	query_template = 'select t.ID as ID, interval_cache.period as period from (select ID, timestamp from est where ID in ({})) t LEFT JOIN interval_cache ON (t.timestamp >= interval_cache.start and t.timestamp <= interval_cache.start + interval_cache.valid_duration and interval_cache.txid = %s and interval_cache.siteid = %s)'
+	query = query_template.format(id_string)
+
+	print 'txid={}, siteid={}'.format(txid, siteid)
+	print 'Query about to be run: "{}"'.format(query)
+
+	cur.execute(query, (txid, siteid))
+
+	out_of_order_ids, in_order_ids = [], []
+
+	id_to_interval = {}
+
+	while True:
+		r = cur.fetchone()
+		if r is None: break
+		r = tuple(r)
+		id, period = r
+		print 'Raw:', r
+		print 'Period:', period
+		if period is None:
+			in_order_ids.append(id)
+		else:
+			out_of_order_ids.append(id)
+			id_to_interval[id] = period
+
+	print 'partition_by_interval_calculation() end'
+	return out_of_order_ids, in_order_ids, id_to_interval
+
+
+# Returns a list of IDs which pass the filter
+def parametrically_filter(db_con, data):
+
+	registry = qraat.signal_filter.Registry(None)
+	for point in data.values():
+		registry.register_point(point)
+
+	# ids = registry.get_all_ids()
+
+	scored_points = None
+
+	good_stuff, bad_stuff, good_ids, bad_ids, good_points, bad_points, good_xs, bad_xs, = None, None, None, None, None, None, None, None
+
+	good_stuff, bad_stuff = registry.screen_bad(registry.points)
+	print 'Got {} good items and {} bad items'.format(len(good_stuff), len(bad_stuff))
+
+	good_ids = [x['ID'] for x in good_stuff]
+	bad_ids = [x['ID'] for x in bad_stuff]
+
+	return good_ids
+
+
+# Returns interval_map, which has keys from interval_chunked mapping to the
+# interval that is given by id_to_interval for ids in value of interval_chunked
+# (should all be the same; this is checked through assertions).
+
+def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
+
+	intervals = defaultdict(list)
+
+	for (k, ids) in interval_chunked.items():
+
+		# Assert in or out
+		is_eligible = [x in eligible_ids for x in ids]
+
+		all_eligible = all(is_eligible)
+		none_eligible = not any(is_eligible)
+		if all_eligible:
+			pass
+		elif none_eligible:
+			print 'None of these are eligible right now, no interval found.'
+			continue
+		else:
+			print 'WARNING: Mixed up situation, some in, some out...problematic. Not processing these IDs.'
+			continue
+		
+		interval = None
+		try:
+			interval = _get_interval_map_entry(ids, id_to_interval)
+			assert interval is not None
+			intervals[k].extend(ids)
+		except NotAllSameValueError:
+			print 'Uh oh! Not all the same!'
+
+	return intervals
