@@ -980,7 +980,7 @@ def time_chunk_ids(db_con, all_data, duration):
 
 	if len(all_data) == 0: return {}
 
-	sorted_pairs = get_sorted_timestamps(all_data.values())
+	sorted_pairs = get_sorted_timestamps_from_data(all_data.values())
 	chunks = defaultdict(list)
 	for (timestamp, id) in sorted_pairs:
 		datum = all_data[id]
@@ -994,11 +994,11 @@ def time_chunk_ids(db_con, all_data, duration):
 	return chunks
 
 
-def get_sorted_timestamps(db_con, ids):
+def get_sorted_timestamps_from_ids(db_con, ids):
 	records = read_est_records(db_con, ids)
-	return get_sorted_timestamps(records)
+	return get_sorted_timestamps_from_data(records.values())
 
-def get_sorted_timestamps(data):
+def get_sorted_timestamps_from_data(data):
 	pairs = []
 	for datum in data:
 		print 'datum:', datum
@@ -1042,7 +1042,7 @@ def calculate_interval(db_con, ids):
 
 	print 'calculate_interval for {} values'.format(len(ids))
 
-	sorted_pairs = get_sorted_timestamps(db_con, ids)
+	sorted_pairs = get_sorted_timestamps_from_ids(db_con, ids)
 	print 'Got {} sorted pairs'.format(len(sorted_pairs))
 	print '---'
 	for (i, (timestamp, val)) in enumerate(sorted_pairs):
@@ -1210,5 +1210,29 @@ def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
 			intervals[k].extend(ids)
 		except NotAllSameValueError:
 			print 'Uh oh! Not all the same!'
+
+	return intervals
+
+def get_intervals_from_db(db_con, ids):
+
+	print 'get intervals for:', ids
+
+	cur = db_con.cursor()
+
+	ids_template = ', '.join(map(lambda x : '{}', ids))
+	id_string = ids_template.format(*ids)
+	q = 'select t.ID, interval_cache.period from interval_cache RIGHT JOIN (select ID, timestamp, siteid, txid from est where ID in ({})) as t ON (t.siteid = interval_cache.siteid and t.txid = interval_cache.txid and t.timestamp >= interval_cache.start and t.timestamp <= interval_cache.start + interval_cache.valid_duration) where interval_cache.start IS NOT NULL;'
+
+	row = cur.execute(q.format(id_string))
+
+	intervals = {}
+
+	while True:
+		r = cur.fetchone()
+		if r is None: break
+		r = tuple(r)
+		intervals[r[0]] = float(r[1])
+
+	print 'Intervals returned from DB:', intervals
 
 	return intervals

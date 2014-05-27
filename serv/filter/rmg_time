@@ -428,29 +428,6 @@ def insert_scores(change_handler, scores, update=False):
 		change_handler.db_execute_many(qraat.signal_filter.INSERT_TEMPLATE, args)
 
 
-def get_intervals_from_db(db_con, ids):
-
-	print 'get intervals for:', ids
-
-	cur = db_con.cursor()
-
-	ids_template = ', '.join(map(lambda x : '{}', ids))
-	id_string = ids_template.format(*ids)
-	q = 'select t.ID, interval_cache.period from interval_cache RIGHT JOIN (select ID, timestamp, siteid, txid from est where ID in ({})) as t ON (t.siteid = interval_cache.siteid and t.txid = interval_cache.txid and t.timestamp >= interval_cache.start and t.timestamp <= interval_cache.start + interval_cache.valid_duration) where interval_cache.start IS NOT NULL;'
-
-	row = cur.execute(q.format(id_string))
-
-	intervals = {}
-
-	while True:
-		r = cur.fetchone()
-		if r is None: break
-		r = tuple(r)
-		intervals[r[0]] = float(r[1])
-
-	print 'Intervals returned from DB:', intervals
-
-	return intervals
 	
 COUNT_GOOD = 0
 COUNT_ALL = 0
