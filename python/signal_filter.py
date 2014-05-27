@@ -874,7 +874,6 @@ def score(ids):
 
 	# Calculate brand new intervals for those which need it
 	for k in interval_chunked:
-
 		a = interval_chunked[k]
 		# b = get_parametric_passed_ids_in_chunk(db_con, k)
 		# all_chunk_ids = interval_chunked[k] + get_parametric_passed_ids_in_chunk(db_con, k)
@@ -890,8 +889,11 @@ def score(ids):
 				print 'Interval computed:', interval
 				base, duration, siteid, txid = k
 				store_interval_assume(change_handler, interval, base, duration, txid, siteid)
+				print 'Stored interval for: {}+{}: {}'.format(base, duration, interval)
 
-				scores = time_filter(db_con, passed_filter_ids_set, in_context_of=all_chunk_ids)
+				print 'About to time filter now!'
+				scores = time_filter(db_con, new_filtered_ids, in_context_of=all_chunk_ids)
+				print 'Did I succeed?'
 				insert_scores(change_handler, scores)
 		else:
 			# For each 'out-of-order' (already computed interval value)
@@ -935,7 +937,11 @@ def time_filter(db_con, ids, in_context_of=None):
 
 	scores = defaultdict(int)
 
-	intervals = get_intervals_from_db(db_con, ids)
+	intervals = get_intervals_from_db(db_con, ids, insert_as_needed=True)
+	orphan_keys = [x for x in ids if x not in intervals.keys()]
+	if len(orphan_keys) > 0:
+		print 'Orphan keys #:', len(orphan_keys)
+		assert False
 
 	print 'Would write out data'
 
@@ -1101,7 +1107,7 @@ def read_est_records(db_con, ids, expanded=False):
 	else:
 		ids_template = ', '.join(map(lambda x : '{}', ids))
 		id_string = ids_template.format(*ids)
-		print 'Going to read {} ids'.format(len(ids))
+		# print 'Going to read {} ids'.format(len(ids))
 		q = 'SELECT {} FROM est WHERE ID IN ({});'.format(field_string, id_string)
 		rows = cur.execute(q.format(field_string, id_string))
 	
@@ -1213,9 +1219,12 @@ def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
 
 	return intervals
 
-def get_intervals_from_db(db_con, ids):
+def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 
-	print 'get intervals for:', ids
+	# change handler
+	change_handler = ChangeHandler(db_con, 'db')
+
+	# print 'get intervals for:', ids
 
 	cur = db_con.cursor()
 
@@ -1234,5 +1243,19 @@ def get_intervals_from_db(db_con, ids):
 		intervals[r[0]] = float(r[1])
 
 	print 'Intervals returned from DB:', intervals
+
+	ids_with_intervals = intervals.keys()
+
+	ids_with_no_interval = [x for x in ids if x not in ids_with_intervals]
+	if len(ids_with_no_interval) == 0:
+		if insert_as_needed:
+			data = read_est_records(db_con, ids)
+			interval_chunked = time_chunk_ids(db_con, data, CONFIG_INTERVAL_WINDOW_SIZE)
+			for interval_key, interval_ids in interval_chunked.items():
+				base, duration, siteid, txid = interval_key
+				interval = calculate_interval(db_con, interval_ids)
+				store_interval_assume(change_handler, interval, base, duration, txid, siteid)
+		else:
+			assert False
 
 	return intervals
