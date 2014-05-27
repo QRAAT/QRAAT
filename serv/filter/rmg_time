@@ -286,9 +286,6 @@ def main():
 
 
 
-class NotAllSameValueError(Exception):
-	def __init__(self):
-		pass
 
 def _get_interval_map_entry(ids, id_to_interval):
 	for id in ids:

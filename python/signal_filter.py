@@ -1307,3 +1307,7 @@ def insert_scores(change_handler, scores, update=False):
 		pass
 	else:
 		change_handler.db_execute_many(qraat.signal_filter.INSERT_TEMPLATE, args)
+
+class NotAllSameValueError(Exception):
+	def __init__(self):
+		pass
