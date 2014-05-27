@@ -832,20 +832,19 @@ def score(ids):
 	print 'Found {} out of order, {} in order'.format(len(out_of_order_ids), len(in_order_ids))
 
 	# param filter
-	passed_filter_ids = parametrically_filter(db_con, data)
+	all_that_passed_filter_ids = parametrically_filter(db_con, data)
 
-	passed_filter_ids_set = set(passed_filter_ids)
+	passed_filter_ids_set = set(all_that_passed_filter_ids)
 
-	passed_filter_ids = id_set.intersection(passed_filter_ids_set)
+	new_filtered_ids = id_set.intersection(passed_filter_ids_set)
 
-	print '{} items passed parametric filter'.format(len(passed_filter_ids))
+	print '{} items passed parametric filter'.format(len(new_filtered_ids))
 
 	# Insert scores for parametrically bad points...
-	for k in data.keys():
-		if k in passed_filter_ids: continue
+	for id in id_set.difference(all_that_passed_filter_ids):
 		change_handler.add_score(k, -2, 0)
 
-	interval_chunked = time_chunk_ids(db_con, passed_filter_ids, data, CONFIG_INTERVAL_WINDOW_SIZE)
+	interval_chunked = time_chunk_ids(db_con, data, CONFIG_INTERVAL_WINDOW_SIZE)
 
 	interval_map = get_interval_map(out_of_order_ids, interval_chunked, id_to_interval)
 
@@ -859,9 +858,10 @@ def score(ids):
 	for k in interval_chunked:
 
 		a = interval_chunked[k]
-		b = get_parametric_passed_ids_in_chunk(db_con, k)
+		# b = get_parametric_passed_ids_in_chunk(db_con, k)
 		# all_chunk_ids = interval_chunked[k] + get_parametric_passed_ids_in_chunk(db_con, k)
-		all_chunk_ids = a + b
+		all_chunk_ids = a
+		# all_chunk_ids = a + b
 
 		if k not in interval_map:
 			print 'No interval for {} yet.'.format(k)
@@ -872,6 +872,9 @@ def score(ids):
 				print 'Interval computed:', interval
 				base, duration, siteid, txid = k
 				store_interval_assume(change_handler, interval, base, duration, txid, siteid)
+
+				scores = time_filter(db_con, passed_filter_ids_set, in_context_of=all_chunk_ids)
+				insert_scores(change_handler, scores)
 		else:
 			# For each 'out-of-order' (already computed interval value)
 			# chunk, re-compute the interval value and see if it
@@ -887,30 +890,28 @@ def score(ids):
 			average = (old_interval + new_interval) / 2.
 			percentage_difference = math.abs(new_interval - old_interval) / average
 			if percentage_difference > CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD:
-				
+				store_interval_update(change_handler, new_interval, base, duration, txid, siteid)
+				scores = time_filter(db_con, all_chunk_ids_set)
+				insert_scores(change_handler, scores, update=True)
 				pass
 			else:
-				# Add scores using the old_interval
-				# 
+				scores = time_filter(db_con, passed_filter_ids_set, in_context_of=all_chunk_ids)
+				insert_scores(change_handler, scores)
 
 	
-	scores = time_filter(db_con, passed_filter_ids)
-
-	insert_scores(change_handler, scores, update=True)
-
 	print 'Scores inserted.'
 
 
 
 # Pre-condition: intervals must exist in the database covering all the items in ids
 
-def time_filter(db_con, ids):
-
-	global COUNT_GOOD, COUNT_ALL
+def time_filter(db_con, ids, in_context_of=None):
 
 	if len(ids) == 0: return {}
 
-	data = read_est_records(db_con, ids)
+	context = ids if in_context_of is None else in_context_of
+
+	data = read_est_records(db_con, context)
 
 	all_timestamps = sorted([x['timestamp'] for x in data.values()])
 
@@ -918,18 +919,9 @@ def time_filter(db_con, ids):
 
 	intervals = get_intervals_from_db(db_con, ids)
 
-	COUNT_ALL += 1
-
-	if len(intervals) == 0:
-		COUNT_GOOD += 1
-
 	print 'Would write out data'
-	# for d in data.values():
-	# 	print '{} - {}'.format(d['ID'], d['timestamp'])
 
 	print 'Intervals computed for DB:', len(intervals)
-
-	# sys.exit(-1)
 
 	for id in ids:
 
@@ -941,7 +933,6 @@ def time_filter(db_con, ids):
 			assert False
 		else:
 			score = 0
-			# sys.exit(-1)
 			# calculate possible center points to investigate
 			interval = intervals[id]
 			tstamp = data[id]['timestamp']
@@ -967,11 +958,11 @@ def time_filter(db_con, ids):
 
 
 
-def time_chunk_ids(db_con, ids, all_data, duration):
+def time_chunk_ids(db_con, all_data, duration):
 
-	if len(ids) == 0: return {}
+	if len(all_data) == 0: return {}
 
-	sorted_pairs = get_sorted_timestamps(db_con, ids)
+	sorted_pairs = get_sorted_timestamps(all_data)
 	chunks = defaultdict(list)
 	for (timestamp, id) in sorted_pairs:
 		datum = all_data[id]
@@ -985,33 +976,65 @@ def time_chunk_ids(db_con, ids, all_data, duration):
 	return chunks
 
 
-def get_sorted_timestamps(db_con, ids):
-	cur = db_con.cursor()
-
-	ids_template = ', '.join(map(lambda x : '{}', ids))
-	id_string = ids_template.format(*ids)
-	query = 'SELECT ID, timestamp FROM est where ID IN ({});'.format(id_string)
-	print 'About to execute query "{}"'.format(query)
-	rows = cur.execute(query)
-
-	# rows = cur.execute(q, (start, start + end, siteid, txid))
-	print 'Calculating interval from {} values...'.format(rows)
-
-	# Have to format the data as a sequence of (timestamp, id) 2-tuples...
-
+def get_sorted_timestamps(data):
 	pairs = []
-
-	while True:
-		r = cur.fetchone()
-		if r is None:
-			break
-		else:
-			r = tuple(r)
-			id = int(r[0])
-			timestamp = float(r[1])
-			t = (timestamp, id)
-			pairs.append(t)
+	for datum in data:
+		t = (data['timestamp'], data['ID'])
+		pairs.append(t)
 
 	sorted_pairs = sorted(pairs)
 
 	return sorted_pairs
+
+
+
+def get_parametric_passed_ids_in_chunk(db_con, k):
+	cur = db_con.cursor()
+	base, duration, siteid, txid = k
+	q = 'select t.ID from (select ID from est where timestamp >= %s and timestamp <= %s and siteid = %s and txid = %s) t LEFT JOIN estscore ON t.ID = estscore.estid AND absscore < 0;'
+	cur.execute(q, (base, base + duration, siteid, txid))
+
+	ids = []
+
+	while True:
+		r = cur.fetchone()
+		if r is None: break
+		r = tuple(r)
+		ids.append(r[0])
+
+	return ids
+
+def store_interval_assume(change_handler, interval, base, duration, txid, siteid):
+	print 'Storing interval={}, {}+{}'.format(interval, base, duration)
+	q = 'insert into interval_cache (period, start, valid_duration, txid, siteid) values (%s, %s, %s, %s, %s);'
+	change_handler.add_sql(q, (interval, base, duration, txid, siteid))
+
+def store_interval_update(change_handler, interval, base, duration, txid, siteid):
+	print 'Updating interval={}, {}+{}'.format(interval, base, duration)
+	q = 'update interval_cache set interval = %s where base = %s and duration = %s and txid = %s and siteid = %s;'
+	change_handler.add_sql(q, (interval, base, duration, txid, siteid))
+
+
+def calculate_interval(db_con, ids):
+
+	print 'calculate_interval for {} values'.format(len(ids))
+
+	sorted_pairs = get_sorted_timestamps(db_con, ids)
+	print 'Got {} sorted pairs'.format(len(sorted_pairs))
+	print '---'
+	for (i, (timestamp, val)) in enumerate(sorted_pairs):
+		print '{}. {}'.format(i + 1, timestamp)
+	print '---'
+
+	interval_windows = qraat.signal_filter.WindowIterator(sorted_pairs, None)
+
+	intervals = []
+
+	# There should only be one.
+	for (i, w) in enumerate(interval_windows):
+		print 'Processed interval window:', (i+1)
+		interval = w.calculate_interval_from()
+		print 'Produced interval:', interval
+		intervals.append(interval)
+	assert len(intervals) == 1
+	return intervals[0]

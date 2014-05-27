@@ -287,21 +287,6 @@ def main():
 		# Add unscored points to a queue for scoring
 
 
-def get_parametric_passed_ids_in_chunk(db_con, k):
-	cur = db_con.cursor()
-	base, duration, siteid, txid = k
-	q = 'select t.ID from (select ID from est where timestamp >= %s and timestamp <= %s and siteid = %s and txid = %s) t LEFT JOIN estscore ON t.ID = estscore.estid AND absscore < 0;'
-	cur.execute(q, (base, base + duration, siteid, txid))
-
-	ids = []
-
-	while True:
-		r = cur.fetchone()
-		if r is None: break
-		r = tuple(r)
-		ids.append(r[0])
-
-	return ids
 
 
 # Returns interval_map, which has keys from interval_chunked mapping to the
@@ -514,10 +499,6 @@ def insert_scores(change_handler, scores, update=False):
 	else:
 		change_handler.db_execute_many(qraat.signal_filter.INSERT_TEMPLATE, args)
 
-def store_interval_assume(change_handler, interval, base, duration, txid, siteid):
-	print 'Storing interval={}, {}+{}'.format(interval, base, duration)
-	q = 'insert into interval_cache (period, start, valid_duration, txid, siteid) values (%s, %s, %s, %s, %s);'
-	change_handler.add_sql(q, (interval, base, duration, txid, siteid))
 
 def get_intervals_from_db(db_con, ids):
 
@@ -856,29 +837,6 @@ def add_record_for_interval(db_con, timestamp, siteid, txid, recalculate=False):
 	# return intervals
 	
 
-def calculate_interval(db_con, ids):
-
-	print 'calculate_interval for {} values'.format(len(ids))
-
-	sorted_pairs = get_sorted_timestamps(db_con, ids)
-	print 'Got {} sorted pairs'.format(len(sorted_pairs))
-	print '---'
-	for (i, (timestamp, val)) in enumerate(sorted_pairs):
-		print '{}. {}'.format(i + 1, timestamp)
-	print '---'
-
-	interval_windows = qraat.signal_filter.WindowIterator(sorted_pairs, None)
-
-	intervals = []
-
-	# There should only be one.
-	for (i, w) in enumerate(interval_windows):
-		print 'Processed interval window:', (i+1)
-		interval = w.calculate_interval_from()
-		print 'Produced interval:', interval
-		intervals.append(interval)
-	assert len(intervals) == 1
-	return intervals[0]
 
 	
 
