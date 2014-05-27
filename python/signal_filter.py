@@ -32,6 +32,10 @@ import util
 THRESHOLD_BAND3 = 150
 THRESHOLD_BAND10 = 900
 
+
+# False if actually apply changes to database, True if just write script to file (update.sql in cwd)
+CONFIG_JUST_STAGE_CHANGES = False
+
 class Registry:
 
 	def __init__(self, args):
@@ -1038,3 +1042,60 @@ def calculate_interval(db_con, ids):
 		intervals.append(interval)
 	assert len(intervals) == 1
 	return intervals[0]
+
+
+def init_change_handler():
+	change_handler = None
+	if CONFIG_JUST_STAGE_CHANGES:
+		sql_output_filename = 'update.sql'
+		sql_w = open(sql_output_filename, 'w')
+		change_handler = qraat.signal_filter.ChangeHandler(sql_w, 'file')
+	else:
+		# NOTE: I don't declare the db connection here, because passing it
+		# between modules seems to mess things up.
+		change_handler = qraat.signal_filter.ChangeHandler(None, 'db')
+	return change_handler
+
+
+def read_est_records(db_con, ids, expanded=False):
+
+	if len(ids) == 0:
+		return []
+
+	cur = db_con.cursor()
+
+	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
+
+	rows = None
+
+	field_string = ', '.join(fields)
+
+	if expanded:
+		q = 'SELECT min(timestamp), max(timestamp) FROM est;'
+		rows = cur.execute(q)
+		r = cur.fetchone()
+		r = tuple(r)
+		min, max = r
+		cur = db_con.cursor()
+		q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s'
+		rows = cur.execute(q.format(field_string), (min, max))
+	else:
+		ids_template = ', '.join(map(lambda x : '{}', ids))
+		id_string = ids_template.format(*ids)
+		print 'Going to read {} ids'.format(len(ids))
+		q = 'SELECT {} FROM est WHERE ID IN ({});'.format(field_string, id_string)
+		rows = cur.execute(q.format(field_string, id_string))
+	
+	site_data = {}
+	r = None
+	while True:
+		r = cur.fetchone()
+		if r is None: break
+		r = tuple(r)
+		named_row = dict(zip(fields, r))
+		for k in named_row:
+			if named_row[k].__class__ == decimal.Decimal:
+				named_row[k] = float(named_row[k])
+		site_data[named_row['ID']] = named_row
+
+	return site_data

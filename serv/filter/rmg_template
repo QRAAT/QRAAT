@@ -23,8 +23,6 @@ import time, os, sys, commands
 import MySQLdb as mdb
 from optparse import OptionParser
 
-import rmg_time
-
 # Check for running instances of this program. 
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
@@ -59,7 +57,7 @@ try:
   total_chunks = int((t_end - t_start) / float(chunk_size)) + 1
   start_times = [(t_start + (i * chunk_size)) for i in range(total_chunks)]
   intervals = [(x, min(t_end, x + chunk_size)) for x in start_times]
-  change_handler = rmg_time.init_change_handler()
+  change_handler = qraat.signal_filter.init_change_handler()
   for start, end in intervals:
     # print '{} - {}'.format(start, end)
     # Get all unscored IDs in this chunk
@@ -79,7 +77,7 @@ try:
       print 'No IDs to process.'
     else:
       print 'Here goes.'
-      rmg_time.score(l)
+      qraat.signal_filter.score(l)
       print 'Done.'
     
 except mdb.Error, e:
