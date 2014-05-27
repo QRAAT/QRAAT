@@ -994,6 +994,10 @@ def time_chunk_ids(db_con, all_data, duration):
 	return chunks
 
 
+def get_sorted_timestamps(db_con, ids):
+	records = read_est_records(db_con, ids)
+	return get_sorted_timestamps(records)
+
 def get_sorted_timestamps(data):
 	pairs = []
 	for datum in data:
@@ -1038,7 +1042,6 @@ def calculate_interval(db_con, ids):
 
 	print 'calculate_interval for {} values'.format(len(ids))
 
-	assert False
 	sorted_pairs = get_sorted_timestamps(db_con, ids)
 	print 'Got {} sorted pairs'.format(len(sorted_pairs))
 	print '---'
