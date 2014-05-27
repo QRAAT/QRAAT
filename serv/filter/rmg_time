@@ -380,52 +380,6 @@ def _rel_score(score):
 
 	
 
-def insert_scores(change_handler, scores, update=False):
-
-	db_con = change_handler.obj
-
-	args = []
-	for (id, score) in scores.items():
-		rel_score = _rel_score(score)
-		args.append((id, score, rel_score))
-
-	if update:
-
-		all_to_insert = set(scores.keys())
-		cur = db_con.cursor()
-		ids_template = ', '.join(map(lambda x : '{}', ids))
-		id_string = ids_template.format(*ids)
-		q = 'SELECT estid in estscore WHERE estid IN ({})'.format(id_string)
-		rows = cur.execute(q)
-		already_there = set()
-		while True:
-			r = cur.fetchone()
-			if r is None: break
-			r = tuple(r)
-			already_there.add(r[0])
-
-		newly_there = all_to_insert.difference(already_there)
-
-		updates = []
-		for id in already_there:
-			score = scores[id]
-			rel_score = _rel_score(score)
-			updates.append((score, rel_score, id))
-		cur = db_con.cursor()
-		cur.executemany(qraat.signal_filter.UPDATE_TEMPLATE, updates)
-
-		inserts = []
-		for id in newly_there:
-			score = scores[id]
-			rel_score = _rel_score(score)
-			inserts.append((id, score, rel_score))
-		cur = db_con.cursor()
-		cur.executemany(qraat.signal_filter.INSERT_TEMPLATE, inserts)
-		
-
-		pass
-	else:
-		change_handler.db_execute_many(qraat.signal_filter.INSERT_TEMPLATE, args)
 
 
 	
