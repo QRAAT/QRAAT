@@ -1,7 +1,8 @@
 #!/usr/bin/python2
-# rmg_template
-# Template for writing scripts. This program is part of QRAAT, 
-# an automated animal tracking system based on GNU Radio. 
+# rmg_filter_auto
+# Script to call for time filtering things that haven't been time filtered yet.
+# This program is part of QRAAT, an automated animal tracking system based on
+# GNU Radio. 
 #
 # Copyright (C) 2013 Christopher Patton
 # 
@@ -35,8 +36,8 @@ parser = OptionParser()
 parser.description = '''This does nothing.'''
 parser.add_option('-s', '--siteid', action='store', type='int', dest='siteid')
 parser.add_option('-t', '--txid', action='store', type='int', dest='txid')
-parser.add_option('-a', '--t_start', action='store', type='int', dest='t_start')
-parser.add_option('-z', '--t_end', action='store', type='int', dest='t_end')
+# parser.add_option('-a', '--t_start', action='store', type='int', dest='t_start')
+# parser.add_option('-z', '--t_end', action='store', type='int', dest='t_end')
 
 (options, args) = parser.parse_args()
 
