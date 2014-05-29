@@ -34,6 +34,9 @@ THRESHOLD_BAND3 = 150
 THRESHOLD_BAND10 = 900
 
 
+# Search this many interval distances in both directions of a point for corroborating neighbors
+CONFIG_DELTA_AWAY = 3
+
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
 CONFIG_JUST_STAGE_CHANGES = False
 
