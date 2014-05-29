@@ -869,6 +869,8 @@ def score(ids):
 
 	interval_chunked = time_chunk_ids(db_con, data, CONFIG_INTERVAL_WINDOW_SIZE)
 
+	unscored_ids_chunked = match_up_to_chunks(interval_chunked, ids)
+
 	interval_map = get_interval_map(out_of_order_ids, interval_chunked, id_to_interval)
 
 	print '---------------------------------'
@@ -890,6 +892,7 @@ def score(ids):
 		if k not in interval_map:
 			print 'No interval for {} yet.'.format(k)
 			interval = calculate_interval(db_con, interval_chunked[k])
+			unscored_ids = unscored_ids_chunked[k]
 			if interval is None:
 				print 'Problem with computing interval for this.'
 			else:
@@ -899,7 +902,7 @@ def score(ids):
 				print 'Stored interval for: {}+{}: {}'.format(base, duration, interval)
 
 				print 'About to time filter now!'
-				scores = time_filter(db_con, new_filtered_ids, in_context_of=all_chunk_ids)
+				scores = time_filter(db_con, unscored_ids, in_context_of=all_chunk_ids)
 				print 'Did I succeed?'
 				insert_scores(change_handler, scores)
 		else:
@@ -931,12 +934,20 @@ def score(ids):
 				insert_scores(change_handler, scores, update=True)
 				pass
 			else:
-				scores = time_filter(db_con, passed_filter_ids_set, in_context_of=all_chunk_ids)
+				scores = time_filter(db_con, unscored_ids, in_context_of=all_chunk_ids)
 				insert_scores(change_handler, scores)
 
 	
 	print 'Scores inserted.'
 
+def match_up_to_chunks(chunked, ids):
+	id_set = set(ids)
+	d = {}
+	for (k, v) in chunked.items():
+		new_v = [x for x in v if x in id_set]
+		d[k] = new_v
+
+	return d
 
 
 # Pre-condition: intervals must exist in the database covering all the items in ids
@@ -948,6 +959,34 @@ def time_filter(db_con, ids, in_context_of=None):
 	context = ids if in_context_of is None else in_context_of
 
 	data = read_est_records(db_con, context)
+
+
+	# is all that is in context accounted for in data?
+	l1 = []
+	for i in context:
+		if i not in data.keys():
+			l1.append(i)
+
+	# is all that is in ids accounted for in data?
+	l2 = []
+	for i in ids:
+		if i not in data.keys():
+			l2.append(i)
+
+	print 'Context not accounted for:', len(l1)
+	print 'IDs not accounted for:', len(l2)
+
+	i_set = set(ids)
+	c_set = set(context)
+
+	print 'i-c:', len(i_set.difference(c_set))
+	print 'c-i:', c_set.difference(i_set)
+	print 'i&c:', len(i_set.intersection(c_set))
+	print 'i|c:', len(i_set.union(c_set))
+
+	assert c_set >= i_set
+
+	raw_input('abc')
 
 	all_timestamps = sorted([x['timestamp'] for x in data.values()])
 
@@ -1023,7 +1062,7 @@ def get_sorted_timestamps_from_ids(db_con, ids):
 def get_sorted_timestamps_from_data(data):
 	pairs = []
 	for datum in data:
-		print 'datum:', datum
+		# print 'datum:', datum
 		t = (datum['timestamp'], datum['ID'])
 		pairs.append(t)
 
@@ -1065,11 +1104,11 @@ def calculate_interval(db_con, ids):
 	print 'calculate_interval for {} values'.format(len(ids))
 
 	sorted_pairs = get_sorted_timestamps_from_ids(db_con, ids)
-	print 'Got {} sorted pairs'.format(len(sorted_pairs))
-	print '---'
-	for (i, (timestamp, val)) in enumerate(sorted_pairs):
-		print '{}. {}'.format(i + 1, timestamp)
-	print '---'
+	# print 'Got {} sorted pairs'.format(len(sorted_pairs))
+	print '---Calculating interval from {} points'.format(len(sorted_pairs))
+	# for (i, (timestamp, val)) in enumerate(sorted_pairs):
+	# 	print '{}. {}'.format(i + 1, timestamp)
+	# print '---'
 
 	interval_windows = qraat.signal_filter.WindowIterator(sorted_pairs, None)
 
