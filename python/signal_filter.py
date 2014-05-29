@@ -883,7 +883,7 @@ def score(ids):
 		print '{} -> {}'.format(k, v)
 	print '---------------------------------'
 
-	raw_input()
+	# raw_input()
 
 
 	# Calculate brand new intervals for those which need it
@@ -991,7 +991,7 @@ def time_filter(db_con, ids, in_context_of=None):
 
 	assert c_set >= i_set
 
-	raw_input('abc')
+	# raw_input('abc')
 
 	all_timestamps = sorted([x['timestamp'] for x in data.values()])
 
