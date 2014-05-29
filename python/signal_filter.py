@@ -826,6 +826,22 @@ def overtone_vote(candidates):
 	return votes
 
 
+def already_scored_filter(db_con, ids):
+
+	ids_template = ', '.join(map(lambda x : '{}', ids))
+	id_string = ids_template.format(*ids)
+
+	already_scored = []
+	cur = db_con.cursor()
+	q = 'SELECT DISTINCT estid from estscore WHERE estid IN ({});'.format(id_string)
+	rows = cur.execute(q)
+	while True:
+		r = cur.fetchone()
+		if r is None: break
+		already_scored.append(r[0])
+
+	return already_scored
+	
 
 
 
@@ -854,6 +870,10 @@ def score(ids):
 	r = cur.fetchone()
 	assert rows == 1
 	siteid, txid = r
+
+	# Get all of these IDs that might have been scored already and store for
+	# after-action report.
+	already_scored = already_scored_filter(db_con, ids)
 
 	out_of_order_ids, in_order_ids, id_to_interval = partition_by_interval_calculation(db_con, ids, siteid, txid)
 
@@ -941,8 +961,12 @@ def score(ids):
 				scores = time_filter(db_con, unscored_ids, in_context_of=all_chunk_ids)
 				insert_scores(change_handler, scores)
 
+	# Get all of these IDs that might have been scored already and store for
+	# after-action report.
+	after_scored = already_scored_filter(db_con, ids)
+
+	print 'Request: Score {} points of which {} are already scored. Result: {} of these are scored'.format(len(ids), len(already_scored), len(after_scored))
 	
-	print 'Scores inserted.'
 
 def match_up_to_chunks(chunked, ids):
 	id_set = set(ids)
