@@ -888,16 +888,15 @@ def score(ids):
 
 	# Calculate brand new intervals for those which need it
 	for k in interval_chunked:
-		a = interval_chunked[k]
 		# b = get_parametric_passed_ids_in_chunk(db_con, k)
 		# all_chunk_ids = interval_chunked[k] + get_parametric_passed_ids_in_chunk(db_con, k)
-		all_chunk_ids = a
+		all_chunk_ids = interval_chunked[k]
+		unscored_ids = unscored_ids_chunked[k]
 		# all_chunk_ids = a + b
 
 		if k not in interval_map:
 			print 'No interval for {} yet.'.format(k)
 			interval = calculate_interval(db_con, interval_chunked[k])
-			unscored_ids = unscored_ids_chunked[k]
 			if interval is None:
 				print 'Problem with computing interval for this.'
 			else:
