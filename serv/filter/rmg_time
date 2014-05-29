@@ -42,9 +42,6 @@ CONFIG_MIN_INTERVAL = 0.8
 
 
 
-# Distance to look for neighbors while scoring
-CONFIG_ERROR_ALLOWANCE = 0.2
-
 
 # Number of seconds to give as leeway before we assume that we can score
 # everything exactly X minutes 

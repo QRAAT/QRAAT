@@ -33,6 +33,8 @@ import util
 THRESHOLD_BAND3 = 150
 THRESHOLD_BAND10 = 900
 
+# Distance to look for neighbors while scoring
+CONFIG_ERROR_ALLOWANCE = 0.2
 
 # Search this many interval distances in both directions of a point for corroborating neighbors
 CONFIG_DELTA_AWAY = 3
