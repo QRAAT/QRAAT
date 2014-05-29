@@ -58,13 +58,18 @@ for tx in tx_list:
  #process time ranges
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
-    sig = qraat.position.signal(db_con, 
-                                time_range[0]-time_window, 
-                                time_range[1]+time_window, 
-                                tx_id, 0)
+    
+    est_ids = qraat.filt.est_band(db_con, 
+                                  tx_id, 
+                                  time_range[0]-time_window, 
+                                  time_range[1]+time_window)
+    
+    sig = qraat.position.signal(db_con, est_ids)
+    
     if len(sig) == 0: 
       print "Skipping empty chunk"
       continue 
+    
     bl = qraat.position.bearing(sv, sig)
     pos_est = qraat.position.calc_positions(sig, bl, time_window, time_delta)
     qraat.position.insert_positions(db_con, pos_est, tx_id)

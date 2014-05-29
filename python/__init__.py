@@ -26,6 +26,7 @@ from csv import csv, pretty_printer
 from gps import gps
 from det import det
 from est import est
+import filt
 #import signal_filter FIXME This shouldn't run on nodes.
 import position
 from track import track, trackall

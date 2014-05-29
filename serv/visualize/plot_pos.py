@@ -33,10 +33,10 @@ parser.add_option('--tx-id', type='int', metavar='INT', default=51,
                   help="Serial ID of the target transmitter in the database "
                        "context.")
 
-parser.add_option('--t-start', type='float', metavar='SEC', default=0.0, 
+parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800, 
                   help="Start time in secondes after the epoch (UNIX time).")
 
-parser.add_option('--t-end', type='float', metavar='SEC', default=2222222222,
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000,
                   help="End time in secondes after the epoch (UNIX time).")
 
 (options, args) = parser.parse_args()
@@ -65,7 +65,7 @@ while T < options.t_end:
     track.append((np.complex(pos[0], pos[1]), float(pos[2])))
 
   if len(track) == 0: 
-    print >>sys.stderr, "plot_pos: skipping: no data."
+    print >>sys.stderr, "plot_pos: skipping empty window."
     continue
 
   cur.execute('SELECT northing, easting FROM qraat.sitelist WHERE name="site34"')

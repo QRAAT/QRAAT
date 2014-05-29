@@ -72,12 +72,15 @@ parser.add_option('--t-chunk', type='float', metavar='SEC', default=60 * 60 * 4,
                   help="Size of signal chunk to fetch simultaneously. (Note that this "
                        "doesn't affect the calculation, just the memory foot print of " 
                        "this program.)")
-
+  
 parser.add_option('-v', '--verbose', action='store_true', default=False, 
                   help="Print the progression of the algorithm to the terminal.")
 
 parser.add_option('--thresh', type='float', metavar='[0 .. 1]', default=0, 
-                  help="Lower threshold for EST score.")
+                  help="Apply time filter to EST data wiht threshold value.")
+
+parser.add_option('--band', action='store_true', default=False, 
+                  help="Apply band filter to EST data.")
 
 (options, args) = parser.parse_args()
 
@@ -89,17 +92,25 @@ try:
 
   print "position: fetching site data." 
   sv = qraat.position.steering_vectors(db_con, options.cal_id)
+  if options.thresh > 0: # FIXME apply time filter.
+    print "position: using time filter with threshold %f." % options.thresh
+    print >>sys.stderr, "position: warning: time filter not implemented."
+    filt = qraat.filt.est_nofilter    
+  elif options.band: 
+    print "position: using band filter."
+    filt = qraat.filt.est_band
+  else: 
+    print "position: no signal filter."
+    filt = qraat.filt.est_nofilter    
 
   chunks = range(int(options.t_start), int(options.t_end), int(options.t_chunk))
 
   for i in range(len(chunks)):
 
     print "position: fetching chunk %d of %d." % (i+1, len(chunks)) 
-    sig = qraat.position.signal(db_con, 
-                                chunks[i], 
-                                chunks[i] + options.t_chunk,
-                                options.tx_id,
-                                options.thresh)
+    
+    est_ids = filt(db_con, options.tx_id, chunks[i], chunks[i] + options.t_chunk)
+    sig = qraat.position.signal(db_con, est_ids)
 
     if len(sig) == 0:
       print "position: skipping empty chunk."
@@ -115,7 +126,7 @@ try:
                                             options.t_delta, 
                                             options.verbose) 
 
-    print "position: inserting positions."
+    print "position: inserting positions (%d)." % (len(pos_est))
     qraat.position.insert_positions(db_con, pos_est, options.tx_id)
 
 except mdb.Error, e:
