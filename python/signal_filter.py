@@ -1035,8 +1035,6 @@ def time_filter(db_con, ids, in_context_of=None):
 					score += 1
 			scores[id] = score
 
-	print 'Currently {}/{}'.format(COUNT_GOOD, COUNT_ALL)
-
 	return scores
 
 
