@@ -40,6 +40,11 @@ CONFIG_JUST_STAGE_CHANGES = False
 # How long a period the interval should be calculated over
 CONFIG_INTERVAL_WINDOW_SIZE = float(3 * 60) # Three minutes (given in seconds)
 
+# Minimum interval percentage difference which must occur from old value to
+# trigger superceding of the interval with the new ones and re-scoring of
+# slice.
+CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD = 0.25
+
 class Registry:
 
 	def __init__(self, args):

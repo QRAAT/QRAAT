@@ -40,10 +40,6 @@ import qraat
 # Minimum legitimate value before an exception is raised
 CONFIG_MIN_INTERVAL = 0.8
 
-# Minimum interval percentage difference which must occur from old value to
-# trigger superceding of the interval with the new ones and re-scoring of
-# slice.
-CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD = 0.25
 
 
 # Search this many interval distances in both directions of a point for corroborating neighbors
