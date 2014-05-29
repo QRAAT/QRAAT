@@ -287,13 +287,6 @@ def main():
 
 
 
-def _get_interval_map_entry(ids, id_to_interval):
-	for id in ids:
-		assert id in id_to_interval
-	vals = [id_to_interval[x] if x in id_to_interval else None for x in ids]
-	if not all([x == vals[0] for x in vals]):
-		raise NotAllSameValueError()
-	return vals[0]
 
 
 

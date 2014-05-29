@@ -871,6 +871,8 @@ def score(ids):
 		print '{} -> {}'.format(k, v)
 	print '---------------------------------'
 
+	raw_input()
+
 
 	# Calculate brand new intervals for those which need it
 	for k in interval_chunked:
@@ -902,13 +904,22 @@ def score(ids):
 			# in this chunk, if it does not, simply compute new scores
 			# of unscored points in the chunk using the old interval
 			# value.
+			print 'displaying interval map:'
+			for k, v in interval_map.items():
+				print '{} -> {}'.format(k, v)
+			print '()()()()()'
 			old_interval = interval_map[k]
-			print 'Calculating out-of-order interval with {} items'.format(len(b))
-			new_interval = calculate_interval(db_con, b)
+			print 'Calculating out-of-order interval with {} items'.format(len(interval_chunked[k]))
+			new_interval = calculate_interval(db_con, interval_chunked[k])
+
+			print 'New interval: {} ({})'.format(new_interval, new_interval.__class__)
+			print 'Old interval: {} ({})'.format(old_interval, old_interval.__class__)
 
 			# Is new interval appreciably different from old interval?
 			average = (old_interval + new_interval) / 2.
-			percentage_difference = math.abs(new_interval - old_interval) / average
+			abs_val = new_interval - old_interval
+			abs_val = -abs_val if abs_val < 0 else abs_val
+			percentage_difference = abs_val / average
 			if percentage_difference > CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD:
 				store_interval_update(change_handler, new_interval, base, duration, txid, siteid)
 				scores = time_filter(db_con, all_chunk_ids_set)
@@ -1191,7 +1202,8 @@ def parametrically_filter(db_con, data):
 
 def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
 
-	intervals = defaultdict(list)
+	# intervals = defaultdict(list)
+	intervals = {}
 
 	for (k, ids) in interval_chunked.items():
 
@@ -1213,7 +1225,7 @@ def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
 		try:
 			interval = _get_interval_map_entry(ids, id_to_interval)
 			assert interval is not None
-			intervals[k].extend(ids)
+			intervals[k] = interval
 		except NotAllSameValueError:
 			print 'Uh oh! Not all the same!'
 
@@ -1311,3 +1323,11 @@ def insert_scores(change_handler, scores, update=False):
 class NotAllSameValueError(Exception):
 	def __init__(self):
 		pass
+
+def _get_interval_map_entry(ids, id_to_interval):
+	for id in ids:
+		assert id in id_to_interval
+	vals = [id_to_interval[x] if x in id_to_interval else None for x in ids]
+	if not all([x == vals[0] for x in vals]):
+		raise NotAllSameValueError()
+	return vals[0]
