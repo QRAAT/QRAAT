@@ -1378,3 +1378,10 @@ def _get_interval_map_entry(ids, id_to_interval):
 	if not all([x == vals[0] for x in vals]):
 		raise NotAllSameValueError()
 	return vals[0]
+
+def _rel_score(score):
+	rel_score_to_scale = score if score > 0 else 0
+	# change_handler.add_score(id, score, float(rel_score_to_scale) / (CONFIG_DELTA_AWAY * 2))
+	rel_score = float(rel_score_to_scale) / (CONFIG_DELTA_AWAY * 2)
+	return rel_score
+

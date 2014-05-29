@@ -352,12 +352,6 @@ def verify_chunking(all_ids, chunked_ids):
 		set2.update(v)
 	print '|1|: {}, |2|: {}, |1-2|: {}, |2-1|: {}, |1v2|: {}, |1^2|: {}'.format(len(set1), len(set2), len(set1.difference(set2)), len(set2.difference(set1)), len(set1.union(set2)), len(set1.intersection(set2)))
 
-def _rel_score(score):
-	rel_score_to_scale = score if score > 0 else 0
-	# change_handler.add_score(id, score, float(rel_score_to_scale) / (CONFIG_DELTA_AWAY * 2))
-	rel_score = float(rel_score_to_scale) / (CONFIG_DELTA_AWAY * 2)
-	return rel_score
-
 	
 
 
