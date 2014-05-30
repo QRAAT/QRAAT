@@ -25,6 +25,7 @@ import random
 import sys
 import bisect
 import math
+import traceback
 
 import util
 
@@ -557,6 +558,26 @@ class ChangeHandler:
 		getattr(self, 'close_' + self.mode)()
 
 	def db_execute_many(self, template, args):
+		matches = [x for x in args if x[0] == 214183264]
+		if len(matches) > 0:
+			assert len(matches) == 1
+			
+			f = open('/home/sean/scoreinfo.txt', 'a')
+			for match in matches:
+				f.write('many-ex abs={}, rel={}\n'.format(match[1], match[2]))
+				print match
+			assert False
+				# if match[1] == -2:
+				# 	print 'Determined parametric badness'
+				# 	f.write('<-- this one is parametrically bad - many execute statement\n')
+			# try:
+			# 	assert False
+			# except AssertionError:
+			# 	# tr = sys.exc_info()[2]
+			# 	traceback.print_exc(f)
+			# traceback.print_tb(tr, limit=None, file=f)
+			f.write('------------------------\n')
+			f.close()
 		cursor = self.obj.cursor()
 		cursor.executemany(template, args)
 
@@ -611,6 +632,23 @@ class ChangeHandler:
 		self.obj.close()
 
 	def add_score_db(self, estid, absscore, relscore):
+		if estid == 214183264:
+			f = open('/home/sean/scoreinfo.txt', 'a')
+			f.write('single abs={}, rel={}\n'.format(absscore, relscore))
+			if absscore == -2:
+				f.write('<-- this one is parametrically bad - single execute statement\n')
+				# f.close()
+				# assert False
+			# try:
+			# 	assert False
+			# except AssertionError:
+			# 	# tr = sys.exc_info()[2]
+			# 	traceback.print_exc(f)
+			# traceback.print_tb(tr, limit=None, file=f)
+			f.write('------------------------\n')
+			f.close()
+			print 'ADDING ESTID'
+		print 'Adding score!'
 		if ADD_EVERY == 0:
 			# Apply update immediately
 			cursor = self.obj.cursor()
@@ -833,7 +871,7 @@ def already_scored_filter(db_con, ids):
 
 	already_scored = []
 	cur = db_con.cursor()
-	q = 'SELECT DISTINCT estid from estscore WHERE estid IN ({});'.format(id_string)
+	q = 'SELECT estid from estscore WHERE estid IN ({});'.format(id_string)
 	rows = cur.execute(q)
 	while True:
 		r = cur.fetchone()
@@ -853,6 +891,8 @@ def already_scored_filter(db_con, ids):
 def score(ids):
 	change_handler = init_change_handler()
 	db_con = qraat.util.get_db('writer')
+
+	parametrically_poor = set()
 
 	if len(ids) == 0:
 		print 'score() with zero length input...'
@@ -891,10 +931,11 @@ def score(ids):
 	# Insert scores for parametrically bad points...
 	for id in id_set.difference(all_that_passed_filter_ids):
 		change_handler.add_score(id, -2, 0)
+		parametrically_poor.add(id)
 
 	interval_chunked = time_chunk_ids(db_con, data, CONFIG_INTERVAL_WINDOW_SIZE)
 
-	unscored_ids_chunked = match_up_to_chunks(interval_chunked, ids)
+	unscored_ids_chunked = match_up_to_chunks(interval_chunked, id_set.difference(parametrically_poor))
 
 	interval_map = get_interval_map(out_of_order_ids, interval_chunked, id_to_interval)
 
@@ -959,6 +1000,7 @@ def score(ids):
 				pass
 			else:
 				scores = time_filter(db_con, unscored_ids, in_context_of=all_chunk_ids)
+				analyze(unscored_ids, all_chunk_ids, scores)
 				insert_scores(change_handler, scores)
 
 	# Get all of these IDs that might have been scored already and store for
@@ -967,6 +1009,30 @@ def score(ids):
 
 	print 'Request: Score {} points of which {} are already scored. Result: {} of these are scored'.format(len(ids), len(already_scored), len(after_scored))
 	
+
+def analyze(ids_for_scoring, all_ids, scores):
+	set_a = set(ids_for_scoring)
+	set_b = set(all_ids)
+	set_c = set(scores)
+	c = False
+	if 214183264 in set_a:
+		print 'Scoring the point! This should not happen!'
+		c = True
+	if 214183264 in set_b:
+		print 'It\'s in the context, not necessarily a problem'
+		c = True
+	if not c:
+		print 'Nothing much to say'
+	print 'analyze()'
+	print 'a {} -> {}'.format(len(ids_for_scoring), len(set_a))
+	print 'b {} -> {}'.format(len(all_ids), len(set_b))
+	print 'c {} -> {}'.format(len(scores), len(set_c))
+
+	print 'Scoring IDs that are not contained in all IDs:', len(set_a.difference(set_b))
+	print 'Scores that are not in IDs to be scored:', len(set_c.difference(set_a))
+	print 'IDs to be scored that are not in scores:', len(set_a.difference(set_c))
+
+	# if c: raw_input()
 
 def match_up_to_chunks(chunked, ids):
 	id_set = set(ids)
