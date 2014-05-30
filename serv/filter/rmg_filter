@@ -62,17 +62,11 @@ try:
   intervals = [(x, min(t_end, x + chunk_size)) for x in start_times]
   change_handler = qraat.signal_filter.init_change_handler()
   for start, end in intervals:
-    # using cursor table...
+    q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
+	# cursor query:
+	# q = 'insert into `cursor` (name, value) values (%s, 1)'
 
-    # initialize cursor table entry if it does not exist
-    change_handler.add_sql('insert into `cursor` (name, value) values (%s, 1)', ('estscore',))
-
-    cursor_value = qraat.signal_filter.get_cursor_value(change_handler, 'estscore')
-    print 'Got cursor_value:', cursor_value
-
-    q = 'select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s and ID > %s'
-
-	cur = change_handler.add_sql(q, (siteid, txid, start, end, cursor_value))
+	cur = change_handler.add_sql(q, (siteid, txid, start, end))
 
 	l = []
 		r = cur.fetchone()
