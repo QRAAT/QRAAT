@@ -1476,3 +1476,11 @@ def _rel_score(score):
 	rel_score = float(rel_score_to_scale) / (CONFIG_DELTA_AWAY * 2)
 	return rel_score
 
+def get_cursor_value(handler, name):
+	q = 'select value from `cursor` where name = %s'
+	cur = handler.add_sql(q, (name,))
+	u = cur.fetchone()
+	assert u is not None
+	v = cur.fetchone()
+	assert v is None
+	return u
