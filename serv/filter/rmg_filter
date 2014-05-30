@@ -62,10 +62,7 @@ try:
   intervals = [(x, min(t_end, x + chunk_size)) for x in start_times]
   change_handler = qraat.signal_filter.init_change_handler()
   for start, end in intervals:
-    # print '{} - {}'.format(start, end)
-    # Get all unscored IDs in this chunk
     q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
-    #q = 'select est.ID from (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s left join estscore on est.ID = estscore.estid) where est where estscore.estid is null;'
     cur = db_con.cursor()
     rows = cur.execute(q, (siteid, txid, start, end))
     l = []
