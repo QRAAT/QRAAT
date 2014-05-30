@@ -103,33 +103,28 @@ class signal:
   #: Number of channels. 
   N = 4
 
-  def __init__(self, db_con, t_start, t_end, tx_id=None, score_threshold=0): 
+  def __init__(self, db_con, est_ids): 
 
-    # Store eigenvalue decomposition vectors and noise covariance
-    # matrices in NumPy arrays. 
-    cur = db_con.cursor()
-    cur.execute('''SELECT ID, siteid, txid, timestamp, edsp, 
-                          ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
-                          nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
-                          nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
-                          nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
-                          nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
-                     FROM est
-                     JOIN estscore AS s ON s.estID = ID
-                    WHERE (%f <= timestamp) AND (timestamp <= %f) 
-                      AND relscore >= %f 
-                          %s''' % (
-                            t_start, t_end, score_threshod, 
-                           ('AND txid=%d' % tx_id) if tx_id else ''))
-  
-    raw = np.array(cur.fetchall(), dtype=float)
-
-    if raw.shape[0] == 0: 
+    if len(est_ids) == 0:
       self.id = self.site_id = self.tx_id = self.timestamp = np.array([])
       self.edsp = self.ed = self.nc = np.array([])
       self.signal_ct = 0
-   
-    else:
+
+    else: 
+      # Store eigenvalue decomposition vectors and noise covariance
+      # matrices in NumPy arrays. 
+      cur = db_con.cursor()
+      cur.execute('''SELECT ID, siteid, txid, timestamp, edsp, 
+                            ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
+                            nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+                            nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+                            nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+                            nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
+                       FROM est
+                      WHERE ID in (%s)''' % ','.join(map(lambda(x) : str(x), est_ids)))
+    
+      raw = np.array(cur.fetchall(), dtype=float)
+
       # Metadata. 
       (self.id, 
        self.site_id, 
@@ -154,7 +149,26 @@ class signal:
   def __len__(self): 
     return self.signal_ct
 
+  def activity_per_site(self, index_list):
+    ''' Return activity metric per site. 
 
+       The activity metric we use is the standard deviation the signal
+       power (edsp). 
+    
+     :returns: Mapping of siteID to a float.
+     :rtype: dict
+    '''
+    activity = {}
+    for index in index_list:
+      if not activity.get(self.site_id[index]):
+        activity[self.site_id[index]] = [self.edsp[index]]
+      else: 
+        activity[self.site_id[index]].append(self.edsp[index])
+
+    for (site_id, x) in activity.iteritems():
+      activity[site_id] = np.std(x)
+    
+    return activity
 
 
 class bearing: 
@@ -206,12 +220,42 @@ class bearing:
       self.likelihood_deps = likelihood_deps
     else:
       self.likelihood_deps = [] 
+  
 
 
   def __len__(self): 
     return self.likelihoods.shape[0]
 
-  def position_estimator(self, index_list, center, scale, half_span=15):
+
+  def likelihood_per_site(self, index_list):
+    ''' Return summed likelihood distributions per site over time interval. 
+    
+     :returns: Mapping of siteID to bearing bearing distribution. 
+     :rtype: dict
+    ''' 
+    ll_per_site = {}
+    for e in index_list: 
+      if ll_per_site.get(self.site_id[e]) == None:
+        ll_per_site[self.site_id[e]] = self.likelihoods[e,]
+      else: 
+        ll_per_site[self.site_id[e]] += self.likelihoods[e,]
+    return ll_per_site
+
+  
+  def bearing_estimator(self, ll_per_site):
+    ''' Estimate bearing of a transmitter from a each site. 
+    
+     :return: Mapping of siteID to (bearing, likelihood) tuple.
+     :rtype: dict
+    ''' 
+    bearing = {}
+    for (site_id, ll) in ll_per_site.iteritems():
+      theta = np.argmax(ll)
+      bearing[site_id] = (theta, ll[theta])
+    return bearing
+
+
+  def position_estimator(self, ll_per_site, center, scale, half_span=15):
     ''' Estimate the position of a transmitter over time interval.
 
       Generate a set of candidate points centered around ``center``.
@@ -238,23 +282,16 @@ class bearing:
     #: Based on bearing self.likelihoods for EST's in time range, calculate
     #: the log likelihood of each candidate point.
     pos_likelihood = np.zeros(site_bearings[self.sites[0].ID].shape[0:2])
-    for est_index in index_list:
-      sv_index = self.site_id[est_index]
-      try:
-        pos_likelihood += np.interp(site_bearings[sv_index],
+    for (site_id, ll) in ll_per_site.iteritems():
+      pos_likelihood += np.interp(site_bearings[site_id], 
                                   range(-360, 360),
-                                  np.hstack((self.likelihoods[est_index,:],
-                                  self.likelihoods[est_index,:])) )
-        # SEAN: Would use self.likelihood_deps right here if I was using them
-      except KeyError:
-        pass # Skip sites in the site list where we don't collect data. 
-             # TODO perhaps there should be a row in qraat.sitelist that 
-             # designates sites as qraat nodes. ~ Chris 1/2/14 
-
+                                  np.hstack((ll, ll)) )
+    
     max_index = np.argmax(pos_likelihood)
     return (grid.flat[max_index], round(pos_likelihood.flat[max_index], 6))
 
-  def jitter_estimator(self, index_list, center, scale, half_span=15):
+
+  def jitter_estimator(self, ll_per_site, center, scale, half_span=15):
     ''' Position estimator with a little jitter around the center. 
     
       Vary the northing and easting of the center uniformly plus 
@@ -265,7 +302,7 @@ class bearing:
     j_center = center + np.complex(round(random.uniform(j_neg, j_pos), 2), 
                                    round(random.uniform(j_neg, j_pos), 2))
     
-    return self.position_estimator(index_list, j_center, scale, half_span) 
+    return self.position_estimator(ll_per_site, j_center, scale, half_span) 
 
 
 
@@ -322,7 +359,7 @@ def calc_windows(bl, t_window, t_delta):
 
 
 
-def calc_positions(bl, t_window, t_delta, verbose=False):
+def calc_positions(signal, bl, t_window, t_delta, verbose=False):
   ''' Calculate positions of a transmitter over a time interval. 
   
     :param bl: Bearing likelihoods for time range. 
@@ -334,73 +371,94 @@ def calc_positions(bl, t_window, t_delta, verbose=False):
     :param verbose: Output some debugging information. 
     :type verbose: bool
   '''
-  pos_est = []
-  pos_est_deps = []
+  pos_est = [] 
 
   if verbose:
     print "%15s %-19s %-19s %-19s" % ('time window',
               '100 meters', '10 meters', '1 meter')
 
-  try:
-    for (t, index_list) in calc_windows(bl, t_window, t_delta): 
+  for (t, index_list) in calc_windows(bl, t_window, t_delta): 
+   
+    pos = ll = pos_deps = pos_activity = None
 
-      if (len(set(bl.site_id[index_list])) > 1): 
+    # Calculate activiy. (siteID -> activity.) 
+    activity = signal.activity_per_site(index_list)
 
-        if verbose: 
-          print "Time window {0} - {1}".format(
-            t - t_window / 2.0, t + t_window)
+    # Calculate most likely bearings. (siteID -> (theta, ll[theta]).)
+    ll_per_site = bl.likelihood_per_site(index_list)
+    bearing = bl.bearing_estimator(ll_per_site)
 
-        scale = 100
-        pos = center
-        while scale >= 1: # 100, 10, 1 meters ...
-          (pos, ll) = bl.jitter_estimator(index_list, pos, scale)
-          if verbose:
-            print "%8dn,%de" % (pos.real, pos.imag),
-          scale /= 10
+    # Zip together bearing and activity
+    # TODO make sure activity[site_id] = None if it couldn't be done. 
+    for site_id in bearing.keys(): 
+      bearing[site_id] = bearing[site_id] + (activity[site_id],)
+    
+    # Calculate position if data is available. 
+    if (len(set(bl.site_id[index_list])) > 1): 
 
-        pos_deps = []
+      # Activity for a position is given as the arithmetic mean of 
+      # of the standard deviations of signal power per site. 
+      pos_activity = np.mean([activity for (_, _, activity) in bearing.values()])
 
-        # Determine components of est that contribute to the computed position.
-        for est_index in index_list:
-          pos_deps.append(bl.id[est_index])
+      if verbose: 
+        print "Time window {0} - {1}".format(
+          t - t_window / 2.0, t + t_window)
 
-        pos_est.append((t,        # timestamp
-                        pos.imag, # easting
-                        pos.real, # northing
-                        ll))      # likelihood
+      # Calculate position 
+      scale = 100
+      pos = center
+      while scale >= 1: # 100, 10, 1 meters ...
+        (pos, ll) = bl.jitter_estimator(ll_per_site, pos, scale)
+        if verbose:
+          print "%8dn,%de" % (pos.real, pos.imag),
+        scale /= 10
 
-        pos_est_deps.append({'est':tuple(pos_deps)})
-        if verbose: print
+      # Determine components of est that contribute to the computed position.
+      pos_deps = []
+      for est_index in index_list:
+        pos_deps.append(bl.id[est_index])
+      pos_deps = {'est': tuple(pos_deps)}
 
-      # else: pos_est.append((t, nil, nil)) 
-      # NOTE Perhaps we should insert a "nil" position if there wasn't 
-      #  enough data to calculate a position. ~Chris 2/12/14
+      if verbose: print
+    
+    pos_est.append((t, bearing, pos, ll, pos_activity, pos_deps))
 
-  except KeyboardInterrupt: 
-    pass
-
-  return pos_est, pos_est_deps
+  return pos_est
 
 
 
-def insert_positions(db_con, pos_est, pos_est_deps, tx_id):
+def insert_positions(db_con, pos_est, tx_id):
     ''' Insert positions into database with provenance. ''' 
     cur = db_con.cursor()
 
-    query = '''INSERT INTO Position
-                (txid, timestamp, easting, northing, likelihood)
-               VALUES (%s, %s, %s, %s, %s)'''
-    #cur.executemany(, [(tx_id, pe[0], pe[1], pe[2]) for pe in pos_est])
+    query_insert_pos = '''INSERT INTO Position
+                           (txID, timestamp, easting, northing, likelihood, activity)
+                          VALUES (%s, %s, %s, %s, %s, %s)''' 
+
+    query_insert_bearing = '''INSERT INTO Bearing 
+                               (txID, siteID, posID, timestamp, bearing, likelihood, activity)
+                              VALUES (%s, %s, %s, %s, %s, %s, %s)''' 
 
     # Insert results into database.
-    all_insertions = []
-    for pos_est_index in range(len(pos_est)):
-      this_pos_est = pos_est[pos_est_index]
-      this_pos_est_deps = pos_est_deps[pos_est_index]
-      cur.execute(query, (tx_id, this_pos_est[0], this_pos_est[1], this_pos_est[2], this_pos_est[3]))
-      pos_est_insertion_id = cur.lastrowid
-      all_insertions.append(pos_est_insertion_id)
-      handle_provenance_insertion(cur, this_pos_est_deps, {'Position':(pos_est_insertion_id,)})
+    for (t, bearing, pos, ll, activity, pos_deps) in pos_est:
+        
+      pos_id = None
+
+      # Insert position.
+      if pos:
+        cur.execute(query_insert_pos, (tx_id, 
+                                       t, 
+                                       pos.imag, # easting 
+                                       pos.real, # northing
+                                       ll, activity))
+        pos_id = cur.lastrowid                               
+        handle_provenance_insertion(cur, pos_deps, {'Position':(pos_id,)})
+
+      # Insert bearings.
+      for (site_id, (theta, ll, activity)) in bearing.iteritems():
+        cur.execute(query_insert_bearing, (tx_id, site_id, pos_id, 
+                                           t, theta, 
+                                           ll, activity))
 
 
 

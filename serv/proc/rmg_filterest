@@ -36,7 +36,7 @@ echo Starting `date`
 
 # Get DB credentials
 read user password name <<< $(rmg_csv --row view=writer user password name \
-                                      < $RMG_SERVER_DIR/db_auth)
+                                      < $RMG_SERVER_DB_AUTH)
 
 echo -n "Number of est entries to process: "
 mysql -B --skip-column-names -e 'select count(id) from est where id > (select max(id) from fest);' $name

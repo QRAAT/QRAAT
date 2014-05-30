@@ -40,6 +40,7 @@ GR_PYTHON_INSTALL(
     position.py
     track.py
     util.py
+    filt.py
     DESTINATION ${GR_PYTHON_DIR}/qraat
 )
 

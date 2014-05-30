@@ -1,0 +1,47 @@
+#!/usr/bin/python2
+import qraat.csv
+import MySQLdb as mdb
+import argparse
+
+
+parser = argparse.ArgumentParser(description="Produce tx.csv file from database")
+parser.add_argument("db_auth_file", help="Path to db_auth file")
+parser.add_argument("-f", "--tx_file", help="Path to tx.csv file", default='./tx.csv')
+parser.add_argument("-r", "--rise_trigger", type=float, help="Detector rise trigger", default=1.5)
+parser.add_argument("-t", "--time_constant", type=float, help="Detector time constant", default=10)
+
+args = parser.parse_args()
+
+
+default_type = 'pulse'
+
+db_config = qraat.csv(args.db_auth_file).get(view='reader')
+db_con = mdb.connect(db_config.host, db_config.user,
+                     db_config.password, db_config.name)
+
+db_cursor = db_con.cursor()
+
+db_cursor.execute("SELECT ID, tx_table_name from tx_type where RMG_type=%s",default_type)
+pulse_tuple = db_cursor.fetchone()
+pulse_ID = pulse_tuple[0]
+pulse_table = pulse_tuple[1]
+
+db_cursor.execute('''SELECT tx_ID.ID, {0}.frequency, {0}.pulse_width 
+                   FROM tx_ID, {0}, tx_info
+                   WHERE tx_ID.active=TRUE 
+                     AND tx_info.tx_type_ID=%s
+                     AND tx_ID.tx_info_ID=tx_info.ID
+                     AND tx_ID.ID={0}.tx_ID'''.format(pulse_table),pulse_ID)
+                   
+tx_data = db_cursor.fetchall()
+
+csv_headers = ['ID', 'frequency', 'type', 'pulse_width', 'rise_trigger', 'time_constant']
+
+csv_table = []
+
+for j in tx_data:
+  csv_table.append((j[0], float(j[1]), default_type, j[2], args.rise_trigger, args.time_constant))
+
+txlist = qraat.csv()
+txlist.initialize_from_data(csv_headers, csv_table)
+txlist.write(args.tx_file)

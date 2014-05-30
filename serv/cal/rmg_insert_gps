@@ -52,7 +52,7 @@ if options.cal_id == None:
 
 # Get database credentials.
 try: 
-  db_config = qraat.csv("%s/db_auth" % os.environ['RMG_SERVER_DIR']).get(view='writer')
+  db_config = qraat.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='writer')
 
 except KeyError: 
   print >>sys.stderr, "insert_gps: error: undefined environment variables. Try `source rmg_env.`" 

@@ -153,12 +153,6 @@ class track:
 
     :param db_con: DB connector for MySQL. 
     :type db_con: MySQLdb.connections.Connection
-    :param t_start: Time start (Unix). 
-    :type t_start: float 
-    :param t_end: Time end (Unix).
-    :type t_end: float
-    :param tx_id: Transmitter ID. 
-    :type tx_id: int
     :param M: Maximum foot speed of target (m/s), given
               transition time
     :type M: lambda (t) -> float
@@ -174,11 +168,11 @@ class track:
   window_length = 250  
   overlap_length = 25 
 
-  def __init__(self, db_con, t_start, t_end, tx_id, M, C=1, optimal=False):
+  def __init__(self, db_con, pos_ids, tx_id, M, C=1, optimal=False):
     self.tx_id = tx_id
     
     # Get positions. 
-    self._fetch(db_con, t_start, t_end, tx_id)
+    self._fetch(db_con, pos_ids)
     
     # Calculate tracks. 
     if optimal:
@@ -240,25 +234,14 @@ class track:
     self.track = map(lambda(row) : row[:3], self.critical_path(self.toposort(roots), C))
   
 
-  def _fetch(self, db_con, t_start, t_end, tx_id): 
+  def _fetch(self, db_con, pos_ids): 
     cur = db_con.cursor()
     cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
                      FROM Position
-                    WHERE (%f <= timestamp) 
-                      AND (timestamp <= %f)
-                      AND txid = %d
-                    ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
+                    WHERE ID in (%s)
+                    ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), pos_ids)))
     self.pos = cur.fetchall()
   
-  def _fetchall(self, db_con, tx_id):
-    cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
-                     FROM Position
-                    WHERE txid = %d
-                    ORDER BY timestamp ASC''' % tx_id)
-    self.pos = cur.fetchall()
-
-
   def __getiter__(self): 
     return self.track
 
@@ -517,9 +500,11 @@ class track:
     # TODO The file is way longer than it needs to be, since I wanted to display
     # the coordinates and datetime in the tooltip that appears in Google Earth.
     # Perhaps what we want is not a gx:track, but something fucnctionally 
-    # similar. 
+    # similar.
 
-    fd = open('%s.kml' % name, 'w')
+    # TODO Add northing, easting to output. 
+
+    fd = open('%s_track.kml' % name, 'w')
     fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
     fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
     fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
@@ -564,24 +549,31 @@ class track:
     fd.write('</kml>')
     fd.close() 
 
-
-
-class trackall (track): 
-  
-  ''' Transmitter tracks over the entire position table. '''
-
-  def __init__(self, db_con, tx_id, M, C=1, optimal=False):
-    self.tx_id = tx_id
-    
-    # Get positions. 
-    self._fetchall(db_con, tx_id)
-    
-    # Calculate tracks. 
-    if optimal:
-      self._calc_tracks(M, C)
-    else:
-      self._calc_tracks_windowed(M, C)
-  
+    fd = open('%s_pos.kml' % name, 'w')
+    fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+    fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
+    fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
+    fd.write('<Folder>\n')
+    fd.write('  <Placemark>\n')
+    fd.write('  <MultiGeometry>\n')
+    fd.write('    <name>%s (txID=%d) position cloud</name>\n' % (name, tx_id))
+    for row in self.pos:
+      (P, t, ll, pos_id) = (np.complex(row[0], row[1]), 
+                            float(row[2]), 
+                            float(row[3]), 
+                            int(row[4]))
+      tm = time.gmtime(t)
+      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
+      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+      fd.write('    <Point id="%d">\n' % pos_id)
+      fd.write('      <coordinates>%f,%f,0</coordinates>\n' % (lon, lat))
+      fd.write('    </Point>\n')
+    fd.write('  </MultiGeometry>\n')
+    fd.write('  </Placemark>\n')
+    fd.write('</Folder>\n')
+    fd.write('</kml>')
+    fd.close() 
 
      
   

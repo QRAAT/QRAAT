@@ -33,10 +33,10 @@ parser.add_option('--tx-id', type='int', metavar='INT', default=51,
                   help="Serial ID of the target transmitter in the database "
                        "context.")
 
-parser.add_option('--t-start', type='float', metavar='SEC', default=0.0, 
+parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800, 
                   help="Start time in secondes after the epoch (UNIX time).")
 
-parser.add_option('--t-end', type='float', metavar='SEC', default=2222222222,
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000,
                   help="End time in secondes after the epoch (UNIX time).")
 
 (options, args) = parser.parse_args()
@@ -49,8 +49,7 @@ cur = db_con.cursor()
   
 
 T = options.t_start
-T_step = options.t_end# 60 * 60 * 24 * 3 # three days
-# FIXME doing some tests. 
+T_step =  60 * 60 * 24 * 1 / 6 # four hour chunks. 
 
 while T < options.t_end:  
   cur.execute('''SELECT northing, easting, timestamp, likelihood
@@ -58,16 +57,15 @@ while T < options.t_end:
                   WHERE (%f <= timestamp) 
                     AND (timestamp <= %f)
                     AND txid = %d
-                  ORDER BY timestamp ASC''' % (T, T_step, options.tx_id))
+                  ORDER BY timestamp ASC''' % (T, T + T_step, options.tx_id))
   
-  print T, T+ T_step
   T += T_step
   track = []
   for pos in cur.fetchall():
     track.append((np.complex(pos[0], pos[1]), float(pos[2])))
 
   if len(track) == 0: 
-    print >>sys.stderr, "plot_pos: skipping: no data."
+    print >>sys.stderr, "plot_pos: skipping empty window."
     continue
 
   cur.execute('SELECT northing, easting FROM qraat.sitelist WHERE name="site34"')
@@ -141,7 +139,7 @@ while T < options.t_end:
     #   t.tm_year, t.tm_mon, t.tm_mday,
     #   t.tm_hour, t.tm_min, t.tm_sec))
 
-    pp.savefig('tx%d_%04d-%02d-%02d.png' % (options.tx_id, t.tm_year, t.tm_mon, t.tm_mday))
+    pp.savefig('tx%d_%04d-%02d-%02d_%02d%02d.png' % (options.tx_id, t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min))
 
   else: 
     
