@@ -24,6 +24,8 @@ import time, os, sys, commands
 import MySQLdb as mdb
 from optparse import OptionParser
 
+import qraat.signal_filter
+
 # Check for running instances of this program. 
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
