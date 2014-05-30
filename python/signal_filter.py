@@ -582,13 +582,13 @@ class ChangeHandler:
 		cursor.executemany(template, args)
 
 	def add_sql(self, sql_text, sql_args):
-		getattr(self, 'add_sql_' + self.mode)(sql_text, sql_args)
+		return getattr(self, 'add_sql_' + self.mode)(sql_text, sql_args)
 	
 	def add_score(self, estid, absscore, relscore):
-		getattr(self, 'add_score_' + self.mode)(estid, absscore, relscore)
+		return getattr(self, 'add_score_' + self.mode)(estid, absscore, relscore)
 
 	def flush(self):
-		getattr(self, 'flush_' + self.mode)()
+		return getattr(self, 'flush_' + self.mode)()
 		
 	# File operations
 
@@ -653,6 +653,7 @@ class ChangeHandler:
 			# Apply update immediately
 			cursor = self.obj.cursor()
 			cursor.execute(INSERT_TEMPLATE, (estid, absscore, relscore))
+			return cursor
 		else:
 			self.buffer.append((estid, absscore, relscore))
 			if len(self.buffer) >= ADD_EVERY:
@@ -661,7 +662,8 @@ class ChangeHandler:
 	def add_sql_db(self, sql_text, sql_args):
 		cursor = self.obj.cursor()
 		print 'Running query:', sql_text % sql_args
-		return cursor.execute(sql_text, sql_args)
+		rows = cursor.execute(sql_text, sql_args)
+		return cursor
 
 	def flush_db(self):
 		if len(self.buffer) == 0:
