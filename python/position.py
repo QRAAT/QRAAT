@@ -34,6 +34,42 @@ except ImportError: pass
 #:  ~ Chris 1/2/14
 center = np.complex(4260500, 574500)
 
+
+#: Get est's from the database, applying a filter. Return a set of
+#: estID's which are fed to the class signal. TODO Curry these?  
+
+def get_est_ids_timefilter(db_con, tx_id, t_start, t_end, thresh):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID 
+                   FROM est
+                   JOIN estscore ON est.ID = estscore.estID
+                  WHERE txID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f
+                    AND thresh >= %f''' % (tx_id, t_start, t_end, thresh))
+  return [ int(row[0]) for row in cur.fetchall() ]
+
+def get_est_ids_bandfilter(db_con, tx_id, t_start, t_end):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID 
+                   FROM est
+                  WHERE txID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f 
+                    AND band3 < 150 
+                    AND band10 < 900''' % (tx_id, t_start, t_end))
+  return [ int(row[0]) for row in cur.fetchall() ]
+
+def get_est_ids(db_con, tx_id, t_start, t_end):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID 
+                   FROM est
+                  WHERE txID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f''' % (tx_id, t_start, t_end))
+  return [ int(row[0]) for row in cur.fetchall() ]
+
+
 class steering_vectors:
   ''' Encapsulate steering vectors. 
     
