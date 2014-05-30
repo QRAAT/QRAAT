@@ -33,10 +33,10 @@ parser.add_option('--tx-id', type='int', metavar='INT', default=51,
                   help="Serial ID of the target transmitter in the database "
                        "context.")
 
-parser.add_option('--t-start', type='float', metavar='SEC', default=0.0, 
+parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800, 
                   help="Start time in secondes after the epoch (UNIX time).")
 
-parser.add_option('--t-end', type='float', metavar='SEC', default=float("+inf"),
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000,
                   help="End time in secondes after the epoch (UNIX time).")
 
 (options, args) = parser.parse_args()
@@ -51,10 +51,8 @@ C = 1
 
 # A possible way to calculate good tracks. Compute the tracks
 # with some a priori maximum speed that's on the high side. 
-if options.t_start == 0.0 and options.t_end == float("+inf"): 
-  track = qraat.trackall(db_con, options.tx_id, M, C)
-else:
-  track = qraat.track(db_con, options.t_start, options.t_end, options.tx_id, M, C)
+pos_ids = qraat.filt.pos_nofilter(db_con, options.tx_id, options.t_start, options.t_end)
+track = qraat.track(db_con, pos_ids, options.tx_id, M, C)
 
 track.export_kml('tx%d' % options.tx_id, options.tx_id)
 

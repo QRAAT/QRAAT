@@ -21,3 +21,13 @@ def est_nofilter(db_con, tx_id, t_start, t_end):
                     AND timestamp <= %f''' % (tx_id, t_start, t_end))
   return [ int(row[0]) for row in cur.fetchall() ]
   
+
+def pos_nofilter(db_con, tx_id, t_start, t_end):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID 
+                   FROM Position
+                  WHERE txID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f''' % (tx_id, t_start, t_end))
+  return [ int(row[0]) for row in cur.fetchall() ]
+  

@@ -153,12 +153,6 @@ class track:
 
     :param db_con: DB connector for MySQL. 
     :type db_con: MySQLdb.connections.Connection
-    :param t_start: Time start (Unix). 
-    :type t_start: float 
-    :param t_end: Time end (Unix).
-    :type t_end: float
-    :param tx_id: Transmitter ID. 
-    :type tx_id: int
     :param M: Maximum foot speed of target (m/s), given
               transition time
     :type M: lambda (t) -> float
@@ -174,11 +168,11 @@ class track:
   window_length = 250  
   overlap_length = 25 
 
-  def __init__(self, db_con, t_start, t_end, tx_id, M, C=1, optimal=False):
+  def __init__(self, db_con, pos_ids, tx_id, M, C=1, optimal=False):
     self.tx_id = tx_id
     
     # Get positions. 
-    self._fetch(db_con, t_start, t_end, tx_id)
+    self._fetch(db_con, pos_ids)
     
     # Calculate tracks. 
     if optimal:
@@ -240,25 +234,14 @@ class track:
     self.track = map(lambda(row) : row[:3], self.critical_path(self.toposort(roots), C))
   
 
-  def _fetch(self, db_con, t_start, t_end, tx_id): 
+  def _fetch(self, db_con, pos_ids): 
     cur = db_con.cursor()
     cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
                      FROM Position
-                    WHERE (%f <= timestamp) 
-                      AND (timestamp <= %f)
-                      AND txid = %d
-                    ORDER BY timestamp ASC''' % (t_start, t_end, tx_id))
+                    WHERE ID in (%s)
+                    ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), pos_ids)))
     self.pos = cur.fetchall()
   
-  def _fetchall(self, db_con, tx_id):
-    cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
-                     FROM Position
-                    WHERE txid = %d
-                    ORDER BY timestamp ASC''' % tx_id)
-    self.pos = cur.fetchall()
-
-
   def __getiter__(self): 
     return self.track
 
@@ -591,26 +574,6 @@ class track:
     fd.write('</Folder>\n')
     fd.write('</kml>')
     fd.close() 
-
-
-
-
-class trackall (track): 
-  
-  ''' Transmitter tracks over the entire position table. '''
-
-  def __init__(self, db_con, tx_id, M, C=1, optimal=False):
-    self.tx_id = tx_id
-    
-    # Get positions. 
-    self._fetchall(db_con, tx_id)
-    
-    # Calculate tracks. 
-    if optimal:
-      self._calc_tracks(M, C)
-    else:
-      self._calc_tracks_windowed(M, C)
-  
 
      
   
