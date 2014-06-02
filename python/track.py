@@ -510,7 +510,7 @@ class Track:
 
   def insert_db(self, db_con): 
     for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
-         utm_zone_letter, likelihood, activity):
+         utm_zone_letter, likelihood, activity) in self.table:
       pass # TODO 
 
   def export_kml(self, name, tx_id):
