@@ -803,6 +803,8 @@ class Window:
 		argmax = numpy.argmax(histo[0])
 		max_likelihood_interval = histo[1][argmax]
 
+		print 'The maximum likelihood interval is:', max_likelihood_interval
+
 		if all(histo[0] == 0):
 			print 'Skipping interval detection for {}/{} because no data found'.format(txid, slice_id)
 			return None
@@ -823,24 +825,24 @@ class Window:
 		return most_likely_interval
 
 
-def sort_by(arg1, arg2):
+def sort_by(counts, range_starts):
 	ret = []
-	sorting_inds = arg1.argsort()
+	sorting_inds = counts.argsort()
 	r_sorting_inds = list(reversed(sorting_inds))
 	highest_two_vals = [None, None]
-	for val in (arg1[x] for x in r_sorting_inds):
+	for val in (counts[x] for x in r_sorting_inds):
 		if highest_two_vals[0] is None:
 			highest_two_vals[0] = val
 		elif highest_two_vals[1] is None and highest_two_vals[0] != val:
 			highest_two_vals[1] = val
 		else:
 			break
-	if arg1[r_sorting_inds[0]] == 1:
+	if counts[r_sorting_inds[0]] == 1:
 		# collect all of 1
-		return [arg2[x] for x in range(len(arg1)) if arg1[x] == 1]
+		return [range_starts[x] for x in range(len(counts)) if counts[x] == 1]
 	else:
-		print 'Got highest two values:', highest_two_vals
-		return [arg2[x] for x in range(len(arg1)) if arg1[x] in highest_two_vals]
+		highest_two_vals = [x for x in highest_two_vals if x != 0]
+		return [range_starts[x] for x in range(len(counts)) if counts[x] in highest_two_vals]
 
 OVERTONE_LIMIT = 8
 OVERTONE_ERROR = 0.1
@@ -1205,7 +1207,7 @@ def store_interval_update(change_handler, interval, base, duration, txid, siteid
 
 def calculate_interval(db_con, ids):
 
-	print 'calculate_interval for {} values'.format(len(ids))
+	print 'calculate_interval for {} values: {}'.format(len(ids), ids)
 
 	sorted_pairs = get_sorted_timestamps_from_ids(db_con, ids)
 	# print 'Got {} sorted pairs'.format(len(sorted_pairs))
