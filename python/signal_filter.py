@@ -1187,6 +1187,12 @@ def get_parametric_passed_ids_in_chunk(db_con, k):
 	return ids
 
 def store_interval_assume(change_handler, interval, base, duration, txid, siteid):
+	db_con = change_handler.obj
+	cur = db_con.cursor()
+	rows = cur.execute('select * from interval_cache where start = %s and valid_duration = %s and txid = %s and siteid = %s', (base, duration, txid, siteid))
+	if rows > 0:
+		print 'Violation of assumption for {}+{}'.format(base, duration)
+	assert rows == 0
 	print 'Storing interval={}, {}+{}'.format(interval, base, duration)
 	q = 'insert into interval_cache (period, start, valid_duration, txid, siteid) values (%s, %s, %s, %s, %s);'
 	change_handler.add_sql(q, (interval, base, duration, txid, siteid))
@@ -1234,11 +1240,35 @@ def init_change_handler():
 		change_handler = qraat.signal_filter.ChangeHandler(None, 'db')
 	return change_handler
 
+def read_est_records_time_range(db_con, start, end):
+	assert start <= end
+	cur = db_con.cursor()
+	
+	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
+
+	rows = None
+
+	field_string = ', '.join(fields)
+	q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s;'.format(field_string)
+	rows = cur.execute(q.format(field_string), (start, end))
+	
+	site_data = {}
+	r = None
+	while True:
+		r = cur.fetchone()
+		if r is None: break
+		r = tuple(r)
+		named_row = dict(zip(fields, r))
+		for k in named_row:
+			if named_row[k].__class__ == decimal.Decimal:
+				named_row[k] = float(named_row[k])
+		site_data[named_row['ID']] = named_row
+	return site_data
 
 def read_est_records(db_con, ids, expanded=False):
 
 	if len(ids) == 0:
-		return []
+		return {}
 
 	cur = db_con.cursor()
 
@@ -1374,6 +1404,8 @@ def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
 	return intervals
 
 def get_intervals_from_db(db_con, ids, insert_as_needed=False):
+	# TODO: can pipe in all the data needed as an argument once rather than
+	# getting it on demand in the function itself.
 
 	# change handler
 	change_handler = ChangeHandler(db_con, 'db')
@@ -1401,16 +1433,33 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 	ids_with_intervals = intervals.keys()
 
 	ids_with_no_interval = [x for x in ids if x not in ids_with_intervals]
-	if len(ids_with_no_interval) == 0:
-		if insert_as_needed:
-			data = read_est_records(db_con, ids)
-			interval_chunked = time_chunk_ids(db_con, data, CONFIG_INTERVAL_WINDOW_SIZE)
-			for interval_key, interval_ids in interval_chunked.items():
-				base, duration, siteid, txid = interval_key
-				interval = calculate_interval(db_con, interval_ids)
-				store_interval_assume(change_handler, interval, base, duration, txid, siteid)
-		else:
+	
+
+	# create interval keys for these - some assumptions about where windows end
+	# are here...
+	data = read_est_records(db_con, ids_with_no_interval)
+	intervals_to_compute = set()
+	for id, record in data.items():
+		siteid = record['siteid']
+		txid = record['txid']
+		timestamp = record['timestamp']
+		duration = CONFIG_INTERVAL_WINDOW_SIZE
+		base = timestamp - (timestamp % duration)
+		key = (base, duration, siteid, txid)
+		intervals_to_compute.add(key)
+	
+	if len(intervals_to_compute) > 0:
+		if not insert_as_needed:
+			# Cannot continue
 			assert False
+		else:
+			for (base, duration, siteid, txid) in intervals_to_compute:
+				# Get all data within this interval and parametrically score.
+				# Take all passing and calculate interval.
+				interval_data = read_est_records_time_range(db_con, base, base + duration)
+				passed_ids = parametrically_filter(db_con, interval_data)
+				interval = calculate_interval(db_con, passed_ids)
+				store_interval_assume(change_handler, interval, base, duration, txid, siteid)
 
 	return intervals
 
