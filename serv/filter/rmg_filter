@@ -69,10 +69,11 @@ try:
     cur = change_handler.add_sql(q, (siteid, txid, start, end))
 
     l = []
-    r = cur.fetchone()
-    if r is None: break
-    r = tuple(r)
-    l.append(r[0])
+    while True:
+      r = cur.fetchone()
+      if r is None: break
+      r = tuple(r)
+      l.append(r[0])
 
     print 'Got {} items: {}'.format(len(l), l[:10])
 
