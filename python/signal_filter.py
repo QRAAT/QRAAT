@@ -891,6 +891,7 @@ def already_scored_filter(db_con, ids):
 # Output: none explicit - implicitly, score entries added for each id in ids
 
 def score(ids):
+	print 'Initial call to score {} ID(s)'.format(len(ids))
 	change_handler = init_change_handler()
 	db_con = qraat.util.get_db('writer')
 
@@ -923,10 +924,13 @@ def score(ids):
 
 	# param filter
 	all_that_passed_filter_ids = parametrically_filter(db_con, data)
+	print 'Top-level: just got {} passed'.format(len(all_that_passed_filter_ids))
 
 	passed_filter_ids_set = set(all_that_passed_filter_ids)
+	print 'De-duplicated:', len(passed_filter_ids_set)
 
 	new_filtered_ids = id_set.intersection(passed_filter_ids_set)
+	print 'Intersected, leaves:', len(new_filtered_ids)
 
 	print '{} items passed parametric filter'.format(len(new_filtered_ids))
 
