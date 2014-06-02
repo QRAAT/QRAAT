@@ -36,6 +36,10 @@
 #
 #   TODO Think about composing this probability with the position 
 #        likelihood. These would need to be normalized (see notes.)  
+#
+# TODO 
+#  - Make this module look more like position; i.e., move all classmethods 
+#    out of track. 
 
 import numpy as np
 import time, os, sys
@@ -455,6 +459,9 @@ class track:
 
   # 
   # A few families of max speed given time interval functions. 
+  # TODO I'm somewhat abusing the API structure here. Move these
+  # class methods out and make htis module look more like position.
+  # (Or make position look more like track.)
   #
 
   @classmethod
@@ -477,6 +484,16 @@ class track:
   def maxspeed_const(cls, m):
     return lambda (t) : m
 
+  @classmethod
+  def get_pos_ids(cls, db_con, tx_id, t_start, t_end):
+    cur = db_con.cursor()
+    cur.execute('''SELECT ID 
+                     FROM Position
+                    WHERE txID=%d
+                      AND timestamp >= %f 
+                      AND timestamp <= %f''' % (tx_id, t_start, t_end))
+    return [ int(row[0]) for row in cur.fetchall() ]
+  
 
 
 # TODO This will be the Python interface for tracks in the DB. 

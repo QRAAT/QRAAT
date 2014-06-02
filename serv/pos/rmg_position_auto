@@ -59,10 +59,10 @@ for tx in tx_list:
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
     
-    est_ids = qraat.filt.est_band(db_con, 
-                                  tx_id, 
-                                  time_range[0]-time_window, 
-                                  time_range[1]+time_window)
+    est_ids = qraat.position.get_est_ids_bandfilter(db_con, 
+                                                    tx_id, 
+                                                    time_range[0]-time_window, 
+                                                    time_range[1]+time_window)
     
     sig = qraat.position.signal(db_con, est_ids)
     

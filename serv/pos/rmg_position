@@ -92,16 +92,17 @@ try:
 
   print "position: fetching site data." 
   sv = qraat.position.steering_vectors(db_con, options.cal_id)
+  
   if options.thresh > 0: # FIXME apply time filter.
     print "position: using time filter with threshold %f." % options.thresh
     print >>sys.stderr, "position: warning: time filter not implemented."
-    filt = qraat.filt.est_nofilter    
+    get_est_ids = qraat.position.get_est_ids
   elif options.band: 
     print "position: using band filter."
-    filt = qraat.filt.est_band
+    get_est_ids = qraat.position.get_est_ids_bandfilter
   else: 
     print "position: no signal filter."
-    filt = qraat.filt.est_nofilter    
+    get_est_ids = qraat.position.get_est_ids
 
   chunks = range(int(options.t_start), int(options.t_end), int(options.t_chunk))
 
@@ -109,7 +110,7 @@ try:
 
     print "position: fetching chunk %d of %d." % (i+1, len(chunks)) 
     
-    est_ids = filt(db_con, options.tx_id, chunks[i], chunks[i] + options.t_chunk)
+    est_ids = get_est_ids(db_con, options.tx_id, chunks[i], chunks[i] + options.t_chunk)
     sig = qraat.position.signal(db_con, est_ids)
 
     if len(sig) == 0:
