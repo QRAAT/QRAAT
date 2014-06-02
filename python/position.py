@@ -28,11 +28,13 @@ try:
   import MySQLdb as mdb
 except ImportError: pass
 
-#: Center of Quail Ridge reserve (northing, easting). This is the first
-#: "candidate point" used to construct the search space grid. TODO: 
-#: I think this should be a row in qraat.sitelist with name='center'.
-#:  ~ Chris 1/2/14
-center = np.complex(4260500, 574500)
+def get_center(db_con):
+  cur = db_con.cursor()
+  cur.execute('''SELECT northing, easting 
+                   FROM qraat.sitelist
+                  WHERE name = 'center' ''')
+  (n, e) = cur.fetchone()
+  return np.complex(n, e)
 
 
 #: Get est's from the database, applying a filter. Return a set of
@@ -86,8 +88,7 @@ class steering_vectors:
     deps = []
 
     # Get site locations.
-    sites = csv(db_con=db_con, db_table='sitelist')
-
+    sites = csv(db_con=db_con, db_table='sitelist').filter(rx=True)
     sv_deps_by_site = {}
 
     for row in sites:
@@ -395,7 +396,7 @@ def calc_windows(bl, t_window, t_delta):
 
 
 
-def calc_positions(signal, bl, t_window, t_delta, verbose=False):
+def calc_positions(signal, bl, center, t_window, t_delta, verbose=False):
   ''' Calculate positions of a transmitter over a time interval. 
   
     :param bl: Bearing likelihoods for time range. 

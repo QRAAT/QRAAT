@@ -89,10 +89,11 @@ try:
   print "position: start time:", time.asctime(time.localtime(start))
 
   db_con = qraat.util.get_db('writer')
-
+  
   print "position: fetching site data." 
   sv = qraat.position.steering_vectors(db_con, options.cal_id)
-  
+  center = qraat.position.get_center(db_con)
+
   if options.thresh > 0: # FIXME apply time filter.
     print "position: using time filter with threshold %f." % options.thresh
     print >>sys.stderr, "position: warning: time filter not implemented."
@@ -122,7 +123,8 @@ try:
 
     print "position: calculating positions."
     pos_est = qraat.position.calc_positions(sig,
-                                            bl, 
+                                            bl,
+                                            center,
                                             options.t_window, 
                                             options.t_delta, 
                                             options.verbose) 

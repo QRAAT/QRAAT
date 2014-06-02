@@ -28,6 +28,7 @@ print tx_list
 if len(tx_list) > 0:
   cal_id = int(os.environ['RMG_POS_CAL_ID'])
   sv = qraat.position.steering_vectors(db_con, cal_id)
+  center = qraat.position.get_center(db_con)
 
 time_window = float(os.environ['RMG_POS_TIME_WINDOW'])
 time_delta = float(os.environ['RMG_POS_TIME_STEP'])
@@ -71,7 +72,7 @@ for tx in tx_list:
       continue 
     
     bl = qraat.position.bearing(sv, sig)
-    pos_est = qraat.position.calc_positions(sig, bl, time_window, time_delta)
+    pos_est = qraat.position.calc_positions(sig, bl, center, time_window, time_delta)
     qraat.position.insert_positions(db_con, pos_est, tx_id)
 
   temp_max_id = np.max(times[:,0])
