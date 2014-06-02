@@ -477,22 +477,20 @@ class track:
   def maxspeed_const(cls, m):
     return lambda (t) : m
 
-  #
-  # Export tracks to file / database. 
-  #
+
+
+# TODO This will be the Python interface for tracks in the DB. 
+
+class Track:
+
+  def __init__(self, db_con, track_id, t_start, t_end):
+    self.table = []
+    pass # Read track from DB. 
 
   def insert_db(self, db_con): 
-    ''' Insert tracks into datbase. ''' 
-    cur = db_con.cursor()
-    for (P, t, pos_id) in self.track: 
-      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
-      tm = time.gmtime(t)
-      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
-                                             tm.tm_hour, tm.tm_min, tm.tm_sec)
-      cur.execute('''INSERT INTO qraat.Track 
-                            (txID, posId, lon, lat, datetime, timezone) 
-                     VALUES (%d, %d, %f, %f, '%s', '%s')''' % (self.tx_id, 
-                     pos_id, lon, lat, t, 'UTC'))
+    for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
+         utm_zone_letter, likelihood, activity):
+      pass # TODO 
 
   def export_kml(self, name, tx_id):
 
@@ -549,6 +547,22 @@ class track:
     fd.write('</kml>')
     fd.close() 
 
+
+# TODO This will be the Python interface for positions in the DB. 
+ 
+class Position:
+  
+  def __init__(self, db_con=None, tx_id=None, t_start=None, t_end=None): 
+    self.table = []
+    pass # TODO read from database. 
+
+  def insert_db(self, db_con):
+    for (id, tx_id, timestamp, easting, northing, 
+         utm_zone_number, utm_zone_letter, likelihood, activity) in self.table: 
+      pass # TODO 
+
+  def export_kml(self, name, tx_id):
+
     fd = open('%s_pos.kml' % name, 'w')
     fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
     fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
@@ -557,7 +571,7 @@ class track:
     fd.write('  <Placemark>\n')
     fd.write('  <MultiGeometry>\n')
     fd.write('    <name>%s (txID=%d) position cloud</name>\n' % (name, tx_id))
-    for row in self.pos:
+    for row in self.table:
       (P, t, ll, pos_id) = (np.complex(row[0], row[1]), 
                             float(row[2]), 
                             float(row[3]), 
@@ -575,8 +589,23 @@ class track:
     fd.write('</kml>')
     fd.close() 
 
-     
+# TODO This will be the Python interface for bearings in the DB. 
+
+class Bearing: 
   
+  def __init__(self, db_con=None, tx_id=None, site_id=None, t_start=None, t_end=None):
+    self.table = []
+    pass # TODO read from database. 
+
+  def insert_db(db_con):
+    for (id, tx_id, site_id, pos_id, timestamp, bearing, 
+         likelihood, activity) in self.table: 
+      pass # TODO 
+
+  def export_kml(self, name, tx_id, site_id):
+    pass # TODO 
+
+
 
 def tx_name(db_con):
   cur = db_con.cursor()
