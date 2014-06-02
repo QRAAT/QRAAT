@@ -63,18 +63,18 @@ try:
   change_handler = qraat.signal_filter.init_change_handler()
   for start, end in intervals:
     q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
-	# cursor query:
-	# q = 'insert into `cursor` (name, value) values (%s, 1)'
+    # cursor query:
+    # q = 'insert into `cursor` (name, value) values (%s, 1)'
 
-	cur = change_handler.add_sql(q, (siteid, txid, start, end))
+    cur = change_handler.add_sql(q, (siteid, txid, start, end))
 
-	l = []
-		r = cur.fetchone()
-		if r is None: break
-		r = tuple(r)
-		l.append(r[0])
+    l = []
+    r = cur.fetchone()
+    if r is None: break
+    r = tuple(r)
+    l.append(r[0])
 
-      print 'Got {} items: {}'.format(len(l), l[:10])
+    print 'Got {} items: {}'.format(len(l), l[:10])
 
     if len(l) == 0:
       print 'No IDs to process.'
