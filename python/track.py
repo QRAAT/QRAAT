@@ -166,8 +166,7 @@ class track:
     :type optiomal: bool
   '''
   
-  (zone, letter) = 10, 'S' # TODO Add UTM zone to position table, modify 
-                           # code to insert it automatically. 
+  (zone, letter) = 10, 'S' # TODO get this from position table. 
 
   window_length = 250  
   overlap_length = 25 
@@ -496,11 +495,16 @@ class track:
   
 
 
+
+
+
+
+
 # TODO This will be the Python interface for tracks in the DB. 
 
 class Track:
 
-  def __init__(self, db_con, track_id, t_start, t_end):
+  def __init__(self, db_con=None, track_id=None, t_start=None, t_end=None):
     self.table = []
     pass # Read track from DB. 
 
