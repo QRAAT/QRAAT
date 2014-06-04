@@ -995,10 +995,10 @@ def score(ids):
 		print '{} -> {}'.format(k, v)
 	print '---------------------------------'
 
-	neighborhood = compute_interval_neighborhood(interval_chunked.keys())
+	key_neighborhood = compute_interval_neighborhood(interval_chunked.keys())
 
 	print 'Showing off the neighborhood:'
-	for (k, v) in neighborhood.items():
+	for (k, v) in key_neighborhood.items():
 		a, b, c, d = k
 		s, e = a, a + b
 		print 'K: {} ({}-{})'.format(k, s, e)
@@ -1008,7 +1008,6 @@ def score(ids):
 			print '\t{} ({}-{})'.format(val, s, e)
 
 	print '----'
-	sys.exit(4)
 
 
 	# Calculate brand new intervals for those which need it
@@ -1280,13 +1279,6 @@ def time_filter(db_con, ids, in_context_of=None):
 					if debug: print 'Found something in ({}, {})'.format(start, end)
 			scores[id] = score
 			
-			if debug:
-				# print 'SEARCH SPACE:', search_space
-				# print 'Found 710, dropping into interpreter...'
-				# import code
-				# code.interact(local=locals())
-				assert False
-
 			if score == 1:
 				print 'Assigning score of 1 to:', data[id]
 				assert False
