@@ -1279,10 +1279,6 @@ def time_filter(db_con, ids, in_context_of=None):
 					if debug: print 'Found something in ({}, {})'.format(start, end)
 			scores[id] = score
 			
-			if score == 1:
-				print 'Assigning score of 1 to:', data[id]
-				assert False
-
 	return scores
 
 
