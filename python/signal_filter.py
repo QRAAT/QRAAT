@@ -1110,7 +1110,7 @@ def compute_interval_neighborhood(interval_keys, amount_to_ensure=10):
 		for l in interval_keys:
 			_start, _duration, _siteid, _txid = l
 			assert _duration > 0
-			if _siteid != siteid or _txid == txid:
+			if _siteid != siteid or _txid != txid:
 				# This should not be triggered until the single txid-siteid
 				# pair restriction is relaxed. But it doesn't hurt putting it
 				# in now.
@@ -1134,6 +1134,8 @@ def compute_interval_neighborhood(interval_keys, amount_to_ensure=10):
 				continue
 
 			key_neighborhood.append(l)
+
+			# raw_input('?3')
 
 		neighborhood[k] = key_neighborhood
 
