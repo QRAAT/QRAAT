@@ -905,8 +905,16 @@ def score(ids):
 
 	id_set = set(ids)
 
-	data = read_est_records(db_con, ids, expanded=True)
+	# Get the data from the est table for these IDs and any other est records
+	# associated with something within the time range defined by these IDs.
+	# Context is the number of seconds around the min and max timestamp defined
+	# by the ID set to include in the data returned. (Only affects things if
+	# expanded=true).
+	data = read_est_records(db_con, ids, expanded=True, context=300)
 
+	# I assume that all IDs being scored in a call to score() are from the same
+	# txid and siteid. This restriction can probably be relaxed, but this will
+	# make people explicitly aware when this is done.
 	cur = db_con.cursor()
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
@@ -920,31 +928,66 @@ def score(ids):
 	# after-action report.
 	already_scored = already_scored_filter(db_con, ids)
 
+	# Returns a tuple (a, b, c) where a is the sequence of out-of-order IDs
+	# (those occurring in a region with an already defined interval value), b
+	# is the sequence of in-order IDs (those occurring in a region with no
+	# defined interval value), and c is a map from ID to interval for those IDs
+	# that can be associated with an already-computed interval.
+
+	# Note: id_to_interval.keys() == out_of_order_ids.
+
 	out_of_order_ids, in_order_ids, id_to_interval = partition_by_interval_calculation(db_con, ids, siteid, txid)
+
+	assert id_to_interval.keys() == out_of_order_ids
 
 	print 'Found {} out of order, {} in order'.format(len(out_of_order_ids), len(in_order_ids))
 
-	# param filter
+	# Returns the subset of keys of data which represent data which passes the
+	# parametric filters (lowpass filters on band3 and band10 and a rate
+	# limiting filter).
 	all_that_passed_filter_ids = parametrically_filter(db_con, data)
 	print 'Top-level: just got {} passed'.format(len(all_that_passed_filter_ids))
 
 	passed_filter_ids_set = set(all_that_passed_filter_ids)
 	print 'De-duplicated:', len(passed_filter_ids_set)
 
+	# The larger set of parametrically passing points is needed during scoring,
+	# but the intersection of this and the original ID set defines those that
+	# require time filtering.
 	new_filtered_ids = id_set.intersection(passed_filter_ids_set)
 	print 'Intersected, leaves:', len(new_filtered_ids)
 
 	print '{} items passed parametric filter'.format(len(new_filtered_ids))
 
 	# Insert scores for parametrically bad points...
+	# The IDs in the ID set that did not pass the filter are given a sentinel
+	# absolute value in absscore of -2 and a relscore that meets the
+	# assumptions of that value (non-negative).
 	for id in id_set.difference(all_that_passed_filter_ids):
 		change_handler.add_score(id, -2, 0)
 		parametrically_poor.add(id)
 
+	# Buckets the IDs that occur as keys of data into different lists depending
+	# on the timestamp in data for that ID. The returned structure is of the
+	# form:
+
+	# {(start_time, duration, siteid, txid):[IDs with associated timestamps t st. base <= t <= base + duration ]}
+
+	# Note that IDs contained in a bucket must also match on siteid and txid.
+	# This must be true at the moment, as all the IDs passed to score() deal
+	# with a single (siteid, txid) pair.
+
 	interval_chunked = time_chunk_ids(db_con, data, CONFIG_INTERVAL_WINDOW_SIZE)
 
+	# Filters each bucket by restricting to unscored IDs.
 	unscored_ids_chunked = match_up_to_chunks(interval_chunked, id_set.difference(parametrically_poor))
 
+	# Parametric passed:
+	parametrically_good_chunked = match_up_to_chunks(interval_chunked, all_that_passed_filter_ids)
+
+	# Creates a mapping from interval keys to intervals from the mapping from
+	# individual IDs to intervals. Ensures that all IDs associated with a given
+	# interval key have the same interval.
 	interval_map = get_interval_map(out_of_order_ids, interval_chunked, id_to_interval)
 
 	print '---------------------------------'
@@ -952,36 +995,56 @@ def score(ids):
 		print '{} -> {}'.format(k, v)
 	print '---------------------------------'
 
-	# raw_input()
+	neighborhood = compute_interval_neighborhood(interval_chunked.keys())
 
-	key_neighborhood = compute_interval_neighborhood(interval_chunked.keys())
+	print 'Showing off the neighborhood:'
+	for (k, v) in neighborhood.items():
+		a, b, c, d = k
+		s, e = a, a + b
+		print 'K: {} ({}-{})'.format(k, s, e)
+		for val in v:
+			a, b, c, d = val
+			s, e = a, a + b
+			print '\t{} ({}-{})'.format(val, s, e)
+
+	print '----'
+	sys.exit(4)
 
 
 	# Calculate brand new intervals for those which need it
+	# Normally would have to go to the trouble of ensuring context is imported.
+	# Still might. At least the information is available. It has been
+	# parametrically filtered already.
+
 	for k in interval_chunked:
-		# b = get_parametric_passed_ids_in_chunk(db_con, k)
-		# all_chunk_ids = interval_chunked[k] + get_parametric_passed_ids_in_chunk(db_con, k)
 		all_chunk_ids = interval_chunked[k]
 
-		# Compute the list of all_chunk_ids plus stuff from the previous and
-		# next block, if such exist, to provide a context for the time scoring.
 		all_chunk_neighborhood = []
 		for neighbor_key in key_neighborhood[k]:
-			all_chunk_neighborhood.extend(interval_chunked[neighbor_key])
+			all_chunk_neighborhood.extend(parametrically_good_chunked[neighbor_key])
 		
 
+		# Generate a list of IDs to score for this chunk
 		unscored_ids = unscored_ids_chunked[k]
-		# all_chunk_ids = a + b
 
 		if k not in interval_map:
+			# This chunk has no interval computed yet, so compute one
 			print 'No interval for {} yet.'.format(k)
 			interval = calculate_interval(db_con, interval_chunked[k])
 			if interval is None:
 				print 'Problem with computing interval for this.'
+				# For now, crash and burn; this will make me aware of this
+				# situation when it occurs.
+				assert False
 			else:
 				print 'Interval computed:', interval
 				base, duration, siteid, txid = k
+
+				# Store interval in database. Note: this just inserts (does no
+				# checking for already existing interval), because it is known
+				# at this point that no such interval exists.
 				store_interval_assume(change_handler, interval, base, duration, txid, siteid)
+
 				print 'Stored interval for: {}+{}: {}'.format(base, duration, interval)
 
 				print 'About to time filter {} IDs in the context of {} IDs'.format(len(unscored_ids), len(all_chunk_ids))
@@ -1028,8 +1091,54 @@ def score(ids):
 
 	print 'Request: Score {} points of which {} are already scored. Result: {} of these are scored'.format(len(ids), len(already_scored), len(after_scored))
 	
-def compute_interval_neighborhood(interval_keys):
-	pass
+# Ensure that any neighborhoods within 
+def compute_interval_neighborhood(interval_keys, amount_to_ensure=10):
+	neighborhood = {}
+	print 'compute_interval_neighborhood()'
+	print 'keys:'
+
+	for k in interval_keys:
+		# Find all 'neighbors' of k
+		start, duration, siteid, txid = k
+		assert duration > 0
+		interest_start, interest_end = start - amount_to_ensure, start + duration + amount_to_ensure
+
+		key_neighborhood = []
+
+		# Collect all interval keys that deal with anything in the
+		# interest_start to interest_end range
+		for l in interval_keys:
+			_start, _duration, _siteid, _txid = l
+			assert _duration > 0
+			if _siteid != siteid or _txid == txid:
+				# This should not be triggered until the single txid-siteid
+				# pair restriction is relaxed. But it doesn't hurt putting it
+				# in now.
+				continue
+			_range_start, _range_end = _start, _start + _duration
+			
+			# Check for overlap
+
+			# Is there no overlap because the interest area falls entirely
+			# before this key? I'm very conservative on comparison here, you
+			# could just only compare one point; it will only fail if something
+			# weird happens like a negative duration. Still, what's one more
+			# comparison?
+
+			if interest_start < _range_start and interest_end < _range_start:
+				continue
+
+			# Or is the interest area entirely after this key's range?
+
+			if interest_start > _range_end and interest_end > _range_end:
+				continue
+
+			key_neighborhood.append(l)
+
+		neighborhood[k] = key_neighborhood
+
+	return neighborhood
+
 
 def analyze(ids_for_scoring, all_ids, scores):
 	set_a = set(ids_for_scoring)
@@ -1315,7 +1424,7 @@ def read_est_records_time_range(db_con, start, end):
 		site_data[named_row['ID']] = named_row
 	return site_data
 
-def read_est_records(db_con, ids, expanded=False):
+def read_est_records(db_con, ids, expanded=False, context=0):
 
 	if len(ids) == 0:
 		return {}
@@ -1334,6 +1443,8 @@ def read_est_records(db_con, ids, expanded=False):
 		r = cur.fetchone()
 		r = tuple(r)
 		min, max = r
+		min -= context
+		max += context
 		cur = db_con.cursor()
 		q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s'
 		rows = cur.execute(q.format(field_string), (min, max))
@@ -1441,7 +1552,7 @@ def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
 			continue
 		else:
 			print 'WARNING: Mixed up situation, some in, some out...problematic. Not processing these IDs.'
-			continue
+			assert False
 		
 		interval = None
 		try:
