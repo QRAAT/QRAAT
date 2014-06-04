@@ -954,12 +954,22 @@ def score(ids):
 
 	# raw_input()
 
+	key_neighborhood = compute_interval_neighborhood(interval_chunked.keys())
+
 
 	# Calculate brand new intervals for those which need it
 	for k in interval_chunked:
 		# b = get_parametric_passed_ids_in_chunk(db_con, k)
 		# all_chunk_ids = interval_chunked[k] + get_parametric_passed_ids_in_chunk(db_con, k)
 		all_chunk_ids = interval_chunked[k]
+
+		# Compute the list of all_chunk_ids plus stuff from the previous and
+		# next block, if such exist, to provide a context for the time scoring.
+		all_chunk_neighborhood = []
+		for neighbor_key in key_neighborhood[k]:
+			all_chunk_neighborhood.extend(interval_chunked[neighbor_key])
+		
+
 		unscored_ids = unscored_ids_chunked[k]
 		# all_chunk_ids = a + b
 
@@ -974,8 +984,9 @@ def score(ids):
 				store_interval_assume(change_handler, interval, base, duration, txid, siteid)
 				print 'Stored interval for: {}+{}: {}'.format(base, duration, interval)
 
-				print 'About to time filter now!'
-				scores = time_filter(db_con, unscored_ids, in_context_of=all_chunk_ids)
+				print 'About to time filter {} IDs in the context of {} IDs'.format(len(unscored_ids), len(all_chunk_ids))
+				print 'About to invoke time filter with explicit context same as non-explicit?:', all_chunk_ids == unscored_ids
+				scores = time_filter(db_con, unscored_ids, in_context_of=all_chunk_neighborhood)
 				print 'Did I succeed?'
 				insert_scores(change_handler, scores)
 		else:
@@ -1017,6 +1028,8 @@ def score(ids):
 
 	print 'Request: Score {} points of which {} are already scored. Result: {} of these are scored'.format(len(ids), len(already_scored), len(after_scored))
 	
+def compute_interval_neighborhood(interval_keys):
+	pass
 
 def analyze(ids_for_scoring, all_ids, scores):
 	set_a = set(ids_for_scoring)
@@ -1051,16 +1064,31 @@ def match_up_to_chunks(chunked, ids):
 
 	return d
 
+def within(timestamp, r, goal):
+	return timestamp >= (goal - r) and timestamp <= (goal + r)
+
 
 # Pre-condition: intervals must exist in the database covering all the items in ids
 
 def time_filter(db_con, ids, in_context_of=None):
+	print '--------TIME FILTER--------'
+	raw_input('%')
 
 	if len(ids) == 0: return {}
 
 	context = ids if in_context_of is None else in_context_of
 
 	data = read_est_records(db_con, context)
+
+	print 'Is it in the data now?'
+	is_it_there = False
+	for datum in data.values():
+		if within(datum['timestamp'], 1, 700):
+			print 'Yes! :)'
+			is_it_there = True
+			break
+	if not is_it_there:
+		print 'No. :('
 
 
 	# is all that is in context accounted for in data?
@@ -1092,6 +1120,8 @@ def time_filter(db_con, ids, in_context_of=None):
 
 	all_timestamps = sorted([x['timestamp'] for x in data.values()])
 
+	print 'All the timestamps:', all_timestamps
+
 	scores = defaultdict(int)
 
 	intervals = get_intervals_from_db(db_con, ids, insert_as_needed=True)
@@ -1105,6 +1135,9 @@ def time_filter(db_con, ids, in_context_of=None):
 	print 'Intervals computed for DB:', len(intervals)
 
 	for id in ids:
+
+		# Is it near 710?
+		debug = data[id]['timestamp'] >= 709 and data[id]['timestamp'] <= 711
 
 		score = None
 		
@@ -1121,6 +1154,8 @@ def time_filter(db_con, ids, in_context_of=None):
 			offsets = [x * interval for x in factors]
 			absolute = [tstamp + x for x in offsets]
 			search_space = [(x - CONFIG_ERROR_ALLOWANCE, x + CONFIG_ERROR_ALLOWANCE) for x in absolute]
+			# Maybe drop into interpreter, might help
+				
 
 			for start, end in search_space:
 				start_ind = bisect.bisect_left(all_timestamps, start)
@@ -1128,9 +1163,22 @@ def time_filter(db_con, ids, in_context_of=None):
 				if start_ind == end_ind:
 					# No points found
 					pass
+					if debug: print 'Found NOTHING in ({}, {})'.format(start, end)
 				else:
 					score += 1
+					if debug: print 'Found something in ({}, {})'.format(start, end)
 			scores[id] = score
+			
+			if debug:
+				# print 'SEARCH SPACE:', search_space
+				# print 'Found 710, dropping into interpreter...'
+				# import code
+				# code.interact(local=locals())
+				assert False
+
+			if score == 1:
+				print 'Assigning score of 1 to:', data[id]
+				assert False
 
 	return scores
 
