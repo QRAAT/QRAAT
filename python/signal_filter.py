@@ -114,6 +114,7 @@ class Registry:
 
 		xs = [x['timestamp'] for x in points]
 		histo = histogram(xs, bins=(24 * 60))
+		# bin_size = histo[1][1] - histo[1][0]
 		# print 'Calculated histogram'
 
 		# print '*****************************************'
@@ -800,6 +801,9 @@ class Window:
 
 		histo = numpy.histogram(intervals, bins=500, range=(0., 60.))
 
+		# print 'Raw histo [0]:', histo[0]
+		# print 'Raw histo [1]:', histo[1]
+
 		argmax = numpy.argmax(histo[0])
 		max_likelihood_interval = histo[1][argmax]
 
@@ -1030,6 +1034,10 @@ def score(ids):
 			# This chunk has no interval computed yet, so compute one
 			print 'No interval for {} yet.'.format(k)
 			interval = calculate_interval(db_con, interval_chunked[k])
+			if interval < CONFIG_ERROR_ALLOWANCE:
+				print 'Interval too low! Double-counting of the point in question will occur (i.e., the point will be considered its own neighbor)'
+				sys.exit(2)
+
 			if interval is None:
 				print 'Problem with computing interval for this.'
 				# For now, crash and burn; this will make me aware of this
@@ -1038,7 +1046,9 @@ def score(ids):
 			else:
 				print 'Interval computed:', interval
 				base, duration, siteid, txid = k
-
+				if interval < CONFIG_ERROR_ALLOWANCE:
+					print 'Interval too low! Double-counting of the point in question will occur (i.e., the point will be considered its own neighbor)'
+					sys.exit(2)
 				# Store interval in database. Note: this just inserts (does no
 				# checking for already existing interval), because it is known
 				# at this point that no such interval exists.
@@ -1182,7 +1192,7 @@ def within(timestamp, r, goal):
 
 def time_filter(db_con, ids, in_context_of=None):
 	print '--------TIME FILTER--------'
-	raw_input('%')
+	# raw_input('%')
 
 	if len(ids) == 0: return {}
 
@@ -1610,6 +1620,9 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 				interval_data = read_est_records_time_range(db_con, base, base + duration)
 				passed_ids = parametrically_filter(db_con, interval_data)
 				interval = calculate_interval(db_con, passed_ids)
+				assert interval != 0
+				import code
+				code.interact(local=locals())
 				store_interval_assume(change_handler, interval, base, duration, txid, siteid)
 
 	return intervals
