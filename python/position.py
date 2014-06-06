@@ -285,9 +285,17 @@ class Position:
 
 class Bearing: 
   
-  def __init__(self, db_con=None, tx_id=None, site_id=None, t_start=None, t_end=None):
+  def __init__(self, db_con=None, bearing_ids=[]):
     self.table = []
-    pass # TODO read from database. 
+    if len(bearing_ids) > 0:
+      cur = db_con.cursor()
+      cur.execute('''SELECT ID, txID, siteID, timestamp, bearing,
+                            likelihood, activity
+                       FROM Bearing
+                      WHERE ID in (%s)
+                      ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), bearing_ids)))
+      for row in cur.fetchall():
+        self.table.append(row)
 
   def __len__(self):
     return len(self.table)
@@ -503,14 +511,6 @@ def calc_windows(bl, t_window, t_delta):
 def calc_positions(signal, bl, center, t_window, t_delta, tx_id, verbose=False):
   ''' Calculate positions of a transmitter over a time interval. 
   
-    :param bl: Bearing likelihoods for time range. 
-    :type bl: qraat.position.bearing
-    :param t_window: Number of seconds for each time window. 
-    :type t_window: int
-    :param t_delta: Interval of time between each position calculation.
-    :type t_delta: int
-    :param verbose: Output some debugging information. 
-    :type verbose: bool
   '''
   pos_est = [] 
 
@@ -518,9 +518,8 @@ def calc_positions(signal, bl, center, t_window, t_delta, tx_id, verbose=False):
     print "%15s %-19s %-19s %-19s" % ('time window',
               '100 meters', '10 meters', '1 meter')
 
-  guy = Position()
-
-  fella = Bearing()
+  position = Position()
+  bearing = Bearing()
 
   for (t, index_list) in calc_windows(bl, t_window, t_delta): 
    
@@ -531,19 +530,19 @@ def calc_positions(signal, bl, center, t_window, t_delta, tx_id, verbose=False):
 
     # Calculate most likely bearings. (siteID -> (theta, ll[theta]).)
     ll_per_site = bl.likelihood_per_site(index_list)
-    bearing = bl.bearing_estimator(ll_per_site)
+    theta = bl.bearing_estimator(ll_per_site)
 
     # Zip together bearing and activity
     # TODO make sure activity[site_id] = None if it couldn't be done. 
-    for site_id in bearing.keys(): 
-      bearing[site_id] = bearing[site_id] + (activity[site_id],)
+    for site_id in theta.keys(): 
+      theta[site_id] = theta[site_id] + (activity[site_id],)
     
     # Calculate position if data is available. 
     if (len(set(bl.site_id[index_list])) > 1): 
 
       # Activity for a position is given as the arithmetic mean of 
       # of the standard deviations of signal power per site. 
-      pos_activity = np.mean([activity for (_, _, activity) in bearing.values()])
+      pos_activity = np.mean([activity for (_, _, activity) in theta.values()])
 
       if verbose: 
         print "Time window {0} - {1}".format(
@@ -566,50 +565,13 @@ def calc_positions(signal, bl, center, t_window, t_delta, tx_id, verbose=False):
 
       if verbose: print
    
-    pos_est.append((t, bearing, pos, ll, pos_activity, pos_deps))
-    
     if pos: # TODO utm
-      guy.table.append((None, tx_id, t, pos.imag, pos.real, None, None, ll, pos_activity, pos_deps))
+      position.table.append((None, tx_id, t, pos.imag, pos.real, None, None, ll, pos_activity, pos_deps))
     
-    for (site_id, (theta, ll, activity)) in bearing.iteritems():
-      fella.table.append((None, tx_id, site_id, t, theta, ll, activity))
+    for (site_id, (theta, ll, activity)) in theta.iteritems():
+      bearing.table.append((None, tx_id, site_id, t, theta, ll, activity))
 
-  return (fella, guy)
-
-
-
-def insert_positions(db_con, pos_est, tx_id):
-    ''' Insert positions into database with provenance. ''' 
-    cur = db_con.cursor()
-
-    query_insert_pos = '''INSERT INTO Position
-                           (txID, timestamp, easting, northing, likelihood, activity)
-                          VALUES (%s, %s, %s, %s, %s, %s)''' 
-
-    query_insert_bearing = '''INSERT INTO Bearing 
-                               (txID, siteID, posID, timestamp, bearing, likelihood, activity)
-                              VALUES (%s, %s, %s, %s, %s, %s, %s)''' 
-
-    # Insert results into database.
-    for (t, bearing, pos, ll, activity, pos_deps) in pos_est:
-        
-      pos_id = None
-
-      # Insert position.
-      if pos:
-        cur.execute(query_insert_pos, (tx_id, 
-                                       t, 
-                                       pos.imag, # easting 
-                                       pos.real, # northing
-                                       ll, activity))
-        pos_id = cur.lastrowid                               
-        handle_provenance_insertion(cur, pos_deps, {'Position':(pos_id,)})
-
-      # Insert bearings.
-      for (site_id, (theta, ll, activity)) in bearing.iteritems():
-        cur.execute(query_insert_bearing, (tx_id, site_id, pos_id, 
-                                           t, theta, 
-                                           ll, activity))
+  return (bearing, position)
 
 
 
