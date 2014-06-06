@@ -112,13 +112,13 @@ class Node:
     :type ll: float
   '''
 
-  def __init__(self, P, t, ll, pos_id, utm_zone, utm_letter, activity): 
+  def __init__(self, P, t, ll, pos_id, utm_number, utm_letter, activity): 
     # Position.  
     self.P = P
     self.t = t
     self.ll = ll
     self.pos_id = pos_id
-    self.utm_zone = utm_zone
+    self.utm_number = utm_number
     self.utm_letter = utm_letter
     self.activity = activity
 
@@ -226,6 +226,10 @@ class Track:
       track._calc_tracks(M, C)
     else:
       track._calc_tracks_windowed(M, C)
+    
+    for node in track.track:
+      track.table.append((node.pos_id, None, node.t, node.P.imag, node.P.real, 
+                          node.utm_number, node.utm_letter, node.ll, node.activity))
 
     return track
     
@@ -256,10 +260,10 @@ class Track:
       roots = self.graph(self.pos[i:j+1], M)
       guy = self.critical_path(self.toposort(roots), C)
       
-      for (P, t, pos_id, ll) in guy: 
-        if not pos_dict.get(t):
-          pos_dict[t] = set()
-        pos_dict[t].add((P, pos_id, ll))
+      for node in guy: 
+        if not pos_dict.get(node.t):
+          pos_dict[node.t] = set()
+        pos_dict[node.t].add(node)
 
       i += self.window_length - self.overlap_length
 
@@ -268,9 +272,10 @@ class Track:
     # to rerun the critical path algorithm over the tree created 
     # in this process.)
     for (t, val) in sorted(pos_dict.items(), key=lambda(m) : m[0]):
-      (P, pos_id, ll) = min(val, key=lambda(row) : row[2])
-      self.track.append((P, t, pos_id))
-  
+      node = max(val, key=lambda(row) : node.t)
+      self.track.append(node)
+    
+
 
   def _calc_tracks(self, M, C):
     ''' Calculate optimal tracks over all positions. 
@@ -468,7 +473,7 @@ class Track:
     path = []
     
     while node != None:
-      path.append((node.P, node.t, node.ll, node.pos_id))
+      path.append(node)
       node = node.parent
     
     path.reverse()
@@ -497,30 +502,30 @@ class Track:
     fd.write('  <Placemark>\n')
     fd.write('    <name>%s (txID=%d)</name>\n' % (name, tx_id))
     fd.write('    <gx:Track>\n')
-    for (P, t, pos_id) in self.track: 
+    for (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) in self.table: 
       tm = time.gmtime(t)
       t = '%04d-%02d-%02dT%02d:%02d:%02dZ' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
                                               tm.tm_hour, tm.tm_min, tm.tm_sec)
       fd.write('      <when>%s</when>\n' % t)
-    for (P, t, pos_id) in self.track: 
-      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+    for (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) in self.table: 
+      (lat, lon) = utm.to_latlon(easting, northing, self.zone, self.letter) 
       fd.write('      <gx:coord>%f %f 0</gx:coord>\n' % (lon, lat))
     fd.write('      <ExtendedData>\n')
     fd.write('        <SchemaData schemaUrl="#schema">\n')
     fd.write('          <gx:SimpleArrayData name="Time">\n')
-    for (P, t, pos_id) in self.track: 
+    for (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) in self.table: 
       tm = time.gmtime(t)
       t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
                                               tm.tm_hour, tm.tm_min, tm.tm_sec)
       fd.write('          <gx:value>%s</gx:value>\n' % t)
     fd.write('          </gx:SimpleArrayData>\n')
     fd.write('          <gx:SimpleArrayData name="(lat, long)">\n')
-    for (P, t, pos_id) in self.track: 
-      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+    for (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) in self.table: 
+      (lat, lon) = utm.to_latlon(easting, northing, self.zone, self.letter) 
       fd.write('          <gx:value>%fN, %fW</gx:value>\n' % (lat, lon))
     fd.write('          </gx:SimpleArrayData>\n')
     fd.write('          <gx:SimpleArrayData name="posID">\n')
-    for (P, t, pos_id) in self.track: 
+    for (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) in self.table: 
       tm = time.gmtime(t)
       t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
                                               tm.tm_hour, tm.tm_min, tm.tm_sec)
@@ -546,8 +551,8 @@ class Track:
     if len(self.track) > 0: 
       speeds = []
       for i in range(len(self.track)-1): 
-        speeds.append( distance(self.track[i+1][0], self.track[i][0]) / \
-                               (self.track[i+1][1] - self.track[i][1]) )
+        speeds.append( distance(self.track[i+1].P, self.track[i].P) / \
+                               (self.track[i+1].t - self.track[i].t) )
       return (np.mean(speeds), np.std(speeds))
     
     else: return (np.nan, np.nan)
@@ -557,13 +562,13 @@ class Track:
     
     V = []
     for i in range(len(self.track)-1):
-      v = (self.track[i+1][0] - self.track[i][0]) / (self.track[i+1][1] - self.track[i][1])
-      V.append((v, (self.track[i][1] + self.track[i+1][1]) / 2))
+      v = (self.track[i+1].P - self.track[i].P) / (self.track[i+1].t - self.track[i].t)
+      V.append((v, (self.track[i].t + self.track[i+1].t) / 2))
 
     A = []
     for i in range(len(V)-1):
-      a = (V[i+1][0] - V[i][0]) / (V[i+1][1] - V[i][1])
-      A.append((a, (V[i][1] + V[i+1][1]) / 2))
+      a = (V[i+1].P - V[i].P) / (V[i+1].t - V[i].t)
+      A.append((a, (V[i].t + V[i+1].t) / 2))
 
     return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
 
@@ -585,53 +590,9 @@ def tx_name(db_con):
   return d
 
 
+# Testing, testing ... 
+
 if __name__ == '__main__': 
-  
-  tx_id = 54
-  
-  import commands
-  t_start = int(commands.getoutput('date --date="20140202 1200" +%s'))
-  t_end   = int(commands.getoutput('date --date="20140202 1600" +%s'))
-
-  print t_start, t_end
-  M = track.maxspeed_exp((10, 1), (360, 0.1), 0.05)
-  #M = track.maxspeed_linear((10, 1), (180, 0.1), 0.05)
-  C = 1
-
-  db_con = util.get_db('writer')
-  
-  fella = track(db_con, t_start, t_end, tx_id, M, C) 
-  #fella = trackall(db_con, tx_id, M, C) 
-  #fella.export_kml(tx_name(db_con)[tx_id], tx_id)
-
-  t = time.localtime(fella[0][1])
-  s = time.localtime(fella[-1][1])
-  print '%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  txID=%d' % (
-       t.tm_year, t.tm_mon, t.tm_mday,
-       t.tm_hour, t.tm_min,
-       s.tm_year, s.tm_mon, s.tm_mday,
-       s.tm_hour, s.tm_min,
-       tx_id)
-
-  print 'Length of critical path: %d (out of %d)' % (len(fella), len(fella.pos))
-
-  if True:
-
-    import matplotlib.pyplot as pp
-
-    # Plot sites.
-    sites = csv(db_con=db_con, db_table='sitelist')
-    pp.plot(
-     [s.easting for s in sites], 
-     [s.northing for s in sites], 'ro')
-
-    # Plot locations. 
-    pp.plot( 
-     map(lambda (P, t, pos_id): P.imag, fella), 
-     map(lambda (P, t, pos_id): P.real, fella), '.', alpha=0.3)
-
-    pp.savefig("test.png")
- 
      
-
+  pass
 

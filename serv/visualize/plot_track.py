@@ -93,8 +93,8 @@ if overlay:
 
   # Plot tracks. 
   pp.scatter( 
-   map(lambda (P, t, pos_id): E(P.imag), track), 
-   map(lambda (P, t, pos_id): N(P.real), track), alpha=0.2, s=2, c='k', 
+   map(lambda (node): E(node.P.imag), track), 
+   map(lambda (node): N(node.P.real), track), alpha=0.2, s=2, c='k', 
      label='Transmitter tracks')
 
   # Plot sites. 
@@ -103,8 +103,8 @@ if overlay:
    [N(float(s.northing)) for s in sites], 'ro', 
       label='QRAAT receiver sites')
 
-  t = time.localtime(track[0][1])
-  s = time.localtime(track[-1][1])
+  t = time.localtime(track[0].t)
+  s = time.localtime(track[-1].t)
   pp.title('%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  txID=%d' % (
        t.tm_year, t.tm_mon, t.tm_mday,
        t.tm_hour, t.tm_min,
