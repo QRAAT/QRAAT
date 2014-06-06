@@ -49,6 +49,7 @@ def get_center(db_con):
 # estID's which are fed to the class signal. 
 # TODO Curry these?  
 # TODO Change txID to depID. 
+# TODO Grab band filte rfalues from tx_pulse.  
 
 def get_est_ids_timefilter(db_con, dep_id, t_start, t_end, thresh):
   cur = db_con.cursor()
