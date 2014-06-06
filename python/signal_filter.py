@@ -1695,9 +1695,15 @@ def _rel_score(score):
 
 def get_cursor_value(handler, name):
 	q = 'select value from `cursor` where name = %s'
-	cur = handler.add_sql(q, (name,))
-	u = cur.fetchone()
-	assert u is not None
-	v = cur.fetchone()
-	assert v is None
-	return u
+	db_con = handler.obj
+	cur = db_con.cursor()
+	rows = cur.execute(q, (name,))
+	if rows == 0:
+		# Default value
+		return 0
+	elif rows == 1:
+		r = cur.fetchone()
+		r = tuple(r)
+		return r[0]
+	else:
+		raise Exception('Ambiguous cursor value (found {}) for "{}"'.format(rows, name))
