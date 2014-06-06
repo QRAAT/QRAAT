@@ -52,19 +52,6 @@ try:
   import utm, xml
 except ImportError: pass
 
-def distance(Pi, Pj):
-  return np.abs(Pj - Pi)
-
-def speed(v, w):
-  return np.abs((w.P - v.P) / (w.t - v.t))
-
-def acceleration(u, v, w): 
-  V1 = (v.P - u.P) / (v.t - u.t) 
-  V2 = (w.P - v.P) / (w.t - v.t) 
-  t1 = (v.t + u.t) / 2
-  t2 = (w.t + v.t) / 2  
-  return np.abs((V2 - V1) / (t2 - t1))
-
 def get_pos_ids(db_con, tx_id, t_start, t_end):
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
@@ -73,8 +60,13 @@ def get_pos_ids(db_con, tx_id, t_start, t_end):
                     AND timestamp >= %f 
                     AND timestamp <= %f''' % (tx_id, t_start, t_end))
   return [ int(row[0]) for row in cur.fetchall() ]
-  
 
+def get_dep_by_id(db_con, track_id):
+  cur = db_con.cursor()
+  cur.execute('''SELECT depID 
+                   FROM track
+                  WHERE ID=%d''' % track_id)
+  return cur.fetchone()[0]
 
 # 
 # A few families of max speed given time interval functions. 
@@ -98,7 +90,42 @@ def maxspeed_const(m):
   return lambda (t) : m
 
 
+#
+# Run tracker. 
+#
 
+def calc_tracks(db_con, pos, track_id, C=1):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID, depID, max_speed_family, 
+                        speed_burst, speed_sustained, speed_limit
+                   FROM track
+                  WHERE ID = %d''' % track_id)
+  (_, dep_id, family, burst, sustained, limit) = cur.fetchone()
+  if family == 'const':
+    M = maxspeed_const(limit)
+  elif family == 'exp': 
+    M = maxspeed_exp(burst, sustained, limit)
+  elif family == 'linear':
+    M = maxspeed_linear(burst, sustained, limit)
+  
+  return Track.calc(db_con, pos, track_id, M, C) 
+
+
+
+
+
+def distance(Pi, Pj):
+  return np.abs(Pj - Pi)
+
+def speed(v, w):
+  return np.abs((w.P - v.P) / (w.t - v.t))
+
+def acceleration(u, v, w): 
+  V1 = (v.P - u.P) / (v.t - u.t) 
+  V2 = (w.P - v.P) / (w.t - v.t) 
+  t1 = (v.t + u.t) / 2
+  t2 = (w.t + v.t) / 2  
+  return np.abs((V2 - V1) / (t2 - t1))
 
 class Node:
 
@@ -194,33 +221,35 @@ class Track:
     the critical path. 
 
   '''
-  
-  (zone, letter) = 10, 'S' # TODO get this from position table. 
 
   window_length = 250  
   overlap_length = 25 
 
   def __init__(self, db_con=None, track_id=None, t_start=None, t_end=None): 
+    self.track_id = track_id
     self.table = []
-    cur = db_con.cursor()
-    
-    # TODO optimize. 
-    cur.execute('''SELECT posID, depID, timestamp, easting, northing, 
-                          utm_zone_number, utm_zone_letter, likelihood,
-                          activity
-                     FROM track, track_pos, Position
-                    WHERE trackID = %d
-                      AND posID = Position.ID
-                      AND timestamp >= %f AND timestamp <= %f 
-                    ORDER BY timestamp ASC''' % (track_id, t_start, t_end))
-    
-    for row in cur.fetchall():
-      self.table.append(row)
+    if db_con:
+      cur = db_con.cursor()
+      
+      # TODO optimize. 
+      cur.execute('''SELECT posID, depID, timestamp, easting, northing, 
+                            utm_zone_number, utm_zone_letter, likelihood,
+                            activity
+                       FROM track, track_pos, Position
+                      WHERE trackID = %d
+                        AND posID = Position.ID
+                        AND timestamp >= %f AND timestamp <= %f 
+                      ORDER BY timestamp ASC''' % (track_id, t_start, t_end))
+      
+      for row in cur.fetchall():
+        self.table.append((row[0], row[1], float(row[2]), float(row[3]), float(row[4]), 
+                           row[5], row[6], row[7], row[8]))
+        
 
   @classmethod
-  def calc(cls, db_con, pos, tx_id, M, C, optimal=False):
+  def calc(cls, db_con, pos, track_id, M, C, optimal=False):
     track = cls()
-    track.tx_id = tx_id
+    track.track_id = track_id
     
     # Get positions. 
     track.pos = pos
@@ -238,10 +267,13 @@ class Track:
     return track
     
  
-  def insert_db(self, db_con): 
+  def insert_db(self, db_con):
+    # TODO Modify to update tracks.
+    cur = db_con.cursor()
     for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
          utm_zone_letter, likelihood, activity) in self.table:
-      pass # TODO 
+      cur.execute('''INSERT INTO track_pos (posID, trackID)
+                          VALUES (%d, %d)''' % (pos_id, self.track_id))
 
   def _calc_tracks_windowed(self, M, C):
     ''' Calculate tracks over overlapping windows of positions. 
@@ -296,25 +328,14 @@ class Track:
     roots = self.graph(self.pos, M)
     self.track = map(lambda(row) : row[:3], self.critical_path(self.toposort(roots), C))
   
-
-  def _fetch(self, db_con, pos_ids): 
-    cur = db_con.cursor()
-    if len(pos_ids) > 0:
-      cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
-                       FROM Position
-                      WHERE ID in (%s)
-                      ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), pos_ids)))
-      self.pos = cur.fetchall()
-    else: self.pos = []
-  
   def __getiter__(self): 
-    return self.track
+    return self.table
 
   def __getitem__(self, i):
-    return self.track[i]
+    return self.table[i]
   
   def __len__(self):
-    return len(self.track)
+    return len(self.table)
   
   #
   # DAG-building algorithms. 
@@ -337,7 +358,8 @@ class Track:
       :rtype: Node list
     '''
     
-    # pos row: (id, tx_id, timestamp, easting, northing, utm_zone_number, utm_zone_letter, likelihood, activity)
+    # pos row: (id, tx_id, timestamp, easting, northing, 
+    # utm_zone_number, utm_zone_letter, likelihood, activity)
     nodes = []
     for i in range(len(pos)): 
       nodes.append(Node(np.complex(pos[i][4], pos[i][3]), # P 
@@ -490,7 +512,8 @@ class Track:
 
 
   def export_kml(self, name, tx_id):
-
+    # TODO I've changed some stuff ... make sure this output is still sensible. 
+  
     # E.g.: https://developers.google.com/kml/documentation/kmlreference#gxtrack 
     # TODO The file is way longer than it needs to be, since I wanted to display
     # the coordinates and datetime in the tooltip that appears in Google Earth.
@@ -507,30 +530,30 @@ class Track:
     fd.write('  <Placemark>\n')
     fd.write('    <name>%s (txID=%d)</name>\n' % (name, tx_id))
     fd.write('    <gx:Track>\n')
-    for (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) in self.table: 
+    for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
       tm = time.gmtime(t)
       t = '%04d-%02d-%02dT%02d:%02d:%02dZ' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
                                               tm.tm_hour, tm.tm_min, tm.tm_sec)
       fd.write('      <when>%s</when>\n' % t)
-    for (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) in self.table: 
-      (lat, lon) = utm.to_latlon(easting, northing, self.zone, self.letter) 
+    for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
+      (lat, lon) = utm.to_latlon(easting, northing, utm_number, utm_letter) 
       fd.write('      <gx:coord>%f %f 0</gx:coord>\n' % (lon, lat))
     fd.write('      <ExtendedData>\n')
     fd.write('        <SchemaData schemaUrl="#schema">\n')
     fd.write('          <gx:SimpleArrayData name="Time">\n')
-    for (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) in self.table: 
+    for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
       tm = time.gmtime(t)
       t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
                                               tm.tm_hour, tm.tm_min, tm.tm_sec)
       fd.write('          <gx:value>%s</gx:value>\n' % t)
     fd.write('          </gx:SimpleArrayData>\n')
     fd.write('          <gx:SimpleArrayData name="(lat, long)">\n')
-    for (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) in self.table: 
-      (lat, lon) = utm.to_latlon(easting, northing, self.zone, self.letter) 
+    for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
+      (lat, lon) = utm.to_latlon(easting, northing, utm_number, utm_letter) 
       fd.write('          <gx:value>%fN, %fW</gx:value>\n' % (lat, lon))
     fd.write('          </gx:SimpleArrayData>\n')
     fd.write('          <gx:SimpleArrayData name="posID">\n')
-    for (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) in self.table: 
+    for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
       tm = time.gmtime(t)
       t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
                                               tm.tm_hour, tm.tm_min, tm.tm_sec)
@@ -553,37 +576,34 @@ class Track:
     
       :return: (mean, std) tuple. 
     '''
-    if len(self.track) > 0: 
+    if len(self.table) > 0: 
       speeds = []
-      for i in range(len(self.track)-1): 
-        speeds.append( distance(self.track[i+1].P, self.track[i].P) / \
-                               (self.track[i+1].t - self.track[i].t) )
+      for i in range(len(self.table)-1): 
+        # (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) 
+        P = np.complex(self.table[i+1][4], self.table[i+1][3])
+        Q = np.complex(self.table[i][4], self.table[i][3])
+        t_p = self.table[i+1][2]
+        t_q = self.table[i][2]
+        speeds.append( distance(P, Q) / (t_p - t_q) )
       return (np.mean(speeds), np.std(speeds))
     
     else: return (np.nan, np.nan)
 
   def stats(self):
     ''' Piecewise velocity and acceleration along critcal path. '''   
+    # TODO rewrite
+    #    V = []
+    #    for i in range(len(self.table)-1):
+    #      v = (self.table[i+1].P - self.table[i].P) / (self.table[i+1].t - self.table[i].t)
+    #      V.append((v, (self.table[i].t + self.table[i+1].t) / 2))
+    #
+    #    A = []
+    #    for i in range(len(V)-1):
+    #      a = (V[i+1].P - V[i].P) / (V[i+1].t - V[i].t)
+    #      A.append((a, (V[i].t + V[i+1].t) / 2))
+    #
+    #    return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
     
-    V = []
-    for i in range(len(self.track)-1):
-      v = (self.track[i+1].P - self.track[i].P) / (self.track[i+1].t - self.track[i].t)
-      V.append((v, (self.track[i].t + self.track[i+1].t) / 2))
-
-    A = []
-    for i in range(len(V)-1):
-      a = (V[i+1].P - V[i].P) / (V[i+1].t - V[i].t)
-      A.append((a, (V[i].t + V[i+1].t) / 2))
-
-    return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
-
-
-def calc_tracks(db_con, pos, tx_id, M, C=1):
-  # TODO get parameters from track table. 
-  # TODO take in a position object. 
-  return Track.calc(db_con, pos, tx_id, M, C) 
-
-
 
 
 def tx_name(db_con):
