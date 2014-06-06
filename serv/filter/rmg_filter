@@ -49,8 +49,6 @@ try:
 
   db_con = qraat.util.get_db('reader')
 
-  context_length = 3 * 60
-
   chunk_size = int(60 * 60)		# One hour (in seconds)
 
   t_start, t_end = options.t_start, options.t_end
