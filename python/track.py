@@ -37,9 +37,6 @@
 #   TODO Think about composing this probability with the position 
 #        likelihood. These would need to be normalized (see notes.)  
 #
-# TODO 
-#  - Make this module look more like position; i.e., move all classmethods 
-#    out of track. 
 
 import numpy as np
 import time, os, sys
@@ -393,7 +390,7 @@ class Track:
     '''
     
     # TODO update this code to include posID in Node() constructor.
-    # TODO row fomrat has changed!!
+    # TODO row format has changed!!
     roots = []; leaves = []
     i = 0 
     while i < len(pos) - 1:
