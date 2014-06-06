@@ -119,18 +119,21 @@ try:
       continue
 
     print "position: calculating bearing likelihoods (%d)." % len(sig) 
-    bl = qraat.position.bearing(sv, sig)
+    bl = qraat.position.position_estimator(sv, sig)
 
     print "position: calculating positions."
-    pos_est = qraat.position.calc_positions(sig,
-                                            bl,
-                                            center,
-                                            options.t_window, 
-                                            options.t_delta, 
-                                            options.verbose) 
+    (bearing, position) = qraat.position.calc_positions(sig,
+                                                        bl,
+                                                        center,
+                                                        options.t_window, 
+                                                        options.t_delta, 
+                                                        options.tx_id,
+                                                        options.verbose) 
 
-    print "position: inserting positions (%d)." % (len(pos_est))
-    qraat.position.insert_positions(db_con, pos_est, options.tx_id)
+    print "position: inserting positions (%d)." % (len(position))
+    position.insert_db(db_con)
+    print "position: inserting bearings (%d)." % (len(bearing))
+    bearing.insert_db(db_con)
 
 except mdb.Error, e:
   print >>sys.stderr, "position: error: [%d] %s" % (e.args[0], e.args[1])

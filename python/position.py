@@ -28,6 +28,14 @@ try:
   import MySQLdb as mdb
 except ImportError: pass
 
+query_insert_pos = '''INSERT INTO Position
+                       (txID, timestamp, easting, northing, likelihood, activity)
+                      VALUES (%s, %s, %s, %s, %s, %s)''' 
+
+query_insert_bearing = '''INSERT INTO Bearing 
+                           (txID, siteID, timestamp, bearing, likelihood, activity)
+                          VALUES (%s, %s, %s, %s, %s, %s)''' 
+
 def get_center(db_con):
   cur = db_con.cursor()
   cur.execute('''SELECT northing, easting 
@@ -127,6 +135,7 @@ class steering_vectors:
                                                            prov_sv_ids, deps, sv_deps_by_site)
 
 
+
 class signal:
   ''' Encapsulate pulse signal data. 
   
@@ -208,7 +217,87 @@ class signal:
     return activity
 
 
-class bearing: 
+
+class Position:
+  
+  def __init__(self, db_con=None, tx_id=None, t_start=None, t_end=None): 
+    self.table = []
+    pass # TODO read from database. 
+
+  def __len__(self):
+    return len(self.table)
+
+  def insert_db(self, db_con):
+    cur = db_con.cursor()
+    for (id, tx_id, timestamp, easting, northing, 
+         utm_zone_number, utm_zone_letter, likelihood, 
+         activity, pos_deps) in self.table: 
+      cur.execute(query_insert_pos, (tx_id, 
+                                     timestamp, 
+                                     easting,  # pos.imag
+                                     northing, # pos.real
+                                     likelihood, 
+                                     activity))
+      pos_id = cur.lastrowid                               
+      handle_provenance_insertion(cur, pos_deps, {'Position':(pos_id,)})
+
+  def export_kml(self, name, tx_id):
+
+    fd = open('%s_pos.kml' % name, 'w')
+    fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+    fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
+    fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
+    fd.write('<Folder>\n')
+    fd.write('  <Placemark>\n')
+    fd.write('  <MultiGeometry>\n')
+    fd.write('    <name>%s (txID=%d) position cloud</name>\n' % (name, tx_id))
+    for row in self.table:
+      (P, t, ll, pos_id) = (np.complex(row[0], row[1]), 
+                            float(row[2]), 
+                            float(row[3]), 
+                            int(row[4]))
+      tm = time.gmtime(t)
+      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
+      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+      fd.write('    <Point id="%d">\n' % pos_id)
+      fd.write('      <coordinates>%f,%f,0</coordinates>\n' % (lon, lat))
+      fd.write('    </Point>\n')
+    fd.write('  </MultiGeometry>\n')
+    fd.write('  </Placemark>\n')
+    fd.write('</Folder>\n')
+    fd.write('</kml>')
+    fd.close() 
+
+
+
+class Bearing: 
+  
+  def __init__(self, db_con=None, tx_id=None, site_id=None, t_start=None, t_end=None):
+    self.table = []
+    pass # TODO read from database. 
+
+  def __len__(self):
+    return len(self.table)
+
+  def insert_db(self, db_con):
+    cur = db_con.cursor()
+    for (id, tx_id, site_id, timestamp, bearing, 
+         likelihood, activity) in self.table: 
+      cur.execute(query_insert_bearing, (tx_id,
+                                         site_id, 
+                                         timestamp, 
+                                         bearing, 
+                                         likelihood, 
+                                         activity))
+    
+  def export_kml(self, name, tx_id, site_id):
+    pass # TODO 
+
+
+
+
+class position_estimator: 
   ''' Calculate and store bearing likelihood distributions for a signal window.
 
     The likelihoods calculated for the bearings are based on Bartlet's estimator. 
@@ -343,7 +432,7 @@ class bearing:
 
 
 
-class mle_bearing (bearing): 
+class mle_position_estimator (position_estimator): 
   ''' Calculate bearing distribution with the minimum likelihood estimator. ''' 
 
   def __init__(self, sv, sig): 
@@ -396,7 +485,7 @@ def calc_windows(bl, t_window, t_delta):
 
 
 
-def calc_positions(signal, bl, center, t_window, t_delta, verbose=False):
+def calc_positions(signal, bl, center, t_window, t_delta, tx_id, verbose=False):
   ''' Calculate positions of a transmitter over a time interval. 
   
     :param bl: Bearing likelihoods for time range. 
@@ -413,6 +502,10 @@ def calc_positions(signal, bl, center, t_window, t_delta, verbose=False):
   if verbose:
     print "%15s %-19s %-19s %-19s" % ('time window',
               '100 meters', '10 meters', '1 meter')
+
+  guy = Position()
+
+  fella = Bearing()
 
   for (t, index_list) in calc_windows(bl, t_window, t_delta): 
    
@@ -457,10 +550,16 @@ def calc_positions(signal, bl, center, t_window, t_delta, verbose=False):
       pos_deps = {'est': tuple(pos_deps)}
 
       if verbose: print
-    
+   
     pos_est.append((t, bearing, pos, ll, pos_activity, pos_deps))
+    
+    if pos: # TODO utm
+      guy.table.append((None, tx_id, t, pos.imag, pos.real, None, None, ll, pos_activity, pos_deps))
+    
+    for (site_id, (theta, ll, activity)) in bearing.iteritems():
+      fella.table.append((None, tx_id, site_id, t, theta, ll, activity))
 
-  return pos_est
+  return (fella, guy)
 
 
 
@@ -496,6 +595,11 @@ def insert_positions(db_con, pos_est, tx_id):
         cur.execute(query_insert_bearing, (tx_id, site_id, pos_id, 
                                            t, theta, 
                                            ll, activity))
+
+
+
+
+
 
 
 

@@ -71,9 +71,15 @@ for tx in tx_list:
       print "Skipping empty chunk"
       continue 
     
-    bl = qraat.position.bearing(sv, sig)
-    pos_est = qraat.position.calc_positions(sig, bl, center, time_window, time_delta)
-    qraat.position.insert_positions(db_con, pos_est, tx_id)
+    bl = qraat.position.position_estimator(sv, sig)
+    (bearing, position)  = qraat.position.calc_positions(sig, 
+                                                         bl, 
+                                                         center, 
+                                                         time_window, 
+                                                         time_delta,
+                                                         tx_id)
+    bearing.insert_db(db_con)
+    position.insert_db(db_con)
 
   temp_max_id = np.max(times[:,0])
   if temp_max_id > max_id:

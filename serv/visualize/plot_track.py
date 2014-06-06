@@ -52,7 +52,7 @@ C = 1
 # A possible way to calculate good tracks. Compute the tracks
 # with some a priori maximum speed that's on the high side. 
 pos_ids = qraat.track.get_pos_ids(db_con, options.tx_id, options.t_start, options.t_end)
-track = qraat.track(db_con, pos_ids, options.tx_id, M, C)
+track = qraat.track.calc_track(db_con, pos_ids, options.tx_id, M, C)
 
 track.export_kml('tx%d' % options.tx_id, options.tx_id)
 

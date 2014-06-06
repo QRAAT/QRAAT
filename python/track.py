@@ -65,6 +65,41 @@ def acceleration(u, v, w):
   t2 = (w.t + v.t) / 2  
   return np.abs((V2 - V1) / (t2 - t1))
 
+def get_pos_ids(db_con, tx_id, t_start, t_end):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID 
+                   FROM Position
+                  WHERE txID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f''' % (tx_id, t_start, t_end))
+  return [ int(row[0]) for row in cur.fetchall() ]
+  
+
+
+# 
+# A few families of max speed given time interval functions. 
+#
+
+def maxspeed_linear(burst, sustained, limit):
+  return lambda (t) : max(limit, (t - burst[0]) * (
+          float(sustained[1] - burst[1]) / (sustained[0] - burst[0])) + burst[1])
+
+def maxspeed_exp(burst, sustained, limit):
+  (t1, y1) = burst; (t2, y2) = sustained
+  C = limit
+
+  r = np.log((y2 - C) / (y1 - C)) / (t1 - t2) 
+  B = np.exp(r * t2) * (y2 - C)
+  r *= -1
+  
+  return lambda (t) : (B * np.exp(r * t) + C)
+
+def maxspeed_const(m):
+  return lambda (t) : m
+
+
+
+
 class Node:
 
   ''' Node of track graph. 
@@ -147,7 +182,7 @@ class Node:
 
 
 
-class track:
+class Track:
 
   ''' Transmitter tracks. 
 
@@ -171,17 +206,25 @@ class track:
   window_length = 250  
   overlap_length = 25 
 
-  def __init__(self, db_con, pos_ids, tx_id, M, C=1, optimal=False):
-    self.tx_id = tx_id
+  def __init__(self, db_con=None, track_id=None, t_start=None, t_end=None): 
+    pass # TODO 
+
+  @classmethod
+  def calc(cls, db_con, pos_ids, tx_id, M, C, optimal=False):
+    track = cls()
+
+    track.tx_id = tx_id
     
     # Get positions. 
-    self._fetch(db_con, pos_ids)
+    track._fetch(db_con, pos_ids)
     
     # Calculate tracks. 
     if optimal:
-      self._calc_tracks(M, C)
+      track._calc_tracks(M, C)
     else:
-      self._calc_tracks_windowed(M, C)
+      track._calc_tracks_windowed(M, C)
+
+    return track
     
 
   def _calc_tracks_windowed(self, M, C):
@@ -239,11 +282,13 @@ class track:
 
   def _fetch(self, db_con, pos_ids): 
     cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
-                     FROM Position
-                    WHERE ID in (%s)
-                    ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), pos_ids)))
-    self.pos = cur.fetchall()
+    if len(pos_ids) > 0:
+      cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
+                       FROM Position
+                      WHERE ID in (%s)
+                      ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), pos_ids)))
+      self.pos = cur.fetchall()
+    else: self.pos = []
   
   def __getiter__(self): 
     return self.track
@@ -422,92 +467,7 @@ class track:
     
     path.reverse()
     return path
-
-  #
-  # Some statistical features of the tracks. 
-  #
-
-  def speed(self):
-    ''' Calculate mean and standard deviation of the target's speed. 
-    
-      :return: (mean, std) tuple. 
-    '''
-    if len(self.track) > 0: 
-      speeds = []
-      for i in range(len(self.track)-1): 
-        speeds.append( distance(self.track[i+1][0], self.track[i][0]) / \
-                               (self.track[i+1][1] - self.track[i][1]) )
-      return (np.mean(speeds), np.std(speeds))
-    
-    else: return (np.nan, np.nan)
-
-  def stats(self):
-    ''' Piecewise velocity and acceleration along critcal path. '''   
-    
-    V = []
-    for i in range(len(self.track)-1):
-      v = (self.track[i+1][0] - self.track[i][0]) / (self.track[i+1][1] - self.track[i][1])
-      V.append((v, (self.track[i][1] + self.track[i+1][1]) / 2))
-
-    A = []
-    for i in range(len(V)-1):
-      a = (V[i+1][0] - V[i][0]) / (V[i+1][1] - V[i][1])
-      A.append((a, (V[i][1] + V[i+1][1]) / 2))
-
-    return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
-
-  # 
-  # A few families of max speed given time interval functions. 
-  # TODO I'm somewhat abusing the API structure here. Move these
-  # class methods out and make htis module look more like position.
-  # (Or make position look more like track.)
-  #
-
-  @classmethod
-  def maxspeed_linear(cls, burst, sustained, limit):
-    return lambda (t) : max(limit, (t - burst[0]) * (
-            float(sustained[1] - burst[1]) / (sustained[0] - burst[0])) + burst[1])
-
-  @classmethod
-  def maxspeed_exp(cls, burst, sustained, limit):
-    (t1, y1) = burst; (t2, y2) = sustained
-    C = limit
-
-    r = np.log((y2 - C) / (y1 - C)) / (t1 - t2) 
-    B = np.exp(r * t2) * (y2 - C)
-    r *= -1
-    
-    return lambda (t) : (B * np.exp(r * t) + C)
-
-  @classmethod
-  def maxspeed_const(cls, m):
-    return lambda (t) : m
-
-  @classmethod
-  def get_pos_ids(cls, db_con, tx_id, t_start, t_end):
-    cur = db_con.cursor()
-    cur.execute('''SELECT ID 
-                     FROM Position
-                    WHERE txID=%d
-                      AND timestamp >= %f 
-                      AND timestamp <= %f''' % (tx_id, t_start, t_end))
-    return [ int(row[0]) for row in cur.fetchall() ]
   
-
-
-
-
-
-
-
-# TODO This will be the Python interface for tracks in the DB. 
-
-class Track:
-
-  def __init__(self, db_con=None, track_id=None, t_start=None, t_end=None):
-    self.table = []
-    pass # Read track from DB. 
-
   def insert_db(self, db_con): 
     for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
          utm_zone_letter, likelihood, activity) in self.table:
@@ -568,63 +528,45 @@ class Track:
     fd.write('</kml>')
     fd.close() 
 
+  #
+  # Some statistical features of the tracks. 
+  #
 
-# TODO This will be the Python interface for positions in the DB. 
- 
-class Position:
-  
-  def __init__(self, db_con=None, tx_id=None, t_start=None, t_end=None): 
-    self.table = []
-    pass # TODO read from database. 
+  def speed(self):
+    ''' Calculate mean and standard deviation of the target's speed. 
+    
+      :return: (mean, std) tuple. 
+    '''
+    if len(self.track) > 0: 
+      speeds = []
+      for i in range(len(self.track)-1): 
+        speeds.append( distance(self.track[i+1][0], self.track[i][0]) / \
+                               (self.track[i+1][1] - self.track[i][1]) )
+      return (np.mean(speeds), np.std(speeds))
+    
+    else: return (np.nan, np.nan)
 
-  def insert_db(self, db_con):
-    for (id, tx_id, timestamp, easting, northing, 
-         utm_zone_number, utm_zone_letter, likelihood, activity) in self.table: 
-      pass # TODO 
+  def stats(self):
+    ''' Piecewise velocity and acceleration along critcal path. '''   
+    
+    V = []
+    for i in range(len(self.track)-1):
+      v = (self.track[i+1][0] - self.track[i][0]) / (self.track[i+1][1] - self.track[i][1])
+      V.append((v, (self.track[i][1] + self.track[i+1][1]) / 2))
 
-  def export_kml(self, name, tx_id):
+    A = []
+    for i in range(len(V)-1):
+      a = (V[i+1][0] - V[i][0]) / (V[i+1][1] - V[i][1])
+      A.append((a, (V[i][1] + V[i+1][1]) / 2))
 
-    fd = open('%s_pos.kml' % name, 'w')
-    fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-    fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
-    fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
-    fd.write('<Folder>\n')
-    fd.write('  <Placemark>\n')
-    fd.write('  <MultiGeometry>\n')
-    fd.write('    <name>%s (txID=%d) position cloud</name>\n' % (name, tx_id))
-    for row in self.table:
-      (P, t, ll, pos_id) = (np.complex(row[0], row[1]), 
-                            float(row[2]), 
-                            float(row[3]), 
-                            int(row[4]))
-      tm = time.gmtime(t)
-      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
-                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
-      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
-      fd.write('    <Point id="%d">\n' % pos_id)
-      fd.write('      <coordinates>%f,%f,0</coordinates>\n' % (lon, lat))
-      fd.write('    </Point>\n')
-    fd.write('  </MultiGeometry>\n')
-    fd.write('  </Placemark>\n')
-    fd.write('</Folder>\n')
-    fd.write('</kml>')
-    fd.close() 
+    return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
 
-# TODO This will be the Python interface for bearings in the DB. 
 
-class Bearing: 
-  
-  def __init__(self, db_con=None, tx_id=None, site_id=None, t_start=None, t_end=None):
-    self.table = []
-    pass # TODO read from database. 
+def calc_tracks(db_con, pos_ids, tx_id, M, C=1):
+  # TODO get parameters from track table. 
+  # TODO take in a position object. 
+  return Track.calc(db_con, pos_ids, tx_id, M, C) 
 
-  def insert_db(db_con):
-    for (id, tx_id, site_id, pos_id, timestamp, bearing, 
-         likelihood, activity) in self.table: 
-      pass # TODO 
-
-  def export_kml(self, name, tx_id, site_id):
-    pass # TODO 
 
 
 
