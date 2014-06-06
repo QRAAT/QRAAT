@@ -53,7 +53,7 @@ def get_pos_ids(db_con, tx_id, t_start, t_end):
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
                    FROM Position
-                  WHERE txID=%d
+                  WHERE depID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f''' % (tx_id, t_start, t_end))
   return [ int(row[0]) for row in cur.fetchall() ]
@@ -525,7 +525,7 @@ class Track:
     fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
     fd.write('<Folder>\n')
     fd.write('  <Placemark>\n')
-    fd.write('    <name>%s (txID=%d)</name>\n' % (name, tx_id))
+    fd.write('    <name>%s (depID=%d)</name>\n' % (name, tx_id))
     fd.write('    <gx:Track>\n')
     for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
       tm = time.gmtime(t)

@@ -29,11 +29,11 @@ try:
 except ImportError: pass
 
 query_insert_pos = '''INSERT INTO Position
-                       (txID, timestamp, easting, northing, likelihood, activity)
+                       (depID, timestamp, easting, northing, likelihood, activity)
                       VALUES (%s, %s, %s, %s, %s, %s)''' 
 
 query_insert_bearing = '''INSERT INTO Bearing 
-                           (txID, siteID, timestamp, bearing, likelihood, activity)
+                           (depID, siteID, timestamp, bearing, likelihood, activity)
                           VALUES (%s, %s, %s, %s, %s, %s)''' 
 
 def get_center(db_con):
@@ -45,10 +45,12 @@ def get_center(db_con):
   return np.complex(n, e)
 
 
-#: Get est's from the database, applying a filter. Return a set of
-#: estID's which are fed to the class signal. TODO Curry these?  
+# Get est's from the database, applying a filter. Return a set of
+# estID's which are fed to the class signal. 
+# TODO Curry these?  
+# TODO Change txID to depID. 
 
-def get_est_ids_timefilter(db_con, tx_id, t_start, t_end, thresh):
+def get_est_ids_timefilter(db_con, dep_id, t_start, t_end, thresh):
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
                    FROM est
@@ -56,10 +58,10 @@ def get_est_ids_timefilter(db_con, tx_id, t_start, t_end, thresh):
                   WHERE txID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f
-                    AND thresh >= %f''' % (tx_id, t_start, t_end, thresh))
+                    AND thresh >= %f''' % (dep_id, t_start, t_end, thresh))
   return [ int(row[0]) for row in cur.fetchall() ]
 
-def get_est_ids_bandfilter(db_con, tx_id, t_start, t_end):
+def get_est_ids_bandfilter(db_con, dep_id, t_start, t_end):
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
                    FROM est
@@ -67,16 +69,16 @@ def get_est_ids_bandfilter(db_con, tx_id, t_start, t_end):
                     AND timestamp >= %f 
                     AND timestamp <= %f 
                     AND band3 < 150 
-                    AND band10 < 900''' % (tx_id, t_start, t_end))
+                    AND band10 < 900''' % (dep_id, t_start, t_end))
   return [ int(row[0]) for row in cur.fetchall() ]
 
-def get_est_ids(db_con, tx_id, t_start, t_end):
+def get_est_ids(db_con, dep_id, t_start, t_end):
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
                    FROM est
                   WHERE txID=%d
                     AND timestamp >= %f 
-                    AND timestamp <= %f''' % (tx_id, t_start, t_end))
+                    AND timestamp <= %f''' % (dep_id, t_start, t_end))
   return [ int(row[0]) for row in cur.fetchall() ]
 
 
@@ -152,15 +154,17 @@ class signal:
   def __init__(self, db_con, est_ids): 
 
     if len(est_ids) == 0:
-      self.id = self.site_id = self.tx_id = self.timestamp = np.array([])
+      self.id = self.site_id = self.dep_id = self.timestamp = np.array([])
       self.edsp = self.ed = self.nc = np.array([])
       self.signal_ct = 0
 
     else: 
       # Store eigenvalue decomposition vectors and noise covariance
       # matrices in NumPy arrays. 
+      
+      # TODO When qraat.est updates to use depID instead of txID, update this. 
       cur = db_con.cursor()
-      cur.execute('''SELECT ID, siteid, txid, timestamp, edsp, 
+      cur.execute('''SELECT ID, siteID, txID, timestamp, edsp, 
                             ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
                             nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
                             nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
@@ -174,7 +178,7 @@ class signal:
       # Metadata. 
       (self.id, 
        self.site_id, 
-       self.tx_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
+       self.dep_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
       self.timestamp = raw[:,3]
       raw = raw[:,4:]
 
@@ -224,7 +228,7 @@ class Position:
     self.table = []
     if len(pos_ids) > 0:
       cur = db_con.cursor()
-      cur.execute('''SELECT ID, txID, timestamp, easting, northing, 
+      cur.execute('''SELECT ID, depID, timestamp, easting, northing, 
                             utm_zone_number, utm_zone_letter, likelihood,
                             activity
                        FROM Position
@@ -241,10 +245,10 @@ class Position:
 
   def insert_db(self, db_con):
     cur = db_con.cursor()
-    for (id, tx_id, timestamp, easting, northing, 
+    for (id, dep_id, timestamp, easting, northing, 
          utm_zone_number, utm_zone_letter, likelihood, 
          activity, pos_deps) in self.table: 
-      cur.execute(query_insert_pos, (tx_id, 
+      cur.execute(query_insert_pos, (dep_id, 
                                      timestamp, 
                                      easting,  # pos.imag
                                      northing, # pos.real
@@ -253,7 +257,7 @@ class Position:
       pos_id = cur.lastrowid                               
       handle_provenance_insertion(cur, pos_deps, {'Position':(pos_id,)})
 
-  def export_kml(self, name, tx_id):
+  def export_kml(self, name, dep_id):
 
     fd = open('%s_pos.kml' % name, 'w')
     fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
@@ -262,7 +266,7 @@ class Position:
     fd.write('<Folder>\n')
     fd.write('  <Placemark>\n')
     fd.write('  <MultiGeometry>\n')
-    fd.write('    <name>%s (txID=%d) position cloud</name>\n' % (name, tx_id))
+    fd.write('    <name>%s (depID=%d) position cloud</name>\n' % (name, dep_id))
     for row in self.table:
       (P, t, ll, pos_id) = (np.complex(row[0], row[1]), 
                             float(row[2]), 
@@ -289,7 +293,7 @@ class Bearing:
     self.table = []
     if len(bearing_ids) > 0:
       cur = db_con.cursor()
-      cur.execute('''SELECT ID, txID, siteID, timestamp, bearing,
+      cur.execute('''SELECT ID, depID, siteID, timestamp, bearing,
                             likelihood, activity
                        FROM Bearing
                       WHERE ID in (%s)
@@ -305,16 +309,16 @@ class Bearing:
 
   def insert_db(self, db_con):
     cur = db_con.cursor()
-    for (id, tx_id, site_id, timestamp, bearing, 
+    for (id, dep_id, site_id, timestamp, bearing, 
          likelihood, activity) in self.table: 
-      cur.execute(query_insert_bearing, (tx_id,
+      cur.execute(query_insert_bearing, (dep_id,
                                          site_id, 
                                          timestamp, 
                                          bearing, 
                                          likelihood, 
                                          activity))
     
-  def export_kml(self, name, tx_id, site_id):
+  def export_kml(self, name, dep_id, site_id):
     pass # TODO 
 
 
@@ -508,7 +512,7 @@ def calc_windows(bl, t_window, t_delta):
 
 
 
-def calc_positions(signal, bl, center, t_window, t_delta, tx_id, verbose=False):
+def calc_positions(signal, bl, center, t_window, t_delta, dep_id, verbose=False):
   ''' Calculate positions of a transmitter over a time interval. 
   
   '''
@@ -566,10 +570,10 @@ def calc_positions(signal, bl, center, t_window, t_delta, tx_id, verbose=False):
       if verbose: print
    
     if pos: # TODO utm
-      position.table.append((None, tx_id, t, pos.imag, pos.real, None, None, ll, pos_activity, pos_deps))
+      position.table.append((None, dep_id, t, pos.imag, pos.real, None, None, ll, pos_activity, pos_deps))
     
     for (site_id, (theta, ll, activity)) in theta.iteritems():
-      bearing.table.append((None, tx_id, site_id, t, theta, ll, activity))
+      bearing.table.append((None, dep_id, site_id, t, theta, ll, activity))
 
   return (bearing, position)
 
