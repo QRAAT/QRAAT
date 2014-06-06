@@ -193,15 +193,6 @@ class Track:
     are modeled as a directed, acycle graph, from which we compute
     the critical path. 
 
-    :param db_con: DB connector for MySQL. 
-    :type db_con: MySQLdb.connections.Connection
-    :param M: Maximum foot speed of target (m/s), given
-              transition time
-    :type M: lambda (t) -> float
-    :param C: Constant hop cost in critical path calculation.
-    :type C: float
-    :param optimal: If False, use windowed tracking algorithm. 
-    :type optiomal: bool
   '''
   
   (zone, letter) = 10, 'S' # TODO get this from position table. 
@@ -211,7 +202,20 @@ class Track:
 
   def __init__(self, db_con=None, track_id=None, t_start=None, t_end=None): 
     self.table = []
-    pass # TODO 
+    cur = db_con.cursor()
+    
+    # TODO optimize. 
+    cur.execute('''SELECT posID, depID, timestamp, easting, northing, 
+                          utm_zone_number, utm_zone_letter, likelihood,
+                          activity
+                     FROM track, track_pos, Position
+                    WHERE trackID = %d
+                      AND posID = Position.ID
+                      AND timestamp >= %f AND timestamp <= %f 
+                    ORDER BY timestamp ASC''' % (track_id, t_start, t_end))
+    
+    for row in cur.fetchall():
+      self.table.append(row)
 
   @classmethod
   def calc(cls, db_con, pos, tx_id, M, C, optimal=False):
@@ -233,6 +237,11 @@ class Track:
 
     return track
     
+ 
+  def insert_db(self, db_con): 
+    for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
+         utm_zone_letter, likelihood, activity) in self.table:
+      pass # TODO 
 
   def _calc_tracks_windowed(self, M, C):
     ''' Calculate tracks over overlapping windows of positions. 
@@ -478,11 +487,7 @@ class Track:
     
     path.reverse()
     return path
-  
-  def insert_db(self, db_con): 
-    for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
-         utm_zone_letter, likelihood, activity) in self.table:
-      pass # TODO 
+
 
   def export_kml(self, name, tx_id):
 
