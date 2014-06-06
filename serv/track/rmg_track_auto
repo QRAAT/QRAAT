@@ -1,0 +1,49 @@
+#!/usr/bin/python
+# rmg_track_auto_auto
+# 
+# Copyright (C) 2014 Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import qraat
+import time, os, sys, commands
+import MySQLdb as mdb
+from optparse import OptionParser
+
+# Check for running instances of this program. 
+(status, output) = commands.getstatusoutput(
+  'pgrep -c `basename %s`' % (sys.argv[0]))
+if int(output) > 1: 
+  print >>sys.stderr, "track_auto: error: attempted reentry, exiting"
+  sys.exit(1)
+
+try: 
+  start = time.time()
+  print "track_auto: start time:", time.asctime(time.localtime(start))
+
+  db_con = qraat.util.get_db('writer')
+
+  print >>sys.stderr, "track_auto: warning: NOT IMPLEMENTED!"
+  # TODO .... 
+
+
+except mdb.Error, e:
+  print >>sys.stderr, "track_auto: error: [%d] %s" % (e.args[0], e.args[1])
+  sys.exit(1)
+
+except qraat.QraatError, e:
+  print >>sys.stderr, "track_auto: error: %s." % e
+
+finally: 
+  print "track_auto: finished in %.2f seconds." % (time.time() - start)
