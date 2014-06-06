@@ -62,12 +62,12 @@ try:
   for start, end in intervals:
     # print '{} - {}'.format(start, end)
     # Get all unscored IDs in this chunk
-    q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
-    #q = 'select est.ID from (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s left join estscore on est.ID = estscore.estid) where est where estscore.estid is null;'
 
-    # initialize cursor table entry if it does not exist
-	print 'Initializing cursor table now...'
-    change_handler.add_sql(, ('estscore',))
+    q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
+
+    # initialize cursor table entry if it does not exist - wait! no need!
+    # print 'Initializing cursor table now...'
+    # change_handler.add_sql('INSERT IGNORE INTO `cursor` (value, name) values ( , ('estscore',))
 
     cursor_value = qraat.signal_filter.get_cursor_value(change_handler, 'estscore')
     print 'Got cursor_value:', cursor_value
