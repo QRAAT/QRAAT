@@ -220,12 +220,24 @@ class signal:
 
 class Position:
   
-  def __init__(self, db_con=None, tx_id=None, t_start=None, t_end=None): 
+  def __init__(self, db_con=None, pos_ids=[]): 
     self.table = []
-    pass # TODO read from database. 
+    if len(pos_ids) > 0:
+      cur = db_con.cursor()
+      cur.execute('''SELECT ID, txID, timestamp, easting, northing, 
+                            utm_zone_number, utm_zone_letter, likelihood,
+                            activity
+                       FROM Position
+                      WHERE ID in (%s)
+                      ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), pos_ids)))
+      for row in cur.fetchall():
+        self.table.append(row)
 
   def __len__(self):
     return len(self.table)
+
+  def __getitem__(self, i):
+    return self.table[i]
 
   def insert_db(self, db_con):
     cur = db_con.cursor()
@@ -279,6 +291,9 @@ class Bearing:
 
   def __len__(self):
     return len(self.table)
+
+  def __getitem__(self, i):
+    return self.table[i]
 
   def insert_db(self, db_con):
     cur = db_con.cursor()

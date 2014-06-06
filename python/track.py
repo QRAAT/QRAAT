@@ -112,12 +112,15 @@ class Node:
     :type ll: float
   '''
 
-  def __init__(self, P, t, ll, pos_id): 
+  def __init__(self, P, t, ll, pos_id, utm_zone, utm_letter, activity): 
     # Position.  
     self.P = P
     self.t = t
     self.ll = ll
     self.pos_id = pos_id
+    self.utm_zone = utm_zone
+    self.utm_letter = utm_letter
+    self.activity = activity
 
     # Connected component analysis. 
     self.c_size   = 1
@@ -207,16 +210,16 @@ class Track:
   overlap_length = 25 
 
   def __init__(self, db_con=None, track_id=None, t_start=None, t_end=None): 
+    self.table = []
     pass # TODO 
 
   @classmethod
-  def calc(cls, db_con, pos_ids, tx_id, M, C, optimal=False):
+  def calc(cls, db_con, pos, tx_id, M, C, optimal=False):
     track = cls()
-
     track.tx_id = tx_id
     
     # Get positions. 
-    track._fetch(db_con, pos_ids)
+    track.pos = pos
     
     # Calculate tracks. 
     if optimal:
@@ -320,14 +323,16 @@ class Track:
       :rtype: Node list
     '''
     
+    # pos row: (id, tx_id, timestamp, easting, northing, utm_zone_number, utm_zone_letter, likelihood, activity)
     nodes = []
     for i in range(len(pos)): 
-      (P, t, ll, pos_id) = (np.complex(pos[i][0], pos[i][1]), 
-                            float(pos[i][2]), 
-                            float(pos[i][3]), 
-                            int(pos[i][4]))
-      nodes.append(Node(P, t, ll, pos_id)) 
-
+      nodes.append(Node(np.complex(pos[i][4], pos[i][3]), # P 
+                        float(pos[i][2]),                 # t
+                        float(pos[i][7]),                 # ll 
+                        int(pos[i][0]),                   # pos_id
+                        pos[i][5], pos[i][6],             # UTM
+                        float(pos[i][8])))                # actiivty
+      
     for i in range(len(nodes)):
       for j in range(i+1, len(nodes)):
         if nodes[i].t < nodes[j].t and speed(nodes[i], nodes[j]) < M(nodes[j].t - nodes[i].t): 
@@ -351,7 +356,8 @@ class Track:
       thinking is required. **TODO** 
     '''
     
-    # TODO update this code to include posID in Node() constructor. 
+    # TODO update this code to include posID in Node() constructor.
+    # TODO row fomrat has changed!!
     roots = []; leaves = []
     i = 0 
     while i < len(pos) - 1:
@@ -562,10 +568,10 @@ class Track:
     return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
 
 
-def calc_tracks(db_con, pos_ids, tx_id, M, C=1):
+def calc_tracks(db_con, pos, tx_id, M, C=1):
   # TODO get parameters from track table. 
   # TODO take in a position object. 
-  return Track.calc(db_con, pos_ids, tx_id, M, C) 
+  return Track.calc(db_con, pos, tx_id, M, C) 
 
 
 
