@@ -539,6 +539,8 @@ def calc_positions(signal, bl, center, t_window, t_delta, dep_id, verbose=False)
 
     # Zip together bearing and activity
     # TODO make sure activity[site_id] = None if it couldn't be done. 
+    # TODO break up this data structure since it's not necesssary 
+    #      anymore. 
     for site_id in theta.keys(): 
       theta[site_id] = theta[site_id] + (activity[site_id],)
     
@@ -546,7 +548,7 @@ def calc_positions(signal, bl, center, t_window, t_delta, dep_id, verbose=False)
     if (len(set(bl.site_id[index_list])) > 1): 
 
       # Activity for a position is given as the arithmetic mean of 
-      # of the standard deviations of signal power per site. 
+      # of the standard deviations of signal power per site.
       pos_activity = np.mean([activity for (_, _, activity) in theta.values()])
 
       if verbose: 
