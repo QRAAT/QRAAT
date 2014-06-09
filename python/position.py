@@ -217,7 +217,7 @@ class signal:
         activity[self.site_id[index]].append(self.edsp[index])
 
     for (site_id, x) in activity.iteritems():
-      activity[site_id] = np.std(x)
+      activity[site_id] = np.std(x) / np.mean(x)
     
     return activity
 
