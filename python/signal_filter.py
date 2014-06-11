@@ -942,7 +942,13 @@ def score(ids):
 
 	out_of_order_ids, in_order_ids, id_to_interval = partition_by_interval_calculation(db_con, ids, siteid, txid)
 
-	assert id_to_interval.keys() == out_of_order_ids
+	test_condition = set(id_to_interval.keys()) == set(out_of_order_ids)
+
+	if not test_condition:
+		import code
+		code.interact(local=locals())
+
+	assert test_condition
 
 	print 'Found {} out of order, {} in order'.format(len(out_of_order_ids), len(in_order_ids))
 
@@ -1707,3 +1713,10 @@ def get_cursor_value(handler, name):
 		return r[0]
 	else:
 		raise Exception('Ambiguous cursor value (found {}) for "{}"'.format(rows, name))
+
+def update_cursor_value(handler, name, value):
+	q = 'insert into `cursor` (name, value) VALUES (%s, %s) ON DUPLICATE KEY UPDATE value = %s'
+	db_con = handler.obj
+	cur = db_con.cursor()
+	rows = cur.execute(q, (name, value, value))
+	print 'Update cursor "{}" returns: {}'.format(name, rows)

@@ -19,7 +19,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from math import ceil
 import qraat
+import qraat.signal_filter
 import time, os, sys, commands
 import MySQLdb as mdb
 from optparse import OptionParser
@@ -45,21 +47,24 @@ try:
   start = time.time()
   print "template: start time:", time.asctime(time.localtime(start))
 
-  db_con = qraat.util.get_db('reader')
+  # db_con = qraat.util.get_db('reader')
+
+  change_handler = qraat.signal_filter.init_change_handler()
+  db_con = change_handler.obj
 
   context_length = 3 * 60
 
   chunk_size = int(60 * 60)		# One hour (in seconds)
 
-  t_start, t_end = options.t_start, options.t_end
+  # t_start, t_end = options.t_start, options.t_end
 
   siteid, txid = options.siteid, options.txid
 
-  total_chunks = int((t_end - t_start) / float(chunk_size)) + 1
-  start_times = [(t_start + (i * chunk_size)) for i in range(total_chunks)]
-  intervals = [(x, min(t_end, x + chunk_size)) for x in start_times]
-  change_handler = qraat.signal_filter.init_change_handler()
-  for start, end in intervals:
+  # total_chunks = int((t_end - t_start) / float(chunk_size)) + 1
+  # start_times = [(t_start + (i * chunk_size)) for i in range(total_chunks)]
+  # intervals = [(x, min(t_end, x + chunk_size)) for x in start_times]
+  # change_handler = qraat.signal_filter.init_change_handler()
+  # for start, end in intervals:
     # print '{} - {}'.format(start, end)
     # Get all unscored IDs in this chunk
 
@@ -72,28 +77,36 @@ try:
     # print 'Initializing cursor table now...'
     # change_handler.add_sql('INSERT IGNORE INTO `cursor` (value, name) values ( , ('estscore',))
 
-    cursor_value = qraat.signal_filter.get_cursor_value(change_handler, 'estscore')
-    print 'Got cursor_value:', cursor_value
+  cursor_value = qraat.signal_filter.get_cursor_value(change_handler, 'estscore')
+  print 'Got cursor_value:', cursor_value
 
-    q = 'select ID from est where siteid = %s and txid = %s and ID > %s'
+  q = 'select ID from est where siteid = %s and txid = %s and ID > %s'
 
 
-    cur = db_con.cursor()
-    rows = cur.execute(q, (siteid, txid, cursor_value))
-    l = []
-    while True:
-      r = cur.fetchone()
-      if r is None: break
-      r = tuple(r)
-      l.append(r[0])
-      print 'Got {} items: {}'.format(len(l), l[:10])
+  cur = db_con.cursor()
+  rows = cur.execute(q, (siteid, txid, cursor_value))
+  l = []
+  while True:
+    r = cur.fetchone()
+    if r is None: break
+    r = tuple(r)
+    l.append(r[0])
+    print 'Got {} items: {}'.format(len(l), l[:10])
 
-    if len(l) == 0:
-      print 'No IDs to process.'
-    else:
-      print 'Here goes.'
-      qraat.signal_filter.score(l)
-      print 'Done.'
+  if len(l) == 0:
+    print 'No IDs to process.'
+  else:
+    print 'Here goes.'
+    # Split into groups of 1000 each?
+    batch_size = 1000
+    max_range_float = len(l) / float(batch_size)
+    max_range = ceil(max_range_float)
+    for i in range(int(max_range)):
+      sub_l = l[i * batch_size:(i + 1) * batch_size]
+      qraat.signal_filter.score(sub_l)
+      print 'Done scoring.'
+      print 'About to update cursor "{}" to {}'.format('estscore', max(l))
+      qraat.signal_filter.update_cursor_value(change_handler, 'estscore', max(l))
     
 except mdb.Error, e:
   print >>sys.stderr, "template: error: [%d] %s" % (e.args[0], e.args[1])
