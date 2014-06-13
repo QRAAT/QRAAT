@@ -62,8 +62,8 @@ try:
                       AND siteID = %d 
                       AND estID = est.ID''' % (tx_id, t_start, t_end, site_id)) 
 
-    X = cur.fetchall()
-    if len(X) > 0:
+    X = map(lambda(x) : float(x[0]), cur.fetchall())
+    if len(X) > 100:
       print "plot_relscore: plotting (txID=%d, siteID=%d)" % (tx_id, site_id)
 
       fig = plt.figure(figsize=(5,4))
@@ -76,7 +76,7 @@ try:
       ax.set_xlabel('Score')
       ax.set_ylabel('Frequency')
       ax.set_xlim(min(X), max(X))
-      ax.set_ylim(0, 100) # FIXME
+      ax.set_ylim(0, 100000) # FIXME
       ax.grid(False)
 
       plt.savefig("tx%d_site%d.png" % (tx_id, site_id))
