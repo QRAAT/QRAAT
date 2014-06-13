@@ -44,6 +44,9 @@ import random
 import util
 from csv import csv
 
+BURST_INTERVAL = 30        # 30 seconds
+SUSTAINED_INTERVAL = 1800  # 30 minutes
+
 try:
   import MySQLdb as mdb
   import utm, xml
@@ -101,9 +104,9 @@ def calc_tracks(db_con, pos, track_id, C=1):
   if family == 'const':
     M = maxspeed_const(limit)
   elif family == 'exp': 
-    M = maxspeed_exp(burst, sustained, limit)
+    M = maxspeed_exp((BURST_INTERVAL, burst), (SUSTAINED_INTERVAL, sustained), limit)
   elif family == 'linear':
-    M = maxspeed_linear(burst, sustained, limit)
+    M = maxspeed_linear((BURST_INTERVAL, burst), (SUSTAINED_INTERVAL, sustained), limit)
   
   return Track.calc(db_con, pos, track_id, M, C) 
 
