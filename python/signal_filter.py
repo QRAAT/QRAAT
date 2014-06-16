@@ -1106,7 +1106,12 @@ def score(ids):
 
 	print 'Request: Score {} points of which {} are already scored. Result: {} of these are scored'.format(len(ids), len(already_scored), len(after_scored))
 	
-# Ensure that any neighborhoods within 
+# For each interval key in interval_keys, find all other keys that could
+# influence an area within amount_to_ensure. For example (just start and
+# duration here), with (5, 5), (15, 5), (21, 5), and amount_to_ensure=10, (5,
+# 5) would map to a sequence including itself (each always includes itself) and
+# (15, 5), since 5-10 and 15-20 are less than 10 apart. It would not include
+# (21, 5), since (5, 10) and (21, 26) are more than 10 apart.
 def compute_interval_neighborhood(interval_keys, amount_to_ensure=10):
 	neighborhood = {}
 	print 'compute_interval_neighborhood()'
@@ -1547,8 +1552,8 @@ def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
 	for (k, ids) in interval_chunked.items():
 
 		# Assert in or out
+		
 		is_eligible = [x in eligible_ids for x in ids]
-
 		all_eligible = all(is_eligible)
 		none_eligible = not any(is_eligible)
 		if all_eligible:
@@ -1557,16 +1562,27 @@ def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
 			print 'None of these are eligible right now, no interval found.'
 			continue
 		else:
-			print 'WARNING: Mixed up situation, some in, some out...problematic. Not processing these IDs.'
-			assert False
+			print 'WARNING: Mixed up situation, some eligible, some ineligible...restricting to eligible...'
+			orig_len = len(ids)
+			ids = [x for x in ids if x in eligible_ids]
+			new_len = len(ids)
+			print 'Reduced items from {} to {}'.format(orig_len, new_len)
+			
+			#
+			# print 'Key info of mixed up chunk:', k
+			# print 'This chunk has {} IDs eligible for processing and {} not eligible'.format(len([x for x in is_eligible if x]), len([x for x in is_eligible if not x]))
+			# assert False
 		
 		interval = None
 		try:
+			# Throws exception if all ids in ids do not map to the same value
+			# in id_to_interval
 			interval = _get_interval_map_entry(ids, id_to_interval)
 			assert interval is not None
 			intervals[k] = interval
 		except NotAllSameValueError:
 			print 'Uh oh! Not all the same!'
+			assert False
 
 	return intervals
 
@@ -1641,6 +1657,7 @@ def insert_scores(change_handler, scores, update=False):
 	args = []
 	for (id, score) in scores.items():
 		rel_score = _rel_score(score)
+		assert score is not None
 		args.append((id, score, rel_score))
 
 	if update:
@@ -1674,6 +1691,7 @@ def insert_scores(change_handler, scores, update=False):
 			rel_score = _rel_score(score)
 			inserts.append((id, score, rel_score))
 		cur = db_con.cursor()
+		assert None not in score
 		cur.executemany(qraat.signal_filter.INSERT_TEMPLATE, inserts)
 		
 
