@@ -943,13 +943,13 @@ def score(ids):
 
 	out_of_order_ids, in_order_ids, id_to_interval = partition_by_interval_calculation(db_con, ids, siteid, txid)
 
-	test_condition = set(id_to_interval.keys()) == set(out_of_order_ids)
-
-	if not test_condition:
-		import code
-		code.interact(local=locals())
-
-	assert test_condition
+	# test_condition = set(id_to_interval.keys()) == set(out_of_order_ids)
+    #
+	# if not test_condition:
+	# 	import code
+	# 	code.interact(local=locals())
+    #
+	# assert test_condition
 
 	print 'Found {} out of order, {} in order'.format(len(out_of_order_ids), len(in_order_ids))
 
@@ -970,9 +970,6 @@ def score(ids):
 
 	# This is the set that requires time filtering, but the scores must be updated, not inserted
 	updatable_ids = passed_filter_ids_set.difference(id_set)
-
-	all_to_score = new_filtered_ids | updatable_ids
-	assert len(new_filtered_ids & updatable_ids) == 0
 
 	print '{} items passed parametric filter'.format(len(new_filtered_ids))
 
@@ -1006,11 +1003,12 @@ def score(ids):
 			update_chunks[k] = filtered
 
 	# Filters each bucket by restricting to unscored IDs.
-	unscored_ids_chunked = match_up_to_chunks(interval_chunked, all_to_score)
+	# unscored_ids_chunked = match_up_to_chunks(interval_chunked, all_to_score)
 
 	# all_to_score = new_filtered_ids + updatable_ids
 	# Parametric passed:
 	parametrically_good_chunked = match_up_to_chunks(interval_chunked, all_that_passed_filter_ids)
+	updatable_chunked = match_up_to_chunks(interval_chunked, updatable_ids)
 
 	# Creates a mapping from interval keys to intervals from the mapping from
 	# individual IDs to intervals. Ensures that all IDs associated with a given
@@ -1039,8 +1037,9 @@ def score(ids):
 			all_chunk_neighborhood.extend(parametrically_good_chunked[neighbor_key])
 		
 
-		# Generate a list of IDs to score for this chunk
-		unscored_ids = unscored_ids_chunked[k]
+		# stuff to score:
+		for_scoring = parametrically_good_chunked[k]
+		updatables = updatable_chunked[k]
 
 		if k not in interval_map:
 			# This chunk has no interval computed yet, so compute one
@@ -1075,12 +1074,9 @@ def score(ids):
 					store_interval_assume(change_handler, interval, base, duration, txid, siteid)
 					print 'Stored new interval for: {}+{}: {}'.format(base, duration, interval)
 
-				print 'About to time filter {} IDs in the context of {} IDs'.format(len(unscored_ids), len(all_chunk_ids))
-				print 'About to invoke time filter with explicit context same as non-explicit?:', all_chunk_ids == unscored_ids
-				scores = time_filter(db_con, unscored_ids, in_context_of=all_chunk_neighborhood)
+				scores = time_filter(db_con, for_scoring, in_context_of=all_chunk_neighborhood)
 
-				print 'Did I succeed?'
-				insert_scores(change_handler, scores, update_set=updatable_ids)
+				insert_scores(change_handler, scores, update_set=updatables)
 		else:
 			# For each 'out-of-order' (already computed interval value)
 			# chunk, re-compute the interval value and see if it
@@ -1088,10 +1084,7 @@ def score(ids):
 			# in this chunk, if it does not, simply compute new scores
 			# of unscored points in the chunk using the old interval
 			# value.
-			print 'displaying interval map:'
-			for _k, _v in interval_map.items():
-				print '{} -> {}'.format(_k, _v)
-			print '()()()()()'
+
 			old_interval = interval_map[k]
 			print 'Calculating out-of-order interval with {} items'.format(len(interval_chunked[k]))
 			new_interval = calculate_interval(db_con, interval_chunked[k])
@@ -1101,27 +1094,27 @@ def score(ids):
 
 			# Is new interval appreciably different from old interval?
 			average = (old_interval + new_interval) / 2.
+
 			abs_val = new_interval - old_interval
 			abs_val = -abs_val if abs_val < 0 else abs_val
+
 			percentage_difference = abs_val / average
+			print 'Percentage difference:', percentage_difference
+
 			if percentage_difference > CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD:
 				print 'Updating existing interval!'
 				base, duration, siteid, txid = k
 				store_interval_update(change_handler, new_interval, base, duration, txid, siteid)
-				# scores = time_filter(db_con, all_chunk_ids_set)
-				# Use parametrically_good_chunked[k] instead
-				time_filtering_required = parametrically_good_chunked[k]
-				old_len = len(time_filtering_required)
-				time_filtering_required = set(time_filtering_required)
-				new_len = len(time_filtering_required)
-				print 'Size: {} -> {}'.format(old_len, new_len)
-				scores = time_filter(db_con, time_filtering_required)
+
+				scores = time_filter(db_con, for_scoring, in_context_of=all_chunk_neighborhood)
+
+
 				insert_scores(change_handler, scores, update_as_needed=True)
-				pass
 			else:
 				print 'Not different enough!'
-				scores = time_filter(db_con, unscored_ids, in_context_of=all_chunk_ids)
-				analyze(unscored_ids, all_chunk_ids, scores)
+
+				scores = time_filter(db_con, for_scoring, in_context_of=all_chunk_neighborhood)
+
 				insert_scores(change_handler, scores, update_set=updatable_ids)
 
 	# Get all of these IDs that might have been scored already and store for
@@ -1180,36 +1173,10 @@ def compute_interval_neighborhood(interval_keys, amount_to_ensure=10):
 
 			key_neighborhood.append(l)
 
-			# raw_input('?3')
-
 		neighborhood[k] = key_neighborhood
 
 	return neighborhood
 
-
-def analyze(ids_for_scoring, all_ids, scores):
-	set_a = set(ids_for_scoring)
-	set_b = set(all_ids)
-	set_c = set(scores)
-	c = False
-	if 214183264 in set_a:
-		print 'Scoring the point! This should not happen!'
-		c = True
-	if 214183264 in set_b:
-		print 'It\'s in the context, not necessarily a problem'
-		c = True
-	if not c:
-		print 'Nothing much to say'
-	print 'analyze()'
-	print 'a {} -> {}'.format(len(ids_for_scoring), len(set_a))
-	print 'b {} -> {}'.format(len(all_ids), len(set_b))
-	print 'c {} -> {}'.format(len(scores), len(set_c))
-
-	print 'Scoring IDs that are not contained in all IDs:', len(set_a.difference(set_b))
-	print 'Scores that are not in IDs to be scored:', len(set_c.difference(set_a))
-	print 'IDs to be scored that are not in scores:', len(set_a.difference(set_c))
-
-	# if c: raw_input()
 
 def match_up_to_chunks(chunked, ids):
 	id_set = set(ids)
@@ -1680,6 +1647,10 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 
 
 def insert_scores(change_handler, scores, update_as_needed=False, update_set=set()):
+
+	scores = dict(scores)
+
+	assert all([x in scores for x in update_set])
 
 	db_con = change_handler.obj
 
