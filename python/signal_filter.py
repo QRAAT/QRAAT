@@ -664,6 +664,7 @@ class ChangeHandler:
 		cursor = self.obj.cursor()
 		print 'Running query:', sql_text % sql_args
 		rows = cursor.execute(sql_text, sql_args)
+		print 'SQL statement returned:', rows
 		return cursor
 
 	def flush_db(self):
@@ -989,6 +990,15 @@ def score(ids):
 
 	interval_chunked = time_chunk_ids(db_con, data, CONFIG_INTERVAL_WINDOW_SIZE)
 
+	# Compute the chunked by interval IDs of interval_chunked, but restricted
+	# to items in id_set. This is the set of intervals that might need to be
+	# updated
+	update_chunks = {}
+	for (k, v) in interval_chunked.items():
+		filtered = [x for x in v if x in id_set]
+		if len(filtered) > 0:
+			update_chunks[k] = filtered
+
 	# Filters each bucket by restricting to unscored IDs.
 	unscored_ids_chunked = match_up_to_chunks(interval_chunked, id_set.difference(parametrically_poor))
 
@@ -1000,24 +1010,19 @@ def score(ids):
 	# interval key have the same interval.
 	interval_map = get_interval_map(out_of_order_ids, interval_chunked, id_to_interval)
 
-	print '---------------------------------'
-	for (k, v) in interval_map.items():
-		print '{} -> {}'.format(k, v)
-	print '---------------------------------'
-
 	key_neighborhood = compute_interval_neighborhood(interval_chunked.keys())
 
-	print 'Showing off the neighborhood:'
-	for (k, v) in key_neighborhood.items():
-		a, b, c, d = k
-		s, e = a, a + b
-		print 'K: {} ({}-{})'.format(k, s, e)
-		for val in v:
-			a, b, c, d = val
-			s, e = a, a + b
-			print '\t{} ({}-{})'.format(val, s, e)
-
-	print '----'
+	# print 'Showing off the neighborhood:'
+	# for (k, v) in key_neighborhood.items():
+	# 	a, b, c, d = k
+	# 	s, e = a, a + b
+	# 	print 'K: {} ({}-{})'.format(k, s, e)
+	# 	for val in v:
+	# 		a, b, c, d = val
+	# 		s, e = a, a + b
+	# 		print '\t{} ({}-{})'.format(val, s, e)
+    #
+	# print '----'
 
 
 	# Calculate brand new intervals for those which need it
@@ -1058,9 +1063,16 @@ def score(ids):
 				# Store interval in database. Note: this just inserts (does no
 				# checking for already existing interval), because it is known
 				# at this point that no such interval exists.
-				store_interval_assume(change_handler, interval, base, duration, txid, siteid)
-
-				print 'Stored interval for: {}+{}: {}'.format(base, duration, interval)
+				rows = explicit_check(change_handler, interval, base, duration, txid, siteid)
+				if rows > 0:
+					assert rows == 1
+					store_interval_update(change_handler, interval, base, duration, txid, siteid)
+					print 'Updated interval for: {}+{}: {}'.format(base, duration, interval)
+					# print 'Warning: About to call store_interval_assume for {}+{}={} when there is/are already {} existent interval(s)'.format(base, duration, interval, rows)
+					
+				else:
+					store_interval_assume(change_handler, interval, base, duration, txid, siteid)
+					print 'Stored new interval for: {}+{}: {}'.format(base, duration, interval)
 
 				print 'About to time filter {} IDs in the context of {} IDs'.format(len(unscored_ids), len(all_chunk_ids))
 				print 'About to invoke time filter with explicit context same as non-explicit?:', all_chunk_ids == unscored_ids
@@ -1092,7 +1104,7 @@ def score(ids):
 			percentage_difference = abs_val / average
 			if percentage_difference > CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD:
 				print 'Updating existing interval!'
-				base, duration, txid, siteid = k
+				base, duration, siteid, txid = k
 				store_interval_update(change_handler, new_interval, base, duration, txid, siteid)
 				# scores = time_filter(db_con, all_chunk_ids_set)
 				# Use parametrically_good_chunked[k] instead
@@ -1130,6 +1142,7 @@ def compute_interval_neighborhood(interval_keys, amount_to_ensure=10):
 	for k in interval_keys:
 		# Find all 'neighbors' of k
 		start, duration, siteid, txid = k
+		print 'siteid={}, txid={}'.format(siteid, txid)
 		assert duration > 0
 		interest_start, interest_end = start - amount_to_ensure, start + duration + amount_to_ensure
 
@@ -1367,6 +1380,7 @@ def get_parametric_passed_ids_in_chunk(db_con, k):
 	return ids
 
 def store_interval_assume(change_handler, interval, base, duration, txid, siteid):
+	print 'assume args: txid={}, siteid={}'.format(txid, siteid)
 	db_con = change_handler.obj
 	cur = db_con.cursor()
 	rows = cur.execute('select * from interval_cache where start = %s and valid_duration = %s and txid = %s and siteid = %s', (base, duration, txid, siteid))
@@ -1378,6 +1392,9 @@ def store_interval_assume(change_handler, interval, base, duration, txid, siteid
 	change_handler.add_sql(q, (interval, base, duration, txid, siteid))
 
 def store_interval_update(change_handler, interval, base, duration, txid, siteid):
+	if txid == 2:
+		assert False
+	print 'update args: txid={}, siteid={}'.format(txid, siteid)
 	print 'Updating interval={}, {}+{}'.format(interval, base, duration)
 	q = 'update interval_cache set period = %s where start = %s and valid_duration = %s and txid = %s and siteid = %s;'
 	change_handler.add_sql(q, (interval, base, duration, txid, siteid))
@@ -1499,7 +1516,7 @@ def partition_by_interval_calculation(db_con, ids, siteid, txid):
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
 
-	query_template = 'select t.ID as ID, interval_cache.period as period from (select ID, timestamp from est where ID in ({})) t LEFT JOIN interval_cache ON (t.timestamp >= interval_cache.start and t.timestamp <= interval_cache.start + interval_cache.valid_duration and interval_cache.txid = %s and interval_cache.siteid = %s)'
+	query_template = 'select t.ID as ID, interval_cache.period as period from (select ID, timestamp from est where ID in ({})) t LEFT JOIN interval_cache ON (t.timestamp >= interval_cache.start and t.timestamp < interval_cache.start + interval_cache.valid_duration and interval_cache.txid = %s and interval_cache.siteid = %s)'
 	query = query_template.format(id_string)
 
 	print 'txid={}, siteid={}'.format(txid, siteid)
@@ -1609,7 +1626,7 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
-	q = 'select t.ID, interval_cache.period from interval_cache RIGHT JOIN (select ID, timestamp, siteid, txid from est where ID in ({})) as t ON (t.siteid = interval_cache.siteid and t.txid = interval_cache.txid and t.timestamp >= interval_cache.start and t.timestamp <= interval_cache.start + interval_cache.valid_duration) where interval_cache.start IS NOT NULL;'
+	q = 'select t.ID, interval_cache.period from interval_cache RIGHT JOIN (select ID, timestamp, siteid, txid from est where ID in ({})) as t ON (t.siteid = interval_cache.siteid and t.txid = interval_cache.txid and t.timestamp >= interval_cache.start and t.timestamp < interval_cache.start + interval_cache.valid_duration) where interval_cache.start IS NOT NULL;'
 
 	row = cur.execute(q.format(id_string))
 
@@ -1674,9 +1691,10 @@ def insert_scores(change_handler, scores, update=False):
 
 		all_to_insert = set(scores.keys())
 		cur = db_con.cursor()
-		ids_template = ', '.join(map(lambda x : '{}', ids))
-		id_string = ids_template.format(*ids)
-		q = 'SELECT estid in estscore WHERE estid IN ({})'.format(id_string)
+		ids_template = ', '.join(map(lambda x : '{}', all_to_insert))
+		id_string = ids_template.format(*all_to_insert)
+		q = 'SELECT estid FROM estscore WHERE estid IN ({})'.format(id_string)
+		print 'q: "{}"'.format(q)
 		rows = cur.execute(q)
 		already_there = set()
 		while True:
@@ -1698,10 +1716,10 @@ def insert_scores(change_handler, scores, update=False):
 		inserts = []
 		for id in newly_there:
 			score = scores[id]
+			assert score is not None
 			rel_score = _rel_score(score)
 			inserts.append((id, score, rel_score))
 		cur = db_con.cursor()
-		assert None not in score
 		cur.executemany(qraat.signal_filter.INSERT_TEMPLATE, inserts)
 		
 
@@ -1748,3 +1766,13 @@ def update_cursor_value(handler, name, value):
 	cur = db_con.cursor()
 	rows = cur.execute(q, (name, value, value))
 	print 'Update cursor "{}" returns: {}'.format(name, rows)
+
+# Returns number of rows matching. Hoping for zero.
+def explicit_check(change_handler, interval, base, duration, txid, siteid):
+	db_con = change_handler.obj
+	q = 'SELECT * from interval_cache where period = %s and start = %s and valid_duration = %s and txid = %s and siteid = %s'
+	cur = db_con.cursor()
+	rows = cur.execute(q, (interval, base, duration, txid, siteid))
+	return rows
+	
+	pass
