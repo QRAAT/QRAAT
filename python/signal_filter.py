@@ -968,6 +968,12 @@ def score(ids):
 	new_filtered_ids = id_set.intersection(passed_filter_ids_set)
 	print 'Intersected, leaves:', len(new_filtered_ids)
 
+	# This is the set that requires time filtering, but the scores must be updated, not inserted
+	updatable_ids = passed_filter_ids_set.difference(id_set)
+
+	all_to_score = new_filtered_ids | updatable_ids
+	assert len(new_filtered_ids & updatable_ids) == 0
+
 	print '{} items passed parametric filter'.format(len(new_filtered_ids))
 
 	# Insert scores for parametrically bad points...
@@ -1000,8 +1006,9 @@ def score(ids):
 			update_chunks[k] = filtered
 
 	# Filters each bucket by restricting to unscored IDs.
-	unscored_ids_chunked = match_up_to_chunks(interval_chunked, id_set.difference(parametrically_poor))
+	unscored_ids_chunked = match_up_to_chunks(interval_chunked, all_to_score)
 
+	# all_to_score = new_filtered_ids + updatable_ids
 	# Parametric passed:
 	parametrically_good_chunked = match_up_to_chunks(interval_chunked, all_that_passed_filter_ids)
 
@@ -1012,17 +1019,11 @@ def score(ids):
 
 	key_neighborhood = compute_interval_neighborhood(interval_chunked.keys())
 
-	# print 'Showing off the neighborhood:'
-	# for (k, v) in key_neighborhood.items():
-	# 	a, b, c, d = k
-	# 	s, e = a, a + b
-	# 	print 'K: {} ({}-{})'.format(k, s, e)
-	# 	for val in v:
-	# 		a, b, c, d = val
-	# 		s, e = a, a + b
-	# 		print '\t{} ({}-{})'.format(val, s, e)
-    #
-	# print '----'
+
+	# Figure out scores that might need updating. Look through
+	# all_that_passed_filter_ids for those that are near something in id. These
+	# will need to be rescored, with the scores being updated.
+	# find_near(all_that_passed_filter_ids, id_set, 5)
 
 
 	# Calculate brand new intervals for those which need it
@@ -1077,8 +1078,9 @@ def score(ids):
 				print 'About to time filter {} IDs in the context of {} IDs'.format(len(unscored_ids), len(all_chunk_ids))
 				print 'About to invoke time filter with explicit context same as non-explicit?:', all_chunk_ids == unscored_ids
 				scores = time_filter(db_con, unscored_ids, in_context_of=all_chunk_neighborhood)
+
 				print 'Did I succeed?'
-				insert_scores(change_handler, scores)
+				insert_scores(change_handler, scores, update_set=updatable_ids)
 		else:
 			# For each 'out-of-order' (already computed interval value)
 			# chunk, re-compute the interval value and see if it
@@ -1114,13 +1116,13 @@ def score(ids):
 				new_len = len(time_filtering_required)
 				print 'Size: {} -> {}'.format(old_len, new_len)
 				scores = time_filter(db_con, time_filtering_required)
-				insert_scores(change_handler, scores, update=True)
+				insert_scores(change_handler, scores, update_as_needed=True)
 				pass
 			else:
 				print 'Not different enough!'
 				scores = time_filter(db_con, unscored_ids, in_context_of=all_chunk_ids)
 				analyze(unscored_ids, all_chunk_ids, scores)
-				insert_scores(change_handler, scores)
+				insert_scores(change_handler, scores, update_set=updatable_ids)
 
 	# Get all of these IDs that might have been scored already and store for
 	# after-action report.
@@ -1677,22 +1679,20 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 	return intervals
 
 
-def insert_scores(change_handler, scores, update=False):
+def insert_scores(change_handler, scores, update_as_needed=False, update_set=set()):
 
 	db_con = change_handler.obj
 
-	args = []
-	for (id, score) in scores.items():
-		rel_score = _rel_score(score)
-		assert score is not None
-		args.append((id, score, rel_score))
+	newly_there = None
+	already_there = None
 
-	if update:
+	all_to_process = set(scores.keys())
 
-		all_to_insert = set(scores.keys())
+	if update_as_needed:
+
 		cur = db_con.cursor()
-		ids_template = ', '.join(map(lambda x : '{}', all_to_insert))
-		id_string = ids_template.format(*all_to_insert)
+		ids_template = ', '.join(map(lambda x : '{}', all_to_process))
+		id_string = ids_template.format(*all_to_process)
 		q = 'SELECT estid FROM estscore WHERE estid IN ({})'.format(id_string)
 		print 'q: "{}"'.format(q)
 		rows = cur.execute(q)
@@ -1703,29 +1703,35 @@ def insert_scores(change_handler, scores, update=False):
 			r = tuple(r)
 			already_there.add(r[0])
 
-		newly_there = all_to_insert.difference(already_there)
+		newly_there = all_to_process.difference(already_there)
 
-		updates = []
-		for id in already_there:
-			score = scores[id]
-			rel_score = _rel_score(score)
-			updates.append((score, rel_score, id))
-		cur = db_con.cursor()
-		cur.executemany(qraat.signal_filter.UPDATE_TEMPLATE, updates)
-
-		inserts = []
-		for id in newly_there:
-			score = scores[id]
-			assert score is not None
-			rel_score = _rel_score(score)
-			inserts.append((id, score, rel_score))
-		cur = db_con.cursor()
-		cur.executemany(qraat.signal_filter.INSERT_TEMPLATE, inserts)
 		
 
 		pass
 	else:
-		change_handler.db_execute_many(qraat.signal_filter.INSERT_TEMPLATE, args)
+		already_there = list(update_set)
+		newly_there = list(all_to_process.difference(update_set))
+
+	updates = []
+	for id in already_there:
+		score = scores[id]
+		rel_score = _rel_score(score)
+		updates.append((score, rel_score, id))
+
+	inserts = []
+	for id in newly_there:
+		score = scores[id]
+		assert score is not None
+		rel_score = _rel_score(score)
+		inserts.append((id, score, rel_score))
+
+	cur = db_con.cursor()
+	cur.executemany(qraat.signal_filter.UPDATE_TEMPLATE, updates)
+
+	cur = db_con.cursor()
+	cur.executemany(qraat.signal_filter.INSERT_TEMPLATE, inserts)
+
+		# change_handler.db_execute_many(qraat.signal_filter.INSERT_TEMPLATE, args)
 
 class NotAllSameValueError(Exception):
 	def __init__(self):
@@ -1776,3 +1782,10 @@ def explicit_check(change_handler, interval, base, duration, txid, siteid):
 	return rows
 	
 	pass
+
+#
+# # Returns all items from all_ids that have a timestamp within threshold of the
+# # timestamp of some item in score_ids
+# def find_near(all_ids, score_ids, threshold):
+# 	q = 'SELECT ID from est where 
+# 	q = 'SELECT timestamp FROM est WHERE ID IN (...score_ids...)'
