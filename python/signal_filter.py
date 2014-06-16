@@ -1075,8 +1075,8 @@ def score(ids):
 			# of unscored points in the chunk using the old interval
 			# value.
 			print 'displaying interval map:'
-			for k, v in interval_map.items():
-				print '{} -> {}'.format(k, v)
+			for _k, _v in interval_map.items():
+				print '{} -> {}'.format(_k, _v)
 			print '()()()()()'
 			old_interval = interval_map[k]
 			print 'Calculating out-of-order interval with {} items'.format(len(interval_chunked[k]))
@@ -1091,11 +1091,14 @@ def score(ids):
 			abs_val = -abs_val if abs_val < 0 else abs_val
 			percentage_difference = abs_val / average
 			if percentage_difference > CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD:
+				print 'Updating existing interval!'
+				base, duration, txid, siteid = k
 				store_interval_update(change_handler, new_interval, base, duration, txid, siteid)
 				scores = time_filter(db_con, all_chunk_ids_set)
 				insert_scores(change_handler, scores, update=True)
 				pass
 			else:
+				print 'Not different enough!'
 				scores = time_filter(db_con, unscored_ids, in_context_of=all_chunk_ids)
 				analyze(unscored_ids, all_chunk_ids, scores)
 				insert_scores(change_handler, scores)
@@ -1369,7 +1372,7 @@ def store_interval_assume(change_handler, interval, base, duration, txid, siteid
 
 def store_interval_update(change_handler, interval, base, duration, txid, siteid):
 	print 'Updating interval={}, {}+{}'.format(interval, base, duration)
-	q = 'update interval_cache set interval = %s where base = %s and duration = %s and txid = %s and siteid = %s;'
+	q = 'update interval_cache set period = %s where start = %s and valid_duration = %s and txid = %s and siteid = %s;'
 	change_handler.add_sql(q, (interval, base, duration, txid, siteid))
 
 
