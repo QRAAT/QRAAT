@@ -1094,7 +1094,14 @@ def score(ids):
 				print 'Updating existing interval!'
 				base, duration, txid, siteid = k
 				store_interval_update(change_handler, new_interval, base, duration, txid, siteid)
-				scores = time_filter(db_con, all_chunk_ids_set)
+				# scores = time_filter(db_con, all_chunk_ids_set)
+				# Use parametrically_good_chunked[k] instead
+				time_filtering_required = parametrically_good_chunked[k]
+				old_len = len(time_filtering_required)
+				time_filtering_required = set(time_filtering_required)
+				new_len = len(time_filtering_required)
+				print 'Size: {} -> {}'.format(old_len, new_len)
+				scores = time_filter(db_con, time_filtering_required)
 				insert_scores(change_handler, scores, update=True)
 				pass
 			else:
