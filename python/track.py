@@ -36,6 +36,7 @@
 #
 #   TODO Think about composing this probability with the position 
 #        likelihood. These would need to be normalized (see notes.)  
+#
 
 import numpy as np
 import time, os, sys
@@ -43,10 +44,75 @@ import random
 import util
 from csv import csv
 
+BURST_INTERVAL = 30        # 30 seconds
+SUSTAINED_INTERVAL = 1800  # 30 minutes
+
 try:
   import MySQLdb as mdb
   import utm, xml
 except ImportError: pass
+
+def get_pos_ids(db_con, tx_id, t_start, t_end):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID 
+                   FROM Position
+                  WHERE depID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f''' % (tx_id, t_start, t_end))
+  return [ int(row[0]) for row in cur.fetchall() ]
+
+def get_dep_by_id(db_con, track_id):
+  cur = db_con.cursor()
+  cur.execute('''SELECT depID 
+                   FROM track
+                  WHERE ID=%d''' % track_id)
+  return cur.fetchone()[0]
+
+# 
+# A few families of max speed given time interval functions. 
+#
+
+def maxspeed_linear(burst, sustained, limit):
+  return lambda (t) : max(limit, (t - burst[0]) * (
+          float(sustained[1] - burst[1]) / (sustained[0] - burst[0])) + burst[1])
+
+def maxspeed_exp(burst, sustained, limit):
+  (t1, y1) = burst; (t2, y2) = sustained
+  C = limit
+
+  r = np.log((y2 - C) / (y1 - C)) / (t1 - t2) 
+  B = np.exp(r * t2) * (y2 - C)
+  r *= -1
+  
+  return lambda (t) : (B * np.exp(r * t) + C)
+
+def maxspeed_const(m):
+  return lambda (t) : m
+
+
+#
+# Run tracker. 
+#
+
+def calc_tracks(db_con, pos, track_id, C=1):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID, depID, max_speed_family, 
+                        speed_burst, speed_sustained, speed_limit
+                   FROM track
+                  WHERE ID = %d''' % track_id)
+  (_, dep_id, family, burst, sustained, limit) = cur.fetchone()
+  if family == 'const':
+    M = maxspeed_const(limit)
+  elif family == 'exp': 
+    M = maxspeed_exp((BURST_INTERVAL, burst), (SUSTAINED_INTERVAL, sustained), limit)
+  elif family == 'linear':
+    M = maxspeed_linear((BURST_INTERVAL, burst), (SUSTAINED_INTERVAL, sustained), limit)
+  
+  return Track.calc(db_con, pos, track_id, M, C) 
+
+
+
+
 
 def distance(Pi, Pj):
   return np.abs(Pj - Pi)
@@ -73,12 +139,15 @@ class Node:
     :type ll: float
   '''
 
-  def __init__(self, P, t, ll, pos_id): 
+  def __init__(self, P, t, ll, pos_id, utm_number, utm_letter, activity): 
     # Position.  
     self.P = P
     self.t = t
     self.ll = ll
     self.pos_id = pos_id
+    self.utm_number = utm_number
+    self.utm_letter = utm_letter
+    self.activity = activity
 
     # Connected component analysis. 
     self.c_size   = 1
@@ -143,7 +212,7 @@ class Node:
 
 
 
-class track:
+class Track:
 
   ''' Transmitter tracks. 
 
@@ -151,35 +220,63 @@ class track:
     are modeled as a directed, acycle graph, from which we compute
     the critical path. 
 
-    :param db_con: DB connector for MySQL. 
-    :type db_con: MySQLdb.connections.Connection
-    :param M: Maximum foot speed of target (m/s), given
-              transition time
-    :type M: lambda (t) -> float
-    :param C: Constant hop cost in critical path calculation.
-    :type C: float
-    :param optimal: If False, use windowed tracking algorithm. 
-    :type optiomal: bool
   '''
-  
-  (zone, letter) = 10, 'S' # TODO Add UTM zone to position table, modify 
-                           # code to insert it automatically. 
 
   window_length = 250  
   overlap_length = 25 
 
-  def __init__(self, db_con, pos_ids, tx_id, M, C=1, optimal=False):
-    self.tx_id = tx_id
+  def __init__(self, db_con=None, track_id=None, t_start=None, t_end=None): 
+    self.track_id = track_id
+    self.table = []
+    if db_con:
+      cur = db_con.cursor()
+      
+      # TODO optimize. 
+      cur.execute('''SELECT posID, depID, timestamp, easting, northing, 
+                            utm_zone_number, utm_zone_letter, likelihood,
+                            activity
+                       FROM track, track_pos, Position
+                      WHERE trackID = %d
+                        AND posID = Position.ID
+                        AND timestamp >= %f AND timestamp <= %f 
+                      ORDER BY timestamp ASC''' % (track_id, t_start, t_end))
+      
+      for row in cur.fetchall():
+        self.table.append((row[0], row[1], float(row[2]), float(row[3]), float(row[4]), 
+                           row[5], row[6], row[7], row[8]))
+        
+
+  @classmethod
+  def calc(cls, db_con, pos, track_id, M, C, optimal=False):
+    track = cls()
+    track.track_id = track_id
     
     # Get positions. 
-    self._fetch(db_con, pos_ids)
+    track.pos = pos
     
     # Calculate tracks. 
     if optimal:
-      self._calc_tracks(M, C)
+      track._calc_tracks(M, C)
     else:
-      self._calc_tracks_windowed(M, C)
+      track._calc_tracks_windowed(M, C)
     
+    for node in track.track:
+      track.table.append((node.pos_id, None, node.t, node.P.imag, node.P.real, 
+                          node.utm_number, node.utm_letter, node.ll, node.activity))
+
+    return track
+    
+ 
+  def insert_db(self, db_con):
+    # Overwrite existing tracks for time window. 
+    cur = db_con.cursor()
+    cur.execute('''DELETE fROM qraat.track_pos 
+                         WHERE timestamp >= %f 
+                           AND timestamp <= %f''' % (self.table[0][2], self.table[-1][2])) 
+    for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
+         utm_zone_letter, likelihood, activity) in self.table:
+      cur.execute('''INSERT INTO track_pos (posID, trackID, timestamp)
+                          VALUES (%d, %d, %d)''' % (pos_id, self.track_id, t))
 
   def _calc_tracks_windowed(self, M, C):
     ''' Calculate tracks over overlapping windows of positions. 
@@ -207,10 +304,10 @@ class track:
       roots = self.graph(self.pos[i:j+1], M)
       guy = self.critical_path(self.toposort(roots), C)
       
-      for (P, t, pos_id, ll) in guy: 
-        if not pos_dict.get(t):
-          pos_dict[t] = set()
-        pos_dict[t].add((P, pos_id, ll))
+      for node in guy: 
+        if not pos_dict.get(node.t):
+          pos_dict[node.t] = set()
+        pos_dict[node.t].add(node)
 
       i += self.window_length - self.overlap_length
 
@@ -219,9 +316,10 @@ class track:
     # to rerun the critical path algorithm over the tree created 
     # in this process.)
     for (t, val) in sorted(pos_dict.items(), key=lambda(m) : m[0]):
-      (P, pos_id, ll) = min(val, key=lambda(row) : row[2])
-      self.track.append((P, t, pos_id))
-  
+      node = max(val, key=lambda(row) : node.t)
+      self.track.append(node)
+    
+
 
   def _calc_tracks(self, M, C):
     ''' Calculate optimal tracks over all positions. 
@@ -233,23 +331,14 @@ class track:
     roots = self.graph(self.pos, M)
     self.track = map(lambda(row) : row[:3], self.critical_path(self.toposort(roots), C))
   
-
-  def _fetch(self, db_con, pos_ids): 
-    cur = db_con.cursor()
-    cur.execute('''SELECT northing, easting, timestamp, likelihood, ID
-                     FROM Position
-                    WHERE ID in (%s)
-                    ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), pos_ids)))
-    self.pos = cur.fetchall()
-  
   def __getiter__(self): 
-    return self.track
+    return self.table
 
   def __getitem__(self, i):
-    return self.track[i]
+    return self.table[i]
   
   def __len__(self):
-    return len(self.track)
+    return len(self.table)
   
   #
   # DAG-building algorithms. 
@@ -272,14 +361,17 @@ class track:
       :rtype: Node list
     '''
     
+    # pos row: (id, tx_id, timestamp, easting, northing, 
+    # utm_zone_number, utm_zone_letter, likelihood, activity)
     nodes = []
     for i in range(len(pos)): 
-      (P, t, ll, pos_id) = (np.complex(pos[i][0], pos[i][1]), 
-                            float(pos[i][2]), 
-                            float(pos[i][3]), 
-                            int(pos[i][4]))
-      nodes.append(Node(P, t, ll, pos_id)) 
-
+      nodes.append(Node(np.complex(pos[i][4], pos[i][3]), # P 
+                        float(pos[i][2]),                 # t
+                        float(pos[i][7]),                 # ll 
+                        int(pos[i][0]),                   # pos_id
+                        pos[i][5], pos[i][6],             # UTM
+                        float(pos[i][8])))                # actiivty
+      
     for i in range(len(nodes)):
       for j in range(i+1, len(nodes)):
         if nodes[i].t < nodes[j].t and speed(nodes[i], nodes[j]) < M(nodes[j].t - nodes[i].t): 
@@ -303,7 +395,8 @@ class track:
       thinking is required. **TODO** 
     '''
     
-    # TODO update this code to include posID in Node() constructor. 
+    # TODO update this code to include posID in Node() constructor.
+    # TODO row format has changed!!
     roots = []; leaves = []
     i = 0 
     while i < len(pos) - 1:
@@ -414,88 +507,16 @@ class track:
     path = []
     
     while node != None:
-      path.append((node.P, node.t, node.ll, node.pos_id))
+      path.append(node)
       node = node.parent
     
     path.reverse()
     return path
 
-  #
-  # Some statistical features of the tracks. 
-  #
-
-  def speed(self):
-    ''' Calculate mean and standard deviation of the target's speed. 
-    
-      :return: (mean, std) tuple. 
-    '''
-    if len(self.track) > 0: 
-      speeds = []
-      for i in range(len(self.track)-1): 
-        speeds.append( distance(self.track[i+1][0], self.track[i][0]) / \
-                               (self.track[i+1][1] - self.track[i][1]) )
-      return (np.mean(speeds), np.std(speeds))
-    
-    else: return (np.nan, np.nan)
-
-  def stats(self):
-    ''' Piecewise velocity and acceleration along critcal path. '''   
-    
-    V = []
-    for i in range(len(self.track)-1):
-      v = (self.track[i+1][0] - self.track[i][0]) / (self.track[i+1][1] - self.track[i][1])
-      V.append((v, (self.track[i][1] + self.track[i+1][1]) / 2))
-
-    A = []
-    for i in range(len(V)-1):
-      a = (V[i+1][0] - V[i][0]) / (V[i+1][1] - V[i][1])
-      A.append((a, (V[i][1] + V[i+1][1]) / 2))
-
-    return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
-
-  # 
-  # A few families of max speed given time interval functions. 
-  #
-
-  @classmethod
-  def maxspeed_linear(cls, burst, sustained, limit):
-    return lambda (t) : max(limit, (t - burst[0]) * (
-            float(sustained[1] - burst[1]) / (sustained[0] - burst[0])) + burst[1])
-
-  @classmethod
-  def maxspeed_exp(cls, burst, sustained, limit):
-    (t1, y1) = burst; (t2, y2) = sustained
-    C = limit
-
-    r = np.log((y2 - C) / (y1 - C)) / (t1 - t2) 
-    B = np.exp(r * t2) * (y2 - C)
-    r *= -1
-    
-    return lambda (t) : (B * np.exp(r * t) + C)
-
-  @classmethod
-  def maxspeed_const(cls, m):
-    return lambda (t) : m
-
-  #
-  # Export tracks to file / database. 
-  #
-
-  def insert_db(self, db_con): 
-    ''' Insert tracks into datbase. ''' 
-    cur = db_con.cursor()
-    for (P, t, pos_id) in self.track: 
-      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
-      tm = time.gmtime(t)
-      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
-                                             tm.tm_hour, tm.tm_min, tm.tm_sec)
-      cur.execute('''INSERT INTO qraat.Track 
-                            (txID, posId, lon, lat, datetime, timezone) 
-                     VALUES (%d, %d, %f, %f, '%s', '%s')''' % (self.tx_id, 
-                     pos_id, lon, lat, t, 'UTC'))
 
   def export_kml(self, name, tx_id):
-
+    # TODO I've changed some stuff ... make sure this output is still sensible. 
+  
     # E.g.: https://developers.google.com/kml/documentation/kmlreference#gxtrack 
     # TODO The file is way longer than it needs to be, since I wanted to display
     # the coordinates and datetime in the tooltip that appears in Google Earth.
@@ -510,32 +531,32 @@ class track:
     fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
     fd.write('<Folder>\n')
     fd.write('  <Placemark>\n')
-    fd.write('    <name>%s (txID=%d)</name>\n' % (name, tx_id))
+    fd.write('    <name>%s (depID=%d)</name>\n' % (name, tx_id))
     fd.write('    <gx:Track>\n')
-    for (P, t, pos_id) in self.track: 
+    for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
       tm = time.gmtime(t)
       t = '%04d-%02d-%02dT%02d:%02d:%02dZ' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
                                               tm.tm_hour, tm.tm_min, tm.tm_sec)
       fd.write('      <when>%s</when>\n' % t)
-    for (P, t, pos_id) in self.track: 
-      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+    for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
+      (lat, lon) = utm.to_latlon(easting, northing, utm_number, utm_letter) 
       fd.write('      <gx:coord>%f %f 0</gx:coord>\n' % (lon, lat))
     fd.write('      <ExtendedData>\n')
     fd.write('        <SchemaData schemaUrl="#schema">\n')
     fd.write('          <gx:SimpleArrayData name="Time">\n')
-    for (P, t, pos_id) in self.track: 
+    for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
       tm = time.gmtime(t)
       t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
                                               tm.tm_hour, tm.tm_min, tm.tm_sec)
       fd.write('          <gx:value>%s</gx:value>\n' % t)
     fd.write('          </gx:SimpleArrayData>\n')
     fd.write('          <gx:SimpleArrayData name="(lat, long)">\n')
-    for (P, t, pos_id) in self.track: 
-      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+    for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
+      (lat, lon) = utm.to_latlon(easting, northing, utm_number, utm_letter) 
       fd.write('          <gx:value>%fN, %fW</gx:value>\n' % (lat, lon))
     fd.write('          </gx:SimpleArrayData>\n')
     fd.write('          <gx:SimpleArrayData name="posID">\n')
-    for (P, t, pos_id) in self.track: 
+    for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
       tm = time.gmtime(t)
       t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
                                               tm.tm_hour, tm.tm_min, tm.tm_sec)
@@ -549,34 +570,44 @@ class track:
     fd.write('</kml>')
     fd.close() 
 
-    fd = open('%s_pos.kml' % name, 'w')
-    fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-    fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
-    fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
-    fd.write('<Folder>\n')
-    fd.write('  <Placemark>\n')
-    fd.write('  <MultiGeometry>\n')
-    fd.write('    <name>%s (txID=%d) position cloud</name>\n' % (name, tx_id))
-    for row in self.pos:
-      (P, t, ll, pos_id) = (np.complex(row[0], row[1]), 
-                            float(row[2]), 
-                            float(row[3]), 
-                            int(row[4]))
-      tm = time.gmtime(t)
-      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
-                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
-      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
-      fd.write('    <Point id="%d">\n' % pos_id)
-      fd.write('      <coordinates>%f,%f,0</coordinates>\n' % (lon, lat))
-      fd.write('    </Point>\n')
-    fd.write('  </MultiGeometry>\n')
-    fd.write('  </Placemark>\n')
-    fd.write('</Folder>\n')
-    fd.write('</kml>')
-    fd.close() 
+  #
+  # Some statistical features of the tracks. 
+  #
 
-     
-  
+  def speed(self):
+    ''' Calculate mean and standard deviation of the target's speed. 
+    
+      :return: (mean, std) tuple. 
+    '''
+    if len(self.table) > 0: 
+      speeds = []
+      for i in range(len(self.table)-1): 
+        # (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) 
+        P = np.complex(self.table[i+1][4], self.table[i+1][3])
+        Q = np.complex(self.table[i][4], self.table[i][3])
+        t_p = self.table[i+1][2]
+        t_q = self.table[i][2]
+        speeds.append( distance(P, Q) / (t_p - t_q) )
+      return (np.mean(speeds), np.std(speeds))
+    
+    else: return (np.nan, np.nan)
+
+  def stats(self):
+    ''' Piecewise velocity and acceleration along critcal path. '''   
+    # TODO rewrite
+    #    V = []
+    #    for i in range(len(self.table)-1):
+    #      v = (self.table[i+1].P - self.table[i].P) / (self.table[i+1].t - self.table[i].t)
+    #      V.append((v, (self.table[i].t + self.table[i+1].t) / 2))
+    #
+    #    A = []
+    #    for i in range(len(V)-1):
+    #      a = (V[i+1].P - V[i].P) / (V[i+1].t - V[i].t)
+    #      A.append((a, (V[i].t + V[i+1].t) / 2))
+    #
+    #    return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
+    
+
 
 def tx_name(db_con):
   cur = db_con.cursor()
@@ -587,53 +618,9 @@ def tx_name(db_con):
   return d
 
 
+# Testing, testing ... 
+
 if __name__ == '__main__': 
-  
-  tx_id = 54
-  
-  import commands
-  t_start = int(commands.getoutput('date --date="20140202 1200" +%s'))
-  t_end   = int(commands.getoutput('date --date="20140202 1600" +%s'))
-
-  print t_start, t_end
-  M = track.maxspeed_exp((10, 1), (360, 0.1), 0.05)
-  #M = track.maxspeed_linear((10, 1), (180, 0.1), 0.05)
-  C = 1
-
-  db_con = util.get_db('writer')
-  
-  fella = track(db_con, t_start, t_end, tx_id, M, C) 
-  #fella = trackall(db_con, tx_id, M, C) 
-  #fella.export_kml(tx_name(db_con)[tx_id], tx_id)
-
-  t = time.localtime(fella[0][1])
-  s = time.localtime(fella[-1][1])
-  print '%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  txID=%d' % (
-       t.tm_year, t.tm_mon, t.tm_mday,
-       t.tm_hour, t.tm_min,
-       s.tm_year, s.tm_mon, s.tm_mday,
-       s.tm_hour, s.tm_min,
-       tx_id)
-
-  print 'Length of critical path: %d (out of %d)' % (len(fella), len(fella.pos))
-
-  if True:
-
-    import matplotlib.pyplot as pp
-
-    # Plot sites.
-    sites = csv(db_con=db_con, db_table='sitelist')
-    pp.plot(
-     [s.easting for s in sites], 
-     [s.northing for s in sites], 'ro')
-
-    # Plot locations. 
-    pp.plot( 
-     map(lambda (P, t, pos_id): P.imag, fella), 
-     map(lambda (P, t, pos_id): P.real, fella), '.', alpha=0.3)
-
-    pp.savefig("test.png")
- 
      
-
+  pass
 

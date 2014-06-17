@@ -89,19 +89,21 @@ try:
   print "position: start time:", time.asctime(time.localtime(start))
 
   db_con = qraat.util.get_db('writer')
-
+  
   print "position: fetching site data." 
   sv = qraat.position.steering_vectors(db_con, options.cal_id)
+  center = qraat.position.get_center(db_con)
+
   if options.thresh > 0: # FIXME apply time filter.
     print "position: using time filter with threshold %f." % options.thresh
     print >>sys.stderr, "position: warning: time filter not implemented."
-    filt = qraat.filt.est_nofilter    
+    get_est_ids = qraat.position.get_est_ids
   elif options.band: 
     print "position: using band filter."
-    filt = qraat.filt.est_band
+    get_est_ids = qraat.position.get_est_ids_bandfilter
   else: 
     print "position: no signal filter."
-    filt = qraat.filt.est_nofilter    
+    get_est_ids = qraat.position.get_est_ids
 
   chunks = range(int(options.t_start), int(options.t_end), int(options.t_chunk))
 
@@ -109,7 +111,7 @@ try:
 
     print "position: fetching chunk %d of %d." % (i+1, len(chunks)) 
     
-    est_ids = filt(db_con, options.tx_id, chunks[i], chunks[i] + options.t_chunk)
+    est_ids = get_est_ids(db_con, options.tx_id, chunks[i], chunks[i] + options.t_chunk)
     sig = qraat.position.signal(db_con, est_ids)
 
     if len(sig) == 0:
@@ -117,17 +119,21 @@ try:
       continue
 
     print "position: calculating bearing likelihoods (%d)." % len(sig) 
-    bl = qraat.position.bearing(sv, sig)
+    bl = qraat.position.position_estimator(sv, sig)
 
     print "position: calculating positions."
-    pos_est = qraat.position.calc_positions(sig,
-                                            bl, 
-                                            options.t_window, 
-                                            options.t_delta, 
-                                            options.verbose) 
+    (bearing, position) = qraat.position.calc_positions(sig,
+                                                        bl,
+                                                        center,
+                                                        options.t_window, 
+                                                        options.t_delta, 
+                                                        options.tx_id,
+                                                        options.verbose) 
 
-    print "position: inserting positions (%d)." % (len(pos_est))
-    qraat.position.insert_positions(db_con, pos_est, options.tx_id)
+    print "position: inserting positions (%d)." % (len(position))
+    position.insert_db(db_con)
+    print "position: inserting bearings (%d)." % (len(bearing))
+    bearing.insert_db(db_con)
 
 except mdb.Error, e:
   print >>sys.stderr, "position: error: [%d] %s" % (e.args[0], e.args[1])

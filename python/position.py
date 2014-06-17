@@ -28,11 +28,60 @@ try:
   import MySQLdb as mdb
 except ImportError: pass
 
-#: Center of Quail Ridge reserve (northing, easting). This is the first
-#: "candidate point" used to construct the search space grid. TODO: 
-#: I think this should be a row in qraat.sitelist with name='center'.
-#:  ~ Chris 1/2/14
-center = np.complex(4260500, 574500)
+query_insert_pos = '''INSERT INTO Position
+                       (depID, timestamp, easting, northing, likelihood, activity)
+                      VALUES (%s, %s, %s, %s, %s, %s)''' 
+
+query_insert_bearing = '''INSERT INTO Bearing 
+                           (depID, siteID, timestamp, bearing, likelihood, activity)
+                          VALUES (%s, %s, %s, %s, %s, %s)''' 
+
+def get_center(db_con):
+  cur = db_con.cursor()
+  cur.execute('''SELECT northing, easting 
+                   FROM qraat.sitelist
+                  WHERE name = 'center' ''')
+  (n, e) = cur.fetchone()
+  return np.complex(n, e)
+
+
+# Get est's from the database, applying a filter. Return a set of
+# estID's which are fed to the class signal. 
+# TODO Curry these?  
+# TODO Change txID to depID. 
+# TODO Grab band filte rfalues from tx_pulse.  
+
+def get_est_ids_timefilter(db_con, dep_id, t_start, t_end, thresh):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID 
+                   FROM est
+                   JOIN estscore ON est.ID = estscore.estID
+                  WHERE txID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f
+                    AND thresh >= %f''' % (dep_id, t_start, t_end, thresh))
+  return [ int(row[0]) for row in cur.fetchall() ]
+
+def get_est_ids_bandfilter(db_con, dep_id, t_start, t_end):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID 
+                   FROM est
+                  WHERE txID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f 
+                    AND band3 < 150 
+                    AND band10 < 900''' % (dep_id, t_start, t_end))
+  return [ int(row[0]) for row in cur.fetchall() ]
+
+def get_est_ids(db_con, dep_id, t_start, t_end):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID 
+                   FROM est
+                  WHERE txID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f''' % (dep_id, t_start, t_end))
+  return [ int(row[0]) for row in cur.fetchall() ]
+
 
 class steering_vectors:
   ''' Encapsulate steering vectors. 
@@ -50,8 +99,7 @@ class steering_vectors:
     deps = []
 
     # Get site locations.
-    sites = csv(db_con=db_con, db_table='sitelist')
-
+    sites = csv(db_con=db_con, db_table='sitelist').filter(rx=True)
     sv_deps_by_site = {}
 
     for row in sites:
@@ -90,6 +138,7 @@ class steering_vectors:
                                                            prov_sv_ids, deps, sv_deps_by_site)
 
 
+
 class signal:
   ''' Encapsulate pulse signal data. 
   
@@ -106,15 +155,17 @@ class signal:
   def __init__(self, db_con, est_ids): 
 
     if len(est_ids) == 0:
-      self.id = self.site_id = self.tx_id = self.timestamp = np.array([])
+      self.id = self.site_id = self.dep_id = self.timestamp = np.array([])
       self.edsp = self.ed = self.nc = np.array([])
       self.signal_ct = 0
 
     else: 
       # Store eigenvalue decomposition vectors and noise covariance
       # matrices in NumPy arrays. 
+      
+      # TODO When qraat.est updates to use depID instead of txID, update this. 
       cur = db_con.cursor()
-      cur.execute('''SELECT ID, siteid, txid, timestamp, edsp, 
+      cur.execute('''SELECT ID, siteID, txID, timestamp, edsp, 
                             ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
                             nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
                             nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
@@ -128,7 +179,7 @@ class signal:
       # Metadata. 
       (self.id, 
        self.site_id, 
-       self.tx_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
+       self.dep_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
       self.timestamp = raw[:,3]
       raw = raw[:,4:]
 
@@ -166,12 +217,115 @@ class signal:
         activity[self.site_id[index]].append(self.edsp[index])
 
     for (site_id, x) in activity.iteritems():
-      activity[site_id] = np.std(x)
+      activity[site_id] = np.std(x) / np.mean(x)
     
     return activity
 
 
-class bearing: 
+
+class Position:
+  
+  def __init__(self, db_con=None, pos_ids=[]): 
+    self.table = []
+    if len(pos_ids) > 0:
+      cur = db_con.cursor()
+      cur.execute('''SELECT ID, depID, timestamp, easting, northing, 
+                            utm_zone_number, utm_zone_letter, likelihood,
+                            activity
+                       FROM Position
+                      WHERE ID in (%s)
+                      ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), pos_ids)))
+      for row in cur.fetchall():
+        self.table.append(row)
+
+  def __len__(self):
+    return len(self.table)
+
+  def __getitem__(self, i):
+    return self.table[i]
+
+  def insert_db(self, db_con):
+    cur = db_con.cursor()
+    for (id, dep_id, timestamp, easting, northing, 
+         utm_zone_number, utm_zone_letter, likelihood, 
+         activity, pos_deps) in self.table: 
+      cur.execute(query_insert_pos, (dep_id, 
+                                     timestamp, 
+                                     easting,  # pos.imag
+                                     northing, # pos.real
+                                     likelihood, 
+                                     activity))
+      pos_id = cur.lastrowid                               
+      handle_provenance_insertion(cur, pos_deps, {'Position':(pos_id,)})
+
+  def export_kml(self, name, dep_id):
+
+    fd = open('%s_pos.kml' % name, 'w')
+    fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+    fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
+    fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
+    fd.write('<Folder>\n')
+    fd.write('  <Placemark>\n')
+    fd.write('  <MultiGeometry>\n')
+    fd.write('    <name>%s (depID=%d) position cloud</name>\n' % (name, dep_id))
+    for row in self.table:
+      (P, t, ll, pos_id) = (np.complex(row[0], row[1]), 
+                            float(row[2]), 
+                            float(row[3]), 
+                            int(row[4]))
+      tm = time.gmtime(t)
+      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
+                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
+      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
+      fd.write('    <Point id="%d">\n' % pos_id)
+      fd.write('      <coordinates>%f,%f,0</coordinates>\n' % (lon, lat))
+      fd.write('    </Point>\n')
+    fd.write('  </MultiGeometry>\n')
+    fd.write('  </Placemark>\n')
+    fd.write('</Folder>\n')
+    fd.write('</kml>')
+    fd.close() 
+
+
+
+class Bearing: 
+  
+  def __init__(self, db_con=None, bearing_ids=[]):
+    self.table = []
+    if len(bearing_ids) > 0:
+      cur = db_con.cursor()
+      cur.execute('''SELECT ID, depID, siteID, timestamp, bearing,
+                            likelihood, activity
+                       FROM Bearing
+                      WHERE ID in (%s)
+                      ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), bearing_ids)))
+      for row in cur.fetchall():
+        self.table.append(row)
+
+  def __len__(self):
+    return len(self.table)
+
+  def __getitem__(self, i):
+    return self.table[i]
+
+  def insert_db(self, db_con):
+    cur = db_con.cursor()
+    for (id, dep_id, site_id, timestamp, bearing, 
+         likelihood, activity) in self.table: 
+      cur.execute(query_insert_bearing, (dep_id,
+                                         site_id, 
+                                         timestamp, 
+                                         bearing, 
+                                         likelihood, 
+                                         activity))
+    
+  def export_kml(self, name, dep_id, site_id):
+    pass # TODO 
+
+
+
+
+class position_estimator: 
   ''' Calculate and store bearing likelihood distributions for a signal window.
 
     The likelihoods calculated for the bearings are based on Bartlet's estimator. 
@@ -306,7 +460,7 @@ class bearing:
 
 
 
-class mle_bearing (bearing): 
+class mle_position_estimator (position_estimator): 
   ''' Calculate bearing distribution with the minimum likelihood estimator. ''' 
 
   def __init__(self, sv, sig): 
@@ -359,23 +513,18 @@ def calc_windows(bl, t_window, t_delta):
 
 
 
-def calc_positions(signal, bl, t_window, t_delta, verbose=False):
+def calc_positions(signal, bl, center, t_window, t_delta, dep_id, verbose=False):
   ''' Calculate positions of a transmitter over a time interval. 
   
-    :param bl: Bearing likelihoods for time range. 
-    :type bl: qraat.position.bearing
-    :param t_window: Number of seconds for each time window. 
-    :type t_window: int
-    :param t_delta: Interval of time between each position calculation.
-    :type t_delta: int
-    :param verbose: Output some debugging information. 
-    :type verbose: bool
   '''
   pos_est = [] 
 
   if verbose:
     print "%15s %-19s %-19s %-19s" % ('time window',
               '100 meters', '10 meters', '1 meter')
+
+  position = Position()
+  bearing = Bearing()
 
   for (t, index_list) in calc_windows(bl, t_window, t_delta): 
    
@@ -386,19 +535,21 @@ def calc_positions(signal, bl, t_window, t_delta, verbose=False):
 
     # Calculate most likely bearings. (siteID -> (theta, ll[theta]).)
     ll_per_site = bl.likelihood_per_site(index_list)
-    bearing = bl.bearing_estimator(ll_per_site)
+    theta = bl.bearing_estimator(ll_per_site)
 
     # Zip together bearing and activity
     # TODO make sure activity[site_id] = None if it couldn't be done. 
-    for site_id in bearing.keys(): 
-      bearing[site_id] = bearing[site_id] + (activity[site_id],)
+    # TODO break up this data structure since it's not necesssary 
+    #      anymore. 
+    for site_id in theta.keys(): 
+      theta[site_id] = theta[site_id] + (activity[site_id],)
     
     # Calculate position if data is available. 
     if (len(set(bl.site_id[index_list])) > 1): 
 
       # Activity for a position is given as the arithmetic mean of 
-      # of the standard deviations of signal power per site. 
-      pos_activity = np.mean([activity for (_, _, activity) in bearing.values()])
+      # of the standard deviations of signal power per site.
+      pos_activity = np.mean([activity for (_, _, activity) in theta.values()])
 
       if verbose: 
         print "Time window {0} - {1}".format(
@@ -420,45 +571,19 @@ def calc_positions(signal, bl, t_window, t_delta, verbose=False):
       pos_deps = {'est': tuple(pos_deps)}
 
       if verbose: print
+   
+    if pos: # TODO utm
+      position.table.append((None, dep_id, t, pos.imag, pos.real, None, None, ll, pos_activity, pos_deps))
     
-    pos_est.append((t, bearing, pos, ll, pos_activity, pos_deps))
+    for (site_id, (theta, ll, activity)) in theta.iteritems():
+      bearing.table.append((None, dep_id, site_id, t, theta, ll, activity))
 
-  return pos_est
+  return (bearing, position)
 
 
 
-def insert_positions(db_con, pos_est, tx_id):
-    ''' Insert positions into database with provenance. ''' 
-    cur = db_con.cursor()
 
-    query_insert_pos = '''INSERT INTO Position
-                           (txID, timestamp, easting, northing, likelihood, activity)
-                          VALUES (%s, %s, %s, %s, %s, %s)''' 
 
-    query_insert_bearing = '''INSERT INTO Bearing 
-                               (txID, siteID, posID, timestamp, bearing, likelihood, activity)
-                              VALUES (%s, %s, %s, %s, %s, %s, %s)''' 
-
-    # Insert results into database.
-    for (t, bearing, pos, ll, activity, pos_deps) in pos_est:
-        
-      pos_id = None
-
-      # Insert position.
-      if pos:
-        cur.execute(query_insert_pos, (tx_id, 
-                                       t, 
-                                       pos.imag, # easting 
-                                       pos.real, # northing
-                                       ll, activity))
-        pos_id = cur.lastrowid                               
-        handle_provenance_insertion(cur, pos_deps, {'Position':(pos_id,)})
-
-      # Insert bearings.
-      for (site_id, (theta, ll, activity)) in bearing.iteritems():
-        cur.execute(query_insert_bearing, (tx_id, site_id, pos_id, 
-                                           t, theta, 
-                                           ll, activity))
 
 
 
