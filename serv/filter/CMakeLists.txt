@@ -1,5 +1,3 @@
-#INSTALL(PROGRAMS  
-#  rmg_time
-#  DESTINATION bin)
-
-
+INSTALL(PROGRAMS  
+  rmg_filter
+  DESTINATION bin)
