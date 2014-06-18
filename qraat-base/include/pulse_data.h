@@ -25,9 +25,14 @@
 #include <fstream> 
 #include <sys/time.h>
 #include <ctime>
-#include <gr_complex.h>
+#include <complex>
 
 using namespace std;
+
+/* Warning: we expect that the Gnu Radio `gr_complex` type matches this
+ * typedef. This is the case as of version 3.7.3, and this is unlikely 
+ * to change down the road. */
+typedef complex<float> my_complex;
 
 //! Error handling. 
 typedef enum { FileReadError, NoDataError, IndexError } PulseDataError; 
@@ -92,7 +97,7 @@ friend class detectmod_detect;
 protected:
 
   //! Data array, size = params.channel_ct * params.sample_ct. 
-  gr_complex *data; 
+  my_complex *data; 
   
   //! Point to start of the circular buffer (oldest sample). 
   int index; 
@@ -167,12 +172,12 @@ public:
   /*!
    * Arbitrary access over data array. To get the jth channel of the 
    * ith sample, do "det[(i * det.params.channel_ct) + j]". \b NOTE: in 
-   * Python, \a gr_complex is cast as a tuple (\a real, \a imag).  
+   * Python, \a my_complex is cast as a tuple (\a real, \a imag).  
    */
-  gr_complex& sample(int i); 
+  my_complex& sample(int i); 
 
   //! Same as pulse_data::sample().
-  gr_complex& operator[] (int i); 
+  my_complex& operator[] (int i); 
 
   //! Get the real part of an arbitrary datum. 
   float real(int i); 
@@ -194,7 +199,7 @@ public:
    * Return pointer to the data buffer. Note that 
    * the buffer is not unwrapped. 
    */
-  gr_complex *get(); 
+  my_complex *get(); 
 
 
     /* Routines for the circular buffer */
@@ -202,18 +207,18 @@ public:
   /*!
    * Add sample to circular buffer and increment index. 
    */ 
-  void add(gr_complex *in);
+  void add(my_complex *in);
 
   /*! TODO deprecate */
   int get_index();
 
   /*! TODO deprecate */
-  gr_complex *get_buffer();
+  my_complex *get_buffer();
 
   /*!
    * Return sample at current index (oldest sample.) 
    */
-  gr_complex *get_sample();
+  my_complex *get_sample();
 
   /*!
    * \brief Increment index. 

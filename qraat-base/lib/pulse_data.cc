@@ -73,7 +73,7 @@ pulse_data::pulse_data(
   size = params.channel_ct * params.sample_ct; 
  
   filename = NULL; 
-  data = new gr_complex [params.channel_ct * params.sample_ct]; 
+  data = new my_complex [params.channel_ct * params.sample_ct]; 
 } // constructor for pulse detector
 
 pulse_data::pulse_data(const pulse_data &det)
@@ -82,8 +82,8 @@ pulse_data::pulse_data(const pulse_data &det)
   index = det.index;
   size = det.size; 
   filename = NULL; 
-  data = new gr_complex [params.channel_ct * params.sample_ct]; 
-  memcpy(data,det.data, params.channel_ct * params.sample_ct * sizeof(gr_complex));
+  data = new my_complex [params.channel_ct * params.sample_ct]; 
+  memcpy(data,det.data, params.channel_ct * params.sample_ct * sizeof(my_complex));
 } // constructor from pulse_data instance
 
 pulse_data::~pulse_data() 
@@ -101,14 +101,14 @@ pulse_data::~pulse_data()
 pulse_data& pulse_data::operator=(const pulse_data &det)
 {
   if (params.channel_ct == det.params.channel_ct && params.sample_ct == det.params.sample_ct){
-    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(gr_complex));
+    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(my_complex));
     index = det.index;
     size = det.size; 
   }
   else if (params.channel_ct*params.sample_ct == det.params.channel_ct*det.params.sample_ct){  /* What's this? */ 
     params.channel_ct = det.params.channel_ct;
     params.sample_ct = det.params.sample_ct;
-    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(gr_complex));
+    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(my_complex));
     index = det.index;
     size = det.size;
   }
@@ -116,8 +116,8 @@ pulse_data& pulse_data::operator=(const pulse_data &det)
     params.channel_ct = det.params.channel_ct;
     params.sample_ct = det.params.sample_ct;
     delete [] data; 
-    data = new gr_complex [params.channel_ct * params.sample_ct]; 
-    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(gr_complex));
+    data = new my_complex [params.channel_ct * params.sample_ct]; 
+    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(my_complex));
     index = det.index;
     size = det.size; 
   }
@@ -155,8 +155,8 @@ int pulse_data::read(const char *fn)
     size = params.sample_ct * params.channel_ct; 
   
     /* Get data. */
-    data = new gr_complex [params.channel_ct * params.sample_ct]; 
-    file.read((char*)data, sizeof(gr_complex) * params.sample_ct * params.channel_ct);
+    data = new my_complex [params.channel_ct * params.sample_ct]; 
+    file.read((char*)data, sizeof(my_complex) * params.sample_ct * params.channel_ct);
   }
 
   if (file)
@@ -184,8 +184,8 @@ int pulse_data::write( const char *fn )
 
   /* Unwrap circular buffer and write data */
   file.write((char*)(data + (index * params.channel_ct)), 
-          sizeof(gr_complex) * (params.sample_ct - index) * params.channel_ct);
-  file.write((char*)data, sizeof(gr_complex) * index * params.channel_ct); 
+          sizeof(my_complex) * (params.sample_ct - index) * params.channel_ct);
+  file.write((char*)data, sizeof(my_complex) * index * params.channel_ct); 
   file.close();
   return 0; 
 } // write() 
@@ -200,11 +200,11 @@ const param_t& pulse_data::param() const {
 
  /* Accessors */
 
-gr_complex& pulse_data::operator[] (int i) {
+my_complex& pulse_data::operator[] (int i) {
   return sample(i); 
 } // operator[]
 
-gr_complex& pulse_data::sample(int i) {
+my_complex& pulse_data::sample(int i) {
   if( i< 0 || i > size ) 
     throw IndexError; 
   return data[(i + index) % size];    
@@ -240,7 +240,7 @@ void pulse_data::set_imag(int i, float val) {
   data[(i + index) % size].imag(val);
 } // set_imag()
 
-gr_complex* pulse_data::get()
+my_complex* pulse_data::get()
 {
   return data;
 } // get()
@@ -248,9 +248,9 @@ gr_complex* pulse_data::get()
 
   /* Circular buffer methods */ 
 
-void pulse_data::add(gr_complex *in)
+void pulse_data::add(my_complex *in)
 {
-  memcpy(data + (index * params.channel_ct), in, params.channel_ct * sizeof(gr_complex));
+  memcpy(data + (index * params.channel_ct), in, params.channel_ct * sizeof(my_complex));
   index ++;
   if(index >= params.sample_ct){
     index = 0;
@@ -262,12 +262,12 @@ int pulse_data::get_index()
   return index;
 } // get_index()
 
-gr_complex* pulse_data::get_buffer()
+my_complex* pulse_data::get_buffer()
 {
   return data;
 } // get_buffer()
 
-gr_complex* pulse_data::get_sample()
+my_complex* pulse_data::get_sample()
 {
   return data + (index * params.channel_ct);
 } // get_sample()
