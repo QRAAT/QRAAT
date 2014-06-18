@@ -139,13 +139,13 @@ add_custom_target(uninstall
     ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
 )
 
+
+# Install base 'qraat' module.
+install(CODE "execute_process(COMMAND python setup.py install 
+--prefix=${CMAKE_INSTALL_PREFIX}
+WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})")
+
 ########################################################################
 # Add subdirectories
 ########################################################################
-#add_subdirectory(include)
-#add_subdirectory(lib)
-#add_subdirectory(swig)
-add_subdirectory(python)
-#add_subdirectory(grc)
-#add_subdirectory(apps)
 add_subdirectory(serv)
