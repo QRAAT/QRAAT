@@ -1,0 +1,504 @@
+#!/bin/bash
+# rmg
+# This script is part of the QRAAT system. It provides basic server
+# side controls for RMG comptures/receiver running remotely. 
+#
+# Copyright (C) 2013 Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Notes
+# 
+# Meta data (transmitter file, log files, etc.) is stored persistently on
+# disk on the RMG remotes, typically in /home/rmg. Data (.det files, 
+# status.txt) is written in memory to ramdisk, typically /tmp/ramdisk/det.
+# 
+# We make heavy use of SSH. To avoid entering passwords all the time, we 
+# use an RSA encryption key with no passphrase. The public key is stored 
+# at all RMG remote sites in /home/rmg/.ssh/authorized_keys; the private 
+# key is kept at the server, typically /home/rmg/.ssh/rmg_rsa. This is 
+# because the remotes run the SSH daemon. 
+#
+# Tasks 
+# 
+#  'up'
+#
+#  set site computer's goal to up: computer on, receiver off
+#
+#  'down'
+#
+#  set site computer's goal to down: receiver off, computer to shutdown in 300 seconds
+#
+#  'start'
+#
+#  set site computer's goal to active: computer on, receiver on,
+#
+#  'stop'
+#
+#  same as 'up'
+#
+#  'fetch' 
+#
+# Download pulse data (.det files) from RMG remote to RMG server. Upon 
+# success, erase the transfered data from the RMG remote. The pulse detector 
+# in the RMG module emits .det files into a directory structure like 
+# YYYY/MM/DD/HH/mm/ssuuuuuu.det. We want to be able to copy these files from 
+# RMG remotes to the server, but exclude the directory that is being mutated. 
+#       One solution would be to implement a hot-directory locking 
+# mechanism on the RMG remote side. Since we don't want to burden the site 
+# computers with this extra work, we decided to take advantage of the fact 
+# that the real clock time must be synchronized across all nodes of the 
+# network. We fetch all directories that are older than one minute because 
+# the pulse detector will never mutate these directories again. 
+#
+#  'updatetx' 
+#
+# Update transmitter information on specified sites. This task includes an
+# option to specify a file. 
+#
+#  'cyclerx'
+#
+# Cycle the power on the RMG module.  
+#
+# TODOs 
+# 
+# - Run task on 'all' sites. 
+#
+#
+
+function help() {
+  cat <<!EOF!
+usage: rmg task [-options] {sites}/all  
+
+  This program is part of the QRAAT system. It provides basic controls
+  for RMG computers/receivers running in the field. Perform a batch job
+  on a list of sites. If 'all' is provided, the job will be dispatched to 
+  all up sites.   
+
+  'task' is any one of the following:
+
+    on/off       Switch the field computer's power.
+
+    status       Show status of a site. 
+
+    update       Update a site's configuration information and goal state. 
+
+    up           RMG receiver is unpowered and the detector is stopped. 
+                 (Transition to up state.) 
+
+    down         Instruct field computer to shut down in 5 minutes. 
+                 (Transition to down state.) 
+
+    start        Power on the RMG receiver and start software defined radio. 
+                 Store pulse data remotely. (Transition to active state.)
+
+    stop         Power off the RMG receiver and stop the software defined 
+                 radio. (Transition to up state.)
+
+    fetch        Download pulse data from site to server. Delete downloaded 
+                 data from remote machine. 
+
+    exporttx --file FILE    Export transmitter list from the database 
+                            to a CSV file. Defaults to 'tx.csv.' in 
+                            working directory. 
+    
+    updatetx --file FILE    Update transmitter file on remote computer. 
+                            Defaults to 'tx.csv' in working directory.
+
+    cyclerx      Power off the RMG receiver and power it back on.
+
+    auto_on      Turn automatic scheduler on
+
+    auto_off     Turn automatic scheduler off
+
+    help         Print this. 
+!EOF!
+}
+
+
+  ## Set up environment ##
+PATH="/usr/local/bin:$PATH"
+source rmg_env  # setup RMG environment variables
+
+
+  ## Routines ##
+
+function get_status() {
+# Probe the the status of a site
+
+  SITE=$1
+
+    #Ping computer
+  read comp_ip power_ip comp_outlet rx_outlet powertype serv_state <<< \
+   $(rmg_csv --row $SITE comp_ip power_ip comp_outlet rx_outlet powertype state <$SITELIST)
+  ping $comp_ip -c 3 -w 6 &> /dev/null
+  if [ $? -eq 0 ]
+    then
+      ping_computer="success"
+      read site_goal timestamp site_status <<< `ssh $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+    else
+      ping_computer="failure"
+      site_goal="unknown"
+      site_status="unknown"
+      timestamp=`date -u +%s`
+  fi
+
+    #Ping router
+  if [[ "$powertype" != "nil" ]]
+    then
+      ping $power_ip -c 3 -w 6 &> /dev/null
+      if [ $? -eq 0 ]
+        then
+          ping_router="success"
+          power_status=$(rmg_powerswitch $powertype $power_ip $comp_outlet QUERY)
+          if [[ $ping_computer == "failure" ]]  && [ $power_status -eq 1 ]
+            then
+                #Try pinging computer again
+              ping $comp_ip -c 3 -w 6 &> /dev/null
+              if [ $? -eq 0 ]
+                then
+                  ping_computer="success"
+                  read site_goal timestamp site_status <<< `ssh $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+                else
+                  if [[ $serv_state == "down" ]]
+                    then
+                      site_status="down"
+                  fi
+              fi
+            else
+              if [ $power_status -eq 0 ]
+                then
+                  site_status="off"
+              fi
+          fi
+        else
+          ping_router="failure"
+      fi
+    else
+      ping_router="no_powerswitch"
+      power_status=-1
+  fi
+
+}
+
+function do_update() {
+# Update a site's state remotely. Copy a new site.csv file 
+# and run rmg-node check. 
+  SITE=$1
+  rmg_csv --row $SITE <$SITELIST | \
+  ssh $SITE "cat > site.csv; rmg-node check"  
+
+}
+  
+  ## Get task and options ##
+
+TASK=$1 
+shift
+
+if [ ! $TASK ]
+then
+  help
+  exit 0
+fi
+
+case $TASK in
+ -h|--help|help)
+   help
+   exit 0
+  ;; 
+
+  updatetx)
+    if [[ "$1" == "-f" ]] || [[ "$1" == "--file" ]] 
+    then
+      TX_FILE=$2
+      shift
+      shift
+    else     
+      TX_FILE=$RMG_SERVER_TXLIST
+    fi
+    if [ ! -e $TX_FILE ]
+      then 
+        echo "error: '$TX_FILE' doesn't exist" 1>&2
+        exit 1
+    fi
+  ;;
+
+  exporttx) # Export transmitter config file 
+            # from DB and exit. 
+    if [[ "$1" == "-f" ]] || [[ "$1" == "--file" ]] 
+    then
+      TX_FILE=$2
+      shift
+      shift
+    else     
+      TX_FILE=$RMG_SERVER_TXLIST
+    fi
+    rmg_txlist $RMG_SERVER_DB_AUTH -f $TX_FILE
+    exit 0
+  ;;
+    
+  status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing|die|down_now|auto_off|auto_on)
+  ;; 
+    
+  *)
+    echo error: unrecognized task \'$TASK\'
+    exit 1
+  ;;
+
+esac 
+
+
+  ## Run task at each site ##
+
+SITELIST=$RMG_SERVER_METADATA_DIR/sitelist.csv
+
+if [ ! -e $SITELIST ]; 
+then
+  echo "error: site configuration information not available (no sitelist.csv)." 1>&2
+  exit 1
+fi 
+
+SITES=$@
+if [[ "$SITES" = "all" ]]
+  then
+    SITES=`rmg_csv -c name < $SITELIST`
+fi
+
+if [[ "$TASK" = "auto_o"* ]]
+then
+  for SITE in $SITES
+  do
+    if [[ "$TASK" = "auto_on" ]]
+    then
+      rmg_csv $SITE auto auto < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+    else
+      rmg_csv $SITE auto off < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+    fi
+  done
+  exit 0
+fi
+
+count=0
+for SITE in $SITES
+do
+  read serv_goal <<< $(rmg_csv --row $SITE state <$SITELIST)
+  if [ $? -ne 0 ]; then 
+    echo "error: site '$SITE' not recognized in sitelist at $SITELIST." 1>&2
+    exit 1
+  fi 
+  get_status $SITE
+
+  case $TASK in 
+    status)
+      echo "status $SITE"
+      echo "  Powerswitch Router Ping Test: $ping_router"
+      echo "  Computer Ping Test: $ping_computer"
+      echo "  Site Status:    $site_status, `date --date @$timestamp`"
+      if [[ "$ping_computer" == "success" ]]
+        then 
+          [[ "$site_goal" != "$serv_goal" ]] && \
+           echo "warning: goal state mismatch (serv=$serv_goal, node=$site_goal). Suggest update." 1>&2
+      fi
+    ;;
+
+    update)
+      echo "update $SITE"
+      if [[ "$ping_computer" == "success" ]]
+        then do_update $SITE
+      else 
+        echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
+      fi
+    ;;
+
+    on)
+      echo "on $SITE"
+      if [[ "$ping_router" == "success" ]]
+        then if [[ "$site_status" == "off"* ]]  
+          then
+            rmg_powerswitch $powertype $power_ip $comp_outlet ON
+          else
+            echo "error: first switch the computer's power off." 1>&2
+          fi
+        else
+          echo "error: Router ping test wasn't sucessful" 1>&2
+      fi
+    ;;
+
+    off)
+      echo "off $SITE"
+      if [[ "$ping_router" == "success" ]]
+        then
+          if [[ "$ping_computer" == "failure" ]]
+          then
+            if [[ $serv_goal == "down" ]]
+            then 
+              rmg_powerswitch $powertype $power_ip $comp_outlet OFF
+            else
+              echo "error: Goal in sitelist.csv is not down; cannot poweroff automatically" 1>&2
+            fi
+          else
+            echo "error: Computer is responding to ping; please shutdown computer" 1>&2
+          fi
+        else 
+          echo "error: Router ping test wasn't sucessful" 1>&2
+      fi
+    ;;
+    
+    up|do_nothing) # * -> {up, do_nothing} 
+      echo "$TASK $SITE"
+      if [[ "$ping_computer" == "success" ]]
+        then 
+          rmg_csv $SITE state $TASK < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+          do_update $SITE
+        else 
+          echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
+      fi
+    ;;
+
+    down)
+      echo "down $SITE"
+      if [[ "$ping_computer" == "success" ]]
+        then
+          if [[ "$powertype" == "nil" ]]
+            then
+              echo "Powertype is nil; setting site to up instead of down"
+              TASK=up
+          fi
+          rmg_csv $SITE state $TASK < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+          do_update $SITE
+          TASK=down
+        else
+          echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
+     fi
+    ;;
+
+    down_now)
+      echo "down_now $SITE"
+      if [[ "$ping_computer" == "success" ]]
+        then
+          if [[ "$powertype" == "nil" ]]
+            then
+              echo "Powertype is nil; setting site to up instead of down"
+              rmg_csv $SITE state up < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+              do_update $SITE
+          fi
+          rmg_csv $SITE state down < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+          do_update $SITE
+          mkdir -p $RMG_SERVER_DET_DIR/$SITE 
+          touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
+          rsync -az $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
+          rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
+          ssh $SITE "rmg-node down -d 0; sleep 1; rmg-node check"
+        else
+          echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
+     fi
+    ;;
+
+    die)
+      echo "die $SITE"
+      if [[ "$ping_router" == "success" ]]
+        then
+          rmg_powerswitch $powertype $power_ip $rx_outlet OFF --invert=true
+          rmg_powerswitch $powertype $power_ip $comp_outlet OFF
+        else 
+          echo "error: Router ping test wasn't sucessful" 1>&2
+      fi
+    ;;
+
+    start) # * -> active 
+      echo "start $SITE"
+      if [[ "$ping_computer" == "success" ]]
+        then 
+          rmg_csv $SITE state active < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+          do_update $SITE
+        else 
+          echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
+      fi
+    ;;
+
+    stop)  # * -> up
+      echo "stop $SITE"
+      if [[ "$ping_computer" == "success" ]]
+        then
+          rmg_csv $SITE state up < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+          do_update $SITE
+        else 
+          echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
+      fi
+    ;;
+
+    fetch)
+      echo "fetch $SITE"
+      if [[ "$ping_computer" == "success" ]]
+      then
+        if [[ ! -e $RMG_SERVER_DET_DIR/$SITE/fetching.site ]]
+        then
+          DIRECTORIES_TO_COPY=$(ssh $SITE "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch)
+          if [[ $DIRECTORIES_TO_COPY ]]
+          then
+            mkdir -p $RMG_SERVER_DET_DIR/$SITE 
+            touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
+            for DIR in $DIRECTORIES_TO_COPY; do
+              echo "copying $DIR"
+              mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
+              # download to RMG server and delete from site if xfer succeeds
+              rsync -az --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
+              if [ $? -ne 0 ]; then
+                echo "rsync error copying $DIR from $SITE"
+              fi
+              ssh $SITE "find $RMG_SITE_DET_DIR -mindepth 1 -depth -empty -delete"
+              let ct=ct+1
+            done
+            rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
+          else
+            echo "Nothing to fetch."
+          fi
+        else
+          echo "$SITE is currently being fetched"
+        fi
+      else
+        echo "error: Computer ping test wasn't successful" 1>&2
+      fi
+    ;;
+    
+    updatetx) 
+      echo "updatetx $SITE"
+      if [[ "$ping_computer" == "success" ]]
+        then
+          scp $TX_FILE $SITE:$RMG_SITE_METADATA_DIR/tx.csv 
+          cp -f $TX_FILE $RMG_SERVER_METADATA_DIR/tx.csv 
+          cat $TX_FILE >>$RMG_SERVER_LOG_DIR/rmg_tx.log
+        else
+          echo "error: Computer ping test wasn't successful" 1>&2
+      fi
+    ;;
+ 
+    cyclerx)
+      echo "cyclerx $SITE"
+      if [[ "$ping_router" == "success" ]]
+        then
+          rmg_powerswitch $powertype $poweer_ip $rx_outlet CYCLE
+          if [ $? -ne 0 ]
+            then echo "error (powerswitch): couldn't connect with host" 1>&2
+          fi
+        else
+          echo "error: Router ping test wasn't successful" 1>&2
+      fi
+    ;;
+    
+  esac
+  let count=count+1
+done
+
+

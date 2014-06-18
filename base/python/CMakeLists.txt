@@ -33,12 +33,7 @@ GR_PYTHON_INSTALL(
     __init__.py
     error.py
     det.py
-    est.py
     csv.py
-    gps.py
-    signal_filter.py
-    position.py
-    track.py
     util.py
     DESTINATION ${GR_PYTHON_DIR}/qraat
 )

@@ -1,0 +1,49 @@
+#!/bin/bash
+# rmg_runretry
+# Chris ~12 April 2013
+# 
+# Run the pulse detector. When a failure happens, attempt to restart. 
+#
+
+TYPE=$1
+IP=$2
+RX_OUTLET=$3
+
+if [ ! $RX_OUTLET ]
+  then
+    echo "usage: rmg_runretry <pwr_type> <pwr_ip> <rx_outlet>" 1>&2
+    exit 1
+fi
+
+[[ "$TYPE" == "pingbrother" ]] && invert="--invert=true" 
+
+source rmg_env  # setup RMG environment variables
+STATUS_LOG=$RMG_SITE_METADATA_DIR/status.log
+RETRY_CT=0
+
+if [ ! $RETRY_MAX ]
+then
+  echo "error: retry max not set." 1>&2
+  exit 1
+fi
+
+sleep 1
+rmg_powerswitch $TYPE $IP $RX_OUTLET ON $invert
+
+while [ $RETRY_CT -lt $RETRY_MAX ]
+do 
+  mkdir -p $RMG_SITE_LOG_DIR
+  run_rmg -d $RMG_SITE_DET_DIR \
+        -f $RMG_SITE_METADATA_DIR/tx.csv \
+        -p $RMG_SERIAL_PORT \
+        -t $RMG_TUNE_TIME \
+        1> /dev/null \
+        2> $RMG_SITE_LOG_DIR/run_rmg_error$(date -d 'today' +'%Y.%m.%d_%H.%M').txt 
+#        1> $RMG_SITE_LOG_DIR/run_rmg$(date -d 'today' +'%Y.%m.%d_%H.%M').txt \
+  let RETRY_CT=RETRY_CT+1
+  echo "$(date -u +%s),err_retry($RETRY_CT)" | cat >> $STATUS_LOG
+  rmg_powerswitch $TYPE $IP $RX_OUTLET CYCLE $invert
+done
+
+rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
+echo "$(date -u +%s),err_fatal" | cat >> $STATUS_LOG

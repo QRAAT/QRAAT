@@ -18,49 +18,35 @@
 # Boston, MA 02110-1301, USA.
 
 ########################################################################
-# Include swig generation macros
+# Include python install macros
 ########################################################################
-find_package(SWIG)
-find_package(PythonLibs)
-if(NOT SWIG_FOUND OR NOT PYTHONLIBS_FOUND)
+include(GrPython)
+if(NOT PYTHONINTERP_FOUND)
     return()
 endif()
-include(GrSwig)
-include(GrPython)
 
 ########################################################################
-# Setup swig generation
+# Install python sources
 ########################################################################
-foreach(incdir ${GNURADIO_CORE_INCLUDE_DIRS})
-    list(APPEND GR_SWIG_INCLUDE_DIRS ${incdir}/swig)
-endforeach(incdir)
-
-foreach(incdir ${GRUEL_INCLUDE_DIRS})
-    list(APPEND GR_SWIG_INCLUDE_DIRS ${incdir}/gruel/swig)
-endforeach(incdir)
-
-set(GR_SWIG_LIBRARIES gnuradio-rmg gnuradio-rmg-pulse)
-set(GR_SWIG_DOC_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../include)
-GR_SWIG_MAKE(rmg_swig rmg_swig.i)
-GR_SWIG_MAKE(pulse_swig pulse_data.i)
-SWIG_LINK_LIBRARIES(rmg_swig gnuradio-rmg)
-SWIG_LINK_LIBRARIES(pulse_swig gnuradio-rmg-pulse)
-
-########################################################################
-# Install the build swig module
-########################################################################
-GR_SWIG_INSTALL(TARGETS rmg_swig DESTINATION ${GR_PYTHON_DIR}/qraat/rmg)
-GR_SWIG_INSTALL(TARGETS pulse_swig DESTINATION ${GR_PYTHON_DIR}/qraat)
-
-
-########################################################################
-# Install swig .i files for development
-########################################################################
-install(
+GR_PYTHON_INSTALL(
     FILES
-    rmg_swig.i
-    pulse_data.i
-    DESTINATION ${GR_INCLUDE_DIR}/qraat/swig
+    __init__.py
+    blocks.py
+    params.py
+    pic_interface.py
+    run.py
+    DESTINATION ${GR_PYTHON_DIR}/rmg
 )
 
+########################################################################
+# Handle the unit tests
+########################################################################
+include(GrTest)
 
+set(GR_TEST_TARGET_DEPS gnuradio-rmg)
+set(GR_TEST_PYTHON_DIRS ${CMAKE_BINARY_DIR}/swig)
+GR_ADD_TEST(qa_rmg ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_rmg.py)
+
+########################################################################
+# Add subdirectories
+########################################################################
