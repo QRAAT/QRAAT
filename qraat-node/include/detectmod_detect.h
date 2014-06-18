@@ -25,7 +25,7 @@
 #include <gr_block.h>
 #include <peak_detect.h>
 #include <accumulator.h>
-#include <pulse_data.h>
+#include "../../qraat-base/include/pulse_data.h" // FIXME!!
 #include <gr_sync_block.h>
 
 

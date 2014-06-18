@@ -18,45 +18,30 @@
 # Boston, MA 02110-1301, USA.
 
 ########################################################################
-# Include swig generation macros
+# Setup library
 ########################################################################
-find_package(SWIG)
-find_package(PythonLibs)
-if(NOT SWIG_FOUND OR NOT PYTHONLIBS_FOUND)
-    return()
-endif()
-include(GrSwig)
-include(GrPython)
+include(GrPlatform) #define LIB_SUFFIX
 
-########################################################################
-# Setup swig generation
-########################################################################
-foreach(incdir ${GNURADIO_CORE_INCLUDE_DIRS})
-    list(APPEND GR_SWIG_INCLUDE_DIRS ${incdir}/swig)
-endforeach(incdir)
-
-foreach(incdir ${GRUEL_INCLUDE_DIRS})
-    list(APPEND GR_SWIG_INCLUDE_DIRS ${incdir}/gruel/swig)
-endforeach(incdir)
-
-set(GR_SWIG_LIBRARIES gnuradio-rmg)
-set(GR_SWIG_DOC_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../include)
-GR_SWIG_MAKE(rmg_swig rmg_swig.i)
-SWIG_LINK_LIBRARIES(rmg_swig gnuradio-rmg)
-
-########################################################################
-# Install the build swig module
-########################################################################
-GR_SWIG_INSTALL(TARGETS rmg_swig DESTINATION ${GR_PYTHON_DIR}/rmg)
-
-
-########################################################################
-# Install swig .i files for development
-########################################################################
-install(
-    FILES
-    rmg_swig.i
-    DESTINATION ${GR_INCLUDE_DIR}/rmg/swig
+add_library(gnuradio-rmg-pulse SHARED
+  pulse_data.cc
 )
+
+target_link_libraries(gnuradio-rmg-pulse ${Boost_LIBRARIES} ${GRUEL_LIBRARIES} ${GNURADIO_CORE_LIBRARIES})
+set_target_properties(gnuradio-rmg-pulse PROPERTIES DEFINE_SYMBOL "gnuradio_rmg_pulse_EXPORTS")
+
+########################################################################
+# Install built library files
+########################################################################
+install(TARGETS gnuradio-rmg-pulse
+    LIBRARY DESTINATION lib${LIB_SUFFIX} # .so/.dylib file
+    ARCHIVE DESTINATION lib${LIB_SUFFIX} # .lib file
+    RUNTIME DESTINATION bin              # .dll file
+)
+
+########################################################################
+# Build and register unit test
+########################################################################
+find_package(Boost COMPONENTS unit_test_framework)
+
 
 

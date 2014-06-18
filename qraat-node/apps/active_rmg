@@ -28,7 +28,7 @@ import wx, wx.html
 from gnuradio import gr, blks2, uhd, gru
 from optparse import OptionParser
 from numpy import mean, std
-import qraat.rmg, csv
+import rmg, csv
 import os, sys, signal, time
 import collections
 
@@ -282,7 +282,7 @@ def producer( ):
   # the data structure gets locked up. (NOTE that del dir_finder
   # didn't work) 
 
-  dir_finder = qraat.rmg.rmg_run.detector_array(options.tx_file,
+  dir_finder = rmg.rmg_run.detector_array(options.tx_file,
                                                 options.directory,
                                                 options.bands,
                                                 options.port,

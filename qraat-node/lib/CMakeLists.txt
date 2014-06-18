@@ -28,19 +28,13 @@ add_library(gnuradio-rmg SHARED
   peak_detect.cc 
 )
 
-add_library(gnuradio-rmg-pulse SHARED
-  pulse_data.cc
-)
-
-target_link_libraries(gnuradio-rmg-pulse ${Boost_LIBRARIES} ${GRUEL_LIBRARIES} ${GNURADIO_CORE_LIBRARIES})
 target_link_libraries(gnuradio-rmg gnuradio-rmg-pulse ${Boost_LIBRARIES} ${GRUEL_LIBRARIES} ${GNURADIO_CORE_LIBRARIES})
 set_target_properties(gnuradio-rmg PROPERTIES DEFINE_SYMBOL "gnuradio_rmg_EXPORTS")
-set_target_properties(gnuradio-rmg-pulse PROPERTIES DEFINE_SYMBOL "gnuradio_rmg_pulse_EXPORTS")
 
 ########################################################################
 # Install built library files
 ########################################################################
-install(TARGETS gnuradio-rmg gnuradio-rmg-pulse
+install(TARGETS gnuradio-rmg 
     LIBRARY DESTINATION lib${LIB_SUFFIX} # .so/.dylib file
     ARCHIVE DESTINATION lib${LIB_SUFFIX} # .lib file
     RUNTIME DESTINATION bin              # .dll file

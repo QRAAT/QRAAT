@@ -23,7 +23,7 @@
 #editted by Todd Borrowman ECE-UIUC 01/18/08~02/2010
 
 from gnuradio import gr, gr_unittest, blks2
-import qraat.rmg, sys
+import rmg, sys
 
 tx_name = "test"
 test_data = "unit_test.tdat"
@@ -43,7 +43,7 @@ class qa_rmg (gr_unittest.TestCase):
         di = gr.deinterleave(gr.sizeof_gr_complex)
         
         self.fg.connect(src_file, di)
-        pd = qraat.rmg.detect(4,8000,160,480,0,"results", tx_name, 0,1.5,10)
+        pd = rmg.detect(4,8000,160,480,1.1,"results", tx_name, 1.1,1.5)
         pd.enable()
         self.fg.connect((di,0),(pd,0))
         self.fg.connect((di,1),(pd,1))
