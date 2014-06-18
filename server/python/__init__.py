@@ -21,11 +21,8 @@
   interface. *This doc string is in python/__init__.py*. 
 '''
 
-from error import *
-from csv import csv, pretty_printer 
 from gps import gps
-from det import det
 from est import est
-#import signal_filter FIXME This shouldn't run on nodes.
+import signal_filter 
 import position
 import track

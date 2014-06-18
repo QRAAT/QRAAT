@@ -1,5 +1,5 @@
 INSTALL(PROGRAMS  
-  rmg_env
+  rmg_dbcheck
   DESTINATION bin)
 
 add_subdirectory(proc)

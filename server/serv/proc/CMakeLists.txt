@@ -1,0 +1,5 @@
+INSTALL(PROGRAMS  
+  rmg
+  DESTINATION bin)
+
+

@@ -1,7 +1,6 @@
 INSTALL(PROGRAMS  
   rmg_det_to_db
   rmg_process
-  rmg
   rmg-node
   rmg_runretry
   rmg_csv
