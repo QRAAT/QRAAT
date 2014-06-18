@@ -1,3 +1,4 @@
 Non-GR base/CMakeLists.txt
-qraat.rmg
 
+Node: install qraat-base and rmg. 
+Server: install qraat-base and qraat-serv.

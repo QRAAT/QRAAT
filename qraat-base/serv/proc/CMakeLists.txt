@@ -1,8 +1,6 @@
 INSTALL(PROGRAMS  
   rmg_det_to_db
   rmg_process
-  rmg-node
-  rmg_runretry
   rmg_csv
   rmg_fetch
   rmg_powerswitch
