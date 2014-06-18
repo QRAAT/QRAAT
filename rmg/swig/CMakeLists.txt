@@ -50,7 +50,7 @@ SWIG_LINK_LIBRARIES(pulse_swig gnuradio-rmg-pulse)
 # Install the build swig module
 ########################################################################
 GR_SWIG_INSTALL(TARGETS rmg_swig DESTINATION ${GR_PYTHON_DIR}/rmg)
-GR_SWIG_INSTALL(TARGETS pulse_swig DESTINATION ${GR_PYTHON_DIR}/rmg)
+GR_SWIG_INSTALL(TARGETS pulse_swig DESTINATION ${GR_PYTHON_DIR}/qraat)
 
 
 ########################################################################
