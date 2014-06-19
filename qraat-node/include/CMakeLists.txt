@@ -21,7 +21,6 @@
 # Install public header files
 ########################################################################
 install(FILES
-    rmg_api.h
     accumulator.h
     detectmod_detect.h
     peak_detect.h

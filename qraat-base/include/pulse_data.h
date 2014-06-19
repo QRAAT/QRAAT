@@ -20,12 +20,12 @@
 #ifndef pulse_data_h
 #define pulse_data_h
 
-#include <rmg_api.h>
 #include <iostream> 
 #include <fstream> 
 #include <sys/time.h>
 #include <ctime>
 #include <complex>
+#include "rmg_api.h"
 
 using namespace std;
 
@@ -159,7 +159,7 @@ public:
   /*!
    * Write pulse data to file. Unwrap circular buffer if necessary. 
    */
-  int write(const char *fn="");
+  int write(const char *fn);
 
 
     /* accessors */ 

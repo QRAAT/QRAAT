@@ -21,11 +21,11 @@
 #ifndef INCLUDED_detectmod_detect_H
 #define INCLUDED_detectmod_detect_H
 
-#include <rmg_api.h>
+#include <rmg/rmg_api.h>
 #include <gr_block.h>
 #include <peak_detect.h>
 #include <accumulator.h>
-#include "../../qraat-base/include/pulse_data.h" // FIXME!!
+#include <rmg/pulse_data.h>
 #include <gr_sync_block.h>
 
 

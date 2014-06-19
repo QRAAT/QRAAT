@@ -39,10 +39,11 @@ foreach(incdir ${GRUEL_INCLUDE_DIRS})
     list(APPEND GR_SWIG_INCLUDE_DIRS ${incdir}/gruel/swig)
 endforeach(incdir)
 
-set(GR_SWIG_LIBRARIES gnuradio-rmg)
+set(GR_SWIG_LIBRARIES gnuradio-rmg rmg-pulse)
 set(GR_SWIG_DOC_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 GR_SWIG_MAKE(rmg_swig rmg_swig.i)
 SWIG_LINK_LIBRARIES(rmg_swig gnuradio-rmg)
+SWIG_LINK_LIBRARIES(rmg_swig rmg-pulse)
 
 ########################################################################
 # Install the build swig module

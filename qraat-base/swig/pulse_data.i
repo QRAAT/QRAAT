@@ -19,15 +19,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define RMG_API
-
 %module(docstring="""
   ``pulse_data`` is a class used by the pulse detector for data storage and 
   for writing pulse records out to disk. It's also the parent class :mod:`qraat.det`. 
-""") pulse_swig
-
-
-%include "gnuradio.i" // the common stuff
+""") pulse_data
 
 %{
 #include "pulse_data.h"
@@ -70,11 +65,11 @@ pulse_time      %s",
   } catch ( PulseDataError e ) {
     switch(e) {
       case FileReadError: 
-        SWIG_exception(SWIG_RuntimeError,"file doesn't exist or doesn't contain pulse data"); break;
+        PyErr_SetString(PyExc_RuntimeError, "file doesn't exist or doesn't contain pulse data"); break;
       case NoDataError:
-        SWIG_exception(SWIG_RuntimeError,"no data read yet"); break;
+        PyErr_SetString(PyExc_RuntimeError, "no data read yet"); break;
       case IndexError: 
-        SWIG_exception(SWIG_RuntimeError,"index out of range!"); break;
+        PyErr_SetString(PyExc_RuntimeError, "index out of range"); break;
       default: cout << "unknown";
     }
     return 0;
@@ -82,8 +77,8 @@ pulse_time      %s",
 }
 
 
-/* Map gr_complex to a Python tuple, (real, imag) */
-%typemap(out) gr_complex& {
+/* Map my_complex to a Python tuple, (real, imag) */
+%typemap(out) my_complex& {
   $result = PyTuple_New(2);
   PyObject *r = PyFloat_FromDouble((double) $1->real()); 
   PyObject *i = PyFloat_FromDouble((double) $1->imag()); 
@@ -96,7 +91,7 @@ class pulse_data {
 friend class detectmod_detect; 
 protected:
 
-  gr_complex *data;
+  my_complex *data;
 
 public:
   
@@ -115,7 +110,7 @@ public:
 
   /* file io */
   int read(const char *fn); 
-  int write(const char *fn="");
+  int write(const char *fn);
 
   /* accessors - throw PulseDataErr */
   const param_t& param(); 
@@ -123,7 +118,7 @@ public:
   float real(int i); 
   void set_imag(int i, float val);
   void set_real(int i, float val);
-  gr_complex &sample(int i); 
+  my_complex &sample(int i); 
 
 };
   

@@ -28,7 +28,7 @@ add_library(gnuradio-rmg SHARED
   peak_detect.cc 
 )
 
-target_link_libraries(gnuradio-rmg gnuradio-rmg-pulse ${Boost_LIBRARIES} ${GRUEL_LIBRARIES} ${GNURADIO_CORE_LIBRARIES})
+target_link_libraries(gnuradio-rmg rmg-pulse ${Boost_LIBRARIES} ${GRUEL_LIBRARIES} ${GNURADIO_CORE_LIBRARIES})
 set_target_properties(gnuradio-rmg PROPERTIES DEFINE_SYMBOL "gnuradio_rmg_EXPORTS")
 
 ########################################################################

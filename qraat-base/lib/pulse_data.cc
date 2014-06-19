@@ -27,7 +27,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 
-#include "pulse_data.h"
+#include "../include/pulse_data.h"
 
 using namespace std;
 

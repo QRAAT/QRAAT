@@ -36,7 +36,7 @@
 #include <errno.h>
 #include "boost/filesystem.hpp"
 
-#include "../../qraat-base/include/pulse_data.h" // FIXME!!
+#include <rmg/pulse_data.h>
 
 #ifndef O_BINARY
 #define	O_BINARY 0
