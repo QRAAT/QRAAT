@@ -29,14 +29,14 @@ Plot tracks. This program is
 part of QRAAT, an automated animal tracking system based on GNU Radio.   
 '''
 
-parser.add_option('--tx-id', type='int', metavar='INT', default=51,
-                  help="Serial ID of the target transmitter in the database "
-                       "context.")
+parser.add_option('--track-id', type='int', metavar='INT', default=0,
+                  help="Track ID. A track consists of a set of tracking params "
+                       "and the associated deployment ID. Default is 0.")
 
-parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800, 
+parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800.0, 
                   help="Start time in secondes after the epoch (UNIX time).")
 
-parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000,
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0, 
                   help="End time in secondes after the epoch (UNIX time).")
 
 (options, args) = parser.parse_args()
@@ -46,15 +46,13 @@ db_con = qraat.util.get_db('reader')
 
 overlay = True
 #M = qraat.track.maxspeed_exp((10, 1), (300, 0.1),0.05)
-M = qraat.track.maxspeed_const(3)
-C = 1
 
-# A possible way to calculate good tracks. Compute the tracks
-# with some a priori maximum speed that's on the high side. 
-pos_ids = qraat.filt.pos_nofilter(db_con, options.tx_id, options.t_start, options.t_end)
-track = qraat.track(db_con, pos_ids, options.tx_id, M, C)
+track = qraat.track.Track(db_con, 
+                          options.track_id, 
+                          options.t_start, 
+                          options.t_end)
 
-track.export_kml('tx%d' % options.tx_id, options.tx_id)
+track.export_kml('track%d' % options.track_id, options.track_id)
 
 print len(track)
 # We then calculate statistics on the transition speeds in the 
@@ -82,7 +80,7 @@ if overlay:
   N = lambda(y) : bg.shape[0] - (y - n0) / float(bg.shape[0]) * (n1 - n0)
 
 
-  sites = qraat.csv(db_con=db_con, db_table='sitelist')
+  sites = qraat.csv(db_con=db_con, db_table='sitelist').filter(rx=True)
 
   fig = pp.figure()
   ax = fig.add_subplot(1,1,1)
@@ -92,8 +90,8 @@ if overlay:
 
   # Plot tracks. 
   pp.scatter( 
-   map(lambda (P, t, pos_id): E(P.imag), track), 
-   map(lambda (P, t, pos_id): N(P.real), track), alpha=0.2, s=2, c='k', 
+   map(lambda (row): E(row[3]), track), 
+   map(lambda (row): N(row[4]), track), alpha=0.2, s=2, c='k', 
      label='Transmitter tracks')
 
   # Plot sites. 
@@ -102,14 +100,14 @@ if overlay:
    [N(float(s.northing)) for s in sites], 'ro', 
       label='QRAAT receiver sites')
 
-  t = time.localtime(track[0][1])
-  s = time.localtime(track[-1][1])
-  pp.title('%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  txID=%d' % (
+  t = time.localtime(track[0][2])
+  s = time.localtime(track[-1][2])
+  pp.title('%04d-%02d-%02d  %02d:%02d - %04d-%02d-%02d  %02d:%02d  trackID=%d' % (
        t.tm_year, t.tm_mon, t.tm_mday,
        t.tm_hour, t.tm_min,
        s.tm_year, s.tm_mon, s.tm_mday,
        s.tm_hour, s.tm_min,
-       options.tx_id), size='smaller')
+       options.track_id), size='smaller')
 
   pp.grid(b=True, which='both', color='gray', linestyle='-')
 
@@ -128,7 +126,7 @@ if overlay:
   #   t.tm_year, t.tm_mon, t.tm_mday,
   #   t.tm_hour, t.tm_min, t.tm_sec))
 
-  pp.savefig('tx%d.png' % options.tx_id)
+  pp.savefig('track%d.png' % options.track_id)
 
 else: 
   

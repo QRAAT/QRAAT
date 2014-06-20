@@ -1,3 +1,6 @@
 INSTALL(PROGRAMS  
-  rmg_filter
+  rmg_track
+  rmg_track_auto
   DESTINATION bin)
+
+

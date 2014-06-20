@@ -16,7 +16,7 @@ db_con = qraat.util.get_db('writer')
 cursor = db_con.cursor()
 
 #get id of last processed record
-cursor.execute("select last_processed from position_processing;")
+cursor.execute("SELECT value FROM qraat.cursor WHERE name='position'")
 last_processed = cursor.fetchone()[0]
 print "Last EST record processed: {}".format(last_processed)
 
@@ -28,6 +28,7 @@ print tx_list
 if len(tx_list) > 0:
   cal_id = int(os.environ['RMG_POS_CAL_ID'])
   sv = qraat.position.steering_vectors(db_con, cal_id)
+  center = qraat.position.get_center(db_con)
 
 time_window = float(os.environ['RMG_POS_TIME_WINDOW'])
 time_delta = float(os.environ['RMG_POS_TIME_STEP'])
@@ -59,10 +60,10 @@ for tx in tx_list:
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
     
-    est_ids = qraat.filt.est_band(db_con, 
-                                  tx_id, 
-                                  time_range[0]-time_window, 
-                                  time_range[1]+time_window)
+    est_ids = qraat.position.get_est_ids_bandfilter(db_con, 
+                                                    tx_id, 
+                                                    time_range[0]-time_window, 
+                                                    time_range[1]+time_window)
     
     sig = qraat.position.signal(db_con, est_ids)
     
@@ -70,9 +71,15 @@ for tx in tx_list:
       print "Skipping empty chunk"
       continue 
     
-    bl = qraat.position.bearing(sv, sig)
-    pos_est = qraat.position.calc_positions(sig, bl, time_window, time_delta)
-    qraat.position.insert_positions(db_con, pos_est, tx_id)
+    bl = qraat.position.position_estimator(sv, sig)
+    (bearing, position)  = qraat.position.calc_positions(sig, 
+                                                         bl, 
+                                                         center, 
+                                                         time_window, 
+                                                         time_delta,
+                                                         tx_id)
+    bearing.insert_db(db_con)
+    position.insert_db(db_con)
 
   temp_max_id = np.max(times[:,0])
   if temp_max_id > max_id:
@@ -80,4 +87,4 @@ for tx in tx_list:
 
 #store id of last processed record
 if not max_id == last_processed:
-  cursor.execute("update position_processing set last_processed=%s;", (max_id,))
+  cursor.execute("UPDATE qraat.cursor SET value=%s WHERE name='position'", (max_id,))

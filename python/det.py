@@ -55,6 +55,8 @@ class det (pulse_data):
       for k in range(self.params.channel_ct):
         (r, i) = self.sample((j * self.params.channel_ct) + k)
         self.data[j,k] = np.complex(r,i)
+    if np.any(np.isnan(self.data)):
+      raise IOError("NaN in det data")#bad data samples
     self.pulse = self.data[self.params.pulse_index:self.params.pulse_index+self.params.pulse_sample_ct,:]
     self.time = self.params.t_sec + (self.params.t_usec * 1e-6)
     m = tag_regex.search(fn)
