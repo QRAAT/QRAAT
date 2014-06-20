@@ -10,7 +10,4 @@ WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})")
 ########################################################################
 add_subdirectory(include)
 add_subdirectory(lib)
-#add_subdirectory(swig)
-#add_subdirectory(grc)
-#add_subdirectory(apps)
-add_subdirectory(serv)
+add_subdirectory(scripts)

@@ -7,4 +7,4 @@ install(CODE "execute_process(COMMAND python setup.py install
 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})")
 
 # Descend into serv/ 
-add_subdirectory(serv)
+add_subdirectory(scripts)
