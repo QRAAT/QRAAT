@@ -207,31 +207,6 @@ class Registry:
 			if point['ID'] in bad_ids:
 				bad_points.append(point)
 
-		#bad_point_data = [x for x in
-		#good_point_data = [x for x in points if x[0] not in bad_ids]
-		#good_points, bad_points = [], []
-		#for point in points:
-			#if point[0] in good_ids:
-				#good_points.append((point[1], point[2]))
-			#else:
-				## If it's not good it's bad.
-				#bad_points.append((point[1], point[2]))
-		##good_points = [(x[1], x[2]) for x in points if x[0] in good_ids]
-		##bad_points = [(x[1], x[2]) for x in points if x[0] in bad_ids]
-		#if len(good_points) == 0:
-			#return None
-		## NOTE: Still fail if no good points. I want to be aware of that.
-		#good_xs, good_ys = zip(*good_points)
-
-		#bad_xs, bad_ys = [], []
-		#try:
-			#bad_xs, bad_ys = zip(*bad_points)
-		#except ValueError:
-			#pass
-
-		#print 'screen_bad() end'
-		#return ((good_xs, good_ys), (bad_xs, bad_ys), good_ids, bad_ids)
-		#return good_point_data, bad_point_data
 		return good_points, bad_points
 
 		#if 'with_id' in kw.keys() and kw['with_id']:
@@ -239,7 +214,6 @@ class Registry:
 		#else:
 			#return z
 
-	# NOTE: Should this be a method?
 	def get_matlab_style_points_for_ids(self, ids, x_field, y_field, verbose=False):
 		xs, ys = [], []
 		if verbose: print 'Iterating through {} points'.format(len(self.points))
@@ -252,16 +226,6 @@ class Registry:
 
 
 
-	def get_bad_simple(self):
-		# Work on all in self.points
-		counts = self.get_matching_points(self.points)
-		for point in points:
-			if point['ID'] not in counts.keys():
-				good_points.append(point)
-		# print '|counts| = {}'.format(len(counts))
-		# for (k, v) in counts.items()[:10]:
-		# 	print 'count {} -> {}'.format(k, v)
-		return counts, good_points
 
 	def get_bad_points(self, ids, **kw):
 		global current_count
@@ -714,6 +678,9 @@ def sort_by(counts, range_starts):
 OVERTONE_LIMIT = 8
 OVERTONE_ERROR = 0.1
 
+# Tally the frequency of items but consider integral multiples of the value to
+# count as support toward it.
+
 def overtone_vote(candidates):
 	votes = collections.defaultdict(int)
 	candidates = list(sorted(candidates))
@@ -894,6 +861,8 @@ def score(ids):
 	for k in interval_chunked:
 		all_chunk_ids = interval_chunked[k]
 
+		# For each chunk's key, throw in the data for that and surrounding
+		# chunks. Used to make sure the 'edge' of the window is caught.
 		all_chunk_neighborhood = []
 		for neighbor_key in key_neighborhood[k]:
 			all_chunk_neighborhood.extend(parametrically_good_chunked[neighbor_key])
@@ -936,6 +905,8 @@ def score(ids):
 					store_interval_assume(change_handler, interval, base, duration, txid, siteid)
 					print 'Stored new interval for: {}+{}: {}'.format(base, duration, interval)
 
+				# Time filter parametrically good data in the context of
+				# parametrically good data from this and surrounding chunks.
 				scores = time_filter(db_con, for_scoring, in_context_of=all_chunk_neighborhood)
 
 				insert_scores(change_handler, scores, update_set=updatables)
@@ -968,15 +939,24 @@ def score(ids):
 				base, duration, siteid, txid = k
 				store_interval_update(change_handler, new_interval, base, duration, txid, siteid)
 
+				# Re-score all parametrically good data
+
 				scores = time_filter(db_con, for_scoring, in_context_of=all_chunk_neighborhood)
 
 
 				insert_scores(change_handler, scores, update_as_needed=True)
 			else:
 				print 'Not different enough!'
+				# TODO
 
 				scores = time_filter(db_con, for_scoring, in_context_of=all_chunk_neighborhood)
 
+				# This does the extra work of updating the values that are
+				# already in the database and will definitely not change. This
+				# could be made more efficient by removing those values from
+				# score. That would also remove the need for using the
+				# update_set keyword arg of insert_scores (since nothing would
+				# be updated, only insertions).
 				insert_scores(change_handler, scores, update_set=updatable_ids)
 
 	# Get all of these IDs that might have been scored already and store for
@@ -1039,6 +1019,8 @@ def compute_interval_neighborhood(interval_keys, amount_to_ensure=10):
 
 	return neighborhood
 
+# Returns a structure with the same keys as chunked, but with each sequence
+# value of chunked replaced with this value restricted to values in ids
 
 def match_up_to_chunks(chunked, ids):
 	id_set = set(ids)
@@ -1049,12 +1031,13 @@ def match_up_to_chunks(chunked, ids):
 
 	return d
 
+# Returns true if timestamp is within +- r of the goal value.
 def within(timestamp, r, goal):
 	return timestamp >= (goal - r) and timestamp <= (goal + r)
 
 
-# Pre-condition: intervals must exist in the database covering all the items in ids
-
+# Perform time filtering on IDs, possibly in the context of a larger set of IDs
+# specified in in_context_of.
 def time_filter(db_con, ids, in_context_of=None):
 	print '--------TIME FILTER--------'
 	# raw_input('%')
@@ -1121,8 +1104,7 @@ def time_filter(db_con, ids, in_context_of=None):
 
 	for id in ids:
 
-		# Is it near 710?
-		debug = data[id]['timestamp'] >= 709 and data[id]['timestamp'] <= 711
+		debug = False
 
 		score = None
 		
@@ -1141,6 +1123,7 @@ def time_filter(db_con, ids, in_context_of=None):
 			search_space = [(x - CONFIG_ERROR_ALLOWANCE, x + CONFIG_ERROR_ALLOWANCE) for x in absolute]
 			# Maybe drop into interpreter, might help
 				
+			# Perform binary search through sorted data.
 
 			for start, end in search_space:
 				start_ind = bisect.bisect_left(all_timestamps, start)
@@ -1157,7 +1140,10 @@ def time_filter(db_con, ids, in_context_of=None):
 	return scores
 
 
-
+# Bucket IDs into groups depending on their siteid and txid (which should
+# currently be the same for all values in a run) and start_time and duration
+# such that the timestamp falls in the range [start_time, start_time +
+# duration).
 
 def time_chunk_ids(db_con, all_data, duration):
 
@@ -1210,6 +1196,8 @@ def get_parametric_passed_ids_in_chunk(db_con, k):
 
 	return ids
 
+# Stores an interval value; assumes that a value for this (siteid, txid, base,
+# duration) does not exist.
 def store_interval_assume(change_handler, interval, base, duration, txid, siteid):
 	print 'assume args: txid={}, siteid={}'.format(txid, siteid)
 	db_con = change_handler.obj
@@ -1222,6 +1210,8 @@ def store_interval_assume(change_handler, interval, base, duration, txid, siteid
 	q = 'insert into interval_cache (period, start, valid_duration, txid, siteid) values (%s, %s, %s, %s, %s);'
 	change_handler.add_sql(q, (interval, base, duration, txid, siteid))
 
+# Stores an interval value; assumes that a value for this (siteid, txid, base,
+# duration) does exist.
 def store_interval_update(change_handler, interval, base, duration, txid, siteid):
 	if txid == 2:
 		assert False
@@ -1230,7 +1220,8 @@ def store_interval_update(change_handler, interval, base, duration, txid, siteid
 	q = 'update interval_cache set period = %s where start = %s and valid_duration = %s and txid = %s and siteid = %s;'
 	change_handler.add_sql(q, (interval, base, duration, txid, siteid))
 
-
+# Calculate an interval from the IDs in the list ids (which will be all
+# parametrically passing points in a time range, most likely).
 def calculate_interval(db_con, ids):
 
 	print 'calculate_interval for {} values: {}'.format(len(ids), ids)
@@ -1268,6 +1259,7 @@ def init_change_handler():
 		change_handler = qraat.signal_filter.ChangeHandler(None, 'db')
 	return change_handler
 
+# Read and format into a dictionary structure a range of est records from the database.
 def read_est_records_time_range(db_con, start, end):
 	assert start <= end
 	cur = db_con.cursor()
@@ -1293,6 +1285,11 @@ def read_est_records_time_range(db_con, start, end):
 		site_data[named_row['ID']] = named_row
 	return site_data
 
+# Read est records into a dictionary data structure. If expanded is true, then
+# ids defines a time range, everything within which is retrieved. Otherwise,
+# data exactly for records in ids are returned. Context only functions if
+# expanded is True, and expands the time range (both into the past and the
+# future) by context seconds.
 def read_est_records(db_con, ids, expanded=False, context=0):
 
 	if len(ids) == 0:
@@ -1338,7 +1335,10 @@ def read_est_records(db_con, ids, expanded=False, context=0):
 
 	return site_data
 
-
+# Returns a 3-tuple of out-of-order IDs (those associated with a time range
+# with a computed interval value), in-order IDs (those associated with a time
+# range with no computed interval value), and a map from IDs in out-of-order
+# IDs to the computed interval value.
 def partition_by_interval_calculation(db_con, ids, siteid, txid):
 	print 'partition_by_interval_calculation()'
 
@@ -1444,6 +1444,9 @@ def get_interval_map(eligible_ids, interval_chunked, id_to_interval):
 
 	return intervals
 
+# Gets a dictionary from IDs in ids to interval values, either retrieved
+# already computed from the database, or if they do not exist, computed and
+# then stored in the database.
 def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 	# TODO: can pipe in all the data needed as an argument once rather than
 	# getting it on demand in the function itself.
@@ -1507,7 +1510,12 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 
 	return intervals
 
-
+# Insert scores (a dictionary from ID to absolute score) into the database. If
+# update_as_needed is True, the database will be queried for all scores, and
+# those for which a record currently exists will be updated, while all others
+# will be inserted. If update_as_needed is False, then IDs that are in
+# update_set will be updated and all others will be inserted. The default
+# values specify that all scores will be inserted.
 def insert_scores(change_handler, scores, update_as_needed=False, update_set=set()):
 
 	scores = dict(scores)
@@ -1570,6 +1578,8 @@ class NotAllSameValueError(Exception):
 	def __init__(self):
 		pass
 
+# Get the single value which all IDs in ids map to in id_to_interval. If no
+# such single value exists, throw an exception.
 def _get_interval_map_entry(ids, id_to_interval):
 	for id in ids:
 		assert id in id_to_interval
@@ -1578,12 +1588,15 @@ def _get_interval_map_entry(ids, id_to_interval):
 		raise NotAllSameValueError()
 	return vals[0]
 
+# Calculate relative score from absolute score.
 def _rel_score(score):
 	rel_score_to_scale = score if score > 0 else 0
 	# change_handler.add_score(id, score, float(rel_score_to_scale) / (CONFIG_DELTA_AWAY * 2))
 	rel_score = float(rel_score_to_scale) / (CONFIG_DELTA_AWAY * 2)
 	return rel_score
 
+# Get cursor value from database. Returns a default value if no such cursor
+# value exists.
 def get_cursor_value(handler, name):
 	q = 'select value from `cursor` where name = %s'
 	db_con = handler.obj
@@ -1599,6 +1612,8 @@ def get_cursor_value(handler, name):
 	else:
 		raise Exception('Ambiguous cursor value (found {}) for "{}"'.format(rows, name))
 
+# Inserts (with a fallback to update) the cursor with the specified name and
+# value.
 def update_cursor_value(handler, name, value):
 	q = 'insert into `cursor` (name, value) VALUES (%s, %s) ON DUPLICATE KEY UPDATE value = %s'
 	db_con = handler.obj
@@ -1613,12 +1628,3 @@ def explicit_check(change_handler, interval, base, duration, txid, siteid):
 	cur = db_con.cursor()
 	rows = cur.execute(q, (interval, base, duration, txid, siteid))
 	return rows
-	
-	pass
-
-#
-# # Returns all items from all_ids that have a timestamp within threshold of the
-# # timestamp of some item in score_ids
-# def find_near(all_ids, score_ids, threshold):
-# 	q = 'SELECT ID from est where 
-# 	q = 'SELECT timestamp FROM est WHERE ID IN (...score_ids...)'
