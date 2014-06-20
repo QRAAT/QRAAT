@@ -17,7 +17,6 @@ from collections import defaultdict
 import collections
 import decimal
 import itertools
-import matplotlib.pyplot
 from numpy import histogram
 import numpy
 import qraat
@@ -83,8 +82,6 @@ class Registry:
 			new_tuples.append(tuple(new_tuple))
 		return new_tuples
 
-	def optionally_highlight_all_points(self, ids):
-		self.optionally_highlight_some_points(self.points)
 
 	def read_txlist_thresholds(self):
 
@@ -176,138 +173,7 @@ class Registry:
 		return counts
 
 
-	def optionally_highlight_some_points(self, item_to_plot, points, **kw):
-		print 'optionally_highlight_some_points() -> get_matching_points()'
-		counts = self.get_matching_points(points, **kw)
 
-		for (i, j) in counts.items():
-			if j == 0:
-				print 'key', i, 'is 0'
-
-		ids_by_count = defaultdict(list)
-
-
-
-
-		colors = ('g', 'r', 'c', 'm', 'k', 'y', 'burlywood', 'chartreuse', \
-				'cornflowerblue', 'darkolivegreen', 'indianred', 'greenyellow', \
-				'goldenrod', 'indigo', 'limegreen', 'mediumorchid')
-		current_unassigned = 0
-		links = {}
-		current_color = 0
-		combos = ('frequency', 'band3', 'band10', 'edsp')
-		for i in range(len(combos) + 1):
-			for combo in itertools.combinations(combos, i):
-				links[combo] = colors[current_color]
-				current_color += 1
-		color_to_go = defaultdict(list)
-		print 'Finished generating structure:', links
-		print 'There are {} problematic points'.format(len(counts))
-		for (k, v) in counts.items():
-			#h = hash(tuple(v))
-			h = tuple(v)
-			color = links[h]
-			color_to_go[color].append(k)
-			#if h in links.keys():
-				#color = links[h]
-				#color_to_go[color].append(k)
-			#else:
-				#new_color = colors[current_unassigned]
-				#links[h] = new_color
-				#print 'Assigned color {} to {}'.format(new_color, v)
-				#current_unassigned += 1
-
-
-		for (color, ids) in color_to_go.items():
-			plot_against = self.arguments['plotAgainst'] if 'plotAgainst' in self.arguments else 'timestamp'
-			my_points = [x for x in points if x['ID'] in ids]
-			xs, ys = zip(*[(x[plot_against], x[item_to_plot]) for x in my_points])
-			#matplotlib.pyplot.gca().set_yscale('log')
-			if kw['log']:
-				ys = numpy.log(ys)
-			matplotlib.pyplot.scatter(xs, ys, c=color)
-			print 'Scattering {} points in color {}'.format(len(xs), color)
-
-		print 'Returning...'
-		return
-
-		for (k, v) in points_by_count.items():
-			if len(v) == 0:
-				print 'Huh?:', k
-			plot_against = self.arguments['plotAgainst'] if 'plotAgainst' in self.arguments else 'timestamp'
-			xs, ys = zip(*[(x[plot_against], x[item_to_plot]) for x in v])
-			# generate color
-
-			color_string = str(1. - (float(k) / max_val))
-
-			#matplotlib.pyplot.scatter(xs, ys, c=color_string)
-			matplotlib.pyplot.scatter(xs, ys, c='r')
-
-
-
-
-
-		print 'length:', len(counts)
-		for (k, v) in counts.items():
-			ids_by_count[v].append(k)
-
-		points_by_count = {}
-		print '&'
-		for (k, v) in ids_by_count.items():
-			print '!!'
-			points_by_count[k] = [x for x in points if x['ID'] in v]
-		print '&'
-
-		print len(points_by_count)
-		counts = points_by_count.keys()
-
-
-		if len(counts) == 0:
-			print 'Skip this one'
-			return
-
-		total_weird_points = 0
-		for v in points_by_count.values():
-			total_weird_points += len(v)
-
-		print 'Weird points found:', total_weird_points
-
-
-		offset = min(counts)
-		r = max(counts) - offset
-		max_val = max(counts)
-
-		colors = ('g', 'r', 'c', 'm')
-
-		for (k, v) in points_by_count.items():
-			if len(v) == 0:
-				print 'Huh?:', k
-			plot_against = self.arguments['plotAgainst'] if 'plotAgainst' in self.arguments else 'timestamp'
-			xs, ys = zip(*[(x[plot_against], x[item_to_plot]) for x in v])
-			# generate color
-
-			color_string = str(1. - (float(k) / max_val))
-
-			#matplotlib.pyplot.scatter(xs, ys, c=color_string)
-			matplotlib.pyplot.scatter(xs, ys, c='r')
-
-	def bw_highlight_some_points(self, item_to_plot, points):
-		print 'bw_highlight_some_points -> get_matching_points()'
-		counts = self.get_matching_points(points)
-		trunc = counts.keys()[:10]
-		print 'trunc:', [(x, y) for (x, y) in counts.items() if x in trunc]
-		for v in counts.values():
-			for e in v:
-				xs, ys = zip(*[(x['timestamp'], x[item_to_plot]) for x in v])
-
-				# generate color
-				matplotlib.pyplot.scatter(xs, ys, c='r')
-		print 'done with bw highlight'
-
-	#def get_good_points(self, item_to_plot, points, **kw):
-		#bad_points = self.get_bad_points(item_to_plot, [x[0] for x in points], **kw)
-		#good_points = [x for x in points if x[0] not in bad_points]
-		#return good_points
 
 	# now I just return a good and a bad list of 3-tuples, so points stay
 	# linked to IDs. For more info, see freq.py.
@@ -385,10 +251,6 @@ class Registry:
 		return xs, ys
 
 
-
-	def optionally_highlight_points(self, item_to_plot, ids, **kw):
-		points = [x for x in self.points if x['ID'] in ids]
-		self.optionally_highlight_some_points(item_to_plot, points, **kw)
 
 	def get_bad_simple(self):
 		# Work on all in self.points
