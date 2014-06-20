@@ -19,7 +19,6 @@ import decimal
 import itertools
 from numpy import histogram
 import numpy
-import qraat
 import random
 import sys
 import bisect
@@ -87,7 +86,7 @@ class Registry:
 
 		if self.txlist is None:
 			d = {}
-			db_con = qraat.util.get_db('reader')
+			db_con = util.get_db('reader')
 			cur = db_con.cursor()
 			q = 'select ID, thresh_band3, thresh_band10 from txlist;'
 			rows = cur.execute(q)
@@ -729,7 +728,7 @@ def already_scored_filter(db_con, ids):
 def score(ids):
 	print 'Initial call to score {} ID(s)'.format(len(ids))
 	change_handler = init_change_handler()
-	db_con = qraat.util.get_db('writer')
+	db_con = util.get_db('writer')
 
 	parametrically_poor = set()
 
@@ -1233,7 +1232,7 @@ def calculate_interval(db_con, ids):
 	# 	print '{}. {}'.format(i + 1, timestamp)
 	# print '---'
 
-	interval_windows = qraat.signal_filter.WindowIterator(sorted_pairs, None)
+	interval_windows = WindowIterator(sorted_pairs, None)
 
 	intervals = []
 
@@ -1252,11 +1251,11 @@ def init_change_handler():
 	if CONFIG_JUST_STAGE_CHANGES:
 		sql_output_filename = 'update.sql'
 		sql_w = open(sql_output_filename, 'w')
-		change_handler = qraat.signal_filter.ChangeHandler(sql_w, 'file')
+		change_handler = ChangeHandler(sql_w, 'file')
 	else:
 		# NOTE: I don't declare the db connection here, because passing it
 		# between modules seems to mess things up.
-		change_handler = qraat.signal_filter.ChangeHandler(None, 'db')
+		change_handler = ChangeHandler(None, 'db')
 	return change_handler
 
 # Read and format into a dictionary structure a range of est records from the database.
@@ -1379,7 +1378,7 @@ def partition_by_interval_calculation(db_con, ids, siteid, txid):
 # Returns a list of IDs which pass the filter
 def parametrically_filter(db_con, data):
 
-	registry = qraat.signal_filter.Registry(None)
+	registry = Registry(None)
 	for point in data.values():
 		registry.register_point(point)
 
@@ -1567,10 +1566,10 @@ def insert_scores(change_handler, scores, update_as_needed=False, update_set=set
 		inserts.append((id, score, rel_score))
 
 	cur = db_con.cursor()
-	cur.executemany(qraat.signal_filter.UPDATE_TEMPLATE, updates)
+	cur.executemany(UPDATE_TEMPLATE, updates)
 
 	cur = db_con.cursor()
-	cur.executemany(qraat.signal_filter.INSERT_TEMPLATE, inserts)
+	cur.executemany(INSERT_TEMPLATE, inserts)
 
 		# change_handler.db_execute_many(qraat.signal_filter.INSERT_TEMPLATE, args)
 
