@@ -22,7 +22,9 @@
 #ifndef INCLUDED_RMG_API_H
 #define INCLUDED_RMG_API_H
 
-#include <gruel/attributes.h>
+/* Defined in gruel/attributes.h in the Gnu Radio source. */ 
+#  define __GR_ATTR_EXPORT   __attribute__((visibility("default")))
+#  define __GR_ATTR_IMPORT   __attribute__((visibility("default")))
 
 #ifdef gnuradio_rmg_EXPORTS
 #  define RMG_API __GR_ATTR_EXPORT

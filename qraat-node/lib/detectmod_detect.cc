@@ -23,6 +23,7 @@
 #include "config.h"
 #endif
 
+#include <qraat/pulse_data.h>
 #include <detectmod_detect.h>
 #include <gr_io_signature.h>
 #include <cstdio>
@@ -36,7 +37,6 @@
 #include <errno.h>
 #include "boost/filesystem.hpp"
 
-#include <rmg/pulse_data.h>
 
 #ifndef O_BINARY
 #define	O_BINARY 0
