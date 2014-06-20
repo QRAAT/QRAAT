@@ -39,7 +39,7 @@ except KeyError:
   sys.exit(1)
 
 try: # Get database credentials. 
-  db_config = qraat.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='writer')
+  db_config = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='writer')
 except IOError, e: 
   print >>sys.stderr, "det_to_db: error: missing DB credential file '%s'." % e.filename
   sys.exit(1)
@@ -111,7 +111,7 @@ for site in dir_sitelist:
           date_tuple = leaf_regex.search(leaf_dir).groups(0)
 
           # Process det files, store signals in the database. 
-          det_list, bad_list = qraat.det.read_dir(leaf_dir)
+          det_list, bad_list = qraat.det.det.read_dir(leaf_dir)
                     
           if bad_list: #there are non-readable det files
             
@@ -127,7 +127,7 @@ for site in dir_sitelist:
             for f in bad_list:
               commands.getstatusoutput("mv {0} {1}".format(f,q_dir))
           
-          table = qraat.est(dets=det_list)
+          table = qraat.est.est(dets=det_list)
   
           cur = db_con.cursor()
           for row in table: 

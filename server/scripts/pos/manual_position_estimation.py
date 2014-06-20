@@ -14,7 +14,7 @@ stop_time = time.mktime(time.strptime(stop_time_str,'%Y%m%d%H%M%S'))
 #stop_time =  1376442000.0
 # Get database credentials. 
 try: 
-  db_config = qraat.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='reader')
+  db_config = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='reader')
 
 except KeyError: 
   print >>sys.stderr, "position: error: undefined environment variables. Try `source rmg_env.`" 
@@ -32,7 +32,7 @@ db_con = mdb.connect(db_config.host,
 cur = db_con.cursor()
 
 #get site locations
-sites = qraat.csv(db_con=db_con, db_table='sitelist')
+sites = qraat.csv.csv(db_con=db_con, db_table='sitelist')
 print sites
 
 #get steering vector data

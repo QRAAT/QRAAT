@@ -81,7 +81,7 @@ class det (pulse_data):
 
       :param base_dir: Root directory for det files. 
       :type base_dir: str
-      :rtype: :class:`qraat.det.det` list
+      :rtype: :class:`qraat.det.det.det` list
 
     """
     files = os.listdir(base_dir)

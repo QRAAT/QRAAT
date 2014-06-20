@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from error import QraatError
+import error
 import sys, time, numpy as np
 import copy
 
@@ -99,7 +99,7 @@ class csv:
         continue
 
       elif len(line) != len(headers): # Malformed line
-        raise QraatError("malformed row in CSV file (%d)" % line_no)
+        raise error.QraatError("malformed row in CSV file (%d)" % line_no)
 
       self.table.append(self.Row())
       for i in range(len(headers)): 
@@ -156,7 +156,7 @@ class csv:
     for line in table_in:
 
       if len(line) != len(self.headers): # Malformed line
-        raise QraatError("line: {0}: has a different number of fields than header: {1}".format(line,self.headers))
+        raise error.QraatError("line: {0}: has a different number of fields than header: {1}".format(line,self.headers))
 
       self.table.append(self.Row())
       for i in range(len(self.headers)): 
@@ -197,7 +197,7 @@ class csv:
     
       Input is a list of *(column, value)* pairs.
 
-    :returns: qraat.csv.Row.
+    :returns: qraat.csv.csv.Row.
     """
     for row in self.table:
       match = True
@@ -211,11 +211,11 @@ class csv:
   def filter(self, **cols):
     """ Filter a table. 
        
-      Accept (col, val) pairs and returns a qraat.csv type.
+      Accept (col, val) pairs and returns a qraat.csv.csv type.
       This is equivelant to "SELECT table WHERE col1 = val1 AND ...
       colN = valN;" in SQL terms. 
 
-    :returns: qraat.csv
+    :returns: qraat.csv.csv
     """
     filtered = copy.deepcopy(self)
     filtered.table = []

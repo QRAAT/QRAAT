@@ -22,7 +22,7 @@ except ImportError: pass
 
 import os, sys
 from csv import csv
-from error import QraatError
+import error
 
 def remove_field(l, i):
   ''' Provenance function. *TODO* '''  
@@ -56,9 +56,9 @@ def get_db(view):
     return db_con
 
   except KeyError:
-    raise QraatError("undefined environment variables. Try `source rmg_env`")
+    raise error.QraatError("undefined environment variables. Try `source rmg_env`")
 
   except IOError, e:
-    raise QraatError("missing DB credential file '%s'" % e.filename)
+    raise error.QraatError("missing DB credential file '%s'" % e.filename)
 
   

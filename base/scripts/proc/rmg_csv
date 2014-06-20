@@ -95,7 +95,7 @@ else:
 
     ## Read header ##
 
-table = qraat.csv(sys.stdin) 
+table = qraat.csv.csv(sys.stdin) 
 
 try:
 

@@ -1,5 +1,5 @@
 #!/usr/bin/python2
-import qraat.csv
+import qraat
 import MySQLdb as mdb
 import argparse
 
@@ -15,7 +15,7 @@ args = parser.parse_args()
 
 default_type = 'pulse'
 
-db_config = qraat.csv(args.db_auth_file).get(view='reader')
+db_config = qraat.csv.csv(args.db_auth_file).get(view='reader')
 db_con = mdb.connect(db_config.host, db_config.user,
                      db_config.password, db_config.name)
 
@@ -42,6 +42,6 @@ csv_table = []
 for j in tx_data:
   csv_table.append((j[0], float(j[1]), default_type, j[2], args.rise_trigger, args.time_constant))
 
-txlist = qraat.csv()
+txlist = qraat.csv.csv()
 txlist.initialize_from_data(csv_headers, csv_table)
 txlist.write(args.tx_file)

@@ -74,16 +74,16 @@ class est (csv):
   """ 
   
     Encapsulation of pulses in signal space. Store the signal features 
-    calculated by :class:`qraat.det.det` in a table mirroring the database 
+    calculated by :class:`qraat.det.det.det` in a table mirroring the database 
     schema. This class serves as an interface between pulse records (.det 
     files), the MySQL database, and can read/write its contents from/to file. 
     Some example usage:  
 
       * | Read a directory of pulse records from disk and dump into database. 
-        | ``e = qraat.est(dets=qraat.det.read_dir('det_files/site1/1998/12/04/21/34'))``
+        | ``e = qraat.est.est(dets=qraat.det.det.read_dir('det_files/site1/1998/12/04/21/34'))``
         | ``e.write_db(db_con, site='site1')``
       * | Read the last hour of ests in database and output to file. 
-        | ``f = qraat.est()``
+        | ``f = qraat.est.est()``
         | ``f.read_db(db_con, time() - 3600, time())``
         | ``f.write('est_files')``
 
@@ -100,9 +100,9 @@ class est (csv):
       pulse was recorded. See :func:`est.write_db`. 
 
     :param det: A pulse record.
-    :type det: qraat.det.det
+    :type det: qraat.det.det.det
     :param dets: A set of pulse records.
-    :type dets: qraat.det.det 
+    :type dets: qraat.det.det.det 
     :param fn: Filename to read est table from. 
     :type fn: str
     
@@ -190,7 +190,7 @@ class est (csv):
     """ Append pulse signal to table.
 
     :param det: Pulse record. 
-    :type det: qraat.det.det
+    :type det: qraat.det.det.det
     """
     
     det.eig()

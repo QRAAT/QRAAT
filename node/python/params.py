@@ -297,7 +297,7 @@ class backend:
       #: each of these bands. 
       self.num_bands = num_bands
       
-      self.transmitters = qraat.csv(path) #: Transmitter data.
+      self.transmitters = qraat.csv.csv(path) #: Transmitter data.
       print 'Transmitters from {0}'.format(path)
     
       if 'use' in self.transmitters.headers:

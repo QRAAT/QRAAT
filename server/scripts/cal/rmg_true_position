@@ -49,7 +49,7 @@ if options.cal_id == None:
 
 # Get database credentials.
 try: 
-  db_config = qraat.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='writer')
+  db_config = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='writer')
 
 except KeyError: 
   print >>sys.stderr, "true_position: error: undefined environment variables. Try `source rmg_env.`" 
@@ -87,7 +87,7 @@ try:
   # Get start and end times. 
   (t_start, t_end) = min(gps_data[:,0]), max(gps_data[:,0])
 
-  for site in qraat.csv(db_con=db_con, db_table='sitelist'):
+  for site in qraat.csv.csv(db_con=db_con, db_table='sitelist'):
 
     # TODO(?) import good pulse data from site - bw10<1000 - time, fdsp, fd*[r,i]
     # NOTE This query is hefty. Selecting all the pulses over the time range of 

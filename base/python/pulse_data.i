@@ -21,7 +21,7 @@
 
 %module(docstring="""
   ``pulse_data`` is a class used by the pulse detector for data storage and 
-  for writing pulse records out to disk. It's also the parent class :mod:`qraat.det`. 
+  for writing pulse records out to disk. It's also the parent class :mod:`qraat.det.det`. 
 """) pulse_data
 
 %{

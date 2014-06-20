@@ -47,11 +47,11 @@ try:
   cur.execute('SELECT count(*) FROM est')
   print "test: there are %d pulses in the database." % cur.fetchone()
 
-  sites = qraat.csv(db_con=db_con, db_table='sitelist')
+  sites = qraat.csv.csv(db_con=db_con, db_table='sitelist')
   print "template: here are the sites."
   print sites
 
-  txs = qraat.csv(db_con=db_con, db_table='txlist').filter(use='yes')
+  txs = qraat.csv.csv(db_con=db_con, db_table='txlist').filter(use='yes')
   print "template: here are the active transmitters."
   print txs
   
@@ -60,7 +60,7 @@ except mdb.Error, e:
   print >>sys.stderr, "template: error: [%d] %s" % (e.args[0], e.args[1])
   sys.exit(1)
 
-except qraat.QraatError, e:
+except qraat.error.QraatError, e:
   print >>sys.stderr, "template: error: %s." % e
 
 finally: 

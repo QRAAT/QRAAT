@@ -52,7 +52,7 @@ if options.cal_id == None:
 
 # Get database credentials.
 try: 
-  db_config = qraat.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='writer')
+  db_config = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='writer')
 
 except KeyError: 
   print >>sys.stderr, "insert_gps: error: undefined environment variables. Try `source rmg_env.`" 
@@ -97,7 +97,7 @@ try:
       sys.exit(0)
   
   # Import gpx data. 
-  gps = qraat.gps(options.gpx_file)
+  gps = qraat.gps.gps(options.gpx_file)
   
   # Insert gps data into database. 
   # NOTE lose precision here. 

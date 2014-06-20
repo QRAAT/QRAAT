@@ -100,7 +100,7 @@ except mdb.Error, e:
   print >>sys.stderr, "stat_pos: error: [%d] %s" % (e.args[0], e.args[1])
   sys.exit(1)
 
-except qraat.QraatError, e:
+except qraat.error.QraatError, e:
   print >>sys.stderr, "stat_pos: error: %s." % e
  
 finally: 
