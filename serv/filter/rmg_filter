@@ -60,6 +60,10 @@ try:
   intervals = [(x, min(t_end, x + chunk_size)) for x in start_times]
   change_handler = qraat.signal_filter.init_change_handler()
   for start, end in intervals:
+    # Right now this rescores points within time range *only* when a score has
+    # not already been computed. Could change this to delete all those scores
+    # (and interval_cache values) and then not do a join filter. But what we do
+    # not want, I'm pretty sure, is more than one score per point.
     q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
     # cursor query:
     # q = 'insert into `cursor` (name, value) values (%s, 1)'
