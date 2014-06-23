@@ -900,12 +900,14 @@ def score(ids):
 				for id in interval_chunked[k]:
 					reasoning[id].append('low interval')
 					change_handler.add_score(id, -3, 0)
+				continue
 
 			if len(interval_chunked[k]) < CONFIG_MINIMUM_POINT_COUNT:
 				# Score of -1
 				for id in interval_chunked[k]:
 					reasoning[id].append('few points')
 					change_handler.add_score(id, -1, 0)
+				continue
 
 			if interval is None:
 				print 'Problem with computing interval for this.'
@@ -921,6 +923,7 @@ def score(ids):
 					for id in interval_chunked[k]:
 						reasoning[id].append('low interval 2')
 						change_handler.add_score(id, -3, 0)
+					continue
 
 				# Store interval in database. Note: this just inserts (does no
 				# checking for already existing interval), because it is known
