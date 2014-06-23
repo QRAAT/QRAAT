@@ -1312,7 +1312,8 @@ def read_est_records(db_con, ids, expanded=False, context=0):
 
 	if expanded:
 		print 'Performing timestamp query'
-		q = 'SELECT min(timestamp), max(timestamp) FROM est;'
+		id_string = ', '.join([str(x) for x in ids])
+		q = 'SELECT min(timestamp), max(timestamp) FROM est WHERE ID IN ({});'.format(id_string)
 		rows = cur.execute(q)
 		r = cur.fetchone()
 		r = tuple(r)
