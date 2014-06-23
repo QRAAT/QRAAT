@@ -90,6 +90,7 @@ try:
 except mdb.Error, e:
   print >>sys.stderr, "template: eror: [%d] %s" % (e.args[0], e.args[1])
   traceback.print_exc(file=sys.stdout)
+  print 'len of reasoning:', len(reasoning)
   sys.exit(1)
 
 except qraat.QraatError, e:
