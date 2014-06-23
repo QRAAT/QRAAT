@@ -738,12 +738,16 @@ def score(ids):
 
 	id_set = set(ids)
 
+	print 'Got ID set:', id_set
+
 	# Get the data from the est table for these IDs and any other est records
 	# associated with something within the time range defined by these IDs.
 	# Context is the number of seconds around the min and max timestamp defined
 	# by the ID set to include in the data returned. (Only affects things if
 	# expanded=true).
+	print 'Preparing to get data...'
 	data = read_est_records(db_con, ids, expanded=True, context=300)
+	print 'Got data.'
 
 	# I assume that all IDs being scored in a call to score() are from the same
 	# txid and siteid. This restriction can probably be relaxed, but this will
@@ -751,11 +755,13 @@ def score(ids):
 	cur = db_con.cursor()
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
+	print 'Preparing to hit database again'
 	q = 'SELECT DISTINCT siteid, txid from est WHERE ID IN ({});'.format(id_string)
 	rows = cur.execute(q)
 	r = cur.fetchone()
 	assert rows == 1
 	siteid, txid = r
+	print 'Got siteid={}, txid={}'.format(siteid, txid)
 
 	# Get all of these IDs that might have been scored already and store for
 	# after-action report.
@@ -770,6 +776,8 @@ def score(ids):
 	# Note: id_to_interval.keys() == out_of_order_ids.
 
 	out_of_order_ids, in_order_ids, id_to_interval = partition_by_interval_calculation(db_con, ids, siteid, txid)
+
+	print '{} out of order IDs, {} in order IDs'.format(len(out_of_order_ids), len(in_order_ids))
 
 	# test_condition = set(id_to_interval.keys()) == set(out_of_order_ids)
     #
