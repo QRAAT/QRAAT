@@ -8,6 +8,6 @@ setup(name='QRAAT-base',
                          sources=['python/pulse_data.i', 'lib/pulse_data.cc'],
                          swig_opts = ['-c++'], 
                          include_dirs=['include'])],
-  #@py_modules=['qraat.rmg', 'qraat.srv', 'qraat.pulse_data'],
+  py_modules=['qraat.pulse_data'],
   package_dir={'qraat' : 'python'},
 )

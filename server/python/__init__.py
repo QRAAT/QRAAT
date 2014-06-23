@@ -3,7 +3,6 @@
   interface. *This doc string is in base/python/__init__.py*. 
 '''
 
-import est
 import gps
 import position
 import signal_filter
