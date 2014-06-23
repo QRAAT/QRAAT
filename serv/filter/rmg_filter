@@ -88,7 +88,7 @@ try:
       print 'Done.'
     
 except mdb.Error, e:
-  print >>sys.stderr, "template: error: [%d] %s" % (e.args[0], e.args[1])
+  print >>sys.stderr, "template: eror: [%d] %s" % (e.args[0], e.args[1])
   traceback.print_exc(file=sys.stdout)
   # raise
   sys.exit(1)
