@@ -22,6 +22,7 @@
 import qraat
 import time, os, sys, commands
 import MySQLdb as mdb
+import traceback
 from optparse import OptionParser
 
 import qraat.signal_filter
@@ -44,6 +45,7 @@ parser.add_option('-z', '--t_end', action='store', type='int', dest='t_end')
 (options, args) = parser.parse_args()
 
 try: 
+  print 'hello.'
   start = time.time()
   print "template: start time:", time.asctime(time.localtime(start))
 
@@ -87,7 +89,9 @@ try:
       print 'Done.'
     
 except mdb.Error, e:
-  print >>sys.stderr, "template: error: [%d] %s" % (e.args[0], e.args[1])
+  print >>sys.stderr, "template: eror: [%d] %s" % (e.args[0], e.args[1])
+  traceback.print_exc(file=sys.stdout)
+  # raise
   sys.exit(1)
 
 except qraat.QraatError, e:
