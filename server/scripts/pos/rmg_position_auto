@@ -2,7 +2,7 @@
 # TODO add timers for logging (e.g. see serv/proc/rmg_det_to_db) 
 # TODO clean up output, as well as error handling in position.py.  
 
-import qraat
+import qraat, qraat.srv
 import numpy as np
 import os, commands, sys
 
@@ -27,8 +27,8 @@ print "{} transmitters found in new records".format(len(tx_list))
 print tx_list
 if len(tx_list) > 0:
   cal_id = int(os.environ['RMG_POS_CAL_ID'])
-  sv = qraat.position.steering_vectors(db_con, cal_id)
-  center = qraat.position.get_center(db_con)
+  sv = qraat.srv.position.steering_vectors(db_con, cal_id)
+  center = qraat.srv.position.get_center(db_con)
 
 time_window = float(os.environ['RMG_POS_TIME_WINDOW'])
 time_delta = float(os.environ['RMG_POS_TIME_STEP'])
@@ -60,20 +60,19 @@ for tx in tx_list:
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
     
-    est_ids = qraat.position.get_est_ids_bandfilter(db_con, 
+    est_ids = qraat.srv.position.get_est_ids_bandfilter(db_con, 
                                                     tx_id, 
                                                     time_range[0]-time_window, 
                                                     time_range[1]+time_window)
     
-    sig = qraat.position.signal(db_con, est_ids)
+    sig = qraat.srv.position.signal(db_con, est_ids)
     
     if len(sig) == 0: 
       print "Skipping empty chunk"
       continue 
     
-    bl = qraat.position.position_estimator(sv, sig)
-    (bearing, position)  = qraat.position.calc_positions(sig, 
-                                                         bl, 
+    bl = qraat.srv.position.position_estimator(sv, sig)
+    (bearing, position)  = qraat.srv.position.calc_positions(sig, bl, 
                                                          center, 
                                                          time_window, 
                                                          time_delta,

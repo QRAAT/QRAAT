@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import qraat
+import qraat, qraat.srv
 import matplotlib.pyplot as pp
 import matplotlib.image as mpimg
 import numpy as np
@@ -47,10 +47,10 @@ db_con = qraat.util.get_db('reader')
 overlay = True
 #M = qraat.track.maxspeed_exp((10, 1), (300, 0.1),0.05)
 
-track = qraat.track.Track(db_con, 
-                          options.track_id, 
-                          options.t_start, 
-                          options.t_end)
+track = qraat.srv.track.Track(db_con, 
+                           options.track_id, 
+                           options.t_start, 
+                           options.t_end)
 
 track.export_kml('track%d' % options.track_id, options.track_id)
 

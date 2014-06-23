@@ -32,7 +32,7 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import MySQLdb as mdb
 import numpy as np
 import time, os, sys
-import qraat
+import qraat, qraat.srv
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -175,17 +175,17 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
 db_con = qraat.util.get_db('reader')
 
 print "plot_search_space: fetching site data."
-sv = qraat.position.steering_vectors(db_con, options.cal_id)
+sv = qraat.srv.position.steering_vectors(db_con, options.cal_id)
 
 print "plot_search_space: fetching signal data."
-sig = qraat.position.signal(db_con, 
+sig = qraat.srv.position.signal(db_con, 
                             options.t_start, 
                             options.t_end, 
                             options.tx_id,
                             options.band_filter)
 
 print "plot_search_space: calculating bearing likelihoods (%d records)." % len(sig)
-bl = qraat.position.bearing(sv, sig)
+bl = qraat.srv.position.bearing(sv, sig)
 
 #: The time step (in seconds) for the position estimation
 #: calculation.
@@ -212,8 +212,8 @@ try:
     w_sites = set(bl.site_id[i:j])
 
     if len(w_sites) > 1: 
-      (pos, pos_likelihood) = calculate_search_space(bl, i, j, qraat.position.center, 10, 150)
-      plot_search_space(pos_likelihood, i, j, qraat.position.center, 10, 150)
+      (pos, pos_likelihood) = calculate_search_space(bl, i, j, qraat.srv.position.center, 10, 150)
+      plot_search_space(pos_likelihood, i, j, qraat.srv.position.center, 10, 150) # FIXME !!!
       print '%04d-%02d-%02d %02d%02d:%02d %-8d %.2fN %.2fE %s' % (
        t.tm_year, t.tm_mon, t.tm_mday,
        t.tm_hour, t.tm_min, t.tm_sec,

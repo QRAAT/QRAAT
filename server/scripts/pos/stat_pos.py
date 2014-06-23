@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import qraat
+import qraat, qraat.srv
 import time, os, sys, commands, re 
 import MySQLdb as mdb
 import numpy as np
@@ -53,7 +53,7 @@ try:
     print >>sys.stderr, "star_pos: error: malformed date string." 
     sys.exit(1)
 
-  V = qraat.track.transition_distribution(db_con, t_start, t_end, options.tx_id)
+  V = qraat.srv.track.transition_distribution(db_con, t_start, t_end, options.tx_id)
 
   if len(V) > 0: 
     (mean, stddev) = (np.mean(V), np.std(V))

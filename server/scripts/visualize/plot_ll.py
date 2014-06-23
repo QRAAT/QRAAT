@@ -32,7 +32,7 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import MySQLdb as mdb
 import numpy as np
 import time, os, sys
-import qraat
+import qraat, qraat.srv
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -134,16 +134,16 @@ def plot_ll(bl, i, j):
 db_con = qraat.util.get_db('reader')
 
 print "plot_ll: fetching site data."
-sv = qraat.position.steering_vectors(db_con, options.cal_id)
+sv = qraat.srv.position.steering_vectors(db_con, options.cal_id)
 
 print "plot_ll: fetching signal data."
-sig = qraat.position.signal(db_con, 
+sig = qraat.srv.position.signal(db_con, 
                             options.t_start, 
                             options.t_end,
                             options.tx_id)
 
 print "plot_ll: calculating bearing likelihood distributions (%d records)." % len(sig)
-bl = qraat.position.bearing(sv, sig)
+bl = qraat.srv.position.bearing(sv, sig)
 
 #: The time step (in seconds) for the position estimation
 #: calculation.
@@ -154,7 +154,7 @@ t_window = options.t_window
 
 try: 
 
-  for (t, index_list) in qraat.position.calc_windows(bl, t_window, t_delta):
+  for (t, index_list) in qraat.srv.position.calc_windows(bl, t_window, t_delta):
     (i, j) = (index_list[0], index_list[-1])
 
     t = time.localtime((bl.time[i] + bl.time[j]) / 2)

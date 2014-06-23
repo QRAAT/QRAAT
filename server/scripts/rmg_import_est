@@ -46,7 +46,7 @@ try:
           for row in table:
             try: 
               table.write_db_row(cur, row, site.name)
-            except qraat.ResolveIdError, e:
+            except qraat.error.ResolveIdError, e:
               print >>sys.stderr, "import_est: warning: skipping est corresponding to '%s'" % e.filename
       
 

@@ -97,7 +97,7 @@ try:
       sys.exit(0)
   
   # Import gpx data. 
-  gps = qraat.gps.gps(options.gpx_file)
+  gps = qraat.srv.gps.gps(options.gpx_file)
   
   # Insert gps data into database. 
   # NOTE lose precision here. 

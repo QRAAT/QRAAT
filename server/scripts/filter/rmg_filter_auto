@@ -21,7 +21,7 @@
 
 from math import ceil
 import qraat
-import qraat.signal_filter
+import qraat.srv
 import time, os, sys, commands
 import MySQLdb as mdb
 from optparse import OptionParser
@@ -49,7 +49,7 @@ try:
 
   # db_con = qraat.util.get_db('reader')
 
-  change_handler = qraat.signal_filter.init_change_handler()
+  change_handler = qraat.srv.signal_filter.init_change_handler()
   db_con = change_handler.obj
 
   context_length = 3 * 60
@@ -63,21 +63,21 @@ try:
   # total_chunks = int((t_end - t_start) / float(chunk_size)) + 1
   # start_times = [(t_start + (i * chunk_size)) for i in range(total_chunks)]
   # intervals = [(x, min(t_end, x + chunk_size)) for x in start_times]
-  # change_handler = qraat.signal_filter.init_change_handler()
+  # change_handler = qraat.srv.signal_filter.init_change_handler()
   # for start, end in intervals:
     # print '{} - {}'.format(start, end)
     # Get all unscored IDs in this chunk
 
     # q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
 
-	# cursor_val = qraat.signal_filter.get_current_cursor_value(db_con)
+	# cursor_val = qraat.srv.signal_filter.get_current_cursor_value(db_con)
     # q = 'select ID from est where siteid = %s and txid = %s and 
 
     # initialize cursor table entry if it does not exist - wait! no need!
     # print 'Initializing cursor table now...'
     # change_handler.add_sql('INSERT IGNORE INTO `cursor` (value, name) values ( , ('estscore',))
 
-  cursor_value = qraat.signal_filter.get_cursor_value(change_handler, 'estscore')
+  cursor_value = qraat.srv.signal_filter.get_cursor_value(change_handler, 'estscore')
   print 'Got cursor_value:', cursor_value
 
   q = 'select ID from est where siteid = %s and txid = %s and ID > %s'
@@ -103,10 +103,10 @@ try:
     max_range = ceil(max_range_float)
     for i in range(int(max_range)):
       sub_l = l[i * batch_size:(i + 1) * batch_size]
-      qraat.signal_filter.score(sub_l)
+      qraat.srv.signal_filter.score(sub_l)
       print 'Done scoring.'
       print 'About to update cursor "{}" to {}'.format('estscore', max(l))
-      qraat.signal_filter.update_cursor_value(change_handler, 'estscore', max(l))
+      qraat.srv.signal_filter.update_cursor_value(change_handler, 'estscore', max(l))
     
 except mdb.Error, e:
   print >>sys.stderr, "template: error: [%d] %s" % (e.args[0], e.args[1])

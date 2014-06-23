@@ -21,7 +21,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import qraat
+import qraat, qraat.srv
 import time, os, sys, commands
 import MySQLdb as mdb
 from optparse import OptionParser
@@ -91,19 +91,19 @@ try:
   db_con = qraat.util.get_db('writer')
   
   print "position: fetching site data." 
-  sv = qraat.position.steering_vectors(db_con, options.cal_id)
-  center = qraat.position.get_center(db_con)
+  sv = qraat.srv.position.steering_vectors(db_con, options.cal_id)
+  center = qraat.srv.position.get_center(db_con)
 
   if options.thresh > 0: # FIXME apply time filter.
     print "position: using time filter with threshold %f." % options.thresh
     print >>sys.stderr, "position: warning: time filter not implemented."
-    get_est_ids = qraat.position.get_est_ids
+    get_est_ids = qraat.srv.position.get_est_ids
   elif options.band: 
     print "position: using band filter."
-    get_est_ids = qraat.position.get_est_ids_bandfilter
+    get_est_ids = qraat.srv.position.get_est_ids_bandfilter
   else: 
     print "position: no signal filter."
-    get_est_ids = qraat.position.get_est_ids
+    get_est_ids = qraat.srv.position.get_est_ids
 
   chunks = range(int(options.t_start), int(options.t_end), int(options.t_chunk))
 
@@ -112,18 +112,17 @@ try:
     print "position: fetching chunk %d of %d." % (i+1, len(chunks)) 
     
     est_ids = get_est_ids(db_con, options.tx_id, chunks[i], chunks[i] + options.t_chunk)
-    sig = qraat.position.signal(db_con, est_ids)
+    sig = qraat.srv.position.signal(db_con, est_ids)
 
     if len(sig) == 0:
       print "position: skipping empty chunk."
       continue
 
     print "position: calculating bearing likelihoods (%d)." % len(sig) 
-    bl = qraat.position.position_estimator(sv, sig)
+    bl = qraat.srv.position.position_estimator(sv, sig)
 
     print "position: calculating positions."
-    (bearing, position) = qraat.position.calc_positions(sig,
-                                                        bl,
+    (bearing, position) = qraat.srv.position.calc_positions(sig, bl,
                                                         center,
                                                         options.t_window, 
                                                         options.t_delta, 
