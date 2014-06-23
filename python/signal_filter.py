@@ -897,14 +897,14 @@ def score(ids):
 			if interval < CONFIG_ERROR_ALLOWANCE:
 				print 'Interval too low! Double-counting of the point in question will occur (i.e., the point will be considered its own neighbor)'
 				# Give these a score of -3
-				for id in interval_chunked[k]:
+				for id in parametrically_good_chunked[k]:
 					reasoning[id].append('low interval')
 					change_handler.add_score(id, -3, 0)
 				continue
 
 			if len(interval_chunked[k]) < CONFIG_MINIMUM_POINT_COUNT:
 				# Score of -1
-				for id in interval_chunked[k]:
+				for id in parametrically_good_chunked[k]:
 					reasoning[id].append('few points')
 					change_handler.add_score(id, -1, 0)
 				continue
@@ -920,7 +920,7 @@ def score(ids):
 				if interval < CONFIG_ERROR_ALLOWANCE:
 					print 'Interval too low! Double-counting of the point in question will occur (i.e., the point will be considered its own neighbor)'
 					# Give these a score of -3
-					for id in interval_chunked[k]:
+					for id in parametrically_good_chunked[k]:
 						reasoning[id].append('low interval 2')
 						change_handler.add_score(id, -3, 0)
 					continue
