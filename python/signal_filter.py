@@ -642,6 +642,9 @@ class Window:
 		assert any(histo[0] != 0)
 		print 'Performing interval detection for {}/{}'.format(txid, slice_id)
 		candidates = sort_by(histo[0], histo[1])
+
+		print 'Candidates:', candidates
+
 		#print 'Got {} candidates'.format(len(candidates))
 		overtone_results = overtone_vote(candidates)
 
