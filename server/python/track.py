@@ -41,8 +41,6 @@
 import numpy as np
 import time, os, sys
 import random
-import util
-from csv import csv
 
 BURST_INTERVAL = 30        # 30 seconds
 SUSTAINED_INTERVAL = 1800  # 30 minutes

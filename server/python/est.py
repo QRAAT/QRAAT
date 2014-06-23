@@ -1,5 +1,5 @@
 # est.py - Structure for processing .det files. Output to file 
-# (.csv) or database. This file is part of QRAAT, an automated 
+# (.qraat.csv.csv) or database. This file is part of QRAAT, an automated 
 # animal tracking system based on GNU Radio. 
 #
 # Copyright (C) 2013 Todd Borrowman, Christopher Patton
@@ -20,9 +20,7 @@
 # TODO 
 #  - Deal with legacy headers in reading .csv files. 
 
-from error import ResolveIdError
-from csv import csv, pretty_printer
-from det import det
+import qraat
 import sys, os, time, errno
 import numpy as np
 from string import Template
@@ -69,12 +67,12 @@ query_update_est = Template(
      WHERE ID=$ID''')
 
 
-class est (csv):
+class est (qraat.csv.csv):
 
   """ 
   
     Encapsulation of pulses in signal space. Store the signal features 
-    calculated by :class:`qraat.det.det.det` in a table mirroring the database 
+    calculated by :class:`qraat.det.det` in a table mirroring the database 
     schema. This class serves as an interface between pulse records (.det 
     files), the MySQL database, and can read/write its contents from/to file. 
     Some example usage:  
@@ -100,9 +98,9 @@ class est (csv):
       pulse was recorded. See :func:`est.write_db`. 
 
     :param det: A pulse record.
-    :type det: qraat.det.det.det
+    :type det: qraat.det.det
     :param dets: A set of pulse records.
-    :type dets: qraat.det.det.det 
+    :type dets: qraat.det.det 
     :param fn: Filename to read est table from. 
     :type fn: str
     
@@ -182,7 +180,7 @@ class est (csv):
           fd.write(','.join(self.headers) + '\n')
           
       fd.write( 
-        ','.join(pretty_printer(getattr(row, col))
+        ','.join(qraat.csv.pretty_printer(getattr(row, col))
           for col in self.headers) + '\n')
 
   
@@ -190,7 +188,7 @@ class est (csv):
     """ Append pulse signal to table.
 
     :param det: Pulse record. 
-    :type det: qraat.det.det.det
+    :type det: qraat.det.det
     """
     
     det.eig()
@@ -309,7 +307,7 @@ class est (csv):
       try:
         row.txid = self.txid_index[row.tagname]
       except KeyError:
-        raise ResolveIdError('txid',row.tagname,row.fn)  
+        raise qraat.error.ResolveIdError('txid',row.tagname,row.fn)  
 
     if row.siteid is None:
       if self.siteid_index is None: 
@@ -318,7 +316,7 @@ class est (csv):
       try:
         row.siteid = self.siteid_index[site]
       except KeyError:
-        raise ResolveIdError('siteid',site,row.fn)
+        raise qraat.error.ResolveIdError('siteid',site,row.fn)
 
     query = query_insert_est if row.ID is None else query_update_est
     # When the template string performs the substitution, it casts 
@@ -327,7 +325,7 @@ class est (csv):
     # for the timestamp. The following line turns the timestamp into 
     # a string with unrounded value. 
     row.timestamp = repr(row.timestamp) 
-    row.datetime = pretty_printer(row.datetime)
+    row.datetime = qraat.csv.pretty_printer(row.datetime)
     cur.execute(query.substitute(row))
 
 

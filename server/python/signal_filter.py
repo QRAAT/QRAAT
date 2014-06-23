@@ -27,8 +27,6 @@ import bisect
 import math
 import traceback
 
-import util
-
 
 
 THRESHOLD_BAND3 = 150
@@ -90,7 +88,7 @@ class Registry:
 
 		if self.txlist is None:
 			d = {}
-			db_con = qraat.util.get_db('reader')
+			db_con = qraat.qraat.util.get_db('reader')
 			cur = db_con.cursor()
 			q = 'select ID, thresh_band3, thresh_band10 from txlist;'
 			rows = cur.execute(q)
@@ -532,7 +530,7 @@ class ChangeHandler:
 		assert self.mode in VALID_MODES
 		if self.mode == 'db':
 			self.buffer = []
-			db_con = util.get_db('writer')
+			db_con = qraat.util.get_db('writer')
 			self.obj = db_con
 		elif self.mode == 'fileinc':
 			self.obj = obj # A filename is this case
@@ -900,7 +898,7 @@ def already_scored_filter(db_con, ids):
 def score(ids):
 	print 'Initial call to score {} ID(s)'.format(len(ids))
 	change_handler = init_change_handler()
-	db_con = qraat.util.get_db('writer')
+	db_con = qraat.qraat.util.get_db('writer')
 
 	parametrically_poor = set()
 

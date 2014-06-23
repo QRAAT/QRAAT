@@ -17,12 +17,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import qraat
 import numpy as np
 import time, os, sys
 import random
-
-import util
-from csv import csv
 
 try:
   import MySQLdb as mdb
@@ -99,7 +97,7 @@ class steering_vectors:
     deps = []
 
     # Get site locations.
-    sites = csv(db_con=db_con, db_table='sitelist').filter(rx=True)
+    sites = qraat.csv(db_con=db_con, db_table='sitelist').filter(rx=True)
     sv_deps_by_site = {}
 
     for row in sites:
@@ -117,8 +115,8 @@ class steering_vectors:
                        FROM Steering_Vectors
                       WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, cal_id))
       raw_data = cur.fetchall()
-      prov_sv_ids = util.get_field(raw_data, 0)
-      data_no_ids = util.remove_field(raw_data, 0)
+      prov_sv_ids = qraat.util.get_field(raw_data, 0)
+      data_no_ids = qraat.util.remove_field(raw_data, 0)
       sv_data = np.array(data_no_ids,dtype=float)
       if sv_data.shape[0] > 0:
         steering_vectors[site.ID] = np.array(sv_data[:,1::2] + np.complex(0,1) * sv_data[:,2::2])
@@ -646,7 +644,7 @@ class halfplane:
   #: The types of plane constrains:
   #: greater than, less than, greater than
   #: or equal to, less than or equal to. 
-  plane_t = util.enum('GT', 'LT', 'GE', 'LE')
+  plane_t = qraat.util.enum('GT', 'LT', 'GE', 'LE')
   plane_string = { plane_t.GT : '>', 
                    plane_t.LT : '<', 
                    plane_t.GE : '>=', 

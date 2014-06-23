@@ -35,7 +35,7 @@ GR_PYTHON_INSTALL(
     params.py
     pic_interface.py
     run.py
-    DESTINATION ${GR_PYTHON_DIR}/rmg
+    DESTINATION ${GR_PYTHON_DIR}/qraat/rmg
 )
 
 ########################################################################
