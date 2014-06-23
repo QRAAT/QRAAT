@@ -45,6 +45,7 @@ parser.add_option('-z', '--t_end', action='store', type='int', dest='t_end')
 (options, args) = parser.parse_args()
 
 try: 
+  print 'hello.'
   start = time.time()
   print "template: start time:", time.asctime(time.localtime(start))
 
