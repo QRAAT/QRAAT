@@ -1311,6 +1311,7 @@ def read_est_records(db_con, ids, expanded=False, context=0):
 	field_string = ', '.join(fields)
 
 	if expanded:
+		print 'Performing timestamp query'
 		q = 'SELECT min(timestamp), max(timestamp) FROM est;'
 		rows = cur.execute(q)
 		r = cur.fetchone()
@@ -1318,18 +1319,23 @@ def read_est_records(db_con, ids, expanded=False, context=0):
 		min, max = r
 		min -= context
 		max += context
+		print 'Done with that'
+		print 'Performing large est query'
 		cur = db_con.cursor()
-		q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s'
-		rows = cur.execute(q.format(field_string), (min, max))
+		q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s'.format(field_string)
+		rows = cur.execute(q, (min, max))
 	else:
+		print 'Querying IDs in particular'
 		ids_template = ', '.join(map(lambda x : '{}', ids))
 		id_string = ids_template.format(*ids)
 		# print 'Going to read {} ids'.format(len(ids))
 		q = 'SELECT {} FROM est WHERE ID IN ({});'.format(field_string, id_string)
 		rows = cur.execute(q.format(field_string, id_string))
 	
+	print 'Done'
 	site_data = {}
 	r = None
+	print 'Traversing cursor'
 	while True:
 		r = cur.fetchone()
 		if r is None: break
@@ -1339,6 +1345,7 @@ def read_est_records(db_con, ids, expanded=False, context=0):
 			if named_row[k].__class__ == decimal.Decimal:
 				named_row[k] = float(named_row[k])
 		site_data[named_row['ID']] = named_row
+	print 'All done'
 
 	return site_data
 
