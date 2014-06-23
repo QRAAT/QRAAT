@@ -45,7 +45,6 @@ parser.add_option('-z', '--t_end', action='store', type='int', dest='t_end')
 (options, args) = parser.parse_args()
 
 try: 
-  print 'hello.'
   start = time.time()
   print "template: start time:", time.asctime(time.localtime(start))
 
@@ -91,7 +90,6 @@ try:
 except mdb.Error, e:
   print >>sys.stderr, "template: eror: [%d] %s" % (e.args[0], e.args[1])
   traceback.print_exc(file=sys.stdout)
-  # raise
   sys.exit(1)
 
 except qraat.QraatError, e:
