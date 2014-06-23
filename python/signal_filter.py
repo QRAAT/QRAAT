@@ -734,6 +734,8 @@ def already_scored_filter(db_con, ids):
 # Output: none explicit - implicitly, score entries added for each id in ids
 
 def score(ids):
+	global reasoning
+	reasoning = defaultdict(list)
 	print 'Initial call to score {} ID(s)'.format(len(ids))
 	change_handler = init_change_handler()
 	db_con = util.get_db('writer')
@@ -823,8 +825,7 @@ def score(ids):
 	# assumptions of that value (non-negative).
 	for id in id_set.difference(all_that_passed_filter_ids):
 		change_handler.add_score(id, -2, 0)
-		if id == 205058070:
-			print 'Setting sentinel as parametrically bad'
+		reasoning[id].append('parametrically bad')
 		parametrically_poor.add(id)
 
 	# Buckets the IDs that occur as keys of data into different lists depending
@@ -897,13 +898,13 @@ def score(ids):
 				print 'Interval too low! Double-counting of the point in question will occur (i.e., the point will be considered its own neighbor)'
 				# Give these a score of -3
 				for id in interval_chunked[k]:
-					if id == 205058070: print 'Setting sentinel as abnormally low interval'
+					reasoning[id].append('low interval')
 					change_handler.add_score(id, -3, 0)
 
 			if len(interval_chunked[k]) < CONFIG_MINIMUM_POINT_COUNT:
 				# Score of -1
 				for id in interval_chunked[k]:
-					if id == 205058070: print 'Setting sentinel as low point count'
+					reasoning[id].append('few points')
 					change_handler.add_score(id, -1, 0)
 
 			if interval is None:
@@ -918,7 +919,7 @@ def score(ids):
 					print 'Interval too low! Double-counting of the point in question will occur (i.e., the point will be considered its own neighbor)'
 					# Give these a score of -3
 					for id in interval_chunked[k]:
-						if id == 205058070: print 'Setting sentinel as low interval 2'
+						reasoning[id].append('low interval 2')
 						change_handler.add_score(id, -3, 0)
 
 				# Store interval in database. Note: this just inserts (does no
