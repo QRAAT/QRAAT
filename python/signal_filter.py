@@ -32,7 +32,9 @@ import util
 THRESHOLD_BAND3 = 150
 THRESHOLD_BAND10 = 900
 
-# Distance to look for neighbors while scoring
+# Distance to look for neighbors while scoring. If interval is calculated for a
+# point less than this, the time score cannot be calculated, so this is given a
+# score of -3.
 CONFIG_ERROR_ALLOWANCE = 0.2
 
 # Search this many interval distances in both directions of a point for corroborating neighbors
@@ -48,6 +50,9 @@ CONFIG_INTERVAL_WINDOW_SIZE = float(3 * 60) # Three minutes (given in seconds)
 # trigger superceding of the interval with the new ones and re-scoring of
 # slice.
 CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD = 0.25
+
+# Minimum number of points before intervals are calculated. If less than this number is found, items are given a score of -1.
+CONFIG_MINIMUM_POINT_COUNT = 20
 
 class Registry:
 
@@ -888,7 +893,14 @@ def score(ids):
 			interval = calculate_interval(db_con, interval_chunked[k])
 			if interval < CONFIG_ERROR_ALLOWANCE:
 				print 'Interval too low! Double-counting of the point in question will occur (i.e., the point will be considered its own neighbor)'
-				sys.exit(2)
+				# Give these a score of -3
+				for id in interval_chunked[k]:
+					change_handler.add_score(id, -3, 0)
+
+			if len(interval_chunked[k]) < CONFIG_MINIMUM_POINT_COUNT:
+				# Score of -1
+				for id in interval_chunked[k]:
+					change_handler.add_score(id, -1, 0)
 
 			if interval is None:
 				print 'Problem with computing interval for this.'
@@ -900,7 +912,10 @@ def score(ids):
 				base, duration, siteid, txid = k
 				if interval < CONFIG_ERROR_ALLOWANCE:
 					print 'Interval too low! Double-counting of the point in question will occur (i.e., the point will be considered its own neighbor)'
-					sys.exit(2)
+					# Give these a score of -3
+					for id in interval_chunked[k]:
+						change_handler.add_score(id, -3, 0)
+
 				# Store interval in database. Note: this just inserts (does no
 				# checking for already existing interval), because it is known
 				# at this point that no such interval exists.
