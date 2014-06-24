@@ -6,7 +6,6 @@ INSTALL(PROGRAMS
   rmg_detcount
   rmg_estcount
   rmg_dbstats
-  rmg_status
   DESTINATION bin)
 
 

@@ -97,7 +97,7 @@ class steering_vectors:
     deps = []
 
     # Get site locations.
-    sites = qraat.csv(db_con=db_con, db_table='sitelist').filter(rx=True)
+    sites = qraat.csv.csv(db_con=db_con, db_table='sitelist').filter(rx=True)
     sv_deps_by_site = {}
 
     for row in sites:
