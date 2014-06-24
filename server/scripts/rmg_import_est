@@ -1,0 +1,61 @@
+#!/usr/bin/python
+# import_est - Import a directory chalk-full of EST files. At the moment 
+# this just imports everything in /rmg_server/est_files.  
+
+import qraat
+import time, os, sys, commands
+import MySQLdb as mdb
+from optparse import OptionParser
+
+# Check for running instances of this program. 
+(status, output) = commands.getstatusoutput(
+  'pgrep -c `basename %s`' % (sys.argv[0]))
+if int(output) > 1: 
+  print >>sys.stderr, "import_est: error: attempted reentry, exiting"
+  sys.exit(1)
+
+parser = OptionParser()
+parser.description = '''Import a bunch of EST files.'''
+parser.add_option('--base-dir', type='string', default=None)
+
+(options, args) = parser.parse_args()
+
+try: 
+  start = time.time()
+  print "import_est: start time:", time.asctime(time.localtime(start))
+
+  db_con = qraat.util.get_db('writer')
+  cur = db_con.cursor()
+  
+  sites = qraat.csv.csv(db_con=db_con, db_table="sitelist")
+  
+  if options.base_dir == None:
+    base_dir = os.environ.get('RMG_SERVER_EST_DIR')
+  else: base_dir = options.base_dir
+  
+  if base_dir:
+      
+    for site in sites:
+    
+      (status, output) = commands.getstatusoutput('find -H %s/%s -type f' % (
+                          base_dir, site.name))
+
+      if status == 0:
+        for fn in output.split('\n'):
+          table = qraat.est.est(fn=fn)
+          for row in table:
+            try: 
+              table.write_db_row(cur, row, site.name)
+            except qraat.error.ResolveIdError, e:
+              print >>sys.stderr, "import_est: warning: skipping est corresponding to '%s'" % e.filename
+      
+
+except mdb.Error, e:
+  print >>sys.stderr, "import_est: error: [%d] %s" % (e.args[0], e.args[1])
+  sys.exit(1)
+
+except qraat.error.QraatError, e:
+  print >>sys.stderr, "import_est: error: %s." % e
+
+finally: 
+  print "import_est: finished in %.2f seconds." % (time.time() - start)

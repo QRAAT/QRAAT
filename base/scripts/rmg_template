@@ -1,0 +1,67 @@
+#!/usr/bin/python
+# rmg_template
+# Template for writing scripts. This program is part of QRAAT, 
+# an automated animal tracking system based on GNU Radio. 
+#
+# Copyright (C) 2013 Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import qraat
+import time, os, sys, commands
+import MySQLdb as mdb
+from optparse import OptionParser
+
+# Check for running instances of this program. 
+(status, output) = commands.getstatusoutput(
+  'pgrep -c `basename %s`' % (sys.argv[0]))
+if int(output) > 1: 
+  print >>sys.stderr, "template: error: attempted reentry, exiting"
+  sys.exit(1)
+
+parser = OptionParser()
+
+parser.description = '''This does nothing.'''
+
+(options, args) = parser.parse_args()
+
+try: 
+  start = time.time()
+  print "template: start time:", time.asctime(time.localtime(start))
+
+  db_con = qraat.util.get_db('reader')
+  
+  # Something ... 
+  cur = db_con.cursor()
+  cur.execute('SELECT count(*) FROM est')
+  print "test: there are %d pulses in the database." % cur.fetchone()
+
+  sites = qraat.csv.csv(db_con=db_con, db_table='sitelist')
+  print "template: here are the sites."
+  print sites
+
+  txs = qraat.csv.csv(db_con=db_con, db_table='txlist').filter(use='yes')
+  print "template: here are the active transmitters."
+  print txs
+  
+
+except mdb.Error, e:
+  print >>sys.stderr, "template: error: [%d] %s" % (e.args[0], e.args[1])
+  sys.exit(1)
+
+except qraat.error.QraatError, e:
+  print >>sys.stderr, "template: error: %s." % e
+
+finally: 
+  print "template: finished in %.2f seconds." % (time.time() - start)
