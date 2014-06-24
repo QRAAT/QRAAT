@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Map</title>
+  <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+  <style type="text/css">
+    html { height: 90% }
+    body { height: 100%; margin: 10; padding: 0 }
+    #map-canvas { height: 90% }
+  </style>
+
+<script type="text/javascript"
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPB3_yj11lEK6uSAthSd0Btv-E1FJqt3I">
+</script>
+
+<script type="text/javascript">
+  function initialize() {
+    var myLatLng = new google.maps.LatLng(38.479385, -122.142365);
+    var mapOptions = {
+      center: myLatLng,
+      zoom: 14,
+      mapTypeId: google.maps.MapTypeId.SATELLITE,
+   
+       panControl:true,
+       zoomControl:true,
+       mapTypeControl:true,
+       scaleControl:true,
+       streetViewControl:true,
+       overviewMapControl:true,
+       rotateControl:true
+   };
+
+    var map = new google.maps.Map(document.getElementById("map-canvas"),mapOptions);
+    
+    var contentString = '<div id="content"><h1>Mouse1</h1><p id="description">Mouse 1 is located at '+myLatLng+'.</p>';
+    var infowindow = new google.maps.InfoWindow({
+      content: contentString
+    });
+
+    var marker = new google.maps.Marker({
+      position: myLatLng,
+      map: map,
+      draggable:true,
+      title:"Quail Ridge Reserve"
+    });
+  google.maps.event.addListener(marker, 'click', function() {
+    infowindow.open(map,marker);
+    });
+  }
+
+ google.maps.event.addDomListener(window, 'load', initialize);
+</script>
+</head>
+
+<body>
+  <form name="latlng" action="/maps2.html" method="get">
+  {% comment %} {% csrf_token %} {% endcomment %}
+  Latitude: <input type="text" name="lat"><br />
+  Longitude: <input type="text" name="lng"><br />
+  <input type="submit" value="Submit">
+  </form><br />
+
+  <div id="map-canvas"/>
+</body>
+</html>

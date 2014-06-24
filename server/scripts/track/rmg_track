@@ -1,0 +1,78 @@
+#!/usr/bin/python
+# rmg_track
+#
+# Copyright (C) 2014 Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import qraat, qraat.srv
+import time, os, sys, commands
+import MySQLdb as mdb
+from optparse import OptionParser
+
+# Check for running instances of this program. 
+(status, output) = commands.getstatusoutput(
+  'pgrep -c `basename %s`' % (sys.argv[0]))
+if int(output) > 1: 
+  print >>sys.stderr, "track: error: attempted reentry, exiting"
+  sys.exit(1)
+
+parser = OptionParser()
+
+parser.description = '''\
+'''
+
+parser.add_option('--track-id', type='int', metavar='INT', default=0,
+                  help="Track ID. A track consists of a set of tracking params "
+                       "and the associated deployment ID. Default is 0.")
+
+parser.add_option('--t-start', type='float', metavar='SEC', default=1376420800.0, 
+                  help="Start time in secondes after the epoch (UNIX time).")
+
+parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0, 
+                  help="End time in secondes after the epoch (UNIX time).")
+
+parser.add_option('-v', '--verbose', action='store_true', default=False, 
+                  help="Print the progression of the algorithm to the terminal.")
+
+(options, args) = parser.parse_args()
+
+try: 
+  start = time.time()
+  print "track: start time:", time.asctime(time.localtime(start))
+
+  db_con = qraat.util.get_db('writer')
+  
+  dep_id = qraat.srv.track.get_dep_by_id(db_con, options.track_id)
+
+  print "track: fetching positions."
+  pos_ids = qraat.srv.track.get_pos_ids(db_con, dep_id, options.t_start, options.t_end)
+  pos = qraat.srv.position.Position(db_con, pos_ids)
+
+  print "track: calculating."
+  track = qraat.srv.track.calc_tracks(db_con, pos, options.track_id, C=0)
+
+  print "track: updating tracks."
+  track.insert_db(db_con)
+
+
+except mdb.Error, e:
+  print >>sys.stderr, "track: error: [%d] %s" % (e.args[0], e.args[1])
+  sys.exit(1)
+
+except qraat.error.QraatError, e:
+  print >>sys.stderr, "track: error: %s." % e
+
+finally: 
+  print "track: finished in %.2f seconds." % (time.time() - start)

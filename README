@@ -2,3 +2,14 @@ This package is comprised of software for the Quail Ridge Automated Animal
 Tracking (QRAAT) project. It remains under major development, but is 
 distributed nonetheless under the terms of the GNU General Public License, 
 in the hopes that it will be useful. 
+
+Root directories:
+
+  base/ - The base QRAAT software distribution. This includes C++ and Python
+          libraries, as well as some scripts used both by the nodes and 
+          server. Build with CMake.  
+
+  node/ - Software for QRAAT nodes, including the RMG module. Requires Gnu
+          Radio to install. Build with CMake. 
+
+  node/ - Server code. Build with CMake.

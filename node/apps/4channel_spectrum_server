@@ -1,0 +1,219 @@
+#!/usr/bin/env python
+# 4channel_spectrum_server 
+# Modified version of 4channel_spectrum that allows visualisation of the 
+# RMG over a network. The server side is physically connected to the RMG. 
+# It transmits the GNU Radio data stream and receives control commands 
+# from the client. This file is part of QRAAT, an automated animal tracking 
+# system based on GNU Radio. 
+#
+# Copyright (C) 2012 Todd Borrowman, Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+from gnuradio import gr, eng_notation, uhd, gru
+from gnuradio.eng_option import eng_option
+from rmg import pic_interface as pic_io
+from optparse import OptionParser
+import sys, math, time
+import SocketServer
+
+# required FPGA that can do 4 rx channels.
+
+data_port  = 50007 # datagram socket for USRP transmission
+param_port = 50006 # stream socket for configuring the USRP remotely
+
+parser = OptionParser (option_class=eng_option)
+parser.add_option ("-c", "--ddc-freq", type="eng_float", default=10.7e6,
+                   help="set Rx DDC frequency to FREQ", metavar="FREQ")
+parser.add_option ("-d", "--decim", type="int", default=250,
+                   help="USRP decimation")
+parser.add_option ("-n", "--hostname", default="localhost", help="host name on which to run server")
+parser.add_option ("-p", "--port", type="string",
+                           default="/dev/ttyS0",
+                           help="serial port for communication to RMG PIC")
+(options, args) = parser.parse_args()
+
+
+class usrp_spectrum_serv(gr.top_block):
+  # Gnu Radio processing graph
+  # USRP -> UDP-sink
+
+  def __init__(self, addr="localhost"):
+    gr.top_block.__init__(self) 
+
+    if len(args) != 0:
+      parser.print_help()
+      raise SystemExit
+
+    self.nchan = 4
+    self.pic_lo = 0
+
+    # create pic_control
+    self.pic = pic_io.rmg_pic_interface(options.port)
+
+    ## USRP source
+    self.u = uhd.usrp_source(device_addr="fpga=usrp1_fpga_4rx.rbf",
+      stream_args = uhd.stream_args('fc32', channels=range(self.nchan)))
+
+    self.u.set_subdev_spec("A:A A:B B:A B:B")
+    self.g_range = self.u.get_gain_range()
+    self.set_gain((self.g_range.start()+self.g_range.stop())/2)
+
+    self.usrp_center = options.ddc_freq
+    self.usrp_rate = self.u.get_clock_rate()
+    usb_rate = self.usrp_rate / options.decim
+    self.u.set_samp_rate(usb_rate)
+    print "USRP Rate", self.usrp_rate
+    print "USB Rate", self.u.get_samp_rate()
+    
+    self.slider_range = usb_rate * 0.9375 
+    self.f_lo = -self.slider_range/2      
+    self.f_hi = self.slider_range/2       
+    self.af_sample_rate = 8000            
+    fir_decim = long (usb_rate / self.af_sample_rate)
+    print "fir_decim ", fir_decim
+    self.set_freq(self.usrp_center)
+
+    ## interleave the four channels  
+    self.interleaver = gr.interleave(gr.sizeof_gr_complex) 
+    self.connect((self.u, 0), (self.interleaver, 0))
+    self.connect((self.u, 1), (self.interleaver, 1))
+    self.connect((self.u, 2), (self.interleaver, 2))
+    self.connect((self.u, 3), (self.interleaver, 3))
+   
+    ## output to udp socket
+    self.v = gr.udp_sink(gr.sizeof_gr_complex, addr, data_port, payload_size=8096) 
+    self.connect(self.interleaver, self.v)
+     
+  #sets gain on all receiver channels
+  def set_gain(self, gain):
+    for i in range(self.nchan):
+      self.u.set_gain(gain,i)
+      
+  #sets frequency of all receiver channels
+  def set_freq(self, target_freq):
+      ok = True
+      for j in range(self.nchan):
+          r = self.u.set_center_freq(target_freq,j)
+          if not r:
+              ok = False
+              print "set_freq: failed to set subdev[%d] freq to %f" % (
+                  i, target_freq)
+      return ok
+
+  #toggles audio band
+  def set_pic_lo(self, val):
+      self.pic_lo = val
+      if self.pic_lo == 0:
+          self.pic.use_high_lo()
+          self.set_freq(self.usrp_center)
+      else:
+          self.pic.use_low_lo()
+          self.set_freq(-self.usrp_center)
+
+  #pga slider event, change receiver gain accordingly
+  def set_pga(self, gain):
+    self.set_gain(gain)
+
+  def pic_up(self):
+    self.pic.inc_freq()
+    self.pic.freq += 100000
+
+  def pic_down(self):
+    self.pic.dec_freq()
+    self.pic.freq -= 100000
+
+class Handler(SocketServer.BaseRequestHandler):
+  # Establish connection with client, transmit USRP parameters, and 
+  # create the gnuradio signal processing graph. Start transmitting 
+  # the data. 
+  
+  def handle(self): 
+    print "Connection established with %s" % self.client_address[0]
+
+    fg = usrp_spectrum_serv(self.client_address[0]) # build graph
+    
+    # transmit USRP parameters
+    self.request.sendall( 
+                          str(fg.usrp_center) + "\n" + 
+                          str(fg.usrp_rate) + "\n" + 
+                          str(fg.u.get_samp_rate()) + "\n" + 
+                          str(fg.pic.freq) + "\n" + 
+                          str(fg.u.get_gain()) + "\n" + 
+                          str(fg.g_range.start()) + "\n" +                          
+                          str(fg.g_range.stop())
+                        )
+    
+    fg.start() # fork processing graph
+    try: 
+      while True:
+        # Wait for instructions from client and respond 'ok' 
+        # or 'failed'. 'quit' breaks the loop.
+        resp = "ok"
+        msg = self.request.recv(1024).strip().split(' ')
+        try:
+          if msg[0] == "set":
+            if msg[1] == "center_freq":
+              if not fg.set_freq(float(msg[2])):
+                resp = "failed" 
+            
+            elif msg[1] == "lo": 
+              if msg[2] == "low":    fg.set_pic_lo(1)
+              elif msg[2] == "high": fg.set_pic_lo(0)
+              else: 
+                resp = "failed"
+                print "bad lo value"
+            
+            elif msg[1] == "gain":
+              fg.set_gain(float(msg[2]))
+            
+            elif msg[1] == "pic":
+              if msg[2] == "up":     fg.pic_up()
+              elif msg[2] == "down": fg.pic_down()
+              else:
+                resp = "failed" 
+                print "bad pic value"
+            
+            else:
+              print "ignoring unrecognized variable '%' in '%' request" % (msg[1], msg[0])       
+                  
+          elif msg[0] == "get": pass # not implemented
+          
+          elif msg[0] == "quit": 
+            break
+            
+          else:
+            resp = "failed"
+            print "ignoring unrecognized request '%s'" % msg[0]
+         
+        except IndexError: 
+          resp = "failed"
+          print "not enough arguments" 
+          
+        print ' '.join(msg), resp
+        self.request.sendall(resp) 
+        
+    finally:
+      print "Connection closed with %s" % self.client_address[0]
+      fg.stop() # join processing graph
+  
+    
+if __name__ == '__main__':
+  try: 
+    server = SocketServer.TCPServer((options.hostname, param_port), Handler)
+    server.serve_forever()
+  except KeyboardInterrupt: pass
+  
+  
+  

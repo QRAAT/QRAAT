@@ -12,6 +12,8 @@ We're using mysql for Django's stuff. How should we connect to the QRAAT
 database? It's not clear to me whether there is a more sophisticated way
 than using our home-brewed API. 
 
+
+
 Useful tutorials
 
   - Set up/test Django framework: https://docs.djangoproject.com/en/1.6/intro/tutorial01/

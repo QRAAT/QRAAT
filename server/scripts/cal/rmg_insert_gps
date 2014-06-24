@@ -1,0 +1,127 @@
+#!/usr/bin/python
+# rmg_insert_gps
+# Insert GPS data for a calibration run into the database. Outputs to
+# qraat.GPS_Calibration_Data. This program is part of QRAAT, an 
+# utomated animal tracking system based on GNU Radio. 
+#
+# Copyright (C) 2013 Todd Borrowman, Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import qraat
+import time, os, sys
+import MySQLdb as mdb
+from optparse import OptionParser
+
+parser = OptionParser()
+
+parser.description = '''\
+Insert GPS information into the database. The data is interpolated 
+with the pulses produced during a calibration run to produce steering 
+vectors for the direction finding algorithm. This program is part of
+QRAAT, an automated animal tracking system based on GNU Radio.   
+'''
+
+parser.add_option('-f', '--gpx-file', type='string', metavar='FILE',
+                  help="GPS data, typically with extension `.gpx`.")
+
+parser.add_option('--cal-id', type='int', metavar='INT',
+                  help="Calibration ID, the serial identifier in the database "
+                       "context identifying a calibration run.")
+
+parser.add_option('--hemisphere', type='string', default='N', metavar='{N,S}',
+                  help="Hemisphere in which the GPS data were collected. "
+                       "Choices are 'N'orth and 'S'outh (default is 'N').")
+
+(options, args) = parser.parse_args()
+
+if options.cal_id == None:
+  print >>sys.stderr, "insert_gps: erorr: need to provide a calibration ID via `--cal-id`."
+  sys.exit(1)
+
+# Get database credentials.
+try: 
+  db_config = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='writer')
+
+except KeyError: 
+  print >>sys.stderr, "insert_gps: error: undefined environment variables. Try `source rmg_env.`" 
+  sys.exit(1) 
+
+except IOError, e: 
+  print >>sys.stderr, "insert_gps: error: missing DB credential file '%s'." % e.filename
+  sys.exit(1)
+
+
+try: 
+  start = time.time()
+  print "insert_gps: start time:", time.asctime(time.localtime(start))
+
+  # Connect to database. 
+  db_con = mdb.connect(db_config.host, 
+                       db_config.user,
+                       db_config.password,
+                       db_config.name)
+  cur = db_con.cursor()
+  
+  # Establish validity of cal_id choice. 
+  cur.execute('''SELECT id 
+                   FROM Calibration_Information''') 
+
+  if options.cal_id not in map(lambda row: int(row[0]), cur.fetchall()):
+    print >>sys.stderr, "insert_gps: error: specified calibration run not in the databse."
+    sys.exit(1)
+
+  cur.execute('''SELECT COUNT(*) 
+                   FROM GPS_Calibration_Data
+                  WHERE cal_infoid = %d''' % options.cal_id)
+
+  if cur.fetchone()[0] > 0: 
+    print >>sys.stderr, ("insert_gps: warning: database already contains GPS data for the "
+                         "specified cal run. Would you like to replace it? [y,n] "), 
+    if raw_input().strip() in ['y', 'Y', 'yes', 'YES']: 
+      cur.execute('''DELETE FROM GPS_Calibration_Data 
+                      WHERE cal_infoid = %d''' % options.cal_id)
+    else:
+      print >>sys.stderr, "insert_gps: exiting."
+      sys.exit(0)
+  
+  # Import gpx data. 
+  gps = qraat.srv.gps.gps(options.gpx_file)
+  
+  # Insert gps data into database. 
+  # NOTE lose precision here. 
+  cur.executemany('''INSERT INTO GPS_Calibration_Data 
+                                (Cal_InfoID, timestamp, latitude, 
+                                 longitude, elevation, 
+                                 easting, northing, zone) 
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ;''', 
+    [ ( options.cal_id, gps.time[j], gps.latitude[j], 
+        gps.longitude[j], gps.elevation[j], 
+        gps.easting[j], gps.northing[j], 
+        "{0:.0f}{1}".format(gps.zone[j], options.hemisphere) ) 
+      for j in range(gps.num_records) ]
+  )
+
+  cur.execute('COMMIT')
+
+except mdb.Error, e:
+  print >>sys.stderr, "insert_gps: error: [%d] %s" % (e.args[0], e.args[1])
+  sys.exit(1)
+
+except IOError, e: 
+  print >>sys.stderr, "insert_gps: error: specified GPX file '%s' doesn't exists." % options.gpx_file 
+  sys.exit(1)
+
+finally: 
+  print "insert_gps: finished in %.2f seconds." % (time.time() - start)
