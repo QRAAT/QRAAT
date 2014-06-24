@@ -5,8 +5,10 @@ from hellotest import views
 from django.contrib import admin
 admin.autodiscover()
 
-urlpatterns = patterns('',
-  url(r'^hello/', include ('hello.urls')),
+urlpatterns = patterns('hellotest.views',
+    url(r'^index.html', 'index'),
+)
+
+urlpatterns += patterns('',
   url(r'^admin/', include(admin.site.urls)),
-  url(r'^hellotest/', include('hellotest.urls')),
 )
