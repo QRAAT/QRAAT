@@ -1,0 +1,44 @@
+#!/usr/bin/python 
+# read_det 
+# Display the contents of .det files. This file is part of QRAAT, an 
+# automated animal tracking system based on GNU Radio. 
+#
+# Copyright (C) 2012 Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import qraat, sys
+
+if(len(sys.argv) == 1):
+  print "usage: read_det pulse_data.det"
+  sys.exit(1)
+
+det = qraat.det.det(sys.argv[1])
+p = det.param()
+
+
+print p
+
+print ' '*4,
+for i in range(p.channel_ct-1): 
+  print "%-21s  |" % ('channel %-2d' % (i+1)),
+print 'channel %d (real, imag)' % p.channel_ct 
+print '-'*4 + ('-'*24+'+')*(p.channel_ct-1) + '-'*22
+
+for i in range(p.sample_ct):
+  print "%-4d" % (i+1) + " |".join(
+   [ "%11s %11s" % ("%-4.02f" % det.real((i*p.channel_ct)+j), 
+                    "%-4.02f" % det.imag((i*p.channel_ct)+j))
+      for j in range(p.channel_ct) ] ) 
+    

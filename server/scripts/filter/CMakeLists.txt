@@ -1,0 +1,3 @@
+INSTALL(PROGRAMS  
+  rmg_filter
+  DESTINATION bin)

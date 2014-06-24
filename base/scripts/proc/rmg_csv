@@ -1,0 +1,167 @@
+#!/usr/bin/python
+# rmg_csv
+# Input a CSV formatted site list on STDIN, return an entry or 
+# modify the file and output to STDOUT. This script is part of the 
+# QRAAT system. 
+#
+# Example usage
+# rmg_csv site10 powertype <sitelist.csv      ... Emit a cell, 
+#       e.g., the type of power supply at site 10. 
+# rmg_csv site10 status down <sitelist.csv >tmp && mv tmp csv.csv 
+#       ... Update a cell in the file, write to a temporary file, and 
+#       rename the updated to the original. 
+# rmg_csv -r site10 <sitelist.csv >site10.csv ... Output a site-
+#       specific CSV file.
+# rmg_csv -c status <sitelist.csv             ... Emit a list of 
+#       of parameter values for all sites, e.g. statuses. 
+# rmg_csv --row site10 power_ip comp_ip <sitelist.csv ... Emit columns
+#       per row.
+# rmg_csv --row view=reader user password <$RMG_SERVER_DB_AUTH
+#       ... get user/password for DB view. 
+#
+# Copyright (C) 2013 Christopher Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+import sys
+import qraat
+
+usage = """\
+usage: rmg_csv <site> <parameter> [<value>] 
+          -c,--column <parameter> [<value>] 
+          -r,--row <site> [{parameter list}]
+          -r,--row <col=value> [{paramter list}]
+          -l,--last-row   [{parameter list}]
+ < path/to/original.csv [> path/to/new.csv]
+
+  If a value is specified, then a .csv file is emitted to 
+  standard output; otherwise the requested parameter's value
+  is emitted.""" 
+
+    ## Parse command line parameters ##
+
+if len(sys.argv) < 2 or len(sys.argv) == 2 and sys.argv[1] in ['-h', '--help']:
+  print >> sys.stderr, usage
+  sys.exit(0)
+
+elif sys.argv[1] in ['-l', '--last-row']:
+  # Operate on last row. Can't mutate.
+  (row, col, value) = (None, None, None)
+  if len(sys.argv) > 2: 
+    param_list = sys.argv[2:]
+  else: param_list = None
+
+elif len(sys.argv) < 3:
+  print >> sys.stderr, "error (csv): too few arguments arguments." 
+  print >> sys.stderr, usage
+  sys.exit(1)
+
+elif sys.argv[1][0] == '-':
+
+  if sys.argv[1] in ['-c', '--column']: 
+    # Operate on column. Either emit column values or set them all to 'value'. 
+    sys.argv.append(None)
+    (row, col, value) = (None, sys.argv[2], sys.argv[3]) 
+
+  elif sys.argv[1] in ['-r', '--row']: 
+    # Operate on row. Emit first row whose name matches 'row'. Can't mutate. 
+    (row, col, value) = (sys.argv[2], None, None)
+    if len(sys.argv) > 3: 
+      param_list = sys.argv[3:]
+    else: param_list = None
+
+  else:
+    print >> sys.stderr, "error (csv): unknown option '%s'." % sys.argv[1][1:]
+    print >> sys.stderr, usage
+    sys.exit(1)
+
+else: 
+  # Operate on cell. Either emit first match or set to 'value'.
+  sys.argv.append(None)
+  (row, col, value) = sys.argv[1:4]
+
+
+    ## Read header ##
+
+table = qraat.csv.csv(sys.stdin) 
+
+try:
+
+    ## Operate on last row only ##
+
+  if (not row and not col): 
+    # FIXME not efficient for long files
+    line = table[-1]
+    if param_list: 
+      for col in param_list:
+         print getattr(line, col)
+    else:
+      print ','.join(table.headers)
+      print ','.join(line)
+      
+    sys.exit(0)
+
+    ## Parse line by line ##
+
+  if value or (row and not col) and not param_list: 
+    print ','.join(table.headers)
+
+  for line in table: 
+    if not row and col: # Column
+      if not value:
+        if len(getattr(line, col)) == 0: 
+          print "nil"
+        else:
+          print getattr(line, col)
+        
+      elif value: 
+        setattr(line, col, value)
+        print ','.join(line)
+
+    elif row and not col: # Row
+      tok = row.split('=')
+      if (len(tok) == 1 and line.name == tok[0]) or \
+         (len(tok) == 2 and getattr(line, tok[0]) == tok[1]): 
+        if param_list: 
+          for col in param_list:
+            print getattr(line, col)
+        else: print ','.join(line)
+        sys.exit(0)
+    
+    else: # Cell
+      if not value and line.name == row: # Just get value
+        if len(getattr(line, col)) == 0: 
+          print "nil"
+        else:
+          print getattr(line, col)
+        sys.exit(0)
+      elif value: 
+        if line.name == row:
+          setattr(line, col, value)
+        print ','.join(line)
+
+except IndexError: 
+  pass
+
+except KeyError: 
+  print >> sys.stderr, "error (csv): no such parameter '%s'." % col
+  sys.exit(1)
+
+
+if row and not value:
+  print >> sys.stderr, "error (csv): '%s' doesn't appear in csv." % row
+  sys.exit(1)
+else:
+  sys.exit(0)
