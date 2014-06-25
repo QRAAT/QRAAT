@@ -25,7 +25,7 @@ import bisect
 import math
 import traceback
 
-
+import qraat # There's probably a way of preventing the cyclic import here, but for now this will do.
 
 THRESHOLD_BAND3 = 150
 THRESHOLD_BAND10 = 900
