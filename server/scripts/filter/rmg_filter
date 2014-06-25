@@ -92,11 +92,11 @@ except mdb.Error, e:
   with open('/home/qraat/error.log', 'w') as f:
     traceback.print_exc(file=f)
     for k, vs in qraat.srv.signal_filter.reasoning.items():
-      f.write(str(k))
+      f.write(str(k) + '\n')
       for v in vs:
-        f.write('\t*' + str(v))
-    f.write('len of reasoning:' + str(len(qraat.srv.signal_filter.reasoning)))
-  sys.exit(1)
+        f.write('\t*' + str(v) + '\n')
+    f.write('len of reasoning:' + str(len(qraat.srv.signal_filter.reasoning)) + '\n')
+  # sys.exit(1)
 
 except qraat.error.QraatError, e:
   print >>sys.stderr, "template: error: %s." % e
