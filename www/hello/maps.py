@@ -6,24 +6,19 @@ from django.forms import ModelForm
 from django import forms
 from django.core.serializers.json import DjangoJSONEncoder
 
+
 import json
 import qraat
 import time
 import datetime
 import utm
 
-class Prefs(models.Model):
-  db = models.CharField(max_length=8)
-  dtfr = models.DateField(blank=True, null=True)
-  tifr = models.TimeField(blank=True, null=True)
-  dtto = models.DateField(blank=True, null=True)
-  tito = models.TimeField(blank=True, null=True)
-
-  def __unicode__(self):
-    return self.db
+import sys, time
+import qraat, qraat.srv
+import MySQLdb as mdb
 
 
-class Convert(models.Model):
+class Convert:
 #list of tuples: latlons_pos
   cursor2 = connection.cursor()
   cursor2.execute("SELECT ID, depID, timestamp, easting, northing, utm_zone_number, utm_zone_letter, likelihood, activity FROM qraat.Position limit 2000")
@@ -64,6 +59,46 @@ class Convert(models.Model):
 
 
 
+
+# tracks
+#!/usr/bin/python
+  try: 
+    start = time.time()
+    print "template: start time:", time.asctime(time.localtime(start))
+
+    db_con5 = qraat.util.get_db('reader')
+ 
+                                        # trackID, t_start, t_end
+    track = qraat.srv.track.Track(db_con5, 0, 1376420800, 1376442000) 
+    
+    #for pos in track:
+    #  print pos
+
+      #outputs --> 0: ID, 1: dep_ID, 2: timestamp 3: easting, 4: northing, 5: number, 6: letter, 7: likelihood 8: activity
+        #(32742L, 77L, 1376433897.0, 574441.13, 4259698.55, 10, 'S', 211.199601, 0.972890572988)
+        #(32742L, 73L, 1376433897.0, 574441.13, 4259698.55, 10, 'S', 211.199601, 0.972890572988)
+        #etc
+    
+  except mdb.Error, e:
+    print >>sys.stderr, "template: error: [%d] %s" % (e.args[0], e.args[1])
+    sys.exit(1)
+
+  except qraat.error.QraatError, e:
+    print >>sys.stderr, "template: error: %s." % e
+
+  finally: 
+    print "template: finished in %.2f seconds." % (time.time() - start)
+    
+    track_list = 55 #alisha
+    #for i in track:
+     # track_list.append((i))
+    #for (i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8]) in track:
+     #(lat, lng) = utm.to_latlon(float(i[3]), float(i[4]), i[5], i[6])
+    # track_list.append((i[0], i[1], i[2], i[3], i[4], i[5], i[7], i[8]))
+     #(lat, lng)))
+    
+    json_track = json.dumps(track_list)
+
 #to do:
 #dynamic, pass in from forms:
 #change Table (track vs Position)
@@ -100,9 +135,9 @@ class Convert(models.Model):
 
 
 
-class Site(models.Model):
+class Site:
   db_con = qraat.util.get_db('reader')
-  sites = qraat.csv(db_con=db_con, db_table='sitelist')
+  sites = qraat.csv.csv(db_con=db_con, db_table='sitelist')
 
   static_pyth_var = 45
 
@@ -118,30 +153,6 @@ class Site(models.Model):
  
     site_list_length = json.dumps(len(latlons))
 
+# lat = models.FloatField(max_length=50)
+#  lng = models.FloatField(max_length=50)
 
-class LatLng(models.Model):
-  #def __unicode__(self):
-  #  return '%f, %f' % (self.lat, self.lng)
-  lat = models.FloatField(max_length=50)
-  lng = models.FloatField(max_length=50)
-
-class Poll(models.Model):
-  def __unicode__(self):
-    return self.question
-  def was_published_today(self):
-    return self.pub_date.date() == datetime.date.today()
-  question = models.CharField(max_length=200)
-  pub_date = models.DateTimeField('date published')
-
-class Choice(models.Model):
- def __unicode__(self):
-    return self.choice
- poll = models.ForeignKey(Poll)
- choice = models.CharField(max_length=200)
- votes = models.IntegerField()
-
-#class Map(models.Model):
-#  def __unicode__(self):
-#    return self.choice
-#lat = models.IntegerField()
-#lng = models.IntegerField()

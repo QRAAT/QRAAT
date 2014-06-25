@@ -10,7 +10,7 @@
     body { height: 100%; margin: 5; padding: 0 }
     #map-canvas { margin-top: 1cm; height: 60%; width: 68%; float: right; }
     #text {width: 28%; height: 90%; float: left; font-size: 14px; margin: 1%; }
-    #page_title {font-size: 35px; font-weight:bold; }
+    #page_title {font-size: 30px; font-weight:bold; }
     #prefs {border-style:solid; border-width: 1px; height: 35%; overflow: scroll; padding: 10px; }
     #mouseover {border-style:solid; border-width: 1px; height: 45%; overflow: scroll; padding: 10px;}
     #charts {float: right; }
@@ -138,8 +138,8 @@
       strokeWeight: 1
     };
 
-    
-// pass in site locations from json from models
+//Site Markers    
+    // pass in site locations from json from models
     var sites_latlon = {{latlon_list}};
     var flight_len = {{latlon_len}};
     
@@ -178,8 +178,8 @@
 
 
 
-    //using json to pass in lat lon points from database for line
-    //displays 10 points (site1 and server(7) are the same)
+//Red lines, Flight Plan
+  //using json to pass in lat lon points from database for line
     
     var flight_latlon_pos = {{latlon_pos}};
     var flight_pos_len = {{latlon_pos_len}};
@@ -190,10 +190,17 @@
       flightPlanCoordinates.push(point);
     }
 
-
+//2nd Polyline 
+   // var flight_track = {{track_list}};
+   // var flightPlanCoordinates2 = new Array();
+   // for (i=0; i < flight_track.length-1; i++)
+   // {
+   //   var point2 = new google.maps.LatLng(flight_track[i][8][0], flight_track[i][8][1]);
+   //   flightPlanCoordinates2.push(point);
+   // }
 
   //-------------------
-    // SITELIST: using json to pass in lat lon points from database for line
+    // original polyline: SITELIST: using json to pass in lat lon points from database for line
 
    // var flight_latlon = {{latlon_list}};
    // var flight_len = {{latlon_len}};
@@ -203,7 +210,6 @@
    // var point = new google.maps.LatLng(flight_latlon[i][0], flight_latlon[i][1]);
    // flightPlanCoordinates.push(point);
    // }
-   
    //var flightPlanCoordinates = 
     //    [
     //    new google.maps.LatLng(flight_latlon[0][0], flight_latlon[0][1]),
@@ -211,12 +217,13 @@
    //    ]; 
     
  
+ //red polyline
     var flightPath = new google.maps.Polyline({
       path: flightPlanCoordinates,
       geodesic: true,
       strokeColor: '#FF0000',
       strokeOpacity: 1.0,
-      strokeWeight: 2});
+      strokeWeight: 1});
 
     flightPath.setMap(map);
 
@@ -224,9 +231,22 @@
       infowindow.open(map,marker);
      });
 
+//2nd blue polyline
+   // var flightPath2 = new google.maps.Polyline({
+   //   path: flightPlanCoordinates2,
+   //   geodesic: true,
+   //   strokeColor: '#0000FF',
+   //   strokeOpacity: 1.0,
+   //   strokeWeight: 1});
+
+   // flightPath2.setMap(map);
+
+  //  google.maps.event.addListener(marker, 'click', function() {
+  //    infowindow.open(map,marker);
+  //   });
 
 
- //show alert
+ // show alert
  //   google.maps.event.addDomListener(map, 'click', showAlert)
 
 
@@ -288,7 +308,7 @@ function show_latlng() {
 function drawChart() {
       var data1 = new google.visualization.DataTable();
         data1.addColumn('number', 'Time');
-        data1.addColumn('number', 'Activity');
+        data1.addColumn('number', 'Fox1');
     
     //pass in the data_list from views and models
     var mouseover_data = {{json_data_list}};
@@ -331,7 +351,7 @@ function drawChart() {
     
     var data2 = new google.visualization.DataTable();
       data2.addColumn('number', 'Time');
-      data2.addColumn('number', 'Activity');
+      data2.addColumn('number', 'Fox1');
     
     var result2 = [];
     for (var i=0; i < mouseover_len; i++) {
@@ -447,6 +467,7 @@ function submitIfComplete()
 
 <h3><center><u>SET PREFERENCES</u></center></h3>
 <!-- {{ message }} -->
+
 <form action="/hello/maps4.html" method="get" id="formID">
   <select id='tx_ID' name="tx_ID" onchange="submitIfComplete()">
       <option value="0">Select transmitter...</option>
@@ -457,22 +478,25 @@ function submitIfComplete()
       <option value="{{i.0}}">{{i.0}} (inactive)</option>
       {% endif %}
     {% endfor %}
-    <!--<option value="0">Select transmitter...</option>
+
+   <!--<option value="0">Select transmitter...</option>
     <option value="1">Transmitter 1</option>
     <option value="2">Transmitter 2</option>
     <option value="3">Transmitter 3</option> -->
   </select>
-
-<br />
+<br><font size="1"> Note: only 63 and 64 are distinct in my local db</font>
+    
+<br /><br />
   <select id='data_type' name='data_type' onchange="submitIfComplete()">
     <option value="0">Select data type...</option>
     <option value="pos">Positions</option>
     <option value="trk">Tracks</option>
   </select>
   
-<br />
-  from <font size="1">yyyy-mm-dd hh:mm:ss</font><br /><input type="datetime" value="2014-06-10 10:01:10" name="dt_fr" id="dt_fr">
-  to Date/Time <font size="1"></font><br /> <input type="datetime" value="2014-06-12 20:10:04" name="dt_to" id="dt_to">
+<br /><br />
+  FROM Date/Time <font size="1">(YYYY-MM-DD HH:MM:SS)</font><br /><input type="datetime" value="2014-06-10 10:01:10" name="dt_fr" id="dt_fr">
+  <br />
+  TO Date/Time <font size="1">(YYY-MM-DD HH:MM:SS)</font><br /> <input type="datetime" value="2014-06-12 20:10:04" name="dt_to" id="dt_to">
 
 
 <br /><br />
@@ -487,7 +511,13 @@ function submitIfComplete()
   -->
 </form>
 
-<br /><b>{{tx}} {{data_type}} {{date_time}} {{pref}}</b>
+<br /><b>
+<!-- {% for i in track_list %}
+{{ i.0 }}
+{% endfor %} -->
+
+{{track_list}}
+{{tx}} {{data_type}} {{date_time}} {{pref}}</b>
 <!-- {{pref1}} {{pref2}} {{pref3}} -->
 </div><!-- end prefs -->
 
