@@ -4,9 +4,11 @@ from django.db import models, connection
 from django.core import serializers
 from django.forms import ModelForm
 from django import forms
+from django.core.serializers.json import DjangoJSONEncoder
 
 import json
 import qraat
+import time
 import datetime
 import utm
 
@@ -22,14 +24,44 @@ class Prefs(models.Model):
 
 
 class Convert(models.Model):
-#list of tuples: latlons_position
-  cursor = connection.cursor()
-  cursor.execute("SELECT easting, northing, utm_zone_letter, utm_zone_number FROM qraat.Position order by id asc limit 100")
-  sitelist_rows = cursor.fetchall()
-  latlons_position = []
-  for (easting, northing, letter, number) in sitelist_rows:
+#list of tuples: latlons_pos
+  cursor2 = connection.cursor()
+  cursor2.execute("SELECT ID, depID, timestamp, easting, northing, utm_zone_number, utm_zone_letter, likelihood, activity FROM qraat.Position limit 2000")
+  poslist_rows = cursor2.fetchall()
+  latlons_pos = []
+  for (s, d, t, easting, northing, number, letter, l, a) in poslist_rows:
     (lat, lon) = utm.to_latlon(float(easting), float(northing), number, letter)
-    latlons_position.append((lat, lon))
+    latlons_pos.append((lat, lon))
+
+  json_pos = json.dumps(latlons_pos)
+  pos_list_len = json.dumps(len(latlons_pos))
+
+#complete list of data from the Position table
+  data_list = []
+  for (ID, depID, timestamp, easting, northing, utm_zone_number, utm_zone_letter, likehood, activity) in poslist_rows:
+  #note: don't put in utm_zone_letter because it serializes weird
+    (latitude, longitude) = utm.to_latlon(float(easting), float(northing), number, letter)
+    #datetime_raw = time.localtime(timestamp)
+    #datetime = time.strftime('%Y-%m-%d %H:%M:%S', datetime_raw)
+    data_list.append((ID, depID, float(timestamp), float(easting), float(northing), utm_zone_number, float(likehood), float(activity), (latitude, longitude)))
+    
+  
+  # need to serialize decimal timestamp OR make it a float? does the lat and lon work?
+  json_data_list = json.dumps(data_list)
+  data_list_len = json.dumps(len(data_list))
+
+
+#transmitter list
+
+  cursor3 = connection.cursor()
+  cursor3.execute("SELECT ID, tx_info_ID, active FROM qraat.tx_ID order by active desc, ID asc")
+  tx_rows = cursor3.fetchall()
+  tx_list = []
+  for (txid, info, active) in tx_rows:
+    tx_list.append((txid, info, active))
+
+  json_tx = json.dumps(tx_rows)
+
 
 
 #to do:
@@ -37,8 +69,9 @@ class Convert(models.Model):
 #change Table (track vs Position)
 #filter by time
 
+
   #this works for getting the list of tuples of sitelists
-    '''
+  '''
   cursor = connection.cursor()
   cursor.execute("SELECT easting, northing, utm_zone_letter, utm_zone_number FROM qraat.sitelist")
   sitelist_rows = cursor.fetchall()

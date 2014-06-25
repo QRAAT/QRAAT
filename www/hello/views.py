@@ -7,6 +7,7 @@ from django.core.urlresolvers import reverse
 from hello.models import Site, Poll, Choice, LatLng, Convert
 #from hello.forms import LatLngForm
 import qraat
+import time, datetime
 
 #def filter(request):
 #  try:
@@ -18,6 +19,8 @@ import qraat
 #  else:
 #    context = {'database': mydat}
 
+
+# this is not used yet? but will be for prefs
 def prefs(request):
   #form = MyForm(request.POST or None)
   #  if form.is_valid():
@@ -67,31 +70,62 @@ def prefs(request):
 
 
 def maps4(request):
+  
   try:
-    db = request.GET['db']
-    dtfr = request.GET['dtfr']
-    tifr = request.GET['tifr']
-    dtto = request.GET['dtto']
-    tito = request.GET['tito']
+    tx = request.GET['tx_ID']
+    data_type = request.GET['data_type']
+    date_time = request.GET['datetime']
+    #pref = request.GET['pref']
+    #pref1 = request.GET['pref1']
+    #pref2 = request.GET['pref2']
+    #pref3 = request.GET['pref3']
   except:
-    context = {"message": "Select your preferences.",
-              'latlon': Convert.latlons_dict,
+    context = {
+              "message": "Select your preferences.",
+              #'latlon': Convert.latlons_dict,
               'latlon_list': Site.jsonvarpy,
-              'latlon_len': Site.site_list_length
+              'latlon_len': Site.site_list_length,
+
+              'latlon_pos': Convert.json_pos,
+              'latlon_pos_len': Convert.pos_list_len,
+              
+              'json_data_list': Convert.json_data_list,
+              'data_list_len': Convert.data_list_len,
+              
+              'tx_list': Convert.tx_list,
+              #'tx_json': Convert.json_tx,
               }
     return render(request, 'maps4.html', context)
+  
+  
   else:
-    context = {'db': db,
-            'dtfr': dtfr,
-            'tifr': tifr,
-            'dtto': dtto, 
-            'tito': tito,
-            'latlon': Convert.latlons_dict,
+    date_time_secs = time.mktime(datetime.datetime.strptime(date_time, '%Y-%m-%d %H:%M:%S').timetuple())
+
+
+    context = {
+            'tx': tx,
+            'data_type': data_type,
+            'date_time': date_time_secs,
+            #'pref': pref,
+            #'pref1': pref1,
+            #'pref2': pref2,
+            #'pref3': pref3,
+            
+          #for the lines (positions)
+            'latlon_pos': Convert.json_pos,
+            'latlon_pos_len': Convert.pos_list_len,
+            
+          #for the site info
             'latlon_list': Site.jsonvarpy,
-            'latlon_len': Site.site_list_length
+            'latlon_len': Site.site_list_length,
+           
+            'json_data_list': Convert.json_data_list,
+            'data_list_len': Convert.data_list_len,  
+ 
+          #transmitter list
+            'tx_list': Convert.tx_list,
             }
     return render(request, 'maps4.html', context)
-
 
 #the regular map
 #
@@ -105,7 +139,9 @@ def maps4(request):
 
 
 def convert(request):
-  context = {'latlon': Convert.latlons_dict}
+  context = {
+  #'latlon': Convert.latlons_dict
+  }
   return render(request, 'convert.html', context)
 
 def list(request):
