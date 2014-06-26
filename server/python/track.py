@@ -230,13 +230,13 @@ class Track:
       cur = db_con.cursor()
       
       # TODO optimize. 
-      cur.execute('''SELECT posID, depID, timestamp, easting, northing, 
+      cur.execute('''SELECT posID, track.depID, track_pos.timestamp, easting, northing, 
                             utm_zone_number, utm_zone_letter, likelihood,
                             activity
                        FROM track, track_pos, Position
                       WHERE trackID = %d
                         AND posID = Position.ID
-                        AND timestamp >= %f AND timestamp <= %f 
+                        AND track_pos.timestamp >= %f AND track_pos.timestamp <= %f 
                       ORDER BY timestamp ASC''' % (track_id, t_start, t_end))
       
       for row in cur.fetchall():
