@@ -7,16 +7,13 @@
   <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
   <style type="text/css">
     html { height: 100% }
-    body { height: 100%; margin: 5; padding: 0 }
-    #map-canvas { margin-top: 1cm; height: 60%; width: 68%; float: right; }
-    #text {width: 28%; height: 90%; float: left; font-size: 14px; margin: 1%; }
+    body { height: 100%; margin: 0; padding: 0 }
+    #map-canvas { margin-top: 1cm; margin-right: 0.25cm; height: 60%; width: 68%; float: right; }
+    #text {width: 28%; height: 96%; float: left; font-size: 14px; margin: 1%; }
     #page_title {font-size: 30px; font-weight:bold; }
-    #prefs {border-style:solid; border-width: 1px; height: 35%; overflow: scroll; padding: 10px; }
+    #prefs {border-style:solid; border-width: 1px; height: 40%; overflow: scroll; padding: 10px; }
     #mouseover {border-style:solid; border-width: 1px; height: 45%; overflow: scroll; padding: 10px;}
     #charts {float: right; }
-   /* #chart_div {float: center; }
-    #chart_div2 {float: center; }
-    #chart {float: right; } */
   </style>
 
 <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPB3_yj11lEK6uSAthSd0Btv-E1FJqt3I&sensor=false">
@@ -24,14 +21,16 @@
 //    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPB3_yj11lEK6uSAthSd0Btv-E1FJqt3I?&v=3&callback=initialize">
 </script>
 
-
 <script type="text/javascript">
-  
+//show alert
+  function showDjango() {
+    var django_pos = 4;
+    window.alert(django_pos);
+  }
+ 
   function initialize() {
     self.lat = 38.4897343239;
     self.lng = -122.145749745;
-    //self.lat = 38.479385;
-    //self.lng = -122.142365;
     var myLatLng = new google.maps.LatLng(self.lat, self.lng);
 
     var mapOptions = {
@@ -49,18 +48,11 @@
    };
 
 //mouseover data list
-//0: ID, 
-//1: depID, 
-//2: timestamp, 
-//3: easting
-//4: northing
-//5: utm_zone_number
-//none: itm_zone_letter
-//6: likehood
-//7: activity
-    var mouseover_data = {{json_data_list}};
-    var mouseover_len = {{data_list_len}};
-
+//0: ID, 1: depID, 2: timestamp, 3: easting 4: northing 5: utm_zone_number none: itm_zone_letter 6: likehood 7: activity
+    //var mouseover_data = {{json_data_list}};
+    //var mouseover_len = {{data_list_len}};
+    
+    var django_position = {{pos_data}};
 
     var map = new google.maps.Map(document.getElementById("map-canvas"),
       mapOptions);
@@ -102,14 +94,14 @@
       //}
 
     //document.getElementById('m_easting').innerHTML = mouseover_data[0][3];
-      document.getElementById('m_northing').innerHTML = mouseover_data[0][4];
-      document.getElementById('m_date').innerHTML = mouseover_data[0][2];
-      document.getElementById('m_time').innerHTML = mouseover_data[0][2];
-      document.getElementById('m_activity').innerHTML = mouseover_data[0][7];
-      document.getElementById('m_likelihood').innerHTML = mouseover_data[0][6];
-      document.getElementById('m_animal_ID').innerHTML = mouseover_data[0][0];
-      document.getElementById('m_species').innerHTML = 'species here.<br /> <b>listLat:</b> '+mouseover_data[0][8][0]+'<br /> <b>listLon:</b> '+mouseover_data[0][8][1];
-      document.getElementById('m_transmitter').innerHTML = mouseover_data[0][1];
+      document.getElementById('m_northing').innerHTML = django_position[0][4];
+      document.getElementById('m_date').innerHTML = django_position[0][2];
+      document.getElementById('m_time').innerHTML = django_position[0][2];
+      document.getElementById('m_activity').innerHTML = django_position[0][7];
+      document.getElementById('m_likelihood').innerHTML = django_position[0][6];
+      document.getElementById('m_animal_ID').innerHTML = django_position[0][0];
+      document.getElementById('m_species').innerHTML = 'species here.<br /> <b>listLat:</b> '+django_position[0][8][0]+'<br /> <b>listLon:</b> '+django_position[0][8][1];
+      document.getElementById('m_transmitter').innerHTML = django_position[0][1];
     }); //end onemousemove event listener
 
 // ONE MARKER AT MYLATLNG WITH INFOWINDOW
@@ -126,7 +118,6 @@
    //   title:"Quail Ridge Reserve"
    // });
 
-
 // markers for site:
 //circle, can be used for small markers
     var circle ={
@@ -140,9 +131,6 @@
 
 //Site Markers    
     // pass in site locations from json from models
-    var sites_latlon = {{latlon_list}};
-    var flight_len = {{latlon_len}};
-    
     
     var locations = [
       ['Site 1', 38.483052371711864, -122.14958038408795, 1],
@@ -176,17 +164,14 @@
       })(marker, i));
     } //endfor
 
-
-
 //Red lines, Flight Plan
   //using json to pass in lat lon points from database for line
     
-    var flight_latlon_pos = {{latlon_pos}};
-    var flight_pos_len = {{latlon_pos_len}};
+    var flight_latlon_pos = {{pos_data}};
     var flightPlanCoordinates = new Array();
-    for (i=0; i < flight_pos_len-1; i++)
+    for (i=0; i < flight_latlon_pos.length-1; i++)
     {
-      var point = new google.maps.LatLng(flight_latlon_pos[i][0], flight_latlon_pos[i][1]);
+      var point = new google.maps.LatLng(flight_latlon_pos[i][8][0], flight_latlon_pos[i][8][1]);
       flightPlanCoordinates.push(point);
     }
 
@@ -199,24 +184,6 @@
    //   flightPlanCoordinates2.push(point);
    // }
 
-  //-------------------
-    // original polyline: SITELIST: using json to pass in lat lon points from database for line
-
-   // var flight_latlon = {{latlon_list}};
-   // var flight_len = {{latlon_len}};
-   //     var flightPlanCoordinates = new Array();
-   // for (i=0; i < flight_len-1; i++)
-    //{
-   // var point = new google.maps.LatLng(flight_latlon[i][0], flight_latlon[i][1]);
-   // flightPlanCoordinates.push(point);
-   // }
-   //var flightPlanCoordinates = 
-    //    [
-    //    new google.maps.LatLng(flight_latlon[0][0], flight_latlon[0][1]),
-    //    new google.maps.LatLng(flight_latlon[1][0], flight_latlon[1][1]),
-   //    ]; 
-    
- 
  //red polyline
     var flightPath = new google.maps.Polyline({
       path: flightPlanCoordinates,
@@ -245,34 +212,10 @@
   //    infowindow.open(map,marker);
   //   });
 
-
- // show alert
- //   google.maps.event.addDomListener(map, 'click', showAlert)
-
-
-
- // google.maps.event.addListener(map,'mousemove',function(point)
- //   {
- //     document.getElementById('latspan').innerHTML = point.lat()
- //     document.getElementById('lngspan').innerHTML = point.lng() 
- //     document.getElementById('latlong').innerHTML = point.lat() + ', ' + point.lng()
- //   });
-
-
   } //end function initialize
-
-
-
 
 google.maps.event.addDomListener(window, 'load', initialize);
  
-
-//show alert
-//function showAlert() {
-//  window.alert("hi");
-//  }
-
-
 function show_latlng() {
     var newlat = document.getElementById("lat").value;
     var newlng = document.getElementById("lng").value;
@@ -283,57 +226,30 @@ function show_latlng() {
       'Currently located at (Latitude, Longitude): <b>('
       +self.newlat+', '+self.newlng+')</b>.';
   }
-
- // function re_create_map() {
- //   var newlatlng = new google.maps.LatLng(document.getElementById("lat").value,document.getElementById("lng").value);
- //   center = newlatlng; 
 </script>
 
-
-
-
 <!--Charts -->
-
 <script type="text/javascript" src="https://www.google.com/jsapi"></script>
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 <script type="text/javascript">
     google.load("visualization", "1", {packages:["corechart"]});
     google.setOnLoadCallback(drawChart);
 
-//resize chart dynamically??
-   // $(window).on("throttledresize", function (event) {
-   // drawChart();
-   // });
-
 function drawChart() {
-      var data1 = new google.visualization.DataTable();
+    var positions = {{pos_data}};
+//Line Graph 1
+    var data1 = new google.visualization.DataTable();
         data1.addColumn('number', 'Time');
         data1.addColumn('number', 'Fox1');
-    
-    //pass in the data_list from views and models
-    var mouseover_data = {{json_data_list}};
-    var mouseover_len = {{data_list_len}};
-
-
     var result1 = [];
-    for (var i=0; i< mouseover_len; i++) {
-          result1.push([mouseover_data[i][2], mouseover_data[i][7]]);
+    for (var i=0; i< positions.length; i++) {
+          result1.push([positions[i][2], positions[i][7]]);
     }
         //['Year', 'tx1', 'tx2'],
         //['2004',  1000,      400],
         //['2005',  1170,      460],
-        //['2006',  660,       1120],
-        //['2007',  1030,      540],
-        //['2008',  660,       1120],
-        //['2009',  1030,      540],
-        //['2010',  730,      340],
-        //['2011',  1036,      560],
-        //['2012',  1033,      545],
-        //['2013',  1430,      240],
-        //['2014',  1430,      640],
       
       data1.addRows(result1);
-
       var options1 = {
           'title': 'Activity',
           'width': 700,
@@ -341,38 +257,18 @@ function drawChart() {
           vAxis: {
             title: "(0 to 1)"
           },
-          hAxis: {
-            title: 'Time (sec)'
-          }
-          
+          hAxis: {title: 'Time (sec)'}
       };
 
 // Line Graph 2
-    
     var data2 = new google.visualization.DataTable();
       data2.addColumn('number', 'Time');
       data2.addColumn('number', 'Fox1');
-    
     var result2 = [];
-    for (var i=0; i < mouseover_len; i++) {
-      result2.push([mouseover_data[i][2], mouseover_data[i][6]]);
+    for (var i=0; i < positions.length; i++) {
+      result2.push([positions[i][2], positions[i][6]]);
     }
-
     data2.addRows(result2);
-      //var data2 = google.visualization.arrayToDataTable([
-      //  ['Time', 'tx1', 'tx2'],
-      //  ['2004',  10,      20],
-      //  ['2005',  20,      40],
-      //  ['2006',  34,       20],
-      //  ['2007',  103,      54],
-      //  ['2008',  660,       1120],
-      //  ['2009',  1030,      540],
-      //  ['2010',  730,      340],
-      //  ['2011',  1036,      560],
-      //  ['2012',  1033,      545],
-      //  ['2013',  1430,      240],
-      //  ['2014',  1430,      640],
-     // ]);
       var options2 = {
           'title': 'Likelihood',
           'width': 700,
@@ -385,64 +281,21 @@ function drawChart() {
           }
       };
 
-
       var chart1 = new google.visualization.LineChart(document.getElementById('chart_div'));
       var chart2 = new google.visualization.LineChart(document.getElementById('chart_div2'));
-
-      //interactive selection ???
-    //function myClickHandler(){
-    //  var selection = myVis.getSelection();
-
-    //  for (var i = 0; i < selection.length; i++) {
-    //    var item = selection[i];
-    //    if (item.row != null && item.column != null) {
-    //      message += '{row:' + item.row + ',column:' + item.column + '}';
-    //    } else if (item.row != null) {
-    //      message += '{row:' + item.row + '}';
-    //    } else if (item.column != null) {
-    //      message += '{column:' + item.column + '}';
-    //    }
-    //  }
-    //  if (message == '') {
-    //    message = 'nothing';
-    //  }
-    //  alert('You selected ' + message);
-   // }
-      
       
       chart1.draw(data1, options1);
       chart2.draw(data2, options2);
 
-
-//resize chart   
-   // $(window).smartresize(function () {
-   //         chart1.draw(data1, options);
-   //         chart2.draw(data2, options2);
-   // });
 } //end drawChart function
-
  
 </script>
-
-
 </head>
 
-
-
-
 <body>
-<!-- 
-  <form name="latlng" onClick="show_latlng()" method="get">
-  {% comment %} <form name="latlng" action="/maps3.html" method="post">
-  {% csrf_token %} {% endcomment %}
-  <h3>Enter a latitute and longitude: </h3>
-  <label>Latitude:</label> <input type="text" name="lat" id="lat"><br />
-  <label>Longitude:</label> <input type="text" name="lng" id="lng"><br />
-  <input type="submit" value="Submit">
-  </form>
--->
-<div id = "text">
 
+<div id = "text">
+<button onclick="showDjango()">Show Django</button>
 <center><div id="page_title"><a href='maps4.html'>QRAAT Data</a></div>
 </center>
 <br />
@@ -466,7 +319,6 @@ function submitIfComplete()
 </script>
 
 <h3><center><u>SET PREFERENCES</u></center></h3>
-<!-- {{ message }} -->
 
 <form action="/hello/maps4.html" method="get" id="formID">
  <!--uncomment to submit without button, when tx and datatype are selected
@@ -474,11 +326,11 @@ function submitIfComplete()
  -->
   <select id='tx_ID' name="tx_ID">
       <option value="0">Select transmitter...</option>
-    {% for i in tx_list %}
-      {% if i.2 %}
-      <option value="{{i.0}}">{{i.0}} (ACTIVE)</option>
+    {% for i in tx_IDs %}
+      {% if i.active %}
+      <option value="{{i.ID}}">{{i.ID}} (ACTIVE)</option>
       {% else %}
-      <option value="{{i.0}}">{{i.0}} (inactive)</option>
+      <option value="{{i.ID}}">{{i.ID}} (inactive)</option>
       {% endif %}
     {% endfor %}
 
@@ -489,8 +341,7 @@ function submitIfComplete()
   </select>
 <br><font size="1"> Note: only 63 and 64 are distinct in my local db</font>
     
-<br />
-  <select id='data_type' name='data_type'>
+<br /><select id='data_type' name='data_type'>
   <!-- <select id='data_type' name='data_type' onchange="submitIfComplete()"> -->
     <option value="0">Select data type...</option>
     <option value="pos">Positions</option>
@@ -502,33 +353,19 @@ function submitIfComplete()
   <br />
   TO Date/Time <font size="1">(YYY-MM-DD HH:MM:SS)</font><br /> <input type="datetime" value="2014-06-12 20:10:04" name="dt_to" id="dt_to">
 
-
-<br /><br />
-  Show: <br />
+<br><br>
+Show: <br />
   <input type="checkbox" id="pref1" name="pref" value="l_l">lat,lon 
   <input type="checkbox" id="pref2" name="pref" value="prb">likelihood
   <input type="checkbox" id="pref3" name="pref" value="act">activity
-  <!-- 
-  <input type="radio" name="db" value="sitelist">sitelist<br />
-  <input type="radio" name="db" value="track">track<br />
-  <input type="radio" name="db" value="Position">Position<br />
-  -->
-<br>
-<input type="submit" value="Submit" />
 
-</form>
+<br><input type="submit" value="Submit" />
 
-<br /><b>
-<!-- {% for i in track_list %}
-{{ i.0 }}
-{% endfor %} -->
-
-{{track_list}}
-{{tx}} {{data_type}} {{date_time}} {{pref}}</b>
-<!-- {{pref1}} {{pref2}} {{pref3}} -->
+</form><br />
+<b>{{tx}} {{data_type}} {{dt_fr}} {{dt_to}} {{pref}}</b>
 </div><!-- end prefs -->
 
-<br /><center><a href="list.html" target="export">Export view as .kml file</a></center><br />
+<br><center><a href="list.html" target="export">Export view as .kml file</a></center><br>
 
 <div id="mouseover">
 <h3><center><u>MOUSEOVER INFO</u></center></h3>
@@ -557,39 +394,19 @@ Lng: <p id ="lngspan"></p>
 <br /><b>Transmitter: </b><span id="m_transmitter"></span>
 </div> <!-- end mouseover -->
 
-
-
-
-<!--
-<b>Database values from query:</b><br />
-{% for key, value in latlon.items %}
- Lat_{{ forloop.counter }}: {{ key }}<br />
- Lng_{{ forloop.counter }}: {{ value }}<br />
-{% endfor %}
--->
 </div> <!-- end text -->
 
-
-<p id="display"></p>
-
-
-<div id="map-canvas">
-
-</div>
-<br />
-
+<!-- right side -->
+<div id="map-canvas"></div><br />
 
 <div id="charts">
 <div id="chart_div"></div>
 <div id="chart_div2"></div>
 </div>
 
-<div id="container" style="height: 500px; min-width: 500px"></div>
-
 <!--<div id="chart">
 Activity Chart (static image)<br/ >
 <img src="../static/hello/linegraph.gif" width="200" height="150">
 </div> -->
-
 </body>
 </html>
