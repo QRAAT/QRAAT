@@ -1564,14 +1564,14 @@ def insert_scores(change_handler, scores, update_as_needed=False, update_set=set
 
 	if not good_property:
 		violation_count = 0
-		for x in scores:
-			if x not in update_set:
+		for x in update_set:
+			if x not in scores:
 				violation_count += 1
 
 		print 'The following {} points were in the update set but not in scores:'.format(violation_count)
 
-		for x in scores:
-			if x not in update_set:
+		for x in update_set:
+			if x not in scores:
 				print '() {}'.format(x)
 
 		print '-----'
