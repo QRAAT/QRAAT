@@ -1232,6 +1232,8 @@ def store_interval_assume(change_handler, interval, base, duration, txid, siteid
 	print 'assume args: txid={}, siteid={}'.format(txid, siteid)
 	db_con = change_handler.obj
 	cur = db_con.cursor()
+	query_string = 'select * from interval_cache where start = %s and valid_duration = %s and txid = %s and siteid = %s' % (str(base), str(duration), str(txid), str(siteid))
+	print 'Query that is expected to have no rows is "{}"'.format(query_string)
 	rows = cur.execute('select * from interval_cache where start = %s and valid_duration = %s and txid = %s and siteid = %s', (base, duration, txid, siteid))
 	if rows > 0:
 		print 'Violation of assumption for {}+{}'.format(base, duration)
@@ -1664,5 +1666,6 @@ def explicit_check(change_handler, interval, base, duration, txid, siteid):
 	db_con = change_handler.obj
 	q = 'SELECT * from interval_cache where period = %s and start = %s and valid_duration = %s and txid = %s and siteid = %s'
 	cur = db_con.cursor()
+	print 'Performing explicit check query: "{}"'.format(q % (str(interval), str(base), str(duration), str(txid), str(siteid)))
 	rows = cur.execute(q, (interval, base, duration, txid, siteid))
 	return rows
