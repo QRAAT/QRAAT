@@ -1664,8 +1664,8 @@ def update_cursor_value(handler, name, value):
 # Returns number of rows matching. Hoping for zero.
 def explicit_check(change_handler, interval, base, duration, txid, siteid):
 	db_con = change_handler.obj
-	q = 'SELECT * from interval_cache where period = %s and start = %s and valid_duration = %s and txid = %s and siteid = %s'
+	q = 'SELECT * from interval_cache where start = %s and valid_duration = %s and txid = %s and siteid = %s'
 	cur = db_con.cursor()
-	print 'Performing explicit check query: "{}"'.format(q % (str(interval), str(base), str(duration), str(txid), str(siteid)))
-	rows = cur.execute(q, (interval, base, duration, txid, siteid))
+	print 'Performing explicit check query: "{}"'.format(q % (str(base), str(duration), str(txid), str(siteid)))
+	rows = cur.execute(q, (base, duration, txid, siteid))
 	return rows
