@@ -931,6 +931,7 @@ def score(ids):
 					# print 'Warning: About to call store_interval_assume for {}+{}={} when there is/are already {} existent interval(s)'.format(base, duration, interval, rows)
 					
 				else:
+					print 'Storing an interval when rows={}'.format(rows)
 					store_interval_assume(change_handler, interval, base, duration, txid, siteid)
 					print 'Stored new interval for: {}+{}: {}'.format(base, duration, interval)
 
