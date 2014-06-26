@@ -1560,6 +1560,22 @@ def insert_scores(change_handler, scores, update_as_needed=False, update_set=set
 
 	scores = dict(scores)
 
+	good_property = all([x in scores for x in update_set])
+
+	if not good_property:
+		violation_count = 0
+		for x in scores:
+			if x not in update_set:
+				violation_count += 1
+
+		print 'The following {} points were in the update set but not in scores:'.format(violation_count)
+
+		for x in scores:
+			if x not in update_set:
+				print '() {}'.format(x)
+
+		print '-----'
+
 	assert all([x in scores for x in update_set])
 
 	db_con = change_handler.obj
