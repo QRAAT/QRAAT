@@ -35,11 +35,11 @@ class track(models.Model):
 		db_table = "track"
 		unique_together = ("ID","depID")
 	
-	SPEED_CHOICES = ('exp', 'linear', 'const')
+	SPEED_CHOICES = ( ('0','exp'), ('1', 'linear'), ('2','const') )
 	
 	ID = models.AutoField(primary_key=True)
 	depID = models.BigIntegerField(max_length=20)
-	max_speed_family = models.CharField(choices=SPEED_CHOICES) #enum('exp','linear','const')
+	max_speed_family = models.CharField(max_length=1, choices=SPEED_CHOICES) #enum('exp','linear','const')
 	speed_burst = models.FloatField()
 	speed_sustained = models.FloatField()
 	speed_limit = models.FloatField()
