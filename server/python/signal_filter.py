@@ -461,27 +461,24 @@ class ChangeHandler:
 		self.obj.close()
 
 	def add_score_db(self, estid, absscore, relscore):
-		if estid == 214183264:
-			f = open('/home/sean/scoreinfo.txt', 'a')
-			f.write('single abs={}, rel={}\n'.format(absscore, relscore))
-			if absscore == -2:
-				f.write('<-- this one is parametrically bad - single execute statement\n')
-				# f.close()
-				# assert False
-			# try:
-			# 	assert False
-			# except AssertionError:
-			# 	# tr = sys.exc_info()[2]
-			# 	traceback.print_exc(f)
-			# traceback.print_tb(tr, limit=None, file=f)
-			f.write('------------------------\n')
-			f.close()
-			print 'ADDING ESTID'
 		print 'Adding score!'
 		if ADD_EVERY == 0:
 			# Apply update immediately
 			cursor = self.obj.cursor()
-			cursor.execute(INSERT_TEMPLATE, (estid, absscore, relscore))
+			try:
+				cursor.execute(INSERT_TEMPLATE, (estid, absscore, relscore))
+			except Exception:
+				c = self.obj.cursor()
+				rows = c.execute('select absscore, relscore from estscore where estid = %s', (estid,))
+				with open('/home/qraat/duplicate.log', 'w') as f:
+					f.write('Rows returned for ID={}: {}\n'.format(estid, rows))
+					while True:
+						t = c.fetchone()
+						if t is None:
+							break
+						else:
+							f.write('\t* {}\n'.format(t))
+					f.write('Done with exception handling...\n')
 			return cursor
 		else:
 			self.buffer.append((estid, absscore, relscore))
