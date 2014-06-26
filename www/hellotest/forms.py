@@ -13,9 +13,20 @@ TX_CHOICES = (
   ('2', '2'),
 )
 
+
+def get_choices():
+  choices_list = tx_ID.objects.all()
+  return choices_list
+
+class Form3(forms.Form):
+  def __init__(self, *args, **kwargs):
+    super(Form3, self).__init__(*args, **kwargs)
+    self.fields['tx_ID'] = forms.ChoiceField( choices=get_choices() )
+
+
 class Form2(forms.Form):
   data_type = forms.ChoiceField(choices=DATA_CHOICES, required=True, label='data_type')
-  tx_ID = forms.ChoiceField(choices=TX_CHOICES, required = True)
+ #tx_ID = forms.ChoiceField(choices=TX_CHOICES, required = True)
   datetime = forms.CharField(max_length = 100, required = True)
   
 

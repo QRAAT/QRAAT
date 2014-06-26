@@ -469,7 +469,10 @@ function submitIfComplete()
 <!-- {{ message }} -->
 
 <form action="/hello/maps4.html" method="get" id="formID">
-  <select id='tx_ID' name="tx_ID" onchange="submitIfComplete()">
+ <!--uncomment to submit without button, when tx and datatype are selected
+ <select id='tx_ID' name="tx_ID" onchange="submitIfComplete()">
+ -->
+  <select id='tx_ID' name="tx_ID">
       <option value="0">Select transmitter...</option>
     {% for i in tx_list %}
       {% if i.2 %}
@@ -486,8 +489,9 @@ function submitIfComplete()
   </select>
 <br><font size="1"> Note: only 63 and 64 are distinct in my local db</font>
     
-<br /><br />
-  <select id='data_type' name='data_type' onchange="submitIfComplete()">
+<br />
+  <select id='data_type' name='data_type'>
+  <!-- <select id='data_type' name='data_type' onchange="submitIfComplete()"> -->
     <option value="0">Select data type...</option>
     <option value="pos">Positions</option>
     <option value="trk">Tracks</option>
@@ -509,6 +513,9 @@ function submitIfComplete()
   <input type="radio" name="db" value="track">track<br />
   <input type="radio" name="db" value="Position">Position<br />
   -->
+<br>
+<input type="submit" value="Submit" />
+
 </form>
 
 <br /><b>
