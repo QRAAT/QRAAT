@@ -470,7 +470,7 @@ class ChangeHandler:
 			except Exception:
 				c = self.obj.cursor()
 				rows = c.execute('select absscore, relscore from estscore where estid = %s', (estid,))
-				with open('/home/qraat/duplicate.log', 'w') as f:
+				with open('/home/qraat/duplicate.log', 'a') as f:
 					f.write('Rows returned for ID={} while attempting to score as {}/{}: {}\n'.format(estid, absscore, relscore, rows))
 					while True:
 						t = c.fetchone()
