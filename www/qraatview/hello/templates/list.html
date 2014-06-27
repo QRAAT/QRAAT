@@ -1,0 +1,52 @@
+<!-- File: list.html -->
+
+<!doctype html>
+<html>
+<head>
+<title>Site List</title>
+<link rel="stylesheet" type="text/css" href="../static/hello/style.css">
+
+<script>
+function showAlert() {
+  var varfrompy = "{{ staticvar }}";
+  alert(varfrompy);
+}
+
+function showJSON() {
+  for (i=0; i < {{site_list_length}}-1; i++) {
+    var pythonjson = {{jsonvarpy}}[i];
+      lat = pythonjson[0];
+      lon = pythonjson[1];
+  alert("i is: "+i+" list is: "+pythonjson+" Lat is: "+lat+" Lon is: "+lon+" directly"+{{jsonvarpy}}[i][0]);
+  }
+}
+
+function showDirect() {
+  //alert({{jsonvarpy}}[0][0]+" "{{jsonvarpy}}[0][1]);
+  //self.lat = function() {
+  //}
+  alert({{jsonvarpy}});
+}
+</script>
+
+
+</head>
+
+<body>
+{{ siteList }}
+<br />
+<br />
+{{ jsonvarpy }}
+<br /><br /><br />
+text list:<br /><br />
+{{ staticvar }}<br /><br />
+
+<button onclick="showAlert()">Show alert of text passed from django context from Site in models.py, to javascript</button>
+
+
+<br /><br /><br />
+Display the data from python models, to json, to javascript:<br />
+<button onclick="showJSON()">Show JSON</button>
+<button onclick="showDirect()">Show Direct</button>
+</body>
+</html>

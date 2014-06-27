@@ -1,0 +1,46 @@
+<head>
+<title>FORM TEST</title>
+</head>
+
+<body>
+<b>Form from models.py ModelForm:</b><br />
+{{ form }}
+
+<br /><br />
+<b>Form from forms.py:</b><br />
+{{ form2 }}
+
+<br><br>
+<b>Custom Form</b><br />
+{% for choice in form2.data_type.field.choices %}
+    <input type="radio" name="data_type" value="{{choice.0}}"
+      {% ifequal form2.data_type.data choice.0 %}
+        checked="checked"
+      {% endifequal %}/>
+    <label for="">{{choice.1}}</label><br />
+{% endfor %}
+
+<br /><br />
+<b>Dynamic Form</b><br>
+
+{{ form3 }}
+
+<!-- actual html of forms:
+<label for="id_name"></label>
+<input id="id_name" type="text" maxlength="100" name="name"></input>
+<label for="id_url"></label>
+<input id="id_url" type="text" maxlength="100" name="url"></input>
+<label for="id_source"></label>
+<input id="id_source" type="text" maxlength="100" name="source"></input>
+<label for="id_request"></label>
+<input id="id_request" type="text" maxlength="100" name="request"></input>
+
+<label for="id_first"></label>
+<input id="id_first" type="text" maxlength="100" name="first"></input>
+<label for="id_last"></label>
+<input id="id_last" type="text" maxlength="100" name="last"></input>
+<label for="id_middle"></label>
+<input id="id_middle" type="text" maxlength="100" name="middle"></input>
+-->
+
+</body>

@@ -1,0 +1,24 @@
+{{ latlon }}
+1<br /><br />
+
+{% for l in latlon %}
+  {{ l }} <br />
+{% endfor %}
+
+<br />Get Lat and Lon separately from models:<br /><br />
+
+{% for key, value in latlon.items %}
+  {{ key }}<br />
+    {{ value }}<br />
+{% endfor %}
+
+
+
+<br />
+{% comment %}
+{% for l in latlon %}
+  {% for a in l %}
+    {{ a }}<br />
+  {% endfor %}
+{% endfor %}
+{% endcomment %}
