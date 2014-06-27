@@ -471,7 +471,7 @@ class ChangeHandler:
 				c = self.obj.cursor()
 				rows = c.execute('select absscore, relscore from estscore where estid = %s', (estid,))
 				with open('/home/qraat/duplicate.log', 'w') as f:
-					f.write('Rows returned for ID={}: {}\n'.format(estid, rows))
+					f.write('Rows returned for ID={} while attempting to score as {}/{}: {}\n'.format(estid, absscore, relscore, rows))
 					while True:
 						t = c.fetchone()
 						if t is None:
