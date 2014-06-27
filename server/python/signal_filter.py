@@ -1563,10 +1563,20 @@ def insert_scores(change_handler, scores, update_as_needed=False, update_set=set
 	good_property = all([x in scores for x in update_set])
 
 	if not good_property:
+		print 'Warning: Unrecoverable error.'
 		violation_count = 0
 		for x in update_set:
 			if x not in scores:
 				violation_count += 1
+		try:
+			assert False
+		except AssertionError:
+			with open('/home/qraat/unrecov.log', 'w') as f:
+				f.write('Warning: Unrecoverable error.\n')
+				traceback.print_exc(f)
+				f.write('Scores for the following points are being inserted:\n')
+				f.write('scores.keys(): {}\n'.format(scores.keys()))
+				f.write('updatables: {}\n'.format(update_set))
 
 		print 'The following {} points were in the update set but not in scores:'.format(violation_count)
 
