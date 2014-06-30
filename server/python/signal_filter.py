@@ -1271,7 +1271,7 @@ def calculate_interval(db_con, ids):
 	sorted_pairs = get_sorted_timestamps_from_ids(db_con, ids)
 	# print 'Got {} sorted pairs'.format(len(sorted_pairs))
 	print '---Calculating interval from {} points'.format(len(sorted_pairs))
-	raw_input('')
+	# raw_input('')
 	# for (i, (timestamp, val)) in enumerate(sorted_pairs):
 	# 	print '{}. {}'.format(i + 1, timestamp)
 	# print '---'
