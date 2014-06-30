@@ -949,6 +949,7 @@ def score(ids):
 				# parametrically good data from this and surrounding chunks.
 				scores = time_filter(db_con, for_scoring, in_context_of=all_chunk_neighborhood)
 				print 'tf1'
+				print 'Have 5s:', [x for (x, y) in scores.items() if y == 5]
 				print 'Got scores returned:', set(scores.values())
 
 				insert_scores(change_handler, scores, update_set=updatables)
