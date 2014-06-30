@@ -1298,6 +1298,11 @@ def calculate_interval(db_con, ids):
 		print 'Produced interval:', interval
 		intervals.append(interval)
 	assert len(intervals) == 1
+
+	# Writing out to log
+	with open('/home/qraat/interval_log.txt', 'a') as f:
+		f.write('interval: {}\n'.format(intervals[0]))
+
 	return intervals[0]
 
 
