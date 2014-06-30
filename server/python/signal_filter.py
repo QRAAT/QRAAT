@@ -39,6 +39,8 @@ CONFIG_ERROR_ALLOWANCE = 0.2
 CONFIG_DELTA_AWAY = 3
 
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
+# Warning: Not everything goes through ChangeHandler anymore - this can give
+# you an inconsistent DB in addition to an inconsistent "SQL file."
 CONFIG_JUST_STAGE_CHANGES = False
 
 # How long a period the interval should be calculated over
@@ -252,6 +254,12 @@ class Registry:
 		good_points = []
 
 		counts = self.get_matching_points(points, **kw)
+
+		with open('/home/qraat/counts.txt', 'a') as f:
+			f.write('----------------\n')
+			f.write('{}\n'.format(counts))
+			f.write('----------------\n')
+
 		for point in points:
 			if point['ID'] not in counts.keys():
 				good_points.append(point)
