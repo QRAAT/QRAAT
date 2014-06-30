@@ -948,6 +948,7 @@ def score(ids):
 				# Time filter parametrically good data in the context of
 				# parametrically good data from this and surrounding chunks.
 				scores = time_filter(db_con, for_scoring, in_context_of=all_chunk_neighborhood)
+				print 'tf1'
 
 				insert_scores(change_handler, scores, update_set=updatables)
 		else:
@@ -982,6 +983,7 @@ def score(ids):
 				# Re-score all parametrically good data
 
 				scores = time_filter(db_con, for_scoring, in_context_of=all_chunk_neighborhood)
+				print 'tf2'
 
 
 				insert_scores(change_handler, scores, update_as_needed=True)
@@ -990,6 +992,7 @@ def score(ids):
 				# TODO
 
 				scores = time_filter(db_con, for_scoring, in_context_of=all_chunk_neighborhood)
+				print 'tf3'
 
 				# This does the extra work of updating the values that are
 				# already in the database and will definitely not change. This
