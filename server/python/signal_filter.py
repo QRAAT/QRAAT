@@ -956,7 +956,7 @@ def score(ids):
 				print 'Have 5s:', [x for (x, y) in scores.items() if y == 5]
 				print 'Got scores returned:', set(scores.values())
 
-				insert_scores(change_handler, scores, update_set=updatables)
+				insert_scores(change_handler, scores, update_as_needed=True)
 		else:
 			# For each 'out-of-order' (already computed interval value)
 			# chunk, re-compute the interval value and see if it
