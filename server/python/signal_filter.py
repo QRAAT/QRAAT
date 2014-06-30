@@ -1176,6 +1176,8 @@ def time_filter(db_con, ids, in_context_of=None):
 					score += 1
 					if debug: print 'Found something in ({}, {})'.format(start, end)
 			scores[id] = score
+
+	print 'Returning {} score entries'.format(len(scores))
 			
 	return scores
 
