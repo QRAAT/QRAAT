@@ -1301,7 +1301,7 @@ def calculate_interval(db_con, ids):
 
 	# Writing out to log
 	with open('/home/qraat/interval_log.txt', 'a') as f:
-		f.write('interval: {}\n'.format(intervals[0]))
+		f.write('interval: {} ({})\n'.format(intervals[0], len(ids)))
 
 	return intervals[0]
 
