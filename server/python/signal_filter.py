@@ -426,8 +426,8 @@ class ChangeHandler:
 # Have 5s: [206779849L, 206779850L, 206779851L]
 	
 	def add_score(self, estid, absscore, relscore):
-		if estid in (206779849, 206779850, 206779851):
-			_log(estid, absscore, relscore)
+		# if estid in (206779849, 206779850, 206779851):
+		# 	_log(estid, absscore, relscore)
 		return getattr(self, 'add_score_' + self.mode)(estid, absscore, relscore)
 
 	def flush(self):
@@ -1586,10 +1586,10 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 def insert_scores(change_handler, scores, update_as_needed=False, update_set=set()):
 	print 'insert_scores()'
 
-	for five_id in (206779849, 206779850, 206779851):
-		score = scores[five_id]
-		rel_score = _rel_score(score)
-		_log(five_id, score, rel_score)
+	# for five_id in (206779849, 206779850, 206779851):
+	# 	score = scores[five_id]
+	# 	rel_score = _rel_score(score)
+	# 	_log(five_id, score, rel_score)
 		
 	scores = dict(scores)
 
