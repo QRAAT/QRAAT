@@ -1378,8 +1378,8 @@ def read_est_records(db_con, ids, expanded=False, context=0):
 		print 'Done with that'
 		print 'Performing large est query'
 		cur = db_con.cursor()
-		q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp < %s and siteid = %s and txid = %s'.format(field_string, siteid, txid)
-		rows = cur.execute(q, (min, max))
+		q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp < %s and siteid = %s and txid = %s'.format(field_string)
+		rows = cur.execute(q, (min, max, siteid, txid))
 	else:
 		print 'Querying IDs in particular'
 		ids_template = ', '.join(map(lambda x : '{}', ids))
