@@ -104,6 +104,7 @@ class Registry:
 
 		self.read_txlist_thresholds()
 		print 'Getting matching points out of {}'.format(len(points))
+		min_time, max_time = None, None
 		#counts = defaultdict(int)
 		counts = defaultdict(list)
 
@@ -113,6 +114,15 @@ class Registry:
 
 		xs = [x['timestamp'] for x in points]
 		histo = histogram(xs, bins=(24 * 60))
+
+		for t in xs:
+			if min_time is None or t < min_time:
+				min_time = t
+			if max_time is None or t > max_time:
+				max_time = t
+
+		print 'Total time range: {} - {}'.format(min_time, max_time)
+
 		# bin_size = histo[1][1] - histo[1][0]
 		# print 'Calculated histogram'
 
