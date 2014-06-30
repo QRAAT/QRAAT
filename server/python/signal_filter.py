@@ -1319,7 +1319,7 @@ def init_change_handler():
 	return change_handler
 
 # Read and format into a dictionary structure a range of est records from the database.
-def read_est_records_time_range(db_con, start, end):
+def read_est_records_time_range(db_con, start, end, siteid, txid):
 	assert start <= end
 	cur = db_con.cursor()
 	
@@ -1328,7 +1328,7 @@ def read_est_records_time_range(db_con, start, end):
 	rows = None
 
 	field_string = ', '.join(fields)
-	q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s;'.format(field_string)
+	q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s and siteid = %s and txid = %s;'.format(field_string, siteid, txid)
 	rows = cur.execute(q.format(field_string), (start, end))
 	
 	site_data = {}
@@ -1349,6 +1349,9 @@ def read_est_records_time_range(db_con, start, end):
 # data exactly for records in ids are returned. Context only functions if
 # expanded is True, and expands the time range (both into the past and the
 # future) by context seconds.
+
+# Precondition: All ids should represent records from a single txid/siteid pair
+
 def read_est_records(db_con, ids, expanded=False, context=0):
 
 	if len(ids) == 0:
@@ -1365,17 +1368,17 @@ def read_est_records(db_con, ids, expanded=False, context=0):
 	if expanded:
 		print 'Performing timestamp query'
 		id_string = ', '.join([str(x) for x in ids])
-		q = 'SELECT min(timestamp), max(timestamp) FROM est WHERE ID IN ({});'.format(id_string)
+		q = 'SELECT min(timestamp), max(timestamp), siteid, txid FROM est WHERE ID IN ({});'.format(id_string)
 		rows = cur.execute(q)
 		r = cur.fetchone()
 		r = tuple(r)
-		min, max = r
+		min, max, siteid, txid = r
 		min -= context
 		max += context
 		print 'Done with that'
 		print 'Performing large est query'
 		cur = db_con.cursor()
-		q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s'.format(field_string)
+		q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp < %s and siteid = %s and txid = %s'.format(field_string, siteid, txid)
 		rows = cur.execute(q, (min, max))
 	else:
 		print 'Querying IDs in particular'
@@ -1567,7 +1570,7 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 			for (base, duration, siteid, txid) in intervals_to_compute:
 				# Get all data within this interval and parametrically score.
 				# Take all passing and calculate interval.
-				interval_data = read_est_records_time_range(db_con, base, base + duration)
+				interval_data = read_est_records_time_range(db_con, base, base + duration, siteid, txid)
 				passed_ids = parametrically_filter(db_con, interval_data)
 				interval = calculate_interval(db_con, passed_ids)
 				assert interval != 0
