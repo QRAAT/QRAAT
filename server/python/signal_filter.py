@@ -1593,6 +1593,10 @@ def insert_scores(change_handler, scores, update_as_needed=False, update_set=set
 		
 	scores = dict(scores)
 
+	if len(scores) == 0:
+		print 'Nothing to score, returning.'
+		return
+
 	good_property = all([x in scores for x in update_set])
 
 	if not good_property:
