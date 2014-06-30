@@ -1018,7 +1018,7 @@ def score(ids):
 				# score. That would also remove the need for using the
 				# update_set keyword arg of insert_scores (since nothing would
 				# be updated, only insertions).
-				insert_scores(change_handler, scores, update_set=updatable_ids)
+				insert_scores(change_handler, scores, update_set=updatables)
 
 	# Get all of these IDs that might have been scored already and store for
 	# after-action report.
