@@ -1573,6 +1573,7 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 # update_set will be updated and all others will be inserted. The default
 # values specify that all scores will be inserted.
 def insert_scores(change_handler, scores, update_as_needed=False, update_set=set()):
+	print 'insert_scores()'
 
 	scores = dict(scores)
 
@@ -1651,8 +1652,12 @@ def insert_scores(change_handler, scores, update_as_needed=False, update_set=set
 	cur = db_con.cursor()
 	cur.executemany(UPDATE_TEMPLATE, updates)
 
+	print 'Applied {} updates'.format(len(updates))
+
 	cur = db_con.cursor()
 	cur.executemany(INSERT_TEMPLATE, inserts)
+
+	print 'Applied {} insertions'.format(len(inserts))
 
 		# change_handler.db_execute_many(qraat.signal_filter.INSERT_TEMPLATE, args)
 
