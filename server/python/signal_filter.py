@@ -828,6 +828,10 @@ def score(ids):
 
 	print '{} items passed parametric filter'.format(len(new_filtered_ids))
 
+	
+	import code
+	code.interact(local=locals())
+
 	# Insert scores for parametrically bad points...
 	# The IDs in the ID set that did not pass the filter are given a sentinel
 	# absolute value in absscore of -2 and a relscore that meets the
