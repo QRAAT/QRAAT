@@ -48,8 +48,8 @@ rmg_position_auto
 #echo rmg_filterest
 #rmg_filterest
 echo
-#echo track_auto
-#rmg_track_auto
+echo track_auto
+rmg_track_auto
 echo
 echo Finished `date`
 echo
