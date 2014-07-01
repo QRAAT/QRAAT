@@ -1,0 +1,9 @@
+{% extends "qraat_auth/base.html" %}
+
+{% block content %}
+<form  method="post">
+    {% csrf_token %}
+    {{ content.user_form }}
+    <input type="submit" value="Submit" />
+</form>
+{% endblock %}

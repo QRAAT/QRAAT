@@ -38,7 +38,7 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
 	'hello',
 	'hellotest',
-
+	'qraat_auth',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -53,7 +53,7 @@ MIDDLEWARE_CLASSES = (
 ROOT_URLCONF = 'qraatview.urls'
 
 WSGI_APPLICATION = 'qraatview.wsgi.application'
-
+#AUTH_USER_MODEL = 'qraat_auth.People'
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
@@ -70,10 +70,16 @@ DATABASES = {
 		'NAME': 'qraat',
 		'USER': 'qraat',
 		'PASSWORD': 'KJsBA!Zl',
-	}
+	},
+	'auth': {
+		'ENGINE': 'django.db.backends.mysql',
+		'NAME': 'auth',
+		'USER': 'authuser',
+		'PASSWORD': 'authpassword',
+	},
 }
 
-DATABASE_ROUTERS = ['hello.router.QraatRouter',]
+DATABASE_ROUTERS = ['hello.router.QraatRouter', 'qraat_auth.router.AuthRouter',]
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/
