@@ -1,8 +1,8 @@
 {% extends "qraat_auth/base.html" %}
 
 {% block content %}
-<div class="form-container">
- <form action="/auth/login/" method="post">
+<div class="form-container login-form">
+ <form action={% url 'auth:login' %} method="post">
     {% csrf_token %}
 	<!-- Displays form errors -->
 	{% if login_form.non_field_errors %}
@@ -22,14 +22,21 @@
 				{% endfor %}
 			{% endif %}
 			<!-- Displays form field -->
-			<div class="input-group">
+			<div class="input-group input-lg">
 				{{ field.label_tag}} {{ field }}
 			</div>
 		</div>
 	{% endfor %}
-    <div class="input-group submit-btn">
-		<input type="submit" value="Submit" />
+	<div class="input-group submit-btn">
+	 <div class="btn-group">
+		<button class="btn btn-default btn-lg" type="submit" value="sign in">Sign in</button>
 	</div>
- </form>
+  </form>
+<div class="input-group submit-btn">
+  <form class="btn-form" action={%url 'auth:create-user' %} method="get">
+		<button class="btn btn-default btn-lg" type="submit" value="register">Register</button>
+  </form>
+ </div>
+</div>
 </div>
 {% endblock %}
