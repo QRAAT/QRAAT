@@ -1,9 +1,37 @@
 {% extends "qraat_auth/base.html" %}
 
 {% block content %}
-<form  method="post">
+<div class="form-container center-div"> 
+  <form action={% url 'auth:create-user' %}  method="post">
     {% csrf_token %}
-    {{ content.user_form }}
-    <input type="submit" value="Submit" />
-</form>
+	<!-- Display form errors -->
+	{% if user_form.non_field_errors %}
+		<div class="alert alert-danger">
+			{{ user_form.non_field_errors }}
+		</div>
+	{% endif %}
+	<!-- Loop over form fields -->
+	<div class="input-group-container">
+	{% for field in user_form %}
+			{% if field.errors %}
+				{% for error in field.errors %}
+					<div class="input-error">
+						* {{ error|escape}}
+					</div>
+				{% endfor %}
+			{% endif %}
+		<!-- Display form fields -->
+			<div class="input-group input-lg">
+				<div class="form-label">{{ field.label_tag}}</div>
+				<div class="form-field">{{ field }}</div>
+			</div>
+	{% endfor %}
+	<div class="input-group submit-btn">
+		<div class="btn-group-vertical">
+			<button class="btn btn-default btn-lg" type="submit" value="create-user">Submit</button>
+		</div>
+	</div>
+	</div>
+ </form>
+</div>
 {% endblock %}

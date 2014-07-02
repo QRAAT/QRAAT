@@ -45,11 +45,9 @@ def user_logged_in(request):
 	
 
 def createUserForm(request):
-	content = {}
 
 	if request.method == 'POST':
 		user_form = UserForm(request.POST)
-		content['user_form'] = user_form
 		if user_form.is_valid():
 			#creates user here
 			#form.cleaned_data as required
@@ -65,9 +63,9 @@ def createUserForm(request):
 			return HttpResponseRedirect('user-created')
 					
 	else:
-		content['user_form'] = UserForm()
+		user_form = UserForm()
 
-	return render(request, 'qraat_auth/newuserform.html', {'content': content})	
+	return render(request, 'qraat_auth/newuserform.html', {'user_form': user_form})	
 
 def userCreated(request):
 	return HttpResponse("User Created!")
