@@ -56,7 +56,7 @@ while T < options.t_end:
                    FROM Position
                   WHERE (%f <= timestamp) 
                     AND (timestamp <= %f)
-                    AND txid = %d
+                    AND depid = %d
                   ORDER BY timestamp ASC''' % (T, T + T_step, options.tx_id))
   
   T += T_step
@@ -81,7 +81,7 @@ while T < options.t_end:
   if overlay: 
 
     # FIXME Where/how to install this file? 
-    bg = mpimg.imread('/home/christopher/continuum/work/QRAAT/QRAAT/serv/visualize/qr-overlay.png') 
+    bg = mpimg.imread('qr-overlay.png') 
 
     e0 = 572599.5 - 150
     e1 = 577331.4 - 150
