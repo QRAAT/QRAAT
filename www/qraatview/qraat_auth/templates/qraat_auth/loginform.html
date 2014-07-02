@@ -1,9 +1,35 @@
 {% extends "qraat_auth/base.html" %}
 
 {% block content %}
-<form action="/auth/login/" method="post">
+<div class="form-container">
+ <form action="/auth/login/" method="post">
     {% csrf_token %}
-    {{ login_form }}
-    <input type="submit" value="Submit" />
-</form>
+	<!-- Displays form errors -->
+	{% if login_form.non_field_errors %}
+		<div class="alert alert-danger">
+			{{ login_form.non_field_errors }}
+		</div>
+	{% endif %}
+	<!-- Loops over form fields -->
+	{% for field in login_form %}
+		<div class="input-group-container">
+			<!-- Displays fields specific field errors -->
+			{% if field.errors %}
+				{% for error in field.errors %}
+					<div class="input-error">
+						* {{ error|escape}}
+					</div>
+				{% endfor %}
+			{% endif %}
+			<!-- Displays form field -->
+			<div class="input-group">
+				{{ field.label_tag}} {{ field }}
+			</div>
+		</div>
+	{% endfor %}
+    <div class="input-group submit-btn">
+		<input type="submit" value="Submit" />
+	</div>
+ </form>
+</div>
 {% endblock %}
