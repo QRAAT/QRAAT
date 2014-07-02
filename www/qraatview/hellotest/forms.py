@@ -1,43 +1,48 @@
 # hellotest forms.py
 
 from django import forms
+from hello.models import sitelist, tx_ID, Position, track
+from django.shortcuts import render, redirect
 
-
-DATA_CHOICES = (
+DATA_CHOICES = [
+  ('0', 'Select data type...'),
   ('pos', 'Position'),
   ('trc', 'Track'),
-)
+]
 
-TX_CHOICES = (
-  ('1', '1'),
-  ('2', '2'),
-)
-
+PREF_CHOICES = [
+  ('l_l', 'lat, lon'),
+  ('lhd', 'likelihood'),
+  ('act', 'activity')
+]
 
 def get_choices():
-  choices_list = tx_ID.objects.all()
+  choices_list = []
+  choices_list.append((0, "Select transmitter..."))
+  for t in tx_ID.objects.order_by('-active', 'ID'):
+    if (t.active == 0):
+      t.active = "inactive"
+    elif (t.active == 1):
+      t.active = "ACTIVE"
+    choices_list.append((t.ID, str(t.ID)+' - '+t.active))
   return choices_list
 
-class Form3(forms.Form):
-  def __init__(self, *args, **kwargs):
-    super(Form3, self).__init__(*args, **kwargs)
-    self.fields['tx_ID'] = forms.ChoiceField( choices=get_choices() )
 
+class Form(forms.Form):
+  data_type = forms.ChoiceField(choices=DATA_CHOICES, required=True, label='')
+  transmitter = forms.ChoiceField(choices=get_choices(), label='')
+  dt_fr = forms.DateTimeField(required = True, 
+          label="From date/time", 
+          initial="2014-06-10 10:01:10")
+  dt_to = forms.DateTimeField(required = True, 
+          label="To date/time", 
+          initial="2014-06-10 10:01:10")
+  lat_lon = forms.BooleanField(required=True, label="Lat, Lon")
+  north_east = forms.BooleanField(required=True, label="Northing, Easting")
+  likelihood = forms.BooleanField(required=True)
+  activity = forms.BooleanField(required=True)
 
-class Form2(forms.Form):
-  data_type = forms.ChoiceField(choices=DATA_CHOICES, required=True, label='data_type')
- #tx_ID = forms.ChoiceField(choices=TX_CHOICES, required = True)
-  datetime = forms.CharField(max_length = 100, required = True)
-  
+def show_form(request):
+  form = Form(request.GET or None)
+  return render(request, "index.html", {'form': form})
 
- # dynamic_field = forms.ModelChoiceField(queryset=Choice.objects.none())
- #   def __init__(self, item_id):
- #     super(Form2, self).__init__)_
- #     self.fields['item_field'].queryset = Item.objects.filter(id=item_id)
-
- # def __init__(self, *args, **kwargs):
- #   super(Form2, self).__init__(*args, **kwargs)
- #   self.fields['data_type'] = forms.ChoiceField(
- #     choices = get_data_choices() )
-  #def __unicode__(self):
-  #  return u'%s %s %s' % (self.first, self.last, self.middle)

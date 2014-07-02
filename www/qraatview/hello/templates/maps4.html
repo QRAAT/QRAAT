@@ -8,12 +8,12 @@
   <style type="text/css">
     html { height: 100% }
     body { height: 100%; margin: 0; padding: 0 }
-    #map-canvas { margin-top: 1cm; margin-right: 0.25cm; height: 60%; width: 68%; float: right; }
-    #text {width: 28%; height: 96%; float: left; font-size: 14px; margin: 1%; }
+    #map-canvas { margin-top: 1cm; margin-right: 0.25cm; height: 60%; width: 63%; float: right; }
+    #text {width: 33%; height: 90%; float: left; font-size: 14px; margin: 1%; }
     #page_title {font-size: 30px; font-weight:bold; }
-    #prefs {border-style:solid; border-width: 1px; height: 40%; overflow: scroll; padding: 10px; }
-    #mouseover {border-style:solid; border-width: 1px; height: 45%; overflow: scroll; padding: 10px;}
-    #charts {float: right; }
+    #prefs {border-style:solid; border-width: 1px; height: 45%; overflow: scroll; padding: 10px; }
+    #mouseover {border-style:solid; border-width: 1px; height: 40%; overflow: scroll; padding: 10px;}
+   /*  #charts {float: right; } */
   </style>
 
 <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPB3_yj11lEK6uSAthSd0Btv-E1FJqt3I&sensor=false">
@@ -53,7 +53,7 @@
     //var mouseover_len = {{data_list_len}};
     
     var django_position = {{pos_data}};
-
+    
     var map = new google.maps.Map(document.getElementById("map-canvas"),
       mapOptions);
     
@@ -93,7 +93,7 @@
       //  }
       //}
 
-    //document.getElementById('m_easting').innerHTML = mouseover_data[0][3];
+      document.getElementById('m_easting').innerHTML = django_position[0][3];
       document.getElementById('m_northing').innerHTML = django_position[0][4];
       document.getElementById('m_date').innerHTML = django_position[0][2];
       document.getElementById('m_time').innerHTML = django_position[0][2];
@@ -132,18 +132,25 @@
 //Site Markers    
     // pass in site locations from json from models
     
-    var locations = [
-      ['Site 1', 38.483052371711864, -122.14958038408795, 1],
-      ['Site 2', 38.49970896759306, -122.14861965765581, 2],
-      ['Site 3', 38.49932697652555, -122.13974362456665, 3],
-      ['Site 4', 38.49164360655183, -122.15281181424076, 4],
-      ['Site 5', 38.491915740033946, -122.13629936150039, 5], 
-      ['Site 6', 38.49292503709557, -122.14234015310441, 6],
-      ['Site 7', 38.483052371711864, -122.14958038408795, 7],
-      ['Site 8', 38.49518771797572, -122.1514169574267, 8],
-      ['Site 9', 38.493453731086, -122.14803990103866, 9], 
-      ['Center for pos estimation', 38.48973432391515, -122.1457497450115, 10]
-      ];
+   var site_list = {{ siteslist }};
+
+  var locations = [];
+  for (var i = 0; i < site_list.length; i++) {
+    locations.push([site_list[i][0], site_list[i][1], site_list[i][2], site_list[i][0]]);
+    }
+
+//    var locations = [
+//      ['Site 1', 38.483052371711864, -122.14958038408795, 1],
+//      ['Site 2', 38.49970896759306, -122.14861965765581, 2],
+//      ['Site 3', 38.49932697652555, -122.13974362456665, 3],
+//      ['Site 4', 38.49164360655183, -122.15281181424076, 4],
+//      ['Site 5', 38.491915740033946, -122.13629936150039, 5], 
+//      ['Site 6', 38.49292503709557, -122.14234015310441, 6],
+//      ['Site 7', 38.483052371711864, -122.14958038408795, 7],
+//      ['Site 8', 38.49518771797572, -122.1514169574267, 8],
+//      ['Site 9', 38.493453731086, -122.14803990103866, 9], 
+//      ['Center for pos estimation', 38.48973432391515, -122.1457497450115, 10]
+//      ];
 
     var infowindow = new google.maps.InfoWindow();
     var marker, i;
@@ -158,7 +165,7 @@
 
       google.maps.event.addListener(marker, 'click', (function(marker, i) {
         return function() {
-          infowindow.setContent('<b>'+locations[i][0]+'</b><br /> Lat: '+locations[i][1]+'<br /> Lon: '+locations[i][2]);
+          infowindow.setContent('<b>Site '+locations[i][0]+'</b><br /> Lat: '+locations[i][1]+'<br /> Lon: '+locations[i][2]);
           infowindow.open(map, marker);
         }
       })(marker, i));
@@ -228,7 +235,153 @@ function show_latlng() {
   }
 </script>
 
+
+<!-- JQUERY CHARTS WITH FLOT -->
+<!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+-->
+<link href="../static/example.css" rel="stylesheet" type="text/css">
+<script src="../static/jquery-1.11.1.min.js"></script>
+<script src="../static/flot/jquery.flot.js"></script>
+
+<!-- "visitors" plugins (2 charts/zooming) -->
+<script src ="../static/flot/jquery.flot.time.js"></script>
+<script src ="../static/flot/jquery.flot.selection.js"></script>
+
+<script src="../static/flot/jquery.flot.threshold.js"></script>
+<script src="../static/flot/jquery.flot.resize.js"></script>
+
+<!-- plugins for saving graphs as images -->
+<script type="text/javascript" src="http://zizhujy.com/Scripts/base64.js"></script>
+<script type="text/javascript" src="http://zizhujy.com/Scripts/drawing/canvas2image.js"></script>
+<script type="text/javascript" src="http://zizhujy.com/Scripts/flot/jquery.flot.saveAsImage.js"></script>
+
+
+<script type="text/javascript">
+
+$(function() {
+  var positions = {{pos_data}};
+  
+  var d = [];
+  
+  for (var i=0; i< positions.length; i++) {
+  d.push([positions[i][2]*6000, positions[i][7]]);
+}
+
+//example: var d = [[1196463600000, 0], [1196550000000, 0], [1196636400000, 0]]
+
+
+// first correct the timestamps - they are recorded as the daily
+// midnights in UTC+0100, but Flot always displays dates in UTC
+// so we have to add one hour to hit the midnights in the plot
+
+for (var i = 0; i < d.length; ++i) {
+    d[i][0] +=  60*60*1000;
+  }
+
+  // helper for returning the weekends in a period
+    
+function weekendAreas(axes) {
+  var markings = [],
+  d = new Date(axes.xaxis.min);
+
+  // go to the first Saturday
+
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 1) % 7))
+  d.setUTCSeconds(0);
+  d.setUTCMinutes(0);
+  d.setUTCHours(0);
+
+  var i = d.getTime();
+
+  // when we don't set yaxis, the rectangle automatically
+  // extends to infinity upwards and downwards
+
+  do {
+      markings.push({ xaxis: { from: i, to: i + 2 * 24 * 60 * 60 * 1000 } });
+      i += 7 * 24 * 60 * 60 * 1000;
+  } while (i < axes.xaxis.max);
+
+  return markings;
+} // end weekendAreas function
+
+
+  var options = {
+    xaxis: {
+    mode: "time",
+    tickLength: 5
+  },
+  
+  selection: {
+    mode: "x"
+  },
+    grid: {
+    markings: weekendAreas
+    }
+  };
+
+  var plot = $.plot("#placeholder", [d], options);
+
+  var overview = $.plot("#overview", [d], {
+    series: {
+    lines: {
+      show: true,
+      lineWidth: 1
+    },
+    shadowSize: 0
+    },
+    xaxis: {
+    ticks: [],
+    mode: "time"
+    },
+    yaxis: {
+    ticks: [],
+    min: 0,
+    autoscaleMargin: 0.1
+    },
+    selection: {
+    mode: "x"
+    }
+  });
+
+// now connect the two
+
+$("#placeholder").bind("plotselected", function (event, ranges) {
+			
+    // do the zooming
+    $.each(plot.getXAxes(), function(_, axis) {
+      var opts = axis.options;
+      opts.min = ranges.xaxis.from;
+      opts.max = ranges.xaxis.to;
+    });
+  
+    plot.setupGrid();
+    plot.draw();
+    plot.clearSelection();
+
+    // don't fire event on the overview to prevent eternal loop
+    overview.setSelection(ranges, true);
+  });
+
+$("#overview").bind("plotselected", function (event, ranges) {
+    plot.setSelection(ranges);
+  });
+
+// Add the Flot version string to the footer
+
+$("#footer").prepend("Flot " + $.plot.version + " &ndash; ");
+
+}); //end entire function
+
+
+</script>
+
+
+
+
+
 <!--Charts -->
+<!-- 
+
 <script type="text/javascript" src="https://www.google.com/jsapi"></script>
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 <script type="text/javascript">
@@ -290,12 +443,36 @@ function drawChart() {
 } //end drawChart function
  
 </script>
+
+
+
+
+
+
+-->
+
+
+
+
+
+
+
+
 </head>
 
 <body>
 
 <div id = "text">
+
+
+<!--
+
 <button onclick="showDjango()">Show Django</button>
+
+-->
+
+
+
 <center><div id="page_title"><a href='maps4.html'>QRAAT Data</a></div>
 </center>
 <br />
@@ -317,62 +494,28 @@ function submitIfComplete()
     }
 }
 </script>
-
 <h3><center><u>SET PREFERENCES</u></center></h3>
+<!-- THE FORM -->
+<form action ="maps4.html" name="settings" method="get">
+{% for field in form %}
+{{ field.label_tag}} {{field}}<br>
+{% endfor %}
+<font size="1">date range: <b>8/13/2013, 1:57:16 PM</b> to <b>2014-06-16 14:28:12</b></font>
+<center><input type="submit" value="Submit" /></center>
+</form>
 
-<form action="/hello/maps4.html" method="get" id="formID">
- <!--uncomment to submit without button, when tx and datatype are selected
- <select id='tx_ID' name="tx_ID" onchange="submitIfComplete()">
- -->
-  <select id='tx_ID' name="tx_ID">
-      <option value="0">Select transmitter...</option>
-    {% for i in tx_IDs %}
-      {% if i.active %}
-      <option value="{{i.ID}}">{{i.ID}} (ACTIVE)</option>
-      {% else %}
-      <option value="{{i.ID}}">{{i.ID}} (inactive)</option>
-      {% endif %}
-    {% endfor %}
-
-   <!--<option value="0">Select transmitter...</option>
-    <option value="1">Transmitter 1</option>
-    <option value="2">Transmitter 2</option>
-    <option value="3">Transmitter 3</option> -->
-  </select>
-<br><font size="1"> Note: only 63 and 64 are distinct in my local db</font>
-    
-<br /><select id='data_type' name='data_type'>
-  <!-- <select id='data_type' name='data_type' onchange="submitIfComplete()"> -->
-    <option value="0">Select data type...</option>
-    <option value="pos">Positions</option>
-    <option value="trk">Tracks</option>
-  </select>
-  
-<br /><br />
-  FROM Date/Time <font size="1">(YYYY-MM-DD HH:MM:SS)</font><br /><input type="datetime" value="2014-06-10 10:01:10" name="dt_fr" id="dt_fr">
-  <br />
-  TO Date/Time <font size="1">(YYY-MM-DD HH:MM:SS)</font><br /> <input type="datetime" value="2014-06-12 20:10:04" name="dt_to" id="dt_to">
-
-<br><br>
-Show: <br />
-  <input type="checkbox" id="pref1" name="pref" value="l_l">lat,lon 
-  <input type="checkbox" id="pref2" name="pref" value="prb">likelihood
-  <input type="checkbox" id="pref3" name="pref" value="act">activity
-
-<br><input type="submit" value="Submit" />
-
-</form><br />
-<b>{{tx}} {{data_type}} {{dt_fr}} {{dt_to}} {{pref}}</b>
+<br />
+<b>{{tx}} {{data_type}} {{dt_fr}} {{dt_to}} {{pref}} Number of positions: {{pos_data|length}}</b>
 </div><!-- end prefs -->
 
-<br><center><a href="list.html" target="export">Export view as .kml file</a></center><br>
+<br><center><a href="/hellotest/index.html" target="export">Export view as .kml file</a></center><br>
 
 <div id="mouseover">
 <h3><center><u>MOUSEOVER INFO</u></center></h3>
 <!-- js line ~55 -->
 <b>Lat, Long: </b>
 <span id="latlong"></span>
-<br />
+<br>
 <b>Clicked: </b> 
 <input type="text" id="latlongclicked" style="width:300px; border:1px inset gray;"></span>
 
@@ -397,14 +540,31 @@ Lng: <p id ="lngspan"></p>
 </div> <!-- end text -->
 
 <!-- right side -->
-<div id="map-canvas"></div><br />
+<div id="map-canvas"></div>
 
-<div id="charts">
+
+<div id="content">
+
+		<div class="demo-container">
+			<div id="placeholder" class="demo-placeholder"></div>
+		</div>
+
+		<div class="demo-container" style="height:100px;">
+			<div id="overview" class="demo-placeholder"></div>
+		</div>
+
+	</div>
+
+<!--
+<div id="charts"><br>
+
+
+
 <div id="chart_div"></div>
 <div id="chart_div2"></div>
 </div>
 
-<!--<div id="chart">
+<div id="chart">
 Activity Chart (static image)<br/ >
 <img src="../static/hello/linegraph.gif" width="200" height="150">
 </div> -->

@@ -61,15 +61,15 @@ WSGI_APPLICATION = 'qraatview.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'djangodb',
-		'USER': 'django_user',
-		'PASSWORD': 'temp_password',
+        'NAME': 'django',
+		'USER': 'root',
+		'PASSWORD': 'woodland',
     },
 	'qraat': {
 		'ENGINE': 'django.db.backends.mysql',
 		'NAME': 'qraat',
-		'USER': 'qraat',
-		'PASSWORD': 'KJsBA!Zl',
+		'USER': 'root',
+		'PASSWORD': 'woodland',
 	}
 }
 
