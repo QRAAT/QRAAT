@@ -577,18 +577,20 @@ class Track:
     
       :return: (mean, std) tuple. 
     '''
-    if len(self.table) > 0: 
-      speeds = []
-      for i in range(len(self.table)-1): 
-        # (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) 
-        P = np.complex(self.table[i+1][4], self.table[i+1][3])
-        Q = np.complex(self.table[i][4], self.table[i][3])
-        t_p = self.table[i+1][2]
-        t_q = self.table[i][2]
-        speeds.append( distance(P, Q) / (t_p - t_q) )
-      return (np.mean(speeds), np.std(speeds))
-    
-    else: return (np.nan, np.nan)
+    # TODO Rewrite
+    #if len(self.table) > 0: 
+    #  speeds = []
+    #  for i in range(len(self.table)-1): 
+    #    # (pos_id, dep_id, t, easting, northing, utm_number, letter, ll, activity) 
+    #    P = np.complex(self.table[i+1][4], self.table[i+1][3])
+    #    Q = np.complex(self.table[i][4], self.table[i][3])
+    #    t_p = self.table[i+1][2]
+    #    t_q = self.table[i][2]
+    #    speeds.append( distance(P, Q) / (t_p - t_q) )
+    #  return (np.mean(speeds), np.std(speeds))
+    # 
+    # else: return (np.nan, np.nan)
+    return (np.nan, np.nan)
 
   def stats(self):
     ''' Piecewise velocity and acceleration along critcal path. '''   
