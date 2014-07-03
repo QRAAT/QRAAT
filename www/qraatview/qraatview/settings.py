@@ -65,7 +65,7 @@ DATABASES = {
         'NAME': 'django',
         'USER': 'root',
 	'PASSWORD': 'woodland', 
-    },
+        },
 	'qraat': {
 		'ENGINE': 'django.db.backends.mysql',
 		'NAME': 'qraat',
