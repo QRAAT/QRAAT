@@ -20,6 +20,7 @@ import matplotlib.pyplot as pp
 import matplotlib.image as mpimg
 import numpy as np
 import time
+import sys
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -54,6 +55,10 @@ track = qraat.srv.track.Track(db_con,
 
 track.export_kml('track%d' % options.track_id, options.track_id)
 
+if len(track) == 0:
+  print >>sys.stderr, "plot_track: nothing to plot."
+  sys.exit(0)
+  
 print len(track)
 # We then calculate statistics on the transition speeds in the 
 # critical path. Plotting the tracks might reveal spurious points
@@ -68,7 +73,7 @@ print "speed        (mu=%.4f, sigma=%.4f)" % (mean, std)
 if overlay: 
 
   # FIXME Where/how to install this file? 
-  bg = mpimg.imread('/home/christopher/continuum/work/QRAAT/QRAAT/serv/visualize/qr-overlay.png') 
+  bg = mpimg.imread('qr-overlay.png') 
 
   e0 = 572599.5 - 150
   e1 = 577331.4 - 150
