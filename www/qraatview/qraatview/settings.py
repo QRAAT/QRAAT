@@ -39,6 +39,7 @@ INSTALLED_APPS = (
 	'hello',
 	'hellotest',
 	'qraat_auth',
+	'qraat_site',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -79,7 +80,9 @@ DATABASES = {
 	},
 }
 
-DATABASE_ROUTERS = ['hello.router.QraatRouter', 'qraat_auth.router.AuthRouter',]
+DATABASE_ROUTERS = [ 'qraat_site.router.DatabaseAppsRouter',]
+DATABASE_APPS_MAPPING = {'qraat_site':'auth',
+			 'qraat_auth': 'auth'}
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/

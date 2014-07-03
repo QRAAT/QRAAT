@@ -12,4 +12,5 @@ urlpatterns = patterns('',
   url(r'^admin/', include(admin.site.urls)),
   url(r'^hellotest/', include('hellotest.urls')),
   url(r'^auth/', include('qraat_auth.urls', namespace="auth")),
+  url(r'^qraat/', include('qraat_site.urls', namespace="qraat")),
 )
