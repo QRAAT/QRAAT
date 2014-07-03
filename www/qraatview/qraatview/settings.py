@@ -38,7 +38,8 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
 	'hello',
 	'hellotest',
-
+	'qraat_auth',
+	'qraat_site',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -53,7 +54,7 @@ MIDDLEWARE_CLASSES = (
 ROOT_URLCONF = 'qraatview.urls'
 
 WSGI_APPLICATION = 'qraatview.wsgi.application'
-
+#AUTH_USER_MODEL = 'qraat_auth.People'
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
@@ -62,18 +63,26 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'django',
-		'USER': 'root',
-		'PASSWORD': 'woodland',
+        'USER': 'root',
+	'PASSWORD': 'woodland', 
     },
 	'qraat': {
 		'ENGINE': 'django.db.backends.mysql',
 		'NAME': 'qraat',
-		'USER': 'root',
-		'PASSWORD': 'woodland',
-	}
+		'USER': 'qraat',
+		'PASSWORD': 'KJsBA!Zl',
+	},
+	'auth': {
+		'ENGINE': 'django.db.backends.mysql',
+		'NAME': 'auth',
+		'USER': 'authuser',
+		'PASSWORD': 'authpassword',
+	},
 }
 
-DATABASE_ROUTERS = ['hello.router.QraatRouter',]
+DATABASE_ROUTERS = [ 'qraat_site.router.DatabaseAppsRouter',]
+DATABASE_APPS_MAPPING = {'qraat_site':'auth',
+			 'qraat_auth': 'auth'}
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/
@@ -92,4 +101,4 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.6/howto/static-files/
 
-STATIC_URL = '/static/'
+STATIC_URL = "/static/"
