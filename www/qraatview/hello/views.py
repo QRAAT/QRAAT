@@ -6,7 +6,6 @@ from django.shortcuts import render, render_to_response, get_object_or_404
 from django.core.urlresolvers import reverse
 import qraat, time, datetime, json, utm
 
-from hello.maps import Convert
 from hello.models import Position, tx_ID, track, sitelist
 from hello.forms import Form
 

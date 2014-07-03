@@ -37,7 +37,6 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
 	'hello',
-	'hellotest',
 	'qraat_auth',
 	'qraat_site',
 )
@@ -69,8 +68,8 @@ DATABASES = {
 	'qraat': {
 		'ENGINE': 'django.db.backends.mysql',
 		'NAME': 'qraat',
-		'USER': 'qraat',
-		'PASSWORD': 'KJsBA!Zl',
+		'USER': 'root',
+		'PASSWORD': 'woodland',
 	},
 	'auth': {
 		'ENGINE': 'django.db.backends.mysql',
@@ -82,7 +81,7 @@ DATABASES = {
 
 DATABASE_ROUTERS = [ 'qraat_site.router.DatabaseAppsRouter',]
 DATABASE_APPS_MAPPING = {'qraat_site':'auth',
-			 'qraat_auth': 'auth'}
+			 'qraat_auth': 'auth', 'hello': 'qraat'}
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/
