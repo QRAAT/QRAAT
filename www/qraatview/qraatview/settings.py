@@ -30,12 +30,12 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = (
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.admin',
 	'hello',
 	'qraat_auth',
 	'qraat_site',
@@ -53,7 +53,8 @@ MIDDLEWARE_CLASSES = (
 ROOT_URLCONF = 'qraatview.urls'
 
 WSGI_APPLICATION = 'qraatview.wsgi.application'
-#AUTH_USER_MODEL = 'qraat_auth.People'
+#AUTH_USER_MODEL = 'qraat_auth.QraatUser'
+AUTHENTICATION_BACKENDS = ('qraat_auth.models.QraatUserBackend',)
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
@@ -81,7 +82,8 @@ DATABASES = {
 
 DATABASE_ROUTERS = [ 'qraat_site.router.DatabaseAppsRouter',]
 DATABASE_APPS_MAPPING = {'qraat_site':'auth',
-			 'qraat_auth': 'auth', 'hello': 'qraat'}
+			 'qraat_auth': 'auth', 'hello': 'qraat',
+			}	
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/
