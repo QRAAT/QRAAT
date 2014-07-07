@@ -10,7 +10,7 @@ input, select { font: normal 14px "omnes-pro", Helvetica, Arial, sans-serif; }
 
 #content {
         float: right;
-	width: 700px;
+	width: 600px;
 	margin: 0 auto;
 	padding: 10px;
 }
@@ -26,7 +26,7 @@ input, select { font: normal 14px "omnes-pro", Helvetica, Arial, sans-serif; }
 .demo-container {
         float: right;
         box-sizing: border-box;
-	width: 700px;
+	width: 600px;
 	height: 200px;
 /*	padding: 20px 15px 15px 15px;
 	margin: 15px auto 30px auto; */
