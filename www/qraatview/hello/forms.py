@@ -1,4 +1,4 @@
-# hellotest forms.py
+# hello forms.py
 
 from django import forms
 from hello.models import sitelist, tx_ID, Position, track
@@ -39,15 +39,16 @@ class Form(forms.Form):
   trans = forms.ChoiceField(choices=get_choices(), label='Transmitter', initial=63)
   dt_fr = forms.DateTimeField(required = True, 
           label="From date/time (yyyy-mm-dd hh-mm-ss)", 
-          initial="2014-06-15 20:57:16")
-          #default=datetime.now
+          initial="2013-08-13 13:57:16")
   dt_to = forms.DateTimeField(required = True, 
           label="To date/time (yyyy-mm-dd hh-mm-ss", 
-          initial="2014-06-16 10:01:10")
+          initial="2014-06-16 14:28:12")
   zoom = forms.ChoiceField(choices=ZOOM_CHOICES, required = True, label='Default Zoom', initial=14)
+  
+  sites = forms.BooleanField(required=True, label="Show Site Locations", initial=True)
   ll = forms.BooleanField(required=True, label="Show Lat, Lon", initial=True)
   ne = forms.BooleanField(required = True, label="Show Northing, Easting", initial=True)
   lk = forms.BooleanField(required = True, label="Show Likelihood", initial=True)
-  lk_l = forms.FloatField(required=True, label="Likelihood Lower Bound", initial=500.0)
+  lk_l = forms.FloatField(required=True, label="Likelihood Lower Bound", initial=200.0)
   lk_h = forms.FloatField(required=True, label="Likelihood Upper Bound", initial=1000.0)
   activity = forms.BooleanField(required=True, label="Show Activity", initial=True)

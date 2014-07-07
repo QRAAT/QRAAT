@@ -1,4 +1,4 @@
-<!-- File: maps4.html -->
+<!-- File: index.html -->
 
 <!DOCTYPE html>
 <html>
@@ -6,13 +6,14 @@
   <title>QRAAT APP</title>
   <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
   <style type="text/css">
+    button { font: normal 14px "omnes-pro", Helvetica, Arial, sans-serif; }
     html { height: 100% }
-    body { height: 100%; margin: 0; padding: 0 }
+    body { height: 100%; margin: 0; padding: 0; font: normal 14px "omnes-pro", Helvetica, Arial, sans-serif; }
     #map-canvas { margin-top: 1cm; margin-right: 0.25cm; height: 60%; width: 63%; float: right; }
     #text {width: 33%; height: 90%; float: left; font-size: 14px; margin: 1%; }
     #page_title {font-size: 30px; font-weight:bold; }
     #prefs {border-style:solid; border-width: 1px; height: 45%; overflow: scroll; padding: 10px; }
-    #mouseover {border-style:solid; border-width: 1px; height: 40%; overflow: scroll; padding: 10px;}
+    #mouseover {border-style:solid; border-width: 1px; height: 42%; overflow: scroll; padding: 10px;}
    /*  #charts {float: right; } */
   </style>
 
@@ -22,17 +23,29 @@
 </script>
 
 <script type="text/javascript">
+//global variable to highlight poly
+var highlightedPoly;
+
 //show alert
   function showDjango() {
-    var django_pos = 4;
-    window.alert(django_pos);
+    //var myzoom = '{{zoom}}';
+    window.alert(myzoom);
   }
  
   function initialize() {
     self.lat = 38.4897343239;
     self.lng = -122.145749745;
     var myLatLng = new google.maps.LatLng(self.lat, self.lng);
-
+    
+   // var zm = {{zoom}};
+   // if (zm.toString().length > 0) {
+   //   var zom = zm;
+   // }
+    //else {
+    //  var zom = 14;
+   // }
+   
+   // var myzoom = {{zoom}}; 
     var mapOptions = {
       center: myLatLng,
       zoom: 14,
@@ -53,21 +66,20 @@
     //var mouseover_len = {{data_list_len}};
     
     var django_position = {{pos_data}};
-    
+    var selected_data = {{selected_data}};
     var map = new google.maps.Map(document.getElementById("map-canvas"),
       mapOptions);
-    
+
+
+//clicked lat/lon
     google.maps.event.addListener(map,'click',function(event){
         document.getElementById('latlongclicked').value = event.latLng.lat() + ', ' + event.latLng.lng()
-
-    //for (i=0; i=mouseover_len-1; i++) {
-    //  if ((Math.abs(event.latLng.lat() - mouseover_data[i][8][0]) < 0.0001) && 
-    //      (Math.abs(event.latLng.lng() - mouseover_data[i][8][1]) < 0.0001))
-    //    {
-    //         document.getElementById('m_easting').innerHTML = mouseover_data[i][3];
-    //    }
-    //  }
+    
+    var clicked_iat = event.latLng.lat()
+    var clicked_lng = event.latLng.lng()
     });
+
+    
 //mouseover lat/lon
     google.maps.event.addListener(map,'mousemove',function(event){
       //document.getElementById('latspan').innerHTML = event.latLng.lat()
@@ -93,15 +105,39 @@
       //  }
       //}
 
-      document.getElementById('m_easting').innerHTML = django_position[0][3];
-      document.getElementById('m_northing').innerHTML = django_position[0][4];
-      document.getElementById('m_date').innerHTML = django_position[0][2];
-      document.getElementById('m_time').innerHTML = django_position[0][2];
-      document.getElementById('m_activity').innerHTML = django_position[0][7];
-      document.getElementById('m_likelihood').innerHTML = django_position[0][6];
-      document.getElementById('m_animal_ID').innerHTML = django_position[0][0];
-      document.getElementById('m_species').innerHTML = 'species here.<br /> <b>listLat:</b> '+django_position[0][8][0]+'<br /> <b>listLon:</b> '+django_position[0][8][1];
-      document.getElementById('m_transmitter').innerHTML = django_position[0][1];
+
+//if the json.dumps(pos_data) is not an empty list []
+
+
+
+//static data
+//if (django_position.length > 2) {
+//      document.getElementById('m_easting').innerHTML = django_position[0][3];
+//      document.getElementById('m_northing').innerHTML = django_position[0][4];
+//      document.getElementById('m_date').innerHTML = django_position[0][2];
+//      document.getElementById('m_time').innerHTML = django_position[0][2];
+//      document.getElementById('m_activity').innerHTML = django_position[0][7];
+//      document.getElementById('m_likelihood').innerHTML = django_position[0][6];
+//      document.getElementById('m_animal_ID').innerHTML = django_position[0][0];
+//      document.getElementById('m_species').innerHTML = 'species here.<br /> <b>listLat:</b> '+django_position[0][8][0]+'<br /> <b>listLon:</b> '+django_position[0][8][1];
+//      document.getElementById('m_transmitter').innerHTML = django_position[0][1];
+    
+//} 
+
+
+if (selected_data.length > 4) {
+      document.getElementById('m_easting').innerHTML = selected_data[3];
+      document.getElementById('m_northing').innerHTML = selected_data[4];
+      document.getElementById('m_date').innerHTML = selected_data[2];
+      document.getElementById('m_time').innerHTML = selected_data[2];
+      document.getElementById('m_activity').innerHTML = selected_data[7];
+      document.getElementById('m_likelihood').innerHTML = selected_data[6];
+      document.getElementById('m_animal_ID').innerHTML = selected_data[0];
+      document.getElementById('m_species').innerHTML = 'species here.'
+      document.getElementById('m_transmitter').innerHTML = selected_data[1];
+    
+}
+
     }); //end onemousemove event listener
 
 // ONE MARKER AT MYLATLNG WITH INFOWINDOW
@@ -131,13 +167,26 @@
 
 //Site Markers    
     // pass in site locations from json from models
-    
-   var site_list = {{ siteslist }};
+
+var site_checked = {{site_checked}};
+ 
+var site_list = {{ siteslist }};
 
   var locations = [];
-  for (var i = 0; i < site_list.length; i++) {
+
+
+//show site markers if site is checked in preferences
+if (site_checked ==1) {
+for (var i = 0; i < site_list.length; i++) {
     locations.push([site_list[i][0], site_list[i][1], site_list[i][2], site_list[i][0]]);
     }
+}
+
+
+//without the else, there is a "TypeError: a is undefined" probably because locations would be empty
+else {
+locations.push([1,1,1,1]);
+}
 
 //    var locations = [
 //      ['Site 1', 38.483052371711864, -122.14958038408795, 1],
@@ -152,10 +201,12 @@
 //      ['Center for pos estimation', 38.48973432391515, -122.1457497450115, 10]
 //      ];
 
+
     var infowindow = new google.maps.InfoWindow();
     var marker, i;
     var markers = new Array();
-    for (i = 0; i < locations.length; i++) {
+
+ for (i = 0; i < locations.length; i++) {
       marker = new google.maps.Marker({
         position: new google.maps.LatLng(locations[i][1], locations[i][2]),
         map: map
@@ -170,6 +221,8 @@
         }
       })(marker, i));
     } //endfor
+
+
 
 //Red lines, Flight Plan
   //using json to pass in lat lon points from database for line
@@ -191,7 +244,9 @@
    //   flightPlanCoordinates2.push(point);
    // }
 
- //red polyline
+
+
+ //Draw the red polyline
     var flightPath = new google.maps.Polyline({
       path: flightPlanCoordinates,
       geodesic: true,
@@ -201,7 +256,23 @@
 
     flightPath.setMap(map);
 
+    
+    google.maps.event.addListener(flightPath, 'mouseover', function() {
+      flightPath.setOptions({strokeColor: '#00FFaa'});
+    });
+
+    google.maps.event.addListener(flightPath, 'mouseout', function () {
+      flightPath.setOptions({strokeColor: '#FF00FF'});
+    });
+
+//infowindow for markers
     google.maps.event.addListener(marker, 'click', function() {
+     // if (highlightedPoly) { //
+     //   highlightedPoly.setOptions({strokeColor: '#FF000F'});//
+     // }//
+     // flightPath.setOptions({strokeColor: '#00FFaa'});//
+     // highlightedPoly = flightPath;//
+      //flightPath.setOptions({strokeColor: '#00FFaa'});  //
       infowindow.open(map,marker);
      });
 
@@ -233,22 +304,25 @@ function show_latlng() {
       'Currently located at (Latitude, Longitude): <b>('
       +self.newlat+', '+self.newlng+')</b>.';
   }
+
 </script>
 
+<link href="../static/flot/example.css" rel="stylesheet" type="text/css">
 
+
+{% if pos_data|length > 10 %}
 <!-- JQUERY CHARTS WITH FLOT -->
 <!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 -->
-<link href="../static/example.css" rel="stylesheet" type="text/css">
-<script src="../static/jquery-1.11.1.min.js"></script>
-<script src="../static/flot/jquery.flot.js"></script>
+<script src="../static/flot/jquery-1.11.1.min.js"></script>
+<script src="../static/flot/jquery.flot.min.js"></script>
 
 <!-- "visitors" plugins (2 charts/zooming) -->
-<script src ="../static/flot/jquery.flot.time.js"></script>
-<script src ="../static/flot/jquery.flot.selection.js"></script>
+<script src ="../static/flot/jquery.flot.time.min.js"></script>
+<script src ="../static/flot/jquery.flot.selection.min.js"></script>
 
-<script src="../static/flot/jquery.flot.threshold.js"></script>
-<script src="../static/flot/jquery.flot.resize.js"></script>
+<script src="../static/flot/jquery.flot.threshold.min.js"></script>
+<script src="../static/flot/jquery.flot.resize.min.js"></script>
 
 <!-- plugins for saving graphs as images -->
 <script type="text/javascript" src="http://zizhujy.com/Scripts/base64.js"></script>
@@ -263,8 +337,21 @@ $(function() {
   
   var d = [];
   
+  var act_checked = {{act_checked}};
+  var lk_checked = {{lk_checked}};
+
+if (act_checked == 1) {
   for (var i=0; i< positions.length; i++) {
-  d.push([positions[i][2]*6000, positions[i][7]]);
+  //likelihood is 6 and activity is 7
+  d.push([positions[i][2]*6000 + 60*60*1000, positions[i][7]]);
+}
+}
+
+if (lk_checked ==1) {
+  for (var i=0; i< positions.length; i++) {
+  //likelihood is 6 and activity is 7
+  d.push([positions[i][2]*6000 + 60*60*1000, positions[i][6]]);
+}
 }
 
 //example: var d = [[1196463600000, 0], [1196550000000, 0], [1196636400000, 0]]
@@ -274,9 +361,9 @@ $(function() {
 // midnights in UTC+0100, but Flot always displays dates in UTC
 // so we have to add one hour to hit the midnights in the plot
 
-for (var i = 0; i < d.length; ++i) {
-    d[i][0] +=  60*60*1000;
-  }
+// for (var i = 0; i < d.length; ++i) {
+//    d[i][0] +=  60*60*1000;
+//  }
 
   // helper for returning the weekends in a period
     
@@ -366,7 +453,6 @@ $("#overview").bind("plotselected", function (event, ranges) {
     plot.setSelection(ranges);
   });
 
-// Add the Flot version string to the footer
 
 $("#footer").prepend("Flot " + $.plot.version + " &ndash; ");
 
@@ -375,8 +461,7 @@ $("#footer").prepend("Flot " + $.plot.version + " &ndash; ");
 
 </script>
 
-
-
+{% endif %}
 
 
 <!--Charts -->
@@ -443,20 +528,7 @@ function drawChart() {
 } //end drawChart function
  
 </script>
-
-
-
-
-
-
 -->
-
-
-
-
-
-
-
 
 </head>
 
@@ -464,20 +536,15 @@ function drawChart() {
 
 <div id = "text">
 
-
-<!--
-
 <button onclick="showDjango()">Show Django</button>
 
--->
-
-
-
-<center><div id="page_title"><a href='maps4.html'>QRAAT Data</a></div>
+<center>
+<div id="page_title"><a href='index.html'>QRAAT Data</a></div>
+<a href="index.html" target="export">Export view as .kml file</a><br>
 </center>
 <br />
-<div id ="prefs">
 
+<div id ="prefs">
 <script type="text/javascript">
 function submitIfComplete()
 {
@@ -496,23 +563,36 @@ function submitIfComplete()
 </script>
 <h3><center><u>SET PREFERENCES</u></center></h3>
 <!-- THE FORM -->
-<form action ="maps4.html" name="settings" method="get">
+<form action ="index.html" name="settings" method="get">
 {% for field in form %}
 {{ field.label_tag}} {{field}}<br>
 {% endfor %}
 <font size="1">date range: <b>8/13/2013, 1:57:16 PM</b> to <b>2014-06-16 14:28:12</b></font>
+<!-- will be replaced by javascript -->
+<br>Latitude: <input type="text" name="lat_input" value="38.488473">
+<br>Longitude: <input type="text" name="lng_input" value="-122.160824">
+
+
 <center><input type="submit" value="Submit" /></center>
 </form>
 
+
+<br>
+<button onclick="showPositions()">Show displayed positions</button>
+
+
 <br />
-<b>{{tx}} {{data_type}} {{dt_fr}} {{dt_to}} {{pref}} Number of positions: {{pos_data|length}}</b>
+<b>{{tx}} {{data_type}} {{dt_fr}} {{dt_to}} {{zoom}} {{pref}} Number of positions: 
+{{positions|length}}</b>
 </div><!-- end prefs -->
 
-<br><center><a href="/hellotest/index.html" target="export">Export view as .kml file</a></center><br>
+
+<br><br>
 
 <div id="mouseover">
 <h3><center><u>MOUSEOVER INFO</u></center></h3>
 <!-- js line ~55 -->
+<center>Map Info</center>
 <b>Lat, Long: </b>
 <span id="latlong"></span>
 <br>
@@ -523,7 +603,8 @@ function submitIfComplete()
 Lat: <p id="latspan"></p>
 Lng: <p id ="lngspan"></p>
 -->
-<br /><b>Easting: </b><span id="m_easting"></span>
+<br><br><center>Data Info</center>
+<b>Easting: </b><span id="m_easting"></span>
 <br /><b>Northing: </b><span id="m_northing"></span>
 <br />
 <br /><b>Date: </b><span id="m_date"></span>
@@ -542,8 +623,10 @@ Lng: <p id ="lngspan"></p>
 <!-- right side -->
 <div id="map-canvas"></div>
 
-
+{% if positions %}
+<!-- FLOT CHART -->
 <div id="content">
+Activity vs. Time:
 
 		<div class="demo-container">
 			<div id="placeholder" class="demo-placeholder"></div>
@@ -554,10 +637,9 @@ Lng: <p id ="lngspan"></p>
 		</div>
 
 	</div>
-
+{% endif %}
 <!--
 <div id="charts"><br>
-
 
 
 <div id="chart_div"></div>
