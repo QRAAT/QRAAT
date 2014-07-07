@@ -37,6 +37,9 @@ class TxType(models.Model):
     RMG_type = models.CharField(max_length=20)  # varchar(20)
     tx_table_name = models.CharField(max_length=30)  # varchar(30)
 
+    def __unicode__(self):
+        return u'%d' % self.ID
+
 
 class TxInfo(models.Model):
         class Meta:
@@ -44,10 +47,13 @@ class TxInfo(models.Model):
             db_table = "tx_info"
 
         ID = models.AutoField(primary_key=True)
-        tx_type_ID = models.OneToOneField(
-            TxType)  # One to One relation with tx_type
+        tx_type_ID = models.ForeignKey(
+            TxType, db_column="tx_type_ID")  # One to One relation with tx_type
         manufacturer = models.CharField(max_length=50)  # varchar(50)
         model = models.CharField(max_length=50)  # varchar(50)
+
+        def __unicode__(self):
+            return u'%d' % self.ID
 
 
 class tx_ID(models.Model):
@@ -57,8 +63,12 @@ class tx_ID(models.Model):
 
     ID = models.AutoField(
         primary_key=True)  # int(10) primary key autoincrement
-    tx_info_ID = models.OneToOneField(TxInfo)  # foreignKey from tx_info
+    tx_info_ID = models.ForeignKey(
+        TxInfo, db_column="tx_info_ID")  # foreignKey from tx_info
     active = models.BooleanField(default=False)  # tinyint(1)
+
+    def __unicode__(self):
+        return u'%d' % self.ID
 
 
 class TxPulse(models.Model):
@@ -66,7 +76,7 @@ class TxPulse(models.Model):
         app_label = QRAAT_APP_LABEL
         db_table = "tx_pulse"
 
-    tx_ID = models.OneToOneField(tx_ID, primary_key=True)
+    tx_ID = models.ForeignKey(tx_ID, primary_key=True, db_column="tx_ID")
     frequency = models.FloatField()  # float
     pulse_width = models.FloatField()  # float
     pulse_rate = models.FloatField()  # float
@@ -80,7 +90,7 @@ class TxAlias(models.Model):
         db_table = "tx_alias"
 
     ID = models.AutoField(primary_key=True)
-    tx_ID = models.OneToOneField(tx_ID)
+    tx_ID = models.ForeignKey(tx_ID, db_column="tx_ID")
     alias = models.CharField(max_length=50)  # varchar(50)
 
 
@@ -90,7 +100,7 @@ class track(models.Model):
         db_table = "track"
         unique_together = ("ID", "depID")
 
-    SPEED_CHOICES = (('0', 'exp'), ('1', 'linear'), ('2', 'const'))
+    SPEED_CHOICES = (('1', 'exp'), ('2', 'linear'), ('3', 'const'))
 
     ID = models.AutoField(primary_key=True)
     depID = models.BigIntegerField(max_length=20)
@@ -100,6 +110,8 @@ class track(models.Model):
     speed_sustained = models.FloatField()
     speed_limit = models.FloatField()
 
+    def __unicode__(self):
+        return u'%s' % self.ID
 
 class sitelist(models.Model):
     class Meta:
@@ -135,3 +147,6 @@ class sitelist(models.Model):
         decimal_places=2)  # decimal(7,2), default 0.00
 
     rx = models.SmallIntegerField(default=1)  # tinyint(1), default 1
+
+    def __unicode__(self):
+        return u'%s' % self.name
