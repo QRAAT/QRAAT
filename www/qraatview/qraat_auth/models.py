@@ -5,6 +5,7 @@ from django.contrib.auth.models import User, check_password
 # Create your models here.
 
 class QraatUserManager(BaseUserManager):
+	""" User manager that creates and save a user at qraat User table """
 	def create_user(self, username, email, password=None):
 		if not email:
 			raise ValueError("Users must have an email address")
@@ -54,19 +55,26 @@ class QraatUser(AbstractBaseUser):
 
 
 class QraatUserBackend(object):
+	""" User authentication backed.
+		Authenticates user against the qraat user database"""
 	def authenticate(self, username=None, password=None):
 		try:
 			q_user = QraatUser.objects.get(username=username)
 		except QraatUser.DoesNotExist:
 			return None
 		else:
-			if q_user.check_password(password):
-				try:
+			if q_user.check_password(password): #Matching user password
+				try: # If user doesn't exist creates it
 					user = User.objects.get(username=username)
 				except User.DoesNotExist:
 					user = User(username=username)
-					user.set_password(password)
-					user.save()
+				
+				if q_user.is_admin: # Set user permissions
+					user.is_staff = True
+					user.is_superuser = True
+				
+				user.save()
+
 				return user
 		return None	
 	
