@@ -53,7 +53,7 @@ class TxInfo(models.Model):
         model = models.CharField(max_length=50)  # varchar(50)
 
         def __unicode__(self):
-            return u'%d' % self.ID
+            return u'%d %s' % (self.ID, self.model)
 
 
 class tx_ID(models.Model):
