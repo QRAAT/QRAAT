@@ -44,7 +44,7 @@ class TxInfo(models.Model):
             db_table = "tx_info"
 
         ID = models.AutoField(primary_key=True)
-        tx_type = models.OneToOneField(
+        tx_type_ID = models.OneToOneField(
             TxType)  # One to One relation with tx_type
         manufacturer = models.CharField(max_length=50)  # varchar(50)
         model = models.CharField(max_length=50)  # varchar(50)
