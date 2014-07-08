@@ -100,18 +100,19 @@ class track(models.Model):
         db_table = "track"
         unique_together = ("ID", "depID")
 
-    SPEED_CHOICES = (('1', 'exp'), ('2', 'linear'), ('3', 'const'))
+    SPEED_CHOICES = (('exp', 'exp'), ('linear', 'linear'), ('const', 'const'))
 
     ID = models.AutoField(primary_key=True)
     depID = models.BigIntegerField(max_length=20)
     max_speed_family = models.CharField(
-        max_length=1, choices=SPEED_CHOICES)  # enum('exp','linear','const')
+        max_length=6, choices=SPEED_CHOICES)  # enum('exp','linear','const')
     speed_burst = models.FloatField()
     speed_sustained = models.FloatField()
     speed_limit = models.FloatField()
 
     def __unicode__(self):
         return u'%s' % self.ID
+
 
 class sitelist(models.Model):
     class Meta:

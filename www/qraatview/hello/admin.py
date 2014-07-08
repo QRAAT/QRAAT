@@ -19,15 +19,33 @@ class PollAdmin(admin.ModelAdmin):
 
 
 class TransmitterAdmin(admin.ModelAdmin):
-    list_display = ('ID', 'active', 'tx_info_ID')
+    list_display = ('ID', 'Manufacturer',
+                    'Model', 'RMG_type', 'Tx_table_name', 'active')
     list_filter = ('active',)
-    ordering = ('ID',)
+    ordering = ('-active', 'ID')
+
+    def Manufacturer(self, obj):
+        return obj.tx_info_ID.manufacturer
+
+    def Model(self, obj):
+        return obj.tx_info_ID.model
+
+    def RMG_type(self, obj):
+        return obj.tx_info_ID.tx_type_ID.RMG_type
+
+    def Tx_table_name(self, obj):
+        return obj.tx_info_ID.tx_type_ID.tx_table_name
+
+
+class TransmitterInline(admin.StackedInline):
+    model = tx_ID
 
 
 class TxInfoAdmin(admin.ModelAdmin):
     list_display = ('ID', 'tx_type_ID', 'manufacturer', 'model')
     list_fiter = ('tx_type_ID', )
     ordering = ('ID',)
+    inlines = [TransmitterInline, ]
 
 
 class TxTypeAdmin(admin.ModelAdmin):
