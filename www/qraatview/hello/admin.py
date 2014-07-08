@@ -1,6 +1,7 @@
 #from hello.models import Position
 from django.contrib import admin
 from hello.models import sitelist, track, tx_ID, TxType, TxInfo
+from hello.models import TxAlias, TxPulse
 """
 #admin.site.register(Poll)
 
@@ -54,6 +55,15 @@ class TxTypeAdmin(admin.ModelAdmin):
     ordering = ('ID', )
 
 
+class TxAliasAdmin(admin.ModelAdmin):
+    list_display = ('ID', 'alias', 'tx_ID')
+
+
+class TxPulseAdmin(admin.ModelAdmin):
+    list_display = ('tx_ID', 'frequency', 'pulse_width',
+            'pulse_rate', 'band3', 'band10')
+
+
 class SiteListAdmin(admin.ModelAdmin):
     list_display = ('ID', 'name', 'location',
                     'latitude', 'longitude', 'easting', 'northing',
@@ -68,8 +78,11 @@ class TrackAdmin(admin.ModelAdmin):
     list_filter = ('max_speed_family', )
     ordering = ('ID', 'depID')
 
+
 admin.site.register(sitelist, SiteListAdmin)
 admin.site.register(track, TrackAdmin)
 admin.site.register(tx_ID, TransmitterAdmin)
 admin.site.register(TxInfo, TxInfoAdmin)
 admin.site.register(TxType, TxTypeAdmin)
+admin.site.register(TxAlias, TxAliasAdmin)
+admin.site.register(TxPulse, TxPulseAdmin)
