@@ -1,0 +1,25 @@
+{% extends "qraat_site/base.html" %}
+
+{% block content %}
+<table class="table">
+    <tr>
+        <td>Transmitter</td>
+        <td>Manufacturer</td>
+        <td>Model</td>
+        <td>RMG_type</td>
+        <td>tx_table_name</td>
+    </tr>
+    {% for transmitter in transmitters  %}
+        <tr>
+            <td>
+                <a href="transmitter/{{transmitter.ID}}">
+                    Tx-Serial {{transmitter.ID}}</a>
+            </td>
+            <td>{{transmitter.tx_info_ID.manufacturer}}</td>
+            <td>{{transmitter.tx_info_ID.model}}</td>
+            <td>{{transmitter.tx_info_ID.tx_type_ID.RMG_type}}</td>
+            <td>{{transmitter.tx_info_ID.tx_type_ID.tx_table_name}}</td>
+        </tr>
+    {% endfor %}
+</table>
+{% endblock %}

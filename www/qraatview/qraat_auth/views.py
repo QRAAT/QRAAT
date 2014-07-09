@@ -11,15 +11,15 @@ import traceback
 
 def index(request):
 	if not request.user.is_authenticated():
-		return redirect('login/')#?next=%s' % request.path)
-	return redirect('login/logged-in')
+		return redirect('login/?next=%s' % request.path)
+	return redirect('/qraat/')
 
 
 def user_logout(request):
 	if request.user.is_authenticated():
 		logout(request)
 	
-	return HttpResponse("Your're logged out!")
+	return redirect("/qraat/")
 
 def user_login(request):
 	if request.method == 'POST':
@@ -29,7 +29,7 @@ def user_login(request):
 			if user is not None:
 				if user.is_active:
 					login(request, user)
-					return HttpResponseRedirect('logged-in')
+					return redirect('/qraat/')
 				else:
 					return HttpResponse("Innactive user!")	
 	else:
