@@ -94,6 +94,21 @@ class TxAlias(models.Model):
     alias = models.CharField(max_length=50)  # varchar(50)
 
 
+class TxDeployment(models.Model):
+    class Meta:
+        app_label = QRAAT_APP_LABEL
+        db_table = "tx_deployment"
+
+    ID = models.AutoField(primary_key=True)
+    tx_ID = models.ForeignKey(tx_ID, db_column="tx_ID")
+    start_time = models.BigIntegerField(max_length=20)
+    stop_time = models.BigIntegerField(max_length=20)
+
+
+    def __unicode__(self):
+        return u'ID=%d start_time=%d' % (self.ID, self.start_time)
+
+
 class track(models.Model):
     class Meta:
         app_label = QRAAT_APP_LABEL
