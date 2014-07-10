@@ -4,5 +4,7 @@ from qraat_site import views
 urlpatterns = patterns('qraat_site.views',
 	url(r'^$', 'index'),
         url(r'^transmitters/$', 'transmitters'),
+        url(r'^transmitters/(?P<transmitter_id>\d+)/$',
+            'get_transmitter'),
         url(r'^regular-content/$', 'regular_content'),
 )

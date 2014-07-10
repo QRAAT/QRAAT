@@ -36,3 +36,11 @@ def get_nav_options(request):
             nav_options.append({"url": "/qraat/transmitters",
                                 "name": "Transmitters"})
     return nav_options
+
+
+def get_transmitter(request, transmitter_id):
+    tx = tx_ID.objects.get(ID=transmitter_id)
+    return HttpResponse("Transmitter: %d Model: %s Manufacturer: %s" % (tx.ID, tx.tx_info_ID.model, tx.tx_info_ID.manufacturer))
+
+
+
