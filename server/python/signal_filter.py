@@ -921,7 +921,7 @@ def score(ids):
 	cur = db_con.cursor()
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
-	q = 'SELECT DISTINCT siteid, txid from est WHERE ID IN ({});'.format(id_string)
+	q = 'SELECT DISTINCT siteID, deploymentID from est WHERE ID IN ({});'.format(id_string)
 	rows = cur.execute(q)
 	r = cur.fetchone()
 	assert rows == 1
@@ -1333,7 +1333,7 @@ def get_sorted_timestamps_from_data(data):
 def get_parametric_passed_ids_in_chunk(db_con, k):
 	cur = db_con.cursor()
 	base, duration, siteid, txid = k
-	q = 'select t.ID from (select ID from est where timestamp >= %s and timestamp <= %s and siteid = %s and txid = %s) t LEFT JOIN estscore ON t.ID = estscore.estid AND absscore < 0;'
+	q = 'select t.ID from (select ID from est where timestamp >= %s and timestamp <= %s and siteID = %s and deploymentID = %s) t LEFT JOIN estscore ON t.ID = estscore.estid AND absscore < 0;'
 	cur.execute(q, (base, base + duration, siteid, txid))
 
 	ids = []
@@ -1350,20 +1350,20 @@ def store_interval_assume(change_handler, interval, base, duration, txid, siteid
 	print 'assume args: txid={}, siteid={}'.format(txid, siteid)
 	db_con = change_handler.obj
 	cur = db_con.cursor()
-	rows = cur.execute('select * from interval_cache where start = %s and valid_duration = %s and txid = %s and siteid = %s', (base, duration, txid, siteid))
+	rows = cur.execute('select * from interval_cache where start = %s and valid_duration = %s and deploymentID = %s and siteID = %s', (base, duration, txid, siteid))
 	if rows > 0:
 		print 'Violation of assumption for {}+{}'.format(base, duration)
 	assert rows == 0
 	print 'Storing interval={}, {}+{}'.format(interval, base, duration)
-	q = 'insert into interval_cache (period, start, valid_duration, txid, siteid) values (%s, %s, %s, %s, %s);'
+	q = 'insert into interval_cache (period, start, valid_duration, deploymentID, siteID) values (%s, %s, %s, %s, %s);'
 	change_handler.add_sql(q, (interval, base, duration, txid, siteid))
 
 def store_interval_update(change_handler, interval, base, duration, txid, siteid):
 	if txid == 2:
 		assert False
-	print 'update args: txid={}, siteid={}'.format(txid, siteid)
+	print 'update args: deploymentID={}, siteID={}'.format(txid, siteid)
 	print 'Updating interval={}, {}+{}'.format(interval, base, duration)
-	q = 'update interval_cache set period = %s where start = %s and valid_duration = %s and txid = %s and siteid = %s;'
+	q = 'update interval_cache set period = %s where start = %s and valid_duration = %s and deploymentID = %s and siteID = %s;'
 	change_handler.add_sql(q, (interval, base, duration, txid, siteid))
 
 
@@ -1408,7 +1408,7 @@ def read_est_records_time_range(db_con, start, end):
 	assert start <= end
 	cur = db_con.cursor()
 	
-	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
+	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteID', 'deploymentID')
 
 	rows = None
 
@@ -1436,7 +1436,7 @@ def read_est_records(db_con, ids, expanded=False, context=0):
 
 	cur = db_con.cursor()
 
-	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteid', 'txid')
+	fields = ('ID', 'band3', 'band10', 'timestamp', 'siteID', 'deploymentID')
 
 	rows = None
 
@@ -1483,10 +1483,10 @@ def partition_by_interval_calculation(db_con, ids, siteid, txid):
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
 
-	query_template = 'select t.ID as ID, interval_cache.period as period from (select ID, timestamp from est where ID in ({})) t LEFT JOIN interval_cache ON (t.timestamp >= interval_cache.start and t.timestamp < interval_cache.start + interval_cache.valid_duration and interval_cache.txid = %s and interval_cache.siteid = %s)'
+	query_template = 'select t.ID as ID, interval_cache.period as period from (select ID, timestamp from est where ID in ({})) t LEFT JOIN interval_cache ON (t.timestamp >= interval_cache.start and t.timestamp < interval_cache.start + interval_cache.valid_duration and interval_cache.deploymentID = %s and interval_cache.siteid = %s)'
 	query = query_template.format(id_string)
 
-	print 'txid={}, siteid={}'.format(txid, siteid)
+	print 'dep_id={}, site_id={}'.format(txid, siteid)
 	print 'Query about to be run: "{}"'.format(query)
 
 	cur.execute(query, (txid, siteid))
@@ -1593,7 +1593,7 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 
 	ids_template = ', '.join(map(lambda x : '{}', ids))
 	id_string = ids_template.format(*ids)
-	q = 'select t.ID, interval_cache.period from interval_cache RIGHT JOIN (select ID, timestamp, siteid, txid from est where ID in ({})) as t ON (t.siteid = interval_cache.siteid and t.txid = interval_cache.txid and t.timestamp >= interval_cache.start and t.timestamp < interval_cache.start + interval_cache.valid_duration) where interval_cache.start IS NOT NULL;'
+	q = 'select t.ID, interval_cache.period from interval_cache RIGHT JOIN (select ID, timestamp, siteID, deploymentID from est where ID in ({})) as t ON (t.siteid = interval_cache.siteid and t.deploymentID = interval_cache.deploymentID and t.timestamp >= interval_cache.start and t.timestamp < interval_cache.start + interval_cache.valid_duration) where interval_cache.start IS NOT NULL;'
 
 	row = cur.execute(q.format(id_string))
 
@@ -1745,7 +1745,7 @@ def update_cursor_value(handler, name, value):
 # Returns number of rows matching. Hoping for zero.
 def explicit_check(change_handler, interval, base, duration, txid, siteid):
 	db_con = change_handler.obj
-	q = 'SELECT * from interval_cache where period = %s and start = %s and valid_duration = %s and txid = %s and siteid = %s'
+	q = 'SELECT * from interval_cache where period = %s and start = %s and valid_duration = %s and deploymentID = %s and siteID = %s'
 	cur = db_con.cursor()
 	rows = cur.execute(q, (interval, base, duration, txid, siteid))
 	return rows

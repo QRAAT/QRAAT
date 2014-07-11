@@ -46,7 +46,6 @@ def get_center(db_con):
 # Get est's from the database, applying a filter. Return a set of
 # estID's which are fed to the class signal. 
 # TODO Curry these?  
-# TODO Change txID to depID. 
 # TODO Grab band filte rfalues from tx_pulse.  
 
 def get_est_ids_timefilter(db_con, dep_id, t_start, t_end, thresh):
@@ -54,7 +53,7 @@ def get_est_ids_timefilter(db_con, dep_id, t_start, t_end, thresh):
   cur.execute('''SELECT ID 
                    FROM est
                    JOIN estscore ON est.ID = estscore.estID
-                  WHERE txID=%d
+                  WHERE deploymentID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f
                     AND thresh >= %f''' % (dep_id, t_start, t_end, thresh))
@@ -64,7 +63,7 @@ def get_est_ids_bandfilter(db_con, dep_id, t_start, t_end):
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
                    FROM est
-                  WHERE txID=%d
+                  WHERE deploymentID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f 
                     AND band3 < 150 
@@ -75,7 +74,7 @@ def get_est_ids(db_con, dep_id, t_start, t_end):
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
                    FROM est
-                  WHERE txID=%d
+                  WHERE deploymentID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f''' % (dep_id, t_start, t_end))
   return [ int(row[0]) for row in cur.fetchall() ]
@@ -161,9 +160,8 @@ class signal:
       # Store eigenvalue decomposition vectors and noise covariance
       # matrices in NumPy arrays. 
       
-      # TODO When qraat.est updates to use depID instead of txID, update this. 
       cur = db_con.cursor()
-      cur.execute('''SELECT ID, siteID, txID, timestamp, edsp, 
+      cur.execute('''SELECT ID, siteID, deploymentID, timestamp, edsp, 
                             ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
                             nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
                             nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
