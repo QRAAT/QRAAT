@@ -60,6 +60,7 @@ try:
 
   siteid, txid = options.siteid, options.txid
 
+  # FIXME This commented out stuff came up in a merge fix. Shouldn't be a problem. 
   # total_chunks = int((t_end - t_start) / float(chunk_size)) + 1
   # start_times = [(t_start + (i * chunk_size)) for i in range(total_chunks)]
   # intervals = [(x, min(t_end, x + chunk_size)) for x in start_times]
