@@ -50,7 +50,8 @@ try:
   import utm, xml
 except ImportError: pass
 
-def get_pos_ids(db_con, tx_id, t_start, t_end):
+# TODO change tx_id to dep_id 
+def get_pos_ids(db_con, tx_id, t_start, t_end): 
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
                    FROM Position
@@ -607,15 +608,6 @@ class Track:
     #
     #    return (map(lambda(v, t) : np.abs(v), V), map(lambda(a, t) : np.abs(a), A))
     
-
-
-def tx_name(db_con):
-  cur = db_con.cursor()
-  cur.execute('SELECT id, name FROM qraat.txlist')
-  d = {}
-  for (id, name) in cur.fetchall():
-    d[id] = name
-  return d
 
 
 # Testing, testing ... 
