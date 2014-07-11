@@ -1,0 +1,654 @@
+<!-- File: index.html -->
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>QRAAT APP</title>
+  <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+  <style type="text/css">
+    button { font: normal 14px "omnes-pro", Helvetica, Arial, sans-serif; }
+    html { height: 100% }
+    body { height: 100%; margin: 0; padding: 0; font: normal 14px "omnes-pro", Helvetica, Arial, sans-serif; }
+    #map-canvas { margin-top: 1cm; margin-right: 0.25cm; height: 60%; width: 63%; float: right; }
+    #text {width: 33%; height: 90%; float: left; font-size: 14px; margin: 1%; }
+    #page_title {font-size: 30px; font-weight:bold; }
+    #prefs {border-style:solid; border-width: 1px; height: 45%; overflow: scroll; padding: 10px; }
+    #mouseover {border-style:solid; border-width: 1px; height: 42%; overflow: scroll; padding: 10px;}
+   /*  #charts {float: right; } */
+  </style>
+
+<script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPB3_yj11lEK6uSAthSd0Btv-E1FJqt3I&sensor=false">
+//<script type="text/javascript"
+//    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPB3_yj11lEK6uSAthSd0Btv-E1FJqt3I?&v=3&callback=initialize">
+</script>
+
+<script type="text/javascript">
+//global variable to highlight poly
+var highlightedPoly;
+
+//show alert
+  function showDjango() {
+    //var myzoom = '{{zoom}}';
+    window.alert(myzoom);
+  }
+ 
+  function initialize() {
+    self.lat = 38.4897343239;
+    self.lng = -122.145749745;
+    var myLatLng = new google.maps.LatLng(self.lat, self.lng);
+    
+   // var zm = {{zoom}};
+   // if (zm.toString().length > 0) {
+   //   var zom = zm;
+   // }
+    //else {
+    //  var zom = 14;
+   // }
+   
+   // var myzoom = {{zoom}}; 
+    var mapOptions = {
+      center: myLatLng,
+      zoom: 14,
+      mapTypeId: google.maps.MapTypeId.SATELLITE,
+   
+       panControl:true,
+       zoomControl:true,
+       mapTypeControl:true,
+       scaleControl:true,
+       streetViewControl:true,
+       overviewMapControl:true,
+       rotateControl:true
+   };
+
+//mouseover data list
+//0: ID, 1: depID, 2: timestamp, 3: easting 4: northing 5: utm_zone_number none: itm_zone_letter 6: likehood 7: activity
+    //var mouseover_data = {{json_data_list}};
+    //var mouseover_len = {{data_list_len}};
+    
+    var django_position = {{pos_data}};
+    var selected_data = {{selected_data}};
+    var map = new google.maps.Map(document.getElementById("map-canvas"),
+      mapOptions);
+
+
+//clicked lat/lon
+    google.maps.event.addListener(map,'click',function(event){
+        document.getElementById('latlongclicked').value = event.latLng.lat() + ', ' + event.latLng.lng()
+    
+    var clicked_iat = event.latLng.lat()
+    var clicked_lng = event.latLng.lng()
+    });
+
+    
+//mouseover lat/lon
+    google.maps.event.addListener(map,'mousemove',function(event){
+      //document.getElementById('latspan').innerHTML = event.latLng.lat()
+      //document.getElementById('lngspan').innerHTML = event.latLng.lng()
+      document.getElementById('latlong').innerHTML = event.latLng.lat() + ', ' + event.latLng.lng()
+
+//mouseover other data
+//created an error, perhaps too much to handle:
+      //for (i=0; i=mouseover_len-1; i++) {
+      //  if ((Math.abs(event.latLng.lat() - mouseover_data[i][8][0]) < 0.0001) && 
+      //      (Math.abs(event.latLng.lng() - mouseover_data[i][8][1]) < 0.0001)
+      //  {
+      //       document.getElementById('m_easting').innerHTML = mouseover_data[i][3];
+      //      etc..........[i][2]
+      //      document.getElementById('m_northing').innerHTML = mouseover_data[0][4];
+      //      document.getElementById('m_date').innerHTML = mouseover_data[0][2];
+      //      document.getElementById('m_time').innerHTML = mouseover_data[0][2];
+      //      document.getElementById('m_activity').innerHTML = mouseover_data[0][7];
+      //      document.getElementById('m_likelihood').innerHTML = mouseover_data[0][6];
+      //      document.getElementById('m_animal_ID').innerHTML = mouseover_data[0][0];
+      //      document.getElementById('m_species').innerHTML = 'put species here';
+      //      document.getElementById('m_transmitter').innerHTML = mouseover_data[0][1];
+      //  }
+      //}
+
+
+//if the json.dumps(pos_data) is not an empty list []
+
+
+
+//static data
+//if (django_position.length > 2) {
+//      document.getElementById('m_easting').innerHTML = django_position[0][3];
+//      document.getElementById('m_northing').innerHTML = django_position[0][4];
+//      document.getElementById('m_date').innerHTML = django_position[0][2];
+//      document.getElementById('m_time').innerHTML = django_position[0][2];
+//      document.getElementById('m_activity').innerHTML = django_position[0][7];
+//      document.getElementById('m_likelihood').innerHTML = django_position[0][6];
+//      document.getElementById('m_animal_ID').innerHTML = django_position[0][0];
+//      document.getElementById('m_species').innerHTML = 'species here.<br /> <b>listLat:</b> '+django_position[0][8][0]+'<br /> <b>listLon:</b> '+django_position[0][8][1];
+//      document.getElementById('m_transmitter').innerHTML = django_position[0][1];
+    
+//} 
+
+
+if (selected_data.length > 4) {
+      document.getElementById('m_easting').innerHTML = selected_data[3];
+      document.getElementById('m_northing').innerHTML = selected_data[4];
+      document.getElementById('m_date').innerHTML = selected_data[2];
+      document.getElementById('m_time').innerHTML = selected_data[2];
+      document.getElementById('m_activity').innerHTML = selected_data[7];
+      document.getElementById('m_likelihood').innerHTML = selected_data[6];
+      document.getElementById('m_animal_ID').innerHTML = selected_data[0];
+      document.getElementById('m_species').innerHTML = 'species here.'
+      document.getElementById('m_transmitter').innerHTML = selected_data[1];
+    
+}
+
+    }); //end onemousemove event listener
+
+// ONE MARKER AT MYLATLNG WITH INFOWINDOW
+   // var contentString = '<div id="content"><h3>Mouse1</h3>'+
+   // '<p id="description">Mouse 1 is located at '+myLatLng+'.</p>';
+   // var infowindow = new google.maps.InfoWindow({
+   //   content: contentString
+   // });
+
+   // var marker = new google.maps.Marker({
+   //   position: myLatLng,
+   //   map: map,
+   //   draggable:false,
+   //   title:"Quail Ridge Reserve"
+   // });
+
+// markers for site:
+//circle, can be used for small markers
+    var circle ={
+      path: google.maps.SymbolPath.CIRCLE,
+      fillColor: 'red',
+      fillOpacity: .4,
+      scale: 4.5,
+      strokeColor: 'white',
+      strokeWeight: 1
+    };
+
+//Site Markers    
+    // pass in site locations from json from models
+
+var site_checked = {{site_checked}};
+ 
+var site_list = {{ siteslist }};
+
+  var locations = [];
+
+
+//show site markers if site is checked in preferences
+if (site_checked ==1) {
+for (var i = 0; i < site_list.length; i++) {
+    locations.push([site_list[i][0], site_list[i][1], site_list[i][2], site_list[i][0]]);
+    }
+}
+
+
+//without the else, there is a "TypeError: a is undefined" probably because locations would be empty
+else {
+locations.push([1,1,1,1]);
+}
+
+//    var locations = [
+//      ['Site 1', 38.483052371711864, -122.14958038408795, 1],
+//      ['Site 2', 38.49970896759306, -122.14861965765581, 2],
+//      ['Site 3', 38.49932697652555, -122.13974362456665, 3],
+//      ['Site 4', 38.49164360655183, -122.15281181424076, 4],
+//      ['Site 5', 38.491915740033946, -122.13629936150039, 5], 
+//      ['Site 6', 38.49292503709557, -122.14234015310441, 6],
+//      ['Site 7', 38.483052371711864, -122.14958038408795, 7],
+//      ['Site 8', 38.49518771797572, -122.1514169574267, 8],
+//      ['Site 9', 38.493453731086, -122.14803990103866, 9], 
+//      ['Center for pos estimation', 38.48973432391515, -122.1457497450115, 10]
+//      ];
+
+
+    var infowindow = new google.maps.InfoWindow();
+    var marker, i;
+    var markers = new Array();
+
+ for (i = 0; i < locations.length; i++) {
+      marker = new google.maps.Marker({
+        position: new google.maps.LatLng(locations[i][1], locations[i][2]),
+        map: map
+      });
+
+      markers.push(marker);
+
+      google.maps.event.addListener(marker, 'click', (function(marker, i) {
+        return function() {
+          infowindow.setContent('<b>Site '+locations[i][0]+'</b><br /> Lat: '+locations[i][1]+'<br /> Lon: '+locations[i][2]);
+          infowindow.open(map, marker);
+        }
+      })(marker, i));
+    } //endfor
+
+
+
+//Red lines, Flight Plan
+  //using json to pass in lat lon points from database for line
+    
+    var flight_latlon_pos = {{pos_data}};
+    var flightPlanCoordinates = new Array();
+    for (i=0; i < flight_latlon_pos.length-1; i++)
+    {
+      var point = new google.maps.LatLng(flight_latlon_pos[i][8][0], flight_latlon_pos[i][8][1]);
+      flightPlanCoordinates.push(point);
+    }
+
+//2nd Polyline 
+   // var flight_track = {{track_list}};
+   // var flightPlanCoordinates2 = new Array();
+   // for (i=0; i < flight_track.length-1; i++)
+   // {
+   //   var point2 = new google.maps.LatLng(flight_track[i][8][0], flight_track[i][8][1]);
+   //   flightPlanCoordinates2.push(point);
+   // }
+
+
+
+ //Draw the red polyline
+    var flightPath = new google.maps.Polyline({
+      path: flightPlanCoordinates,
+      geodesic: true,
+      strokeColor: '#FF0000',
+      strokeOpacity: 1.0,
+      strokeWeight: 1});
+
+    flightPath.setMap(map);
+
+    
+    google.maps.event.addListener(flightPath, 'mouseover', function() {
+      flightPath.setOptions({strokeColor: '#00FFaa'});
+    });
+
+    google.maps.event.addListener(flightPath, 'mouseout', function () {
+      flightPath.setOptions({strokeColor: '#FF00FF'});
+    });
+
+//infowindow for markers
+    google.maps.event.addListener(marker, 'click', function() {
+     // if (highlightedPoly) { //
+     //   highlightedPoly.setOptions({strokeColor: '#FF000F'});//
+     // }//
+     // flightPath.setOptions({strokeColor: '#00FFaa'});//
+     // highlightedPoly = flightPath;//
+      //flightPath.setOptions({strokeColor: '#00FFaa'});  //
+      infowindow.open(map,marker);
+     });
+
+//2nd blue polyline
+   // var flightPath2 = new google.maps.Polyline({
+   //   path: flightPlanCoordinates2,
+   //   geodesic: true,
+   //   strokeColor: '#0000FF',
+   //   strokeOpacity: 1.0,
+   //   strokeWeight: 1});
+
+   // flightPath2.setMap(map);
+
+  //  google.maps.event.addListener(marker, 'click', function() {
+  //    infowindow.open(map,marker);
+  //   });
+
+  } //end function initialize
+
+google.maps.event.addDomListener(window, 'load', initialize);
+ 
+function show_latlng() {
+    var newlat = document.getElementById("lat").value;
+    var newlng = document.getElementById("lng").value;
+    self.newlat = newlat;
+    self.newlng = newlng;
+    //alert(newlat+', '+newlng);
+    document.getElementById("display").innerHTML = 
+      'Currently located at (Latitude, Longitude): <b>('
+      +self.newlat+', '+self.newlng+')</b>.';
+  }
+
+</script>
+
+<link href="../static/flot/example.css" rel="stylesheet" type="text/css">
+
+
+{% if pos_data|length > 10 %}
+<!-- JQUERY CHARTS WITH FLOT -->
+<!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+-->
+<script src="../static/flot/jquery-1.11.1.min.js"></script>
+<script src="../static/flot/jquery.flot.min.js"></script>
+
+<!-- "visitors" plugins (2 charts/zooming) -->
+<script src ="../static/flot/jquery.flot.time.min.js"></script>
+<script src ="../static/flot/jquery.flot.selection.min.js"></script>
+
+<script src="../static/flot/jquery.flot.threshold.min.js"></script>
+<script src="../static/flot/jquery.flot.resize.min.js"></script>
+
+<!-- plugins for saving graphs as images -->
+<script type="text/javascript" src="http://zizhujy.com/Scripts/base64.js"></script>
+<script type="text/javascript" src="http://zizhujy.com/Scripts/drawing/canvas2image.js"></script>
+<script type="text/javascript" src="http://zizhujy.com/Scripts/flot/jquery.flot.saveAsImage.js"></script>
+
+
+<script type="text/javascript">
+
+$(function() {
+  var positions = {{pos_data}};
+  
+  var d = [];
+  
+  var act_checked = {{act_checked}};
+  var lk_checked = {{lk_checked}};
+
+if (act_checked == 1) {
+  for (var i=0; i< positions.length; i++) {
+  //likelihood is 6 and activity is 7
+  d.push([positions[i][2]*6000 + 60*60*1000, positions[i][7]]);
+}
+}
+
+if (lk_checked ==1) {
+  for (var i=0; i< positions.length; i++) {
+  //likelihood is 6 and activity is 7
+  d.push([positions[i][2]*6000 + 60*60*1000, positions[i][6]]);
+}
+}
+
+//example: var d = [[1196463600000, 0], [1196550000000, 0], [1196636400000, 0]]
+
+
+// first correct the timestamps - they are recorded as the daily
+// midnights in UTC+0100, but Flot always displays dates in UTC
+// so we have to add one hour to hit the midnights in the plot
+
+// for (var i = 0; i < d.length; ++i) {
+//    d[i][0] +=  60*60*1000;
+//  }
+
+  // helper for returning the weekends in a period
+    
+function weekendAreas(axes) {
+  var markings = [],
+  d = new Date(axes.xaxis.min);
+
+  // go to the first Saturday
+
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 1) % 7))
+  d.setUTCSeconds(0);
+  d.setUTCMinutes(0);
+  d.setUTCHours(0);
+
+  var i = d.getTime();
+
+  // when we don't set yaxis, the rectangle automatically
+  // extends to infinity upwards and downwards
+
+  do {
+      markings.push({ xaxis: { from: i, to: i + 2 * 24 * 60 * 60 * 1000 } });
+      i += 7 * 24 * 60 * 60 * 1000;
+  } while (i < axes.xaxis.max);
+
+  return markings;
+} // end weekendAreas function
+
+
+  var options = {
+    xaxis: {
+    mode: "time",
+    tickLength: 5
+  },
+  
+  selection: {
+    mode: "x"
+  },
+    grid: {
+    markings: weekendAreas
+    }
+  };
+
+  var plot = $.plot("#placeholder", [d], options);
+
+  var overview = $.plot("#overview", [d], {
+    series: {
+    lines: {
+      show: true,
+      lineWidth: 1
+    },
+    shadowSize: 0
+    },
+    xaxis: {
+    ticks: [],
+    mode: "time"
+    },
+    yaxis: {
+    ticks: [],
+    min: 0,
+    autoscaleMargin: 0.1
+    },
+    selection: {
+    mode: "x"
+    }
+  });
+
+// now connect the two
+
+$("#placeholder").bind("plotselected", function (event, ranges) {
+			
+    // do the zooming
+    $.each(plot.getXAxes(), function(_, axis) {
+      var opts = axis.options;
+      opts.min = ranges.xaxis.from;
+      opts.max = ranges.xaxis.to;
+    });
+  
+    plot.setupGrid();
+    plot.draw();
+    plot.clearSelection();
+
+    // don't fire event on the overview to prevent eternal loop
+    overview.setSelection(ranges, true);
+  });
+
+$("#overview").bind("plotselected", function (event, ranges) {
+    plot.setSelection(ranges);
+  });
+
+
+$("#footer").prepend("Flot " + $.plot.version + " &ndash; ");
+
+}); //end entire function
+
+
+</script>
+
+{% endif %}
+
+
+<!--Charts -->
+<!-- 
+
+<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+<script type="text/javascript">
+    google.load("visualization", "1", {packages:["corechart"]});
+    google.setOnLoadCallback(drawChart);
+
+function drawChart() {
+    var positions = {{pos_data}};
+//Line Graph 1
+    var data1 = new google.visualization.DataTable();
+        data1.addColumn('number', 'Time');
+        data1.addColumn('number', 'Fox1');
+    var result1 = [];
+    for (var i=0; i< positions.length; i++) {
+          result1.push([positions[i][2], positions[i][7]]);
+    }
+        //['Year', 'tx1', 'tx2'],
+        //['2004',  1000,      400],
+        //['2005',  1170,      460],
+      
+      data1.addRows(result1);
+      var options1 = {
+          'title': 'Activity',
+          'width': 700,
+          'height': 125,
+          vAxis: {
+            title: "(0 to 1)"
+          },
+          hAxis: {title: 'Time (sec)'}
+      };
+
+// Line Graph 2
+    var data2 = new google.visualization.DataTable();
+      data2.addColumn('number', 'Time');
+      data2.addColumn('number', 'Fox1');
+    var result2 = [];
+    for (var i=0; i < positions.length; i++) {
+      result2.push([positions[i][2], positions[i][6]]);
+    }
+    data2.addRows(result2);
+      var options2 = {
+          'title': 'Likelihood',
+          'width': 700,
+          'height': 125,
+          vAxis: {
+            title: "(0 to 1000)"
+          },
+          hAxis: {
+            title: "Time (sec)"
+          }
+      };
+
+      var chart1 = new google.visualization.LineChart(document.getElementById('chart_div'));
+      var chart2 = new google.visualization.LineChart(document.getElementById('chart_div2'));
+      
+      chart1.draw(data1, options1);
+      chart2.draw(data2, options2);
+
+} //end drawChart function
+ 
+</script>
+-->
+
+</head>
+
+<body>
+
+<div id = "text">
+
+<button onclick="showDjango()">Show Django</button>
+
+<center>
+<div id="page_title"><a href='index.html'>QRAAT Data</a></div>
+<a href="index.html" target="export">Export view as .kml file</a><br>
+</center>
+<br />
+
+<div id ="prefs">
+<script type="text/javascript">
+function submitIfComplete()
+{
+  // Check the select has something selected
+  if (
+      document.getElementById('tx_ID').selectedIndex > 0 &&
+      document.getElementById('data_type').selectedIndex > 0
+      //!(document.getElementById('pref1').checked == false &&
+      //document.getElementById('pref2').checked == false &&
+      //document.getElementById('pref3').checked == false
+      )
+    {
+    document.getElementById('formID').submit();
+    }
+}
+</script>
+<h3><center><u>SET PREFERENCES</u></center></h3>
+<!-- THE FORM -->
+<form action ="index.html" name="settings" method="get">
+{% for field in form %}
+{{ field.label_tag}} {{field}}<br>
+{% endfor %}
+<font size="1">date range: <b>8/13/2013, 1:57:16 PM</b> to <b>2014-06-16 14:28:12</b></font>
+<!-- will be replaced by javascript -->
+<br>Latitude: <input type="text" name="lat_input" value="38.488473">
+<br>Longitude: <input type="text" name="lng_input" value="-122.160824">
+
+
+<center><input type="submit" value="Submit" /></center>
+</form>
+
+
+<br>
+<button onclick="showPositions()">Show displayed positions</button>
+
+
+<br />
+<b>{{tx}} {{data_type}} {{dt_fr}} {{dt_to}} {{zoom}} {{pref}} Number of positions: 
+{{positions|length}}</b>
+</div><!-- end prefs -->
+
+
+<br><br>
+
+<div id="mouseover">
+<h3><center><u>MOUSEOVER INFO</u></center></h3>
+<!-- js line ~55 -->
+<center>Map Info</center>
+<b>Lat, Long: </b>
+<span id="latlong"></span>
+<br>
+<b>Clicked: </b> 
+<input type="text" id="latlongclicked" style="width:300px; border:1px inset gray;"></span>
+
+<!--
+Lat: <p id="latspan"></p>
+Lng: <p id ="lngspan"></p>
+-->
+<br><br><center>Data Info</center>
+<b>Easting: </b><span id="m_easting"></span>
+<br /><b>Northing: </b><span id="m_northing"></span>
+<br />
+<br /><b>Date: </b><span id="m_date"></span>
+<br /><b>Time: </b><span id="m_time"></span>
+<br />
+<br /><b>Activity: </b><span id="m_activity"></span>
+<br /><b>Position Likelihood: </b><span id="m_likelihood"></span>
+<br />
+<br /><b>Animal ID: </b><span id="m_animal_ID"></span>
+<br /><b>Species: </b> <span id="m_species"> </span>
+<br /><b>Transmitter: </b><span id="m_transmitter"></span>
+</div> <!-- end mouseover -->
+
+</div> <!-- end text -->
+
+<!-- right side -->
+<div id="map-canvas"></div>
+
+{% if positions %}
+<!-- FLOT CHART -->
+<div id="content">
+Activity vs. Time:
+
+		<div class="demo-container">
+			<div id="placeholder" class="demo-placeholder"></div>
+		</div>
+
+		<div class="demo-container" style="height:100px;">
+			<div id="overview" class="demo-placeholder"></div>
+		</div>
+
+	</div>
+{% endif %}
+<!--
+<div id="charts"><br>
+
+
+<div id="chart_div"></div>
+<div id="chart_div2"></div>
+</div>
+
+<div id="chart">
+Activity Chart (static image)<br/ >
+<img src="../static/hello/linegraph.gif" width="200" height="150">
+</div> -->
+</body>
+</html>
