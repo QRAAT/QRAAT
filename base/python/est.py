@@ -325,7 +325,6 @@ class est (qraat.csv.csv):
     # for the timestamp. The following line turns the timestamp into 
     # a string with unrounded value. 
     row.timestamp = repr(row.timestamp) 
-    row.datetime = qraat.csv.pretty_printer(row.datetime)
     cur.execute(query.substitute(row))
 
 
