@@ -42,6 +42,9 @@ class RxSite(models.Model):
         max_digits=7, decimal_places=2,
         default=0.00)  # decimal(7, 2) default 0.00
 
+    def __unicode__(self):
+        return u'%s' % self.name
+
 
 class Project(models.Model):
     class Meta:
