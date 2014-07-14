@@ -50,15 +50,18 @@ class Project(models.Model):
 
     ID = models.AutoField(primary_key=True)
 
-    ownerID = models.IntegerField(null=False, help_text="References UID in\
+    ownerID = models.IntegerField(
+        null=False, help_text="References UID in\
                                   web frontend, i.e 'django.auth_user.id'")
 
     name = models.CharField(max_length=50, null=False)  # varchar(50) not null
 
     description = models.TextField()
 
-    is_public = models.SmallIntegerField(
-        max_length=1, null=False)  # tinyint(1) not nul
+    is_public = models.BooleanField(
+        default=False, null=False)  # tinyint(1) not nul
+
+    is_hidden = models.BooleanField(default=False)  # boolean default false
 
 
 class AuthProjectViewer(models.Model):
@@ -135,14 +138,21 @@ class Position(models.Model):
         help_text="Averaged over bearing data from all sites")  # double
 
 
-class TxInfo(models.Model):
+class TxMake(models.Model):
         class Meta:
             app_label = QRAAT_APP_LABEL
-            db_table = "tx_info"
+            db_table = "tx_make"
+
+        DEMOD_CHOICES = (
+            ("pulse", "pulse"), ("cont", "cont"), ("afsk", "afsk"))
 
         ID = models.AutoField(primary_key=True)
+
         manufacturer = models.CharField(max_length=50)  # varchar(50)
+
         model = models.CharField(max_length=50)  # varchar(50)
+
+        demod_type = models.CharField(max_length=5, choices=DEMOD_CHOICES)
 
         def __unicode__(self):
             return u'%d %s' % (self.ID, self.model)
@@ -153,24 +163,26 @@ class Tx(models.Model):
         app_label = QRAAT_APP_LABEL
         db_table = "tx"
 
-    DEMOD_CHOICES = (
-        ("pulse", "pulse"), ("cont", "cont"), ("afsk", "afsk"))
-
     ID = models.AutoField(
-        primary_key=True)  # int(10) primary key autoincrement
+        primary_key=True)  # primary key autoincrement
 
-    tx_infoID = models.ForeignKey(
-        TxInfo, db_column="tx_infoID")  # foreignKey from tx_info
+    name = models.CharField(max_length=50, null=False)  # varchar(50) not null
+
+    serial_no = models.CharField(
+        max_length=50, null=False)  # varchar(50) not null
+
+    tx_makeID = models.ForeignKey(
+        TxMake, db_column="tx_makeID")  # foreignkey from
 
     projectID = models.ForeignKey(
         Project, db_column="projectID")
 
     frequency = models.FloatField()
 
-    demod_type = models.CharField(max_length=5, choices=DEMOD_CHOICES)
+    is_hidden = models.BooleanField(default=False)
 
     def __unicode__(self):
-        return u'%d' % self.ID
+        return u'%s %s' % (self.name, self.serial_no)
 
 
 class TxParameters(models.Model):
@@ -179,13 +191,32 @@ class TxParameters(models.Model):
         db_table = "tx_parameters"
         unique_together = ("ID", "txID", "name")  # set multiple fields as keys
 
-    ID = models.AutoField(max_length=10, primary_key=True)
+    ID = models.AutoField(primary_key=True)
 
     txID = models.ForeignKey(Tx, db_column="txID")
 
-    name = models.CharField(max_length=32)  # varchar(32)
+    name = models.CharField(max_length=32, null=False)  # varchar(32)
 
-    value = models.CharField(max_length=64)  # varchar(64)
+    value = models.CharField(max_length=64, null=False)  # varchar(64)
+
+    units = models.CharField(max_length=32)  # varchar(32)
+
+
+class TxMakeParameters(models.Model):
+    class Meta:
+        app_label = QRAAT_APP_LABEL
+        db_table = "tx_make_parameters"
+        unique_together = ('ID', 'tx_makeID', 'name')
+
+    ID = models.AutoField(primary_key=True)
+
+    tx_makeID = models.ForeignKey(TxMake, db_column="tx_makeID")
+
+    name = models.CharField(max_length=32, null=False)  # varchar(32)
+
+    value = models.CharField(max_length=64, null=False)  # varchar(64)
+
+    units = models.CharField(max_length=32)  # varchar(32)
 
 
 class Target(models.Model):
@@ -194,8 +225,7 @@ class Target(models.Model):
         db_table = "target"
 
     ID = models.AutoField(
-        primary_key=True,
-        max_length=10)  # primary_key auto-increment int(10)
+        primary_key=True)  # primary_key auto-increment int(10)
 
     name = models.CharField(max_length=50)
 
@@ -205,17 +235,27 @@ class Target(models.Model):
         Project, db_column="projectID",
         help_text="Project for which target was originally created")
 
+    is_hidden = models.BooleanField(default=False)  # boolean default false
+
 
 class Deployment(models.Model):
     class Meta:
         app_label = QRAAT_APP_LABEL
         db_table = "deployment"
 
-    ID = models.AutoField(max_length=10, primary_key=True)
+    ID = models.AutoField(primary_key=True)
 
-    name = models.CharField(max_length=50)
+    name = models.CharField(max_length=50, null=False)
 
     description = models.TextField()
+
+    time_start = models.DecimalField(
+        max_digits=16, decimal_places=6,
+        help_text="Unix Timestamp (s.us)")  # decimal(16,6)
+
+    time_end = models.DecimalField(
+        max_digits=16, decimal_places=6,
+        help_text="Unix Timestamp (s.us)")  # decimal(16,6)
 
     txID = models.ForeignKey(
         Tx, db_column="txID")
@@ -224,13 +264,12 @@ class Deployment(models.Model):
         Target, db_column="targetID")
 
     projectID = models.ForeignKey(
-        Project, db_column="projectID")
+        Project, db_column="projectID",
+        help_text="Project to which deployment is associated.")
 
-    time_start = models.DecimalField(
-        max_digits=16, decimal_places=6)  # decimal(16,6)
+    is_active = models.BooleanField(default=False)
 
-    time_end = models.DecimalField(
-        max_digits=16, decimal_places=6)  # decimal(16,6)
+    is_hidden = models.BooleanField(default=False)
 
 
 class Track(models.Model):
@@ -256,6 +295,8 @@ class Track(models.Model):
 
     speed_limit = models.FloatField()
 
+    is_hidden = models.BooleanField(default=False)
+
     def __unicode__(self):
         return u'%s' % self.ID
 
@@ -269,7 +310,7 @@ class Site(models.Model):
 
     projectID = models.ForeignKey(Project, db_column="projectID")
 
-    name = models.CharField(max_length=20)  # varchar(20)
+    name = models.CharField(max_length=50)  # varchar(50)
 
     location = models.CharField(max_length=100)  # varchar(100)
 
@@ -277,7 +318,7 @@ class Site(models.Model):
         max_digits=10, decimal_places=6)  # decimal(10,6)
 
     longitude = models.DecimalField(
-        max_digits=10, decimal_places=6)  # decimal(11,6)
+        max_digits=11, decimal_places=6)  # decimal(11,6)
 
     easting = models.DecimalField(
         default=0.00, max_digits=9, decimal_places=2)  # decimal(9,2) unsigned
@@ -287,7 +328,7 @@ class Site(models.Model):
         decimal_places=2)  # decimal(10,2) unsigned
 
     utm_zone_number = models.SmallIntegerField(
-        default=10)  # tinyint(3) unsigned, default 10
+        max_length=3, default=10)  # tinyint(3) unsigned, default 10
 
     utm_zone_letter = models.CharField(
         default='S', max_length=1)  # char(1), default S
@@ -295,6 +336,8 @@ class Site(models.Model):
     elevation = models.DecimalField(
         default=0.00, max_digits=7,
         decimal_places=2)  # decimal(7,2), default 0.00
+
+    is_hidden = models.BooleanField(default=False)
 
     def __unicode__(self):
         return u'%s' % self.name
