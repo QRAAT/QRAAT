@@ -1,6 +1,9 @@
 {% extends "qraat_site/base.html" %}
 
 {% block content %}
+<div class="page-header">
+    <h2> Transmitters </h1>
+</div>
 <table class="table">
     <tr>
         <td>Transmitter</td>
@@ -9,10 +12,10 @@
         <td>RMG_type</td>
         <td>tx_table_name</td>
     </tr>
-    {% for transmitter in transmitters  %}
+    {% for tx in transmitters  %}
         <tr>
             <td>
-                <a href="/qraat/{{transmitter.ID}}/transmitter">
+                <a href="{{transmitter.ID}}">
                     Tx-Serial {{transmitter.ID}}</a>
             </td>
             <td>{{transmitter.tx_info_ID.manufacturer}}</td>
