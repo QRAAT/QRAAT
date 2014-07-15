@@ -26,18 +26,18 @@ try:
   import MySQLdb as mdb
 except ImportError: pass
 
-query_insert_pos = '''INSERT INTO Position
+query_insert_pos = '''INSERT INTO position
                        (deploymentID, timestamp, easting, northing, likelihood, activity)
                       VALUES (%s, %s, %s, %s, %s, %s)''' 
 
-query_insert_bearing = '''INSERT INTO Bearing 
+query_insert_bearing = '''INSERT INTO bearing 
                            (deploymentID, siteID, timestamp, bearing, likelihood, activity)
                           VALUES (%s, %s, %s, %s, %s, %s)''' 
 
 def get_center(db_con):
   cur = db_con.cursor()
   cur.execute('''SELECT northing, easting 
-                   FROM qraat.site
+                   FROM qraat.location
                   WHERE name = 'center' ''')
   (n, e) = cur.fetchone()
   return np.complex(n, e)
@@ -96,11 +96,11 @@ class steering_vectors:
     deps = []
 
     # Get site locations.
-    sites = qraat.csv.csv(db_con=db_con, db_table='rx_site')
+    sites = qraat.csv.csv(db_con=db_con, db_table='site')
     sv_deps_by_site = {}
 
     for row in sites:
-      deps.append(('rx_site', row.ID))
+      deps.append(('site', row.ID))
 
     # Get steering vector data.
     steering_vectors = {} # site.ID -> sv
@@ -228,7 +228,7 @@ class Position:
       cur.execute('''SELECT ID, deploymentID, timestamp, easting, northing, 
                             utm_zone_number, utm_zone_letter, likelihood,
                             activity
-                       FROM Position
+                       FROM position
                       WHERE ID in (%s)
                       ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), pos_ids)))
       for row in cur.fetchall():
@@ -252,7 +252,7 @@ class Position:
                                      likelihood, 
                                      activity))
       pos_id = cur.lastrowid                               
-      handle_provenance_insertion(cur, pos_deps, {'Position':(pos_id,)})
+      handle_provenance_insertion(cur, pos_deps, {'position':(pos_id,)})
 
   def export_kml(self, name, dep_id):
 
@@ -292,7 +292,7 @@ class Bearing:
       cur = db_con.cursor()
       cur.execute('''SELECT ID, deploymentID, siteID, timestamp, bearing,
                             likelihood, activity
-                       FROM Bearing
+                       FROM bearing
                       WHERE ID in (%s)
                       ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), bearing_ids)))
       for row in cur.fetchall():

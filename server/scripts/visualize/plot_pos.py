@@ -29,7 +29,7 @@ Plot tracks. This program is
 part of QRAAT, an automated animal tracking system based on GNU Radio.   
 '''
 
-parser.add_option('--tx-id', type='int', metavar='INT', default=51,
+parser.add_option('--dep-id', type='int', metavar='INT', default=51,
                   help="Serial ID of the target transmitter in the database "
                        "context.")
 
@@ -53,11 +53,11 @@ T_step =  60 * 60 * 24 * 1 / 6 # four hour chunks.
 
 while T < options.t_end:  
   cur.execute('''SELECT northing, easting, timestamp, likelihood
-                   FROM Position
+                   FROM position
                   WHERE (%f <= timestamp) 
                     AND (timestamp <= %f)
-                    AND depid = %d
-                  ORDER BY timestamp ASC''' % (T, T + T_step, options.tx_id))
+                    AND deploymentID = %d
+                  ORDER BY timestamp ASC''' % (T - T_step, T + T_step, options.dep_id))
   
   T += T_step
   track = []
@@ -68,7 +68,7 @@ while T < options.t_end:
     print >>sys.stderr, "plot_pos: skipping empty window."
     continue
 
-  cur.execute('SELECT northing, easting FROM qraat.site WHERE name="site34"')
+  cur.execute('SELECT northing, easting FROM qraat.location WHERE name="site34"')
   (n, e) = cur.fetchone()
   beacon = np.complex(n, e)
   a = open('dist.txt', 'w') 
@@ -93,7 +93,7 @@ while T < options.t_end:
     N = lambda(y) : bg.shape[0] - (y - n0) / float(bg.shape[0]) * (n1 - n0)
 
 
-    sites = qraat.csv.csv(db_con=db_con, db_table='rx_site')
+    sites = qraat.csv.csv(db_con=db_con, db_table='site')
     
     fig = pp.figure()
     ax = fig.add_subplot(1,1,1)
@@ -120,7 +120,7 @@ while T < options.t_end:
          t.tm_hour, t.tm_min,
          s.tm_year, s.tm_mon, s.tm_mday,
          s.tm_hour, s.tm_min,
-         options.tx_id), size='smaller')
+         options.dep_id), size='smaller')
 
     pp.grid(b=True, which='both', color='gray', linestyle='-')
 
@@ -139,7 +139,7 @@ while T < options.t_end:
     #   t.tm_year, t.tm_mon, t.tm_mday,
     #   t.tm_hour, t.tm_min, t.tm_sec))
 
-    pp.savefig('tx%d_%04d-%02d-%02d_%02d%02d.png' % (options.tx_id, t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min))
+    pp.savefig('tx%d_%04d-%02d-%02d_%02d%02d.png' % (options.dep_id, t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min))
 
   else: 
     

@@ -54,7 +54,7 @@ except ImportError: pass
 def get_pos_ids(db_con, tx_id, t_start, t_end): 
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
-                   FROM Position
+                   FROM position
                   WHERE deploymentID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f''' % (tx_id, t_start, t_end))
@@ -234,9 +234,9 @@ class Track:
       cur.execute('''SELECT positionID, track.deploymentID, track_pos.timestamp, easting, northing, 
                             utm_zone_number, utm_zone_letter, likelihood,
                             activity
-                       FROM track, track_pos, Position
+                       FROM track, track_pos, position
                       WHERE trackID = %d
-                        AND positionID = Position.ID
+                        AND positionID = position.ID
                         AND track_pos.timestamp >= %f AND track_pos.timestamp <= %f 
                       ORDER BY timestamp ASC''' % (track_id, t_start, t_end))
       
