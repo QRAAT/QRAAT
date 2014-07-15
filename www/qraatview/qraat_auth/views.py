@@ -5,8 +5,6 @@ from django.contrib.auth.decorators import login_required
 from qraat_auth.forms import UserForm
 from django.contrib.auth.forms import AuthenticationForm
 
-import traceback
-
 # Create your views here.
 
 def index(request):
@@ -44,6 +42,7 @@ def user_logged_in(request):
 	return render(request, 'qraat_auth/loggedin.html', {'username': username})
 	
 
+@login_required(login_url='/auth')
 def createUserForm(request):
 
 	if request.method == 'POST':
@@ -67,6 +66,7 @@ def createUserForm(request):
 
 	return render(request, 'qraat_auth/newuserform.html', {'user_form': user_form})	
 
+@login_required(login_url='/auth')
 def userCreated(request):
 	return HttpResponse("User Created!")
 

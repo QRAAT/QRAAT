@@ -1,19 +1,19 @@
 # from hello.models import Position
 from django.contrib import admin
 from qraat_site.models import Track, Tx, TxMake, Deployment
-from qraat_site.models import RxSite, Site, Project
+from qraat_site.models import Site, Location, Project
 from qraat_site.models import AuthProjectCollaborator, AuthProjectViewer
 from qraat_site.models import TxParameters, TxMakeParameters
 
 
-class RxSiteAdmin(admin.ModelAdmin):
+class SiteAdmin(admin.ModelAdmin):
     list_display = (
         'ID', 'name', 'location',
         'latitude', 'longitude', 'easting',
         'northing', 'utm_zone_number', 'utm_zone_letter', 'elevation')
 
 
-class SiteAdmin(admin.ModelAdmin):
+class LocationAdmin(admin.ModelAdmin):
     list_display = (
         'ID', 'name', 'location',
         'latitude', 'longitude', 'easting',
@@ -130,7 +130,7 @@ class TrackAdmin(admin.ModelAdmin):
         return obj.deploymentID.ID
 
 
-admin.site.register(RxSite, RxSiteAdmin)
+admin.site.register(Location, LocationAdmin)
 admin.site.register(Site, SiteAdmin)
 admin.site.register(Tx, TransmitterAdmin)
 admin.site.register(TxParameters, TxParametersAdmin)

@@ -5,14 +5,14 @@ from django.db import models
 QRAAT_APP_LABEL = 'qraat_site'
 
 
-class RxSite(models.Model):
+class Site(models.Model):
     """ Site data (public)
         only sites with receivers, admins are the only ones with write access
     """
 
     class Meta:
         app_label = QRAAT_APP_LABEL
-        db_table = "rx_site"
+        db_table = "site"
 
     ID = models.AutoField(primary_key=True)
 
@@ -304,10 +304,10 @@ class Track(models.Model):
         return u'%s' % self.ID
 
 
-class Site(models.Model):
+class Location(models.Model):
     class Meta:
         app_label = QRAAT_APP_LABEL
-        db_table = "site"
+        db_table = "location"
 
     ID = models.AutoField(primary_key=True)  # int(11), auto_increment
 
