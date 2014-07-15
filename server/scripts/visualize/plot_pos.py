@@ -68,7 +68,7 @@ while T < options.t_end:
     print >>sys.stderr, "plot_pos: skipping empty window."
     continue
 
-  cur.execute('SELECT northing, easting FROM qraat.sitelist WHERE name="site34"')
+  cur.execute('SELECT northing, easting FROM qraat.site WHERE name="site34"')
   (n, e) = cur.fetchone()
   beacon = np.complex(n, e)
   a = open('dist.txt', 'w') 
@@ -93,7 +93,7 @@ while T < options.t_end:
     N = lambda(y) : bg.shape[0] - (y - n0) / float(bg.shape[0]) * (n1 - n0)
 
 
-    sites = qraat.csv.csv(db_con=db_con, db_table='sitelist').filter(rx=True)
+    sites = qraat.csv.csv(db_con=db_con, db_table='rx_site')
     
     fig = pp.figure()
     ax = fig.add_subplot(1,1,1)

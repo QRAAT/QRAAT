@@ -101,9 +101,7 @@ def calculate_search_space(bl, i, j, center, scale, half_span=15):
                                 bl.likelihoods[est_index,:])) )
       # SEAN: Would use bl.likelihood_deps right here if I was using them
     except KeyError:
-      pass # Skip sites in the site list where we don't collect data. 
-           # TODO perhaps there should be a row in qraat.sitelist that 
-           # designates sites as qraat nodes. ~ Chris 1/2/14 
+      pass 
 
   return (grid.flat[np.argmax(pos_likelihood)], pos_likelihood)
 

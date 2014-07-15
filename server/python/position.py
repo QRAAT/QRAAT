@@ -27,17 +27,17 @@ try:
 except ImportError: pass
 
 query_insert_pos = '''INSERT INTO Position
-                       (depID, timestamp, easting, northing, likelihood, activity)
+                       (deploymentID, timestamp, easting, northing, likelihood, activity)
                       VALUES (%s, %s, %s, %s, %s, %s)''' 
 
 query_insert_bearing = '''INSERT INTO Bearing 
-                           (depID, siteID, timestamp, bearing, likelihood, activity)
+                           (deploymentID, siteID, timestamp, bearing, likelihood, activity)
                           VALUES (%s, %s, %s, %s, %s, %s)''' 
 
 def get_center(db_con):
   cur = db_con.cursor()
   cur.execute('''SELECT northing, easting 
-                   FROM qraat.sitelist
+                   FROM qraat.site
                   WHERE name = 'center' ''')
   (n, e) = cur.fetchone()
   return np.complex(n, e)
@@ -96,11 +96,11 @@ class steering_vectors:
     deps = []
 
     # Get site locations.
-    sites = qraat.csv.csv(db_con=db_con, db_table='sitelist').filter(rx=True)
+    sites = qraat.csv.csv(db_con=db_con, db_table='rx_site')
     sv_deps_by_site = {}
 
     for row in sites:
-      deps.append(('sitelist', row.ID))
+      deps.append(('rx_site', row.ID))
 
     # Get steering vector data.
     steering_vectors = {} # site.ID -> sv
@@ -225,7 +225,7 @@ class Position:
     self.table = []
     if len(pos_ids) > 0:
       cur = db_con.cursor()
-      cur.execute('''SELECT ID, depID, timestamp, easting, northing, 
+      cur.execute('''SELECT ID, deploymentID, timestamp, easting, northing, 
                             utm_zone_number, utm_zone_letter, likelihood,
                             activity
                        FROM Position
@@ -263,7 +263,7 @@ class Position:
     fd.write('<Folder>\n')
     fd.write('  <Placemark>\n')
     fd.write('  <MultiGeometry>\n')
-    fd.write('    <name>%s (depID=%d) position cloud</name>\n' % (name, dep_id))
+    fd.write('    <name>%s (deploymentID=%d) position cloud</name>\n' % (name, dep_id))
     for row in self.table:
       (P, t, ll, pos_id) = (np.complex(row[0], row[1]), 
                             float(row[2]), 
@@ -290,7 +290,7 @@ class Bearing:
     self.table = []
     if len(bearing_ids) > 0:
       cur = db_con.cursor()
-      cur.execute('''SELECT ID, depID, siteID, timestamp, bearing,
+      cur.execute('''SELECT ID, deploymentID, siteID, timestamp, bearing,
                             likelihood, activity
                        FROM Bearing
                       WHERE ID in (%s)

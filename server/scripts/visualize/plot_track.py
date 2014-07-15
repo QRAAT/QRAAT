@@ -85,7 +85,7 @@ if overlay:
   N = lambda(y) : bg.shape[0] - (y - n0) / float(bg.shape[0]) * (n1 - n0)
 
 
-  sites = qraat.csv.csv(db_con=db_con, db_table='sitelist').filter(rx=True)
+  sites = qraat.csv.csv(db_con=db_con, db_table='rx_site')
 
   fig = pp.figure()
   ax = fig.add_subplot(1,1,1)

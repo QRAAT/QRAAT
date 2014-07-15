@@ -55,14 +55,14 @@ def get_pos_ids(db_con, tx_id, t_start, t_end):
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
                    FROM Position
-                  WHERE depID=%d
+                  WHERE deploymentID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f''' % (tx_id, t_start, t_end))
   return [ int(row[0]) for row in cur.fetchall() ]
 
 def get_dep_by_id(db_con, track_id):
   cur = db_con.cursor()
-  cur.execute('''SELECT depID 
+  cur.execute('''SELECT deploymentID 
                    FROM track
                   WHERE ID=%d''' % track_id)
   return cur.fetchone()[0]
@@ -95,7 +95,7 @@ def maxspeed_const(m):
 
 def calc_tracks(db_con, pos, track_id, C=1):
   cur = db_con.cursor()
-  cur.execute('''SELECT ID, depID, max_speed_family, 
+  cur.execute('''SELECT ID, deploymentID, max_speed_family, 
                         speed_burst, speed_sustained, speed_limit
                    FROM track
                   WHERE ID = %d''' % track_id)
@@ -231,12 +231,12 @@ class Track:
       cur = db_con.cursor()
       
       # TODO optimize. 
-      cur.execute('''SELECT posID, track.depID, track_pos.timestamp, easting, northing, 
+      cur.execute('''SELECT positionID, track.deploymentID, track_pos.timestamp, easting, northing, 
                             utm_zone_number, utm_zone_letter, likelihood,
                             activity
                        FROM track, track_pos, Position
                       WHERE trackID = %d
-                        AND posID = Position.ID
+                        AND positionID = Position.ID
                         AND track_pos.timestamp >= %f AND track_pos.timestamp <= %f 
                       ORDER BY timestamp ASC''' % (track_id, t_start, t_end))
       
@@ -274,7 +274,7 @@ class Track:
                            AND timestamp <= %f''' % (self.table[0][2], self.table[-1][2])) 
     for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
          utm_zone_letter, likelihood, activity) in self.table:
-      cur.execute('''INSERT INTO track_pos (posID, trackID, timestamp)
+      cur.execute('''INSERT INTO track_pos (positionID, trackID, timestamp)
                           VALUES (%d, %d, %d)''' % (pos_id, self.track_id, t))
 
   def _calc_tracks_windowed(self, M, C):
@@ -394,7 +394,7 @@ class Track:
       thinking is required. **TODO** 
     '''
     
-    # TODO update this code to include posID in Node() constructor.
+    # TODO update this code to include positionID in Node() constructor.
     # TODO row format has changed!!
     roots = []; leaves = []
     i = 0 
@@ -530,7 +530,7 @@ class Track:
     fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
     fd.write('<Folder>\n')
     fd.write('  <Placemark>\n')
-    fd.write('    <name>%s (depID=%d)</name>\n' % (name, tx_id))
+    fd.write('    <name>%s (deploymentID=%d)</name>\n' % (name, tx_id))
     fd.write('    <gx:Track>\n')
     for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
       tm = time.gmtime(t)
@@ -554,7 +554,7 @@ class Track:
       (lat, lon) = utm.to_latlon(easting, northing, utm_number, utm_letter) 
       fd.write('          <gx:value>%fN, %fW</gx:value>\n' % (lat, lon))
     fd.write('          </gx:SimpleArrayData>\n')
-    fd.write('          <gx:SimpleArrayData name="posID">\n')
+    fd.write('          <gx:SimpleArrayData name="positionID">\n')
     for (pos_id, dep_id, t, easting, northing, utm_number, utm_letter, ll, activity) in self.table: 
       tm = time.gmtime(t)
       t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
