@@ -1,8 +1,8 @@
-# File: hello models.py
+# File: qraat_ui/models.py
 
 from django.db import models
 
-QRAAT_APP_LABEL = 'hello'
+QRAAT_APP_LABEL = 'qraat_ui'
 
 
 class Position(models.Model):

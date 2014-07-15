@@ -1,10 +1,10 @@
 from django.conf.urls import patterns, include, url
-from hello import views
+from qraat_ui import views
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
 admin.autodiscover()
 
-urlpatterns = patterns('hello.views',
+urlpatterns = patterns('qraat_ui.views',
     url(r'^index.html', 'index'),
 )
 urlpatterns += patterns('',

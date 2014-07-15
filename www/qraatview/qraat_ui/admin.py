@@ -1,6 +1,6 @@
 #from hello.models import Position
 from django.contrib import admin
-from hello.models import sitelist, track, tx_ID, TxType, TxInfo
+from qraat_ui.models import sitelist, track, tx_ID, TxType, TxInfo
 """
 #admin.site.register(Poll)
 
