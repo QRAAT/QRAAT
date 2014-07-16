@@ -1,0 +1,154 @@
+{% extends "qraat_site/base.html" %}
+
+{% block content %}
+
+<script>
+    $(document).ready(function(){
+            $(".dropdown-list").click(
+                function(){
+                    parent = this;
+                    $(this).children(".dropdown-list-table").slideToggle(
+                        function(){
+                            $(parent).children("a").toggleClass(" dropup")
+                        });
+                }    
+            );
+    });
+
+</script>
+
+
+{% if project %}
+<div class="jumbotron">
+    <h3>{{project.name}}
+        </br>
+        <small>{{project.description}}</small>
+        </br>
+        </br>
+        <a href="#">
+            <input type="button" class="btn btn-primary btn-lg" value="Edit Project" name="" />
+        </a>
+    </h3>
+</div>
+
+<div class="dropdown-list">
+    <a href="#" class="dropdown-list-heading">
+        <h4>Locations  <span id="dropdown-list-toggle" class="caret"></span></h4>
+    </a>
+    <div class="dropdown-list-table">
+    <table cellspacing="0" class="table">
+        <tr>
+            <td>Name</td>
+            <td>Location</td>
+            <td>Latitude</td>
+            <td>Longitude</td>
+            <td>Easting</td>
+            <td>Northing</td>
+            <td>UTM Zone Number</td>
+            <td>UTM Zone Letter</td>
+            <td>Elevation</td>
+        {% for location in project.get_locations %}
+        <tr>
+            <td>{{location.name}}</td>
+            <td>{{location.location}}</td>
+            <td>{{location.latitude}}</td>
+            <td>{{location.longitude}}</td>
+            <td>{{location.easting}}</td>
+            <td>{{location.northing}}</td>
+            <td>{{location.utm_zone_number}}</td>
+            <td>{{location.utm_zone_letter}}</td>
+            <td>{{location.elevation}}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    </div>
+</div>
+
+<div class="dropdown-list">
+    <a href="#" class="dropdown-list-heading">
+        <h4>Deployments <span id="dropdown-list-toggle" class="caret">
+        </h4>
+    </a>
+    <div class="dropdown-list-table">
+        <table cellspacing="0" class="table">
+            <tr>
+                <td>Name</td>
+                <td>Description</td>
+                <td>Time start</td>
+                <td>Time end</td>
+                <td>Transmitter</td>
+                <td>Target</td>
+                <td>Active</td>
+            </tr>
+            {% for deployment in project.get_deployments %}
+            <tr>
+                <td>{{deployment.name}}</td>
+                <td>{{deployment.description}}</td>
+                <td>{{deployment.time_start}}</td>
+                <td>{{deployment.time_end}}</td>
+                <td>{{deployment.txID}}</td>
+                <td>{{deployment.targetID}}</td>
+                <td>{% if deployment.is_active %}
+                     <span class="glyphicon glyphicon-ok-sign"></span>
+                    {% else %}
+                    <span class="glyphicon glyphicon-remove-sign"></span>
+                    {%endif%}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+<div class="dropdown-list">
+    <a href="#" class="dropdown-list-heading">
+    <h4>Transmitters
+        <span id="dropdown-list-toggle" class="caret"></span>
+    </h4>
+    </a>
+    <div class="dropdown-list-table">
+        <table cellspacing="0" class="table">
+            <tr>
+                <td>Name</td>
+                <td>Serial number</td>
+                <td>Model</td>
+                <td>Manufacturer</td>
+                <td>Frequency</td>
+            </tr>
+            {% for transmitter in project.get_transmitters %}
+                <tr>
+                    <td>{{transmitter.name}}</td>
+                    <td>{{transmitter.serial_no}}</td>
+                    <td>{{transmitter.tx_makeID.model}}</td>
+                    <td>{{transmitter.tx_makeID.manufacturer}}</td>
+                    <td>{{transmitter.frequency}}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+<div class="dropdown-list">
+    <a href="#" class="dropdown-list-heading">
+        <h4> Targets
+            <span class="caret"></span>
+        </h4>
+    </a>
+    <div class="dropdown-list-table">
+        <table cellspacing="0" class="table">
+            <tr>
+                <td>Name</td>
+                <td>Description</td>
+            </tr>
+            {% for target in project.get_targets %}
+            <tr>
+                <td>{{target.name}}</td>
+                <td>{{target.description}}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+{%endif%}
+{% endblock %}

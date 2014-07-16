@@ -66,6 +66,21 @@ class Project(models.Model):
 
     is_hidden = models.BooleanField(default=False)  # boolean default false
 
+    def get_locations(self):
+        return Location.objects.filter(projectID=self.ID)
+
+    def get_deployments(self):
+        return Deployment.objects.filter(projectID=self.ID).order_by('-is_active')
+
+    def get_transmitters(self):
+        return Tx.objects.filter(projectID=self.ID)
+
+    def get_targets(self):
+        return Target.objects.filter(projectID=self.ID)
+
+    def __unicode__(self):
+        return u'ID = %d name = %s' % (self.ID, self.name)
+
 
 class AuthProjectViewer(models.Model):
     class Meta:
