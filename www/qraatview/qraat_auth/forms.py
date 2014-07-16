@@ -57,8 +57,11 @@ class AccountChangeForm(forms.ModelForm):
 
 
 class PasswordChangeForm(forms.ModelForm):
+    cur_password = forms.CharField(
+        label='Current password', widget=forms.PasswordInput)
+
     password1 = forms.CharField(
-        label='Password', widget=forms.PasswordInput)
+        label='New password', widget=forms.PasswordInput)
 
     password2 = forms.CharField(
         label='Password confirmation', widget=forms.PasswordInput)
@@ -66,6 +69,14 @@ class PasswordChangeForm(forms.ModelForm):
     class Meta:
         model = QraatUser
         fields = ()
+
+    def clean_cur_password(self):
+        cur_password = self.cleaned_data.get("cur_password")
+        user = super(PasswordChangeForm, self).save(commit=False)
+        if cur_password and not user.check_password(cur_password):
+            raise forms.ValidationError("Current password don't match")
+
+        return cur_password
 
     def clean_password2(self):
         password1 = self.cleaned_data.get("password1")
@@ -75,7 +86,7 @@ class PasswordChangeForm(forms.ModelForm):
             raise forms.ValidationError("Passwords don't match")
 
         return password2
-    
+
     def save(self, commit=True):
         user = super(PasswordChangeForm, self).save(commit=False)
         user.set_password(self.cleaned_data["password1"])
