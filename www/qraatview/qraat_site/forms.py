@@ -2,7 +2,6 @@ from django import forms
 
 from qraat_site.models import Project, AuthProjectViewer
 from qraat_site.models import AuthProjectCollaborator
-from qraat_auth.models import QraatUser
 from django.contrib.auth.models import User, Group
 from django.contrib.admin.widgets import FilteredSelectMultiple
 
@@ -42,7 +41,7 @@ class ProjectForm(forms.ModelForm):
 
 class UserModelChoiceField(forms.ModelMultipleChoiceField):
     def label_from_instance(self, obj):
-        return QraatUser.objects.get(email=obj.username).get_full_name()
+        return obj.get_full_name()
 
 
 class EditProjectForm(ProjectForm):
@@ -56,13 +55,13 @@ class EditProjectForm(ProjectForm):
     #           '/static/admin/js/SelectBox.js']
 
     viewers = UserModelChoiceField(
-        queryset=User.objects.filter(username__in=(u.email for u in QraatUser.objects.all())), 
+        queryset=User.objects.all(), 
         widget=FilteredSelectMultiple(
             verbose_name="users", is_stacked=False))
 
 
     collaborators = UserModelChoiceField(
-            queryset=User.objects.filter(username__in=(u.email for u in QraatUser.objects.all().exclude())),
+            queryset=User.objects.all(),
             widget=FilteredSelectMultiple(
                 verbose_name="users", is_stacked=False))
 

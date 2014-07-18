@@ -2,9 +2,7 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
-from django.forms import ValidationError
 from qraat_site.models import Project, Tx, Location
-from qraat_auth.models import QraatUser
 from django.core.exceptions import ObjectDoesNotExist
 from qraat_site.forms import ProjectForm, EditProjectForm
 
@@ -52,19 +50,16 @@ def show_transmitter(request, project_id, transmitter_id):
 @login_required(login_url='auth/login')
 def show_location(request, project_id, location_id):
     location = Location.objects.get(ID=location_id)
-    return HttpResponse("Location: %s location: %s" % (location.name, location.location))
+    return HttpResponse(
+        "Location: %s location: %s" % (location.name, location.location))
 
 
 @login_required(login_url='/auth/login')
 def projects(request):
-    public_projects = Project.objects.filter(is_public=True, is_hidden=False)
-    
-    try:
-        user = QraatUser.objects.get(email=request.user.username)
-    except:
-        user = request.user
+    user = request.user
 
     user_projects = Project.objects.filter(ownerID=user.id)
+    public_projects = Project.objects.filter(is_public=True, is_hidden=False)
 
     nav_options = get_nav_options(request)
 
@@ -80,12 +75,10 @@ def create_project(request):
     nav_options = get_nav_options(request)
 
     if request.method == 'POST':
-        try:
-            user = QraatUser.objects.get(email=request.user.username)
-        except ObjectDoesNotExist:
-            raise ValidationError("Trying to add a project with invalid user")
 
+        user = request.user
         form = ProjectForm(user=user, data=request.POST)
+
         if form.is_valid():
             project = form.save()
             Group.objects.create(name="%d_viewers" % project.ID)
@@ -105,43 +98,36 @@ def edit_project(request, project_id):
 
     nav_options = get_nav_options(request)
 
+    user = request.user
+
     try:
-        user = QraatUser.objects.get(email=request.user.username)
+        project = Project.objects.get(ID=project_id)
 
     except ObjectDoesNotExist:
-        return HttpResponse("Error: Just qraat users can see this page")
+        return HttpResponse("Error: We did not find this project")
 
     else:
-        try:
-            project = Project.objects.get(ID=project_id)
+        if user.id == project.ownerID:
+            if request.method == 'POST':
+                form = EditProjectForm(data=request.POST, instance=project)
+                if form.is_valid():
+                    form.save()
+                    return render(
+                        request, 'qraat_site/edit-project.html',
+                        {'nav_options': nav_options,
+                         'changed': True,
+                         'form': form})
+            else:
+                form = EditProjectForm(instance=project)
 
-        except ObjectDoesNotExist:
-            return HttpResponse("Error: We did not find this project")
+            return render(
+                request, 'qraat_site/edit-project.html',
+                {'nav_options': nav_options,
+                 'form': form})
 
         else:
-            if user.id == project.ownerID:
-                if request.method == 'POST':
-                    form = EditProjectForm(data=request.POST, instance=project)
-                    if form.is_valid():
-                        form.save()
-                        return render(
-                            request, 'qraat_site/edit-project.html',
-                            {'nav_options': nav_options,
-                             'changed': True,
-                             'form': form})
-                else:
-                    form = EditProjectForm(instance=project)
-
-                return render(
-                    request, 'qraat_site/edit-project.html',
-                    {'nav_options': nav_options,
-                     'form': form})
-
-            else:
-                return HttpResponse(
-                    "Just the project owner can access this page")
-
-    return HttpResponse("Error: Invalid request")
+            return HttpResponse(
+                "Just the project owner can access this page")
 
 
 def show_project(request, project_id):

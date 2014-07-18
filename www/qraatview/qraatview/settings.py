@@ -56,8 +56,7 @@ ROOT_URLCONF = 'qraatview.urls'
 
 WSGI_APPLICATION = 'qraatview.wsgi.application'
 #AUTH_USER_MODEL = 'qraat_auth.QraatUser'
-AUTHENTICATION_BACKENDS = ('django.contrib.auth.backends.ModelBackend', 
-			'qraat_auth.models.QraatUserBackend',)
+AUTHENTICATION_BACKENDS = ('django.contrib.auth.backends.ModelBackend', )
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
@@ -75,17 +74,10 @@ DATABASES = {
 		'USER': 'root',
 		'PASSWORD': 'woodland',
 	},
-	'auth': {
-		'ENGINE': 'django.db.backends.mysql',
-		'NAME': 'auth',
-		'USER': 'authuser',
-		'PASSWORD': 'authpassword',
-	},
 }
 
 DATABASE_ROUTERS = [ 'qraat_site.router.DatabaseAppsRouter',]
-DATABASE_APPS_MAPPING = {'qraat_site':'auth',
-			 'qraat_auth': 'auth', 'hello': 'qraat',
+DATABASE_APPS_MAPPING = {'qraat_site':'qraat',
 			}	
 
 # Internationalization
@@ -106,3 +98,4 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.6/howto/static-files/
 
 STATIC_URL = "/static/"
+STATIC_ROOT = "/var/www/qraat_site/static/"

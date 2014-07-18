@@ -1,9 +1,7 @@
 from django import forms
-from django.contrib.auth.forms import ReadOnlyPasswordHashField
+from django.contrib.auth.models import User
 
 # Register your models here.
-
-from qraat_auth.models import QraatUser
 
 
 class UserForm(forms.ModelForm):
@@ -18,7 +16,7 @@ class UserForm(forms.ModelForm):
         label='Password confirmation', widget=forms.PasswordInput)
 
     class Meta:
-        model = QraatUser
+        model = User
         fields = ("email", "first_name", "last_name")
 
     def clean_password2(self):
@@ -30,21 +28,23 @@ class UserForm(forms.ModelForm):
 
         return password2
 
-    def clean_username(self):
-        username = self.cleaned_data.get("email")
+    def clean_email(self):
+        email = self.cleaned_data.get("email")
         user = None
 
         try:
-            user = QraatUser.objects.get(email=username)
+            user = User.objects.get(email=email)
         except Exception:
             if user is not None:
                 raise forms.ValidationError("Email already exists")
             else:
-                return username
+                return email
 
     def save(self, commit=True):
         user = super(UserForm, self).save(commit=False)
         user.set_password(self.cleaned_data["password1"])
+        username = self.clean_email()
+        user.username = username
         if commit:
             user.save()
         return user
@@ -52,7 +52,7 @@ class UserForm(forms.ModelForm):
 
 class AccountChangeForm(forms.ModelForm):
     class Meta:
-        model = QraatUser
+        model = User
         fields = ("first_name", "last_name")
 
 
@@ -67,7 +67,7 @@ class PasswordChangeForm(forms.ModelForm):
         label='Password confirmation', widget=forms.PasswordInput)
 
     class Meta:
-        model = QraatUser
+        model = User
         fields = ()
 
     def clean_cur_password(self):
@@ -93,19 +93,3 @@ class PasswordChangeForm(forms.ModelForm):
         if commit:
             user.save()
         return user
-
-
-class QraatUserChangeForm(forms.ModelForm):
-    # A form for updating users. Includes all the fields on
-    # the user, but replaces the password field with admin's
-    # password hash display field.
-    password = ReadOnlyPasswordHashField()
-
-    class Meta:
-        model = QraatUser
-        fields = (
-            "email", "first_name", "last_name",
-            "password", "is_active", "is_admin")
-
-    def clean_password(self):
-        return self.initial["password"]

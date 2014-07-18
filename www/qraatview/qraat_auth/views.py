@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from qraat_auth.forms import UserForm, AccountChangeForm
 from qraat_auth.forms import PasswordChangeForm
 from django.contrib.auth.forms import AuthenticationForm
-from qraat_auth.models import QraatUser
+from django.contrib.auth.models import User
 
 # Create your views here.
 
@@ -75,49 +75,37 @@ def createUserForm(request):
 
 @login_required(login_url='/auth')
 def user_account(request):
-    try:
-        user = QraatUser.objects.get(email=request.user.username)
-    except:
-        user = None  # TODO: Implement exception
-    return render(request, 'qraat_auth/user-account.html', {'user': user})
+    return render(request, 'qraat_auth/user-account.html', {'user': request.user})
 
 
 @login_required(login_url='/auth')
 def edit_account(request):
-    try:
-        user = QraatUser.objects.get(email=request.user.username)
-        form = AccountChangeForm(instance=user)
-    except:
-        form = None  # TODO: Implement exception
-
-    else:
-        if request.method == 'POST':
-            form = AccountChangeForm(request.POST, instance=user)
-            if form.is_valid():
-                form.save()
-                return render(
-                    request, 'qraat_auth/edit-account.html',
-                    {'form': form, 'changed': True})
+    user = request.user 
+    form = AccountChangeForm(instance=user)
+    
+    if request.method == 'POST':
+        form = AccountChangeForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            return render(
+                request, 'qraat_auth/edit-account.html',
+                {'form': form, 'changed': True})
 
     return render(request, 'qraat_auth/edit-account.html', {'form': form})
 
 
 @login_required(login_url='/auth')
 def change_password(request):
-    try:
-        user = QraatUser.objects.get(email=request.user.username)
-        form = PasswordChangeForm(instance=user)
-    except Exception, e:
-        form = None  # TODO: Implement exception
+    user = request.user 
+    form = PasswordChangeForm(instance=user)
 
-    else:
-        if request.method == 'POST':
-            form = PasswordChangeForm(request.POST, instance=user)
-            if form.is_valid():
-                form.save()
-                return render(
-                    request, 'qraat_auth/change-password.html',
-                    {'form': form, 'changed': True})
+    if request.method == 'POST':
+        form = PasswordChangeForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            return render(
+                request, 'qraat_auth/change-password.html',
+                {'form': form, 'changed': True})
 
     return render(request, 'qraat_auth/change-password.html', {'form': form})
 
