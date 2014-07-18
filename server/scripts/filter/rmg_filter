@@ -4,7 +4,7 @@
 # timestamp.  This program is part of QRAAT, an automated animal tracking
 # system based on GNU Radio. 
 #
-# Copyright (C) 2013 Christopher Patton
+# Copyright (C) 2014 Sean Riddle
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -37,10 +37,10 @@ if int(output) > 1:
 parser = OptionParser()
 
 parser.description = '''This does nothing.'''
-parser.add_option('-s', '--siteid', action='store', type='int', dest='siteid')
-parser.add_option('-t', '--txid', action='store', type='int', dest='txid')
-parser.add_option('-a', '--t_start', action='store', type='int', dest='t_start')
-parser.add_option('-z', '--t_end', action='store', type='int', dest='t_end')
+parser.add_option('-s', '--site-id', action='store', type='int')
+parser.add_option('-t', '--dep-id', action='store', type='int')
+parser.add_option('-a', '--t-start', action='store', type='int')
+parser.add_option('-z', '--t-end', action='store', type='int')
 
 (options, args) = parser.parse_args()
 
@@ -54,7 +54,7 @@ try:
 
   t_start, t_end = options.t_start, options.t_end
 
-  siteid, txid = options.siteid, options.txid
+  site_id, dep_id = options.site_id, options.dep_id
 
   total_chunks = int((t_end - t_start) / float(chunk_size)) + 1
   start_times = [(t_start + (i * chunk_size)) for i in range(total_chunks)]
@@ -66,11 +66,11 @@ try:
     # not already been computed. Could change this to delete all those scores
     # (and interval_cache values) and then not do a join filter. But what we do
     # not want, I'm pretty sure, is more than one score per point.
-    q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteid = %s and txid = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
+    q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteID = %s and deploymentID = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
     # cursor query:
     # q = 'insert into `cursor` (name, value) values (%s, 1)'
 
-    cur = change_handler.add_sql(q, (siteid, txid, start, end))
+    cur = change_handler.add_sql(q, (site_id, dep_id, start, end))
 
     l = []
     while True:
@@ -90,13 +90,13 @@ try:
     
 except mdb.Error, e:
   print >>sys.stderr, "template: eror: [%d] %s" % (e.args[0], e.args[1])
-  with open('/home/qraat/error.log', 'w') as f:
-    traceback.print_exc(file=f)
-    for k, vs in qraat.srv.signal_filter.reasoning.items():
-      f.write(str(k) + '\n')
-      for v in vs:
-        f.write('\t*' + str(v) + '\n')
-    f.write('len of reasoning:' + str(len(qraat.srv.signal_filter.reasoning)) + '\n')
+  #with open('/home/qraat/error.log', 'w') as f:
+  #  traceback.print_exc(file=f)
+  #  for k, vs in qraat.srv.signal_filter.reasoning.items():
+  #    f.write(str(k) + '\n')
+  #    for v in vs:
+  #      f.write('\t*' + str(v) + '\n')
+  #  f.write('len of reasoning:' + str(len(qraat.srv.signal_filter.reasoning)) + '\n')
   # sys.exit(1)
 
 except qraat.error.QraatError, e:
