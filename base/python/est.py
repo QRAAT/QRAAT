@@ -29,7 +29,7 @@ from string import Template
 
 query_insert_est = Template(
   '''INSERT INTO est 
-       (siteid, datetime, timestamp, frequency, center, fdsp, 
+       (siteid, timestamp, frequency, center, fdsp, 
         fd1r, fd1i, fd2r, fd2i, fd3r, fd3i, fd4r, fd4i, 
         band3, band10, edsp, 
         ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, 
@@ -38,9 +38,9 @@ query_insert_est = Template(
         nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
         nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
         nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i, 
-        fdsnr, edsnr, timezone, txid)
+        fdsnr, edsnr, deploymentID)
       VALUE 
-       ($siteid, '$datetime', $timestamp, $frequency, $center, $fdsp, 
+       ($siteid, $timestamp, $frequency, $center, $fdsp, 
         $fd1r, $fd1i, $fd2r, $fd2i, $fd3r, $fd3i, $fd4r, $fd4i, 
         $band3, $band10, $edsp, 
         $ed1r, $ed1i, $ed2r, $ed2i, $ed3r, $ed3i, $ed4r, $ed4i, 
@@ -49,11 +49,11 @@ query_insert_est = Template(
         $nc21r, $nc21i, $nc22r, $nc22i, $nc23r, $nc23i, $nc24r, $nc24i, 
         $nc31r, $nc31i, $nc32r, $nc32i, $nc33r, $nc33i, $nc34r, $nc34i, 
         $nc41r, $nc41i, $nc42r, $nc42i, $nc43r, $nc43i, $nc44r, $nc44i, 
-        $fdsnr, $edsnr, '$timezone', $txid)''')
+        $fdsnr, $edsnr, $txid)''')
 
 query_update_est = Template( 
   '''UPDATE est SET
-      siteid=$siteid, datetime='$datetime', timestamp=$timestamp, 
+      siteid=$siteid, timestamp=$timestamp, 
       frequency=$frequency, center=$center, fdsp=$fdsp,
       fd1r=$fd1r, fd1i=$fd1i, fd2r=$fd2r, fd2i=$fd2i, fd3r=$fd3r, fd3i=$fd3i, fd4r=$fd4r, fd4i=$fd4i, 
       band3=$band3, band10=$band10, edsp=$edsp, 
@@ -63,7 +63,7 @@ query_update_est = Template(
       nc21r=$nc21r, nc21i=$nc21i, nc22r=$nc22r, nc22i=$nc22i, nc23r=$nc23r, nc23i=$nc23i, nc24r=$nc24r, nc24i=$nc24i, 
       nc31r=$nc31r, nc31i=$nc31i, nc32r=$nc32r, nc32i=$nc32i, nc33r=$nc33r, nc33i=$nc33i, nc34r=$nc34r, nc34i=$nc34i, 
       nc41r=$nc41r, nc41i=$nc41i, nc42r=$nc42r, nc42i=$nc42i, nc43r=$nc43r, nc43i=$nc43i, nc44r=$nc44r, nc44i=$nc44i, 
-      fdsnr=$fdsnr, edsnr=$edsnr, timezone='$timezone', txid=$txid
+      fdsnr=$fdsnr, edsnr=$edsnr, deploymentID=$txid
      WHERE ID=$ID''')
 
 
@@ -115,7 +115,9 @@ class est (qraat.csv.csv):
     self.txid_index = self.siteid_index = None
     self.table = []
 
-    self.headers = [ 'ID', 'siteid', 'datetime', 'timestamp', 'frequency', 'center', 'fdsp', 
+    # TODO deal with 'datetime' (before 'timestamp')  and 'timezone' (before 'txid') in old est archives. 
+    # NOTE deploymentID called txid for legacy reasons. 
+    self.headers = [ 'ID', 'siteid', 'timestamp', 'frequency', 'center', 'fdsp', 
                      'fd1r', 'fd1i', 'fd2r', 'fd2i', 'fd3r', 'fd3i', 'fd4r', 'fd4i', 
                      'band3', 'band10', 'edsp', 
                      'ed1r', 'ed1i', 'ed2r', 'ed2i', 'ed3r', 'ed3i', 'ed4r', 'ed4i', 
@@ -124,7 +126,7 @@ class est (qraat.csv.csv):
                      'nc21r', 'nc21i', 'nc22r', 'nc22i', 'nc23r', 'nc23i', 'nc24r', 'nc24i', 
                      'nc31r', 'nc31i', 'nc32r', 'nc32i', 'nc33r', 'nc33i', 'nc34r', 'nc34i', 
                      'nc41r', 'nc41i', 'nc42r', 'nc42i', 'nc43r', 'nc43i', 'nc44r', 'nc44i', 
-                     'fdsnr', 'edsnr', 'timezone', 'txid', 
+                     'fdsnr', 'edsnr', 'txid', 
                      'tagname', 'fn' ]
 
     self.Row = type('Row', (object,), { h : None for h in self.headers })
@@ -196,8 +198,6 @@ class est (qraat.csv.csv):
     det.noise_cov()
     new_row = self.Row()
     new_row.tagname   = det.tag_name
-    new_row.datetime  = time.gmtime(det.time)
-    new_row.timezone  = 'UTC' #TODO Is this value always UTC? 
     new_row.timestamp = det.time
     new_row.frequency = det.freq
     new_row.center    = det.params.ctr_freq
@@ -325,7 +325,6 @@ class est (qraat.csv.csv):
     # for the timestamp. The following line turns the timestamp into 
     # a string with unrounded value. 
     row.timestamp = repr(row.timestamp) 
-    row.datetime = qraat.csv.pretty_printer(row.datetime)
     cur.execute(query.substitute(row))
 
 
