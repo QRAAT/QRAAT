@@ -38,7 +38,7 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.admin',
-	'hello',
+	'qraat_ui',
 	'qraat_auth',
 	'qraat_site',
 )
@@ -78,7 +78,7 @@ DATABASES = {
 
 DATABASE_ROUTERS = [ 'qraat_site.router.DatabaseAppsRouter',]
 DATABASE_APPS_MAPPING = {'qraat_site':'qraat',
-			}	
+                         'qraat_ui': 'qraat' }	
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/

@@ -1,5 +1,5 @@
 from django.test import TestCase
-from hello.models import tx_ID, TxInfo, TxType
+from qraat_ui.models import tx_ID, TxInfo, TxType
 
 
 class TransmitterTestCase(TestCase):
