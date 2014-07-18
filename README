@@ -12,4 +12,4 @@ Root directories:
   node/ - Software for QRAAT nodes, including the RMG module. Requires Gnu
           Radio to install. Build with CMake. 
 
-  node/ - Server code. Build with CMake.
+  server/ - Server code. Build with CMake.
