@@ -6,3 +6,25 @@
     float: right;
     width: 80%;
 }
+
+.table-body{
+    display: table;
+    width: 100%;
+    margin-bottom: 20px;
+    border-collapse: collapse;
+    border-spacing: 0px;
+}
+
+.table-element{
+    padding: 8px;
+    line-height: 1.42857;
+    vertical-align: top;
+    border-top: 1px solid #DDD;
+}
+
+.table-row{
+    display: table-row;
+}
+.table-cell{
+    display: table-cell;
+}

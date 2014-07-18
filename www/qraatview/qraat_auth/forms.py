@@ -74,7 +74,7 @@ class PasswordChangeForm(forms.ModelForm):
         cur_password = self.cleaned_data.get("cur_password")
         user = super(PasswordChangeForm, self).save(commit=False)
         if cur_password and not user.check_password(cur_password):
-            raise forms.ValidationError("Current password don't match")
+            raise forms.ValidationError("Current password doesn't match")
 
         return cur_password
 

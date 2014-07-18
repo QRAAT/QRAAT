@@ -1,6 +1,7 @@
 # File: qraat_site models.py
 
 from django.db import models
+from qraat_site.utils import timestamp_todate
 
 QRAAT_APP_LABEL = 'qraat_site'
 
@@ -254,6 +255,9 @@ class Target(models.Model):
         help_text="Project for which target was originally created")
 
     is_hidden = models.BooleanField(default=False)  # boolean default false
+    
+    def __unicode__(self):
+        return u'%s' % self.name
 
 
 class Deployment(models.Model):
@@ -288,6 +292,12 @@ class Deployment(models.Model):
     is_active = models.BooleanField(default=False)
 
     is_hidden = models.BooleanField(default=False)
+    
+    def get_start(self):
+        return timestamp_todate(self.time_start)
+
+    def get_end(self):
+        return timestamp_todate(self.time_end)
 
 
 class Track(models.Model):
