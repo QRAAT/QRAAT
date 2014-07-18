@@ -2,7 +2,7 @@ INSTALL(PROGRAMS
   rmg
   rmg_backup
   rmg_clean
-  rmg_dbexport.pl
+  rmg_dbarchive
   rmg_det_to_db
   rmg_fetch
   rmg_filterest

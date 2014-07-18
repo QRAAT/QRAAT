@@ -26,18 +26,18 @@ try:
   import MySQLdb as mdb
 except ImportError: pass
 
-query_insert_pos = '''INSERT INTO Position
-                       (depID, timestamp, easting, northing, likelihood, activity)
+query_insert_pos = '''INSERT INTO position
+                       (deploymentID, timestamp, easting, northing, likelihood, activity)
                       VALUES (%s, %s, %s, %s, %s, %s)''' 
 
-query_insert_bearing = '''INSERT INTO Bearing 
-                           (depID, siteID, timestamp, bearing, likelihood, activity)
+query_insert_bearing = '''INSERT INTO bearing 
+                           (deploymentID, siteID, timestamp, bearing, likelihood, activity)
                           VALUES (%s, %s, %s, %s, %s, %s)''' 
 
 def get_center(db_con):
   cur = db_con.cursor()
   cur.execute('''SELECT northing, easting 
-                   FROM qraat.sitelist
+                   FROM qraat.location
                   WHERE name = 'center' ''')
   (n, e) = cur.fetchone()
   return np.complex(n, e)
@@ -46,7 +46,6 @@ def get_center(db_con):
 # Get est's from the database, applying a filter. Return a set of
 # estID's which are fed to the class signal. 
 # TODO Curry these?  
-# TODO Change txID to depID. 
 # TODO Grab band filte rfalues from tx_pulse.  
 
 def get_est_ids_timefilter(db_con, dep_id, t_start, t_end, thresh):
@@ -54,7 +53,7 @@ def get_est_ids_timefilter(db_con, dep_id, t_start, t_end, thresh):
   cur.execute('''SELECT ID 
                    FROM est
                    JOIN estscore ON est.ID = estscore.estID
-                  WHERE txID=%d
+                  WHERE deploymentID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f
                     AND thresh >= %f''' % (dep_id, t_start, t_end, thresh))
@@ -64,7 +63,7 @@ def get_est_ids_bandfilter(db_con, dep_id, t_start, t_end):
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
                    FROM est
-                  WHERE txID=%d
+                  WHERE deploymentID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f 
                     AND band3 < 150 
@@ -75,7 +74,7 @@ def get_est_ids(db_con, dep_id, t_start, t_end):
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
                    FROM est
-                  WHERE txID=%d
+                  WHERE deploymentID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f''' % (dep_id, t_start, t_end))
   return [ int(row[0]) for row in cur.fetchall() ]
@@ -97,11 +96,11 @@ class steering_vectors:
     deps = []
 
     # Get site locations.
-    sites = qraat.csv.csv(db_con=db_con, db_table='sitelist').filter(rx=True)
+    sites = qraat.csv.csv(db_con=db_con, db_table='site')
     sv_deps_by_site = {}
 
     for row in sites:
-      deps.append(('sitelist', row.ID))
+      deps.append(('site', row.ID))
 
     # Get steering vector data.
     steering_vectors = {} # site.ID -> sv
@@ -161,9 +160,8 @@ class signal:
       # Store eigenvalue decomposition vectors and noise covariance
       # matrices in NumPy arrays. 
       
-      # TODO When qraat.est updates to use depID instead of txID, update this. 
       cur = db_con.cursor()
-      cur.execute('''SELECT ID, siteID, txID, timestamp, edsp, 
+      cur.execute('''SELECT ID, siteID, deploymentID, timestamp, edsp, 
                             ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
                             nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
                             nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
@@ -227,10 +225,10 @@ class Position:
     self.table = []
     if len(pos_ids) > 0:
       cur = db_con.cursor()
-      cur.execute('''SELECT ID, depID, timestamp, easting, northing, 
+      cur.execute('''SELECT ID, deploymentID, timestamp, easting, northing, 
                             utm_zone_number, utm_zone_letter, likelihood,
                             activity
-                       FROM Position
+                       FROM position
                       WHERE ID in (%s)
                       ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), pos_ids)))
       for row in cur.fetchall():
@@ -254,7 +252,7 @@ class Position:
                                      likelihood, 
                                      activity))
       pos_id = cur.lastrowid                               
-      handle_provenance_insertion(cur, pos_deps, {'Position':(pos_id,)})
+      handle_provenance_insertion(cur, pos_deps, {'position':(pos_id,)})
 
   def export_kml(self, name, dep_id):
 
@@ -265,7 +263,7 @@ class Position:
     fd.write('<Folder>\n')
     fd.write('  <Placemark>\n')
     fd.write('  <MultiGeometry>\n')
-    fd.write('    <name>%s (depID=%d) position cloud</name>\n' % (name, dep_id))
+    fd.write('    <name>%s (deploymentID=%d) position cloud</name>\n' % (name, dep_id))
     for row in self.table:
       (P, t, ll, pos_id) = (np.complex(row[0], row[1]), 
                             float(row[2]), 
@@ -292,9 +290,9 @@ class Bearing:
     self.table = []
     if len(bearing_ids) > 0:
       cur = db_con.cursor()
-      cur.execute('''SELECT ID, depID, siteID, timestamp, bearing,
+      cur.execute('''SELECT ID, deploymentID, siteID, timestamp, bearing,
                             likelihood, activity
-                       FROM Bearing
+                       FROM bearing
                       WHERE ID in (%s)
                       ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), bearing_ids)))
       for row in cur.fetchall():
