@@ -9,11 +9,11 @@ class Position(models.Model):
     class Meta:
         app_label = QRAAT_APP_LABEL
         unique_together = (
-            "ID", "depID", "timestamp")  # set multiple fields as keys
-        db_table = "Position"
+            "ID", "deploymentID", "timestamp")  # set multiple fields as keys
+        db_table = "position"
 
     ID = models.AutoField(primary_key=True)
-    depID = models.BigIntegerField()  # secondary key
+    deploymentID = models.BigIntegerField()  # secondary key
     timestamp = models.DecimalField(
         max_digits=16, decimal_places=6)  # decimal(16,6) secondary key
     easting = models.DecimalField(
@@ -27,72 +27,39 @@ class Position(models.Model):
     likelihood = models.FloatField()  # double
     activity = models.FloatField()  # double
 
+class Deployment(models.Model):
+  class Meta:
+    app_label = QRAAT_APP_LABEL
+    unique_together = ("ID", "txID", "targetID", "projectID")
+    db_table = "deployment"
 
-class TxType(models.Model):
-    class Meta:
-        app_label = QRAAT_APP_LABEL
-        db_table = "tx_type"
-
-    ID = models.AutoField(primary_key=True)
-    RMG_type = models.CharField(max_length=20)  # varchar(20)
-    tx_table_name = models.CharField(max_length=30)  # varchar(30)
-
-    def __unicode__(self):
-        return u'%d' % self.ID
-
-
-class TxInfo(models.Model):
-        class Meta:
-            app_label = QRAAT_APP_LABEL
-            db_table = "tx_info"
-
-        ID = models.AutoField(primary_key=True)
-        tx_type_ID = models.ForeignKey(
-            TxType, db_column="tx_type_ID")  # One to One relation with tx_type
-        manufacturer = models.CharField(max_length=50)  # varchar(50)
-        model = models.CharField(max_length=50)  # varchar(50)
-
-        def __unicode__(self):
-            return u'%d %s' % (self.ID, self.model)
+  ID = models.AutoField(primary_key=True)
+  name = models.CharField(max_length=50)
+  description = models.TextField()
+  time_start = models.DecimalField(max_digits=16, decimal_places=6)
+  time_end = models.DecimalField(max_digits=16, decimal_places=6)
+  txID =  models.SmallIntegerField(max_length=10)
+  targetID = models.SmallIntegerField(max_length=10)
+  projectID = models.SmallIntegerField(max_length=10)
+  is_active = models.SmallIntegerField(max_length=10, default=0)
+  is_hidden = models.SmallIntegerField(max_length=10, default=0)
 
 
-class tx_ID(models.Model):
-    class Meta:
-        app_label = QRAAT_APP_LABEL
-        db_table = "tx_ID"
-
-    ID = models.AutoField(
-        primary_key=True)  # int(10) primary key autoincrement
-    tx_info_ID = models.ForeignKey(
-        TxInfo, db_column="tx_info_ID")  # foreignKey from tx_info
-    active = models.BooleanField(default=False)  # tinyint(1)
-
-    def __unicode__(self):
-        return u'%d' % self.ID
-
-
-class TxPulse(models.Model):
-    class Meta:
-        app_label = QRAAT_APP_LABEL
-        db_table = "tx_pulse"
-
-    tx_ID = models.ForeignKey(tx_ID, primary_key=True, db_column="tx_ID")
-    frequency = models.FloatField()  # float
-    pulse_width = models.FloatField()  # float
-    pulse_rate = models.FloatField()  # float
-    band3 = models.SmallIntegerField()  # small integer
-    band10 = models.SmallIntegerField()  # small integer
-
-
-class TxAlias(models.Model):
-    class Meta:
-        app_label = QRAAT_APP_LABEL
-        db_table = "tx_alias"
-
-    ID = models.AutoField(primary_key=True)
-    tx_ID = models.ForeignKey(tx_ID, db_column="tx_ID")
-    alias = models.CharField(max_length=50)  # varchar(50)
-
+class Site(models.Model):
+  class Meta:
+    app_label = QRAAT_APP_LABEL
+    db_table = "site"
+  
+  ID = models.AutoField(primary_key=True)
+  name = models.CharField(max_length=20)
+  location = models.CharField(max_length=100)
+  latitude = models.DecimalField(max_digits=10, decimal_places=6)
+  longitude = models.DecimalField(max_digits=11, decimal_places=6)
+  easting = models.DecimalField(max_digits=9, decimal_places=2, default=0.00)
+  northing = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+  utm_zone_number = models.SmallIntegerField(max_length=3, default=10)
+  utm_zone_letter = models.CharField(max_length=1, default='S')
+  elevation = models.DecimalField(max_digits=7, decimal_places=2, default=0.00)
 
 class track(models.Model):
     class Meta:
@@ -112,41 +79,3 @@ class track(models.Model):
 
     def __unicode__(self):
         return u'%s' % self.ID
-
-class sitelist(models.Model):
-    class Meta:
-        app_label = QRAAT_APP_LABEL
-        db_table = "sitelist"
-
-    ID = models.AutoField(primary_key=True)  # int(11), auto_increment
-    name = models.CharField(max_length=20)  # varchar(20)
-
-    location = models.CharField(max_length=100)  # varchar(100)
-
-    latitude = models.DecimalField(
-        max_digits=10, decimal_places=6)  # decimal(10,6)
-
-    longitude = models.DecimalField(
-        max_digits=10, decimal_places=6)  # decimal(11,6)
-
-    easting = models.DecimalField(
-        default=0.00, max_digits=9, decimal_places=2)  # decimal(9,2) unsigned
-
-    northing = models.DecimalField(
-        default=0.00, max_digits=10,
-        decimal_places=2)  # decimal(10,2) unsigned
-
-    utm_zone_number = models.SmallIntegerField(
-        default=10)  # tinyint(3) unsigned, default 10
-
-    utm_zone_letter = models.CharField(
-        default='S', max_length=1)  # char(1), default S
-
-    elevation = models.DecimalField(
-        default=0.00, max_digits=7,
-        decimal_places=2)  # decimal(7,2), default 0.00
-
-    rx = models.SmallIntegerField(default=1)  # tinyint(1), default 1
-
-    def __unicode__(self):
-        return u'%s' % self.name
