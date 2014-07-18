@@ -23,6 +23,8 @@ SECRET_KEY = '8%a3r^oveg!z)o^%-87*+kns2c$qma^(=g@%_7ua19q9ug&=5+'
 DEBUG = True
 
 TEMPLATE_DEBUG = True
+TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
+
 
 ALLOWED_HOSTS = []
 
