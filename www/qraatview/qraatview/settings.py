@@ -56,7 +56,6 @@ ROOT_URLCONF = 'qraatview.urls'
 
 WSGI_APPLICATION = 'qraatview.wsgi.application'
 #AUTH_USER_MODEL = 'qraat_auth.QraatUser'
-AUTHENTICATION_BACKENDS = ('django.contrib.auth.backends.ModelBackend', )
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases

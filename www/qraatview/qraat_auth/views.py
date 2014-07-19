@@ -41,6 +41,20 @@ def user_login(request):
         request, 'qraat_auth/loginform.html', {'login_form': login_form})
 
 
+@login_required(login_url='auth')
+def show_users(request):
+    
+    user = request.user
+    if request.method = 'GET':
+        isthere_newuser = request.GET.get("newuser")
+
+        if user.is_superuser:
+            users = User.objects.all()
+            return render(request, 'qraat_auth/users.html', {'users': users})
+        else:
+            return HttpResponse("Restricted area!")
+
+
 @login_required(login_url='/auth')
 def user_logged_in(request):
     username = request.user.username
@@ -53,18 +67,9 @@ def createUserForm(request):
     if request.method == 'POST':
         user_form = UserForm(request.POST)
         if user_form.is_valid():
-            # creates user here
-            # form.cleaned_data as required
-            username = user_form.clean_username()
-            password = user_form.clean_password2()
             user_form.save()
 
-            user = authenticate(username=username,
-                                password=password)
-
-            login(request, user)
-
-            return HttpResponseRedirect('user-created')
+            return redirect('/auth/users?created_user=True')
 
     else:
         user_form = UserForm()
@@ -74,15 +79,21 @@ def createUserForm(request):
 
 
 @login_required(login_url='/auth')
-def user_account(request):
-    return render(request, 'qraat_auth/user-account.html', {'user': request.user})
+def user_account(request, user_id=None):
+    if request.user.is_superuser and user_id:
+        user = User.objects.get(id=user_id)
+    else:
+        user = request.user
+    
+    return render(
+        request, 'qraat_auth/user-account.html', {'user': user})
 
 
 @login_required(login_url='/auth')
 def edit_account(request):
-    user = request.user 
+    user = request.user
     form = AccountChangeForm(instance=user)
-    
+
     if request.method == 'POST':
         form = AccountChangeForm(request.POST, instance=user)
         if form.is_valid():
@@ -96,7 +107,7 @@ def edit_account(request):
 
 @login_required(login_url='/auth')
 def change_password(request):
-    user = request.user 
+    user = request.user
     form = PasswordChangeForm(instance=user)
 
     if request.method == 'POST':

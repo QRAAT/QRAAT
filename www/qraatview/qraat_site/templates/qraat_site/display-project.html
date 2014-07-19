@@ -79,7 +79,7 @@
                 <span class="table-element table-cell">Active</span>
             </div>
             {% for deployment in project.get_deployments %}
-            <a href="#" class="table-element table-row">
+            <a href="/qraat_ui/depID/{{deployment.ID}}" class="table-element table-row">
                 <span class="table-element table-cell">{{deployment.name}}</span>
                 <span class="table-element table-cell">{{deployment.description}}</span>
                 <span class="table-element table-cell">{{deployment.get_start}}</span>

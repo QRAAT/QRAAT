@@ -155,8 +155,15 @@ def regular_content(request):
 
 def get_nav_options(request):
     nav_options = []
+    user = request.user
 
-    if request.user.is_authenticated():
+    if user.is_authenticated():
+        if user.is_superuser:
+            nav_options.append(
+                {"url": "/auth/users",
+                 "name": "Users" })
+
         nav_options.append({"url": "/qraat/projects",
                             "name": "Projects"})
+
     return nav_options
