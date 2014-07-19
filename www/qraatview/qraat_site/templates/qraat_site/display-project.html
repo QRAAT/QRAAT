@@ -1,0 +1,152 @@
+{% extends "qraat_site/base.html" %}
+
+{% block content %}
+
+<script>
+    $(document).ready(function(){
+            $(".dropdown-list-heading").click(
+                function(){
+                    $(this).parent().children("a").toggleClass(" dropup")
+                    $(this).parent().children(".dropdown-list-table").slideToggle("fast");
+                }    
+            );
+    });
+
+</script>
+
+
+{% if project %}
+<div class="jumbotron">
+    <h3>{{project.name}}
+        </br>
+        <small>{{project.description}}</small>
+        </br>
+        </br>
+        <a href="edit-project">
+            <input type="button" class="btn btn-primary btn-lg" value="Edit Project" name="" />
+        </a>
+    </h3>
+</div>
+
+<div class="dropdown-list">
+    <a href="#" class="dropdown-list-heading">
+        <h4>Locations  <span id="dropdown-list-toggle" class="caret"></span></h4>
+    </a>
+    <div class="dropdown-list-table" style="display: none;">
+    <div class="table-body">
+        <div class="table-element table-row">
+            <span class="table-element table-cell">Name</span>
+            <span class="table-element table-cell">Location</span>
+            <span class="table-element table-cell">Latitude</span>
+            <span class="table-element table-cell">Longitude</span>
+            <span class="table-element table-cell">Easting</span>
+            <span class="table-element table-cell">Northing</span>
+            <span class="table-element table-cell">UTM Zone Number</span>
+            <span class="table-element table-cell">UTM Zone Letter</span>
+            <span class="table-element table-cell">Elevation</span>
+        </div>
+        {% for location in project.get_locations %}
+        <a href="location/{{location.ID}}" class="table-element table-row">
+            <span class="table-element table-cell">{{location.name}}</span>
+            <span class="table-element table-cell">{{location.location}}</span>
+            <span class="table-element table-cell">{{location.latitude}}</span>
+            <span class="table-element table-cell">{{location.longitude}}</span>
+            <span class="table-element table-cell">{{location.easting}}</span>
+            <span class="table-element table-cell">{{location.northing}}</span>
+            <span class="table-element table-cell">{{location.utm_zone_number}}</span>
+            <span class="table-element table-cell">{{location.utm_zone_letter}}</span>
+            <span class="table-element table-cell">{{location.elevation}}</span>
+        </a>
+        {% endfor %}
+    </div>
+    </div>
+</div>
+
+<div class="dropdown-list">
+    <a href="#" class="dropdown-list-heading">
+        <h4>Deployments <span id="dropdown-list-toggle" class="caret">
+        </h4>
+    </a>
+    <div class="dropdown-list-table" style="display: none;">
+        <div class="table-body"> 
+            <div class="table-element table-row">
+                <span class="table-element table-cell">Name</span>
+                <span class="table-element table-cell">Description</span>
+                <span class="table-element table-cell">Time start</span>
+                <span class="table-element table-cell">Time end</span>
+                <span class="table-element table-cell">Transmitter</span>
+                <span class="table-element table-cell">Target</span>
+                <span class="table-element table-cell">Active</span>
+            </div>
+            {% for deployment in project.get_deployments %}
+            <a href="#" class="table-element table-row">
+                <span class="table-element table-cell">{{deployment.name}}</span>
+                <span class="table-element table-cell">{{deployment.description}}</span>
+                <span class="table-element table-cell">{{deployment.get_start}}</span>
+                <span class="table-element table-cell">{{deployment.get_end}}</span>
+                <span class="table-element table-cell">{{deployment.txID}}</span>
+                <span class="table-element table-cell">{{deployment.targetID}}</span>
+                <span class="table-element table-cell">{% if deployment.is_active %}
+                     <span class="glyphicon glyphicon-ok-sign"></span>
+                    {% else %}
+                    <span class="glyphicon glyphicon-remove-sign"></span>
+                    {%endif%}
+                </span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="dropdown-list">
+    <a href="#" class="dropdown-list-heading">
+    <h4>Transmitters
+        <span id="dropdown-list-toggle" class="caret"></span>
+    </h4>
+    </a>
+    <div class="dropdown-list-table" style="display: none;">
+        <div class="table-body">
+            <div class="table-element table-row">
+                <span class="table-element table-cell">Name</span>
+                <span class="table-element table-cell">Serial number</span>
+                <span class="table-element table-cell">Model</span>
+                <span class="table-element table-cell">Manufacturer</span>
+                <span class="table-element table-cell">Frequency</span>
+            </div>
+            {% for transmitter in project.get_transmitters %}
+                <a class="table-element table-row" href="transmitter/{{transmitter.ID}}">
+                    <span class="table-element table-cell">{{transmitter.name}}</span>
+                    <span class="table-element table-cell">{{transmitter.serial_no}}</span>
+                    <span class="table-element table-cell">{{transmitter.tx_makeID.model}}</span>
+                    <span class="table-element table-cell">{{transmitter.tx_makeID.manufacturer}}</span>
+                    <span class="table-element table-cell">{{transmitter.frequency}}</span>
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="dropdown-list">
+    <a href="#" class="dropdown-list-heading">
+        <h4> Targets
+            <span class="caret"></span>
+        </h4>
+    </a>
+    <div class="dropdown-list-table" style="display: none;">
+        <div class="table-body">
+            <div class="table-element table-row">
+                <span class="table-element table-cell">Name</span>
+                <span class="table-element table-cell">Description</span>
+            </div>
+            {% for target in project.get_targets %}
+            <a href="#" class="table-element table-row">
+                <span class="table-element table-cell">{{target.name}}</span>
+                <span class="table-element table-cell">{{target.description}}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{%endif%}
+{% endblock %}

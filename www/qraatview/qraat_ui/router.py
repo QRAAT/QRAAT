@@ -3,7 +3,7 @@ class QraatRouter(object):
 	A router to control database operations on models in the qraat application
 	"""
 	def __init__(self):
-		self.QRAAT_LABEL = "hello"
+		self.QRAAT_LABEL = "qraat_ui"
 		self.QRAAT_DB = "qraat"
 	
 	def db_for_read(self, model, **hints):
