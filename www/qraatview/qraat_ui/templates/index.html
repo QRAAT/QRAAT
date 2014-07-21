@@ -12,9 +12,9 @@
     #map-canvas { margin-top: 1cm; margin-right: 0.25cm; height: 60%; width: 63%; float: right; }
     #text {width: 33%; height: 100%; float: left; font-size: 12px; margin: 1%; }
     #page_title {font-size: 30px; font-weight:bold; }
-    #prefs {border-style:solid; border-width: 1px; height: 33%; overflow: scroll; padding: 5px; }
+    #prefs {border-style:solid; border-width: 1px; height: 38%; overflow: scroll; padding: 5px; }
    #mouseover {border-style:solid; border-width: 1px; height: 25%; overflow: scroll; padding: 5px;}
-    #clicked {border-style:solid; border-width: 1px; height: 25%; overflow: scroll; padding: 5px;}
+    #clicked {border-style:solid; border-width: 1px; height: 20%; overflow: scroll; padding: 5px;}
     #right_side { float: center; }
     .current_info {font: normal 12px "omnes-pro", Helvetica, Arial, sans-serif; }
     #right_side2, #content2, .demo-placeholder2, .demo-placeholder { float: right; }
@@ -364,27 +364,28 @@ google.maps.event.addDomListener(window, 'load', initialize);
 
 </script>
 
-<link href="../static/flot/example.css" rel="stylesheet" type="text/css">
+<link href="/static/flot/example.css" rel="stylesheet" type="text/css">
 
 
 {% if pos_data|length > 10 %}
 <!-- JQUERY CHARTS WITH FLOT -->
 <!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 -->
-<script src="../static/flot/jquery-1.11.1.min.js"></script>
-<script src="../static/flot/jquery.flot.min.js"></script>
+<script src="/static/flot/jquery-1.11.1.min.js"></script>
+<script src="/static/flot/jquery.flot.min.js"></script>
 
 <!-- "visitors" plugins (2 charts/zooming) -->
-<script src ="../static/flot/jquery.flot.time.min.js"></script>
-<script src ="../static/flot/jquery.flot.selection.min.js"></script>
+<script src ="/static/flot/jquery.flot.time.min.js"></script>
+<script src ="/static/flot/jquery.flot.selection.min.js"></script>
 
-<script src="../static/flot/jquery.flot.threshold.min.js"></script>
-<script src="../static/flot/jquery.flot.resize.min.js"></script>
+<script src="/static/flot/jquery.flot.threshold.min.js"></script>
+<script src="/static/flot/jquery.flot.resize.min.js"></script>
 
-<!-- plugins for saving graphs as images -->
-<script type="text/javascript" src="http://zizhujy.com/Scripts/base64.js"></script>
+<!-- plugins for saving graphs as images. commented out because they throw an error when the flot graph is selected -->
+<!-- <script type="text/javascript" src="http://zizhujy.com/Scripts/base64.js"></script>
 <script type="text/javascript" src="http://zizhujy.com/Scripts/drawing/canvas2image.js"></script>
 <script type="text/javascript" src="http://zizhujy.com/Scripts/flot/jquery.flot.saveAsImage.js"></script>
+-->
 
 <script type="text/javascript">
 
@@ -404,13 +405,13 @@ $(function() {
 
   if (graph_data ==1) { //likelihood
     for (var i=0; i < positions.length; i++) {
-      d.push([positions[i][2]*1000, positions[i][6]]);
+      d.push([positions[i][2]*1000-7*60*60*1000, positions[i][6]]);
     }
   }
 
   if (graph_data ==2) { //activity
     for (var i=0; i < positions.length; i++) {
-      d.push([positions[i][2]*1000, positions[i][7]]);
+      d.push([positions[i][2]*1000-7*60*60*1000, positions[i][7]]);
       }
     }
   
@@ -433,7 +434,7 @@ $(function() {
     legend: { show: false },
     series: { lines: { show: true }, points: { show: false } },
     grid: { hoverable: true, clickable: true },
-    xaxis: { mode: "time"  },
+    xaxis: { mode: "time", tickSize: [4, "hour"], timeformat: "%m-%d %H:%M" }, //timezone: "America/San Francisco" does this work?
     //yaxis: {min: min, max: max},
     highlightColor: 'red',
     selection: { mode: "xy" },
@@ -572,7 +573,7 @@ $(function() {
 <!-- <button onclick="showDjango()">Show Django</button> -->
 
 <center>
-<div id="page_title"><a href='index.html'>QRAAT Data</a></div>
+<div id="page_title"><a href=''>QRAAT Data</a></div>
  <!--onclick='initialize(38.487828027, -122.149419006, 14);'-->
 <!-- <a href="index.html" target="export">Export view as .kml</a><br>-->
 </center>
@@ -595,7 +596,7 @@ $(function() {
 //}
 </script>
 <b><center><u>SET PREFERENCES</u></center></b>
-<font size="2"><form name="form" id="form" action ="index.html" name="settings" method="get">
+<font size="2"><form name="form" id="form" action ="" name="settings" method="get">
 {% for field in form %}
 {{ field.label_tag}} {{field}}<br>
 {% endfor %}

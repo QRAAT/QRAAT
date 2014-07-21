@@ -9,27 +9,18 @@ from django.core.urlresolvers import reverse
 import qraat, time, datetime, json, utm, math
 
 from qraat_ui.models import Position, track, Deployment, Site
-from qraat_ui.forms import Form
+from qraat_ui.forms import TestForm
 from decimal import Decimal
 
-def index(request):
+def index(request, depID=None):
   #to pass strings to js, use |safe in template.
   #site list
   sites = []
   for s in Site.objects.all():
     sites.append((s.ID, s.name, float(s.latitude), float(s.longitude), float(s.easting), float(s.northing), s.utm_zone_number, s.utm_zone_letter, float(s.elevation)))
-  
-  #transmitter list
-  tx_IDs = []
-  for d in Deployment.objects.all():
-    if (d.time_end != None):
-      tx_IDs.append((d.ID, float(d.time_start), float(d.time_end), 
-      d.txID, d.targetID, d.projectID, d.is_active, d.is_hidden))
-    elif (d.time_end == None):
-      tx_IDs.append((d.ID, float(d.time_start), d.time_end, d.txID,
-      d.targetID, d.projectID, d.is_active, d.is_hidden))
-  
-  #index for clicked point in flot
+
+
+#index for clicked point in flot
   if ('flot_index' in request.GET) and (request.GET['flot_index'] != ""):
     flot_index = int(request.GET['flot_index'])
   else:
@@ -54,24 +45,24 @@ def index(request):
     zoom_selected = int(request.GET['zoom'])
   else:
     zoom_selected = 14
-  if 'trans' in request.GET:
+  if 'trans' in request.GET and not depID:
     tx = request.GET['trans']
   else:
-    tx = None
+    tx = depID
   if 'data_type' in request.GET:
     data_type = request.GET['data_type']
   else:
     data_type = None
   if 'dt_fr' in request.GET: #fix for if empty box
-    dt_fr = request.GET['dt_fr']
+    datetime_from = request.GET['dt_fr']
   else:
-    dt_fr = None
-    dt_fr_sec = None
+    datetime_from = None
+    datetime_from_sec = None
   if 'dt_to' in request.GET:
-    dt_to = request.GET['dt_to']
+    datetime_to = request.GET['dt_to']
   else: 
-    dt_to = None
-    dt_to_sec = None
+    datetime_to = None
+    datetime_to_sec = None
   if 'lk_l' in request.GET:
     lk_l = request.GET['lk_l']
   else:
@@ -112,17 +103,20 @@ def index(request):
   selected_message = "[ Nothing clicked, or no points detected nearby ]"
   selected_index = None
   selected_index_large = None
-  dt_str = None
 
   #if form.is_valid():
-  if dt_fr and dt_to:
-    dt_fr_sec = float(time.mktime(datetime.datetime.strptime(dt_fr, '%Y-%m-%d %H:%M:%S').timetuple()))
-    dt_to_sec = float(time.mktime(datetime.datetime.strptime(dt_to, '%Y-%m-%d %H:%M:%S').timetuple()))
+  if datetime_from and datetime_to:
+    datetime_from_sec = float(time.mktime(datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()))
+    datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
     
+    #if summer: 7 / if fall: 8 - for daylight savings
+    datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference
+    datetime_to_sec_davis = datetime_to_sec + 7*60*60
+
     db_sel = Position   #can change database
     pos_query = db_sel.objects.filter(
-                          timestamp__gte = dt_fr_sec,
-                          timestamp__lte = dt_to_sec,
+                          timestamp__gte = datetime_from_sec_davis,
+                          timestamp__lte = datetime_to_sec_davis,
                           deploymentID = tx,
                           likelihood__gte = lk_l,
                           likelihood__lte = lk_h,
@@ -186,7 +180,7 @@ def index(request):
                   sel.utm_zone_number,
                   sel.utm_zone_letter)
       selected_data.append((lat_c, lon_c))
-      selected_data.append( time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(sel.timestamp))) )
+      selected_data.append( time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(sel.timestamp-7*60*60))) )
       selected_data.append(sel.utm_zone_letter)
     #get the index in the original filtered list, for the clicked pt
       pos_filtered_list_IDs = [int(x[0]) for x in pos_filtered_list]
@@ -206,18 +200,16 @@ def index(request):
     selected_data.append(float(pos_filtered_list[flot_index][6])) #likelihood
     selected_data.append(float(pos_filtered_list[flot_index][7])) #activity
     selected_data.append((float(pos_filtered_list[flot_index][8][0]) , float(pos_filtered_list[flot_index][8][1]))) #lon
-    selected_data.append( time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(pos_filtered_list[flot_index][2]))) )
+    selected_data.append( time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(pos_filtered_list[flot_index][2]-7*60*60))) )
     selected_data.append(pos_filtered_list[flot_index][9])
-    
-    print selected_data
-    
-  print pos_filtered_list
+  
+
 
   context = {
             'pos_data': json.dumps(pos_filtered_list), #plot & related data
             'positions': pos_filtered_list, #for getting the no. of positions
             'siteslist': json.dumps(sites), #for plotting the site markers
-            'form': Form(request.GET or None), #for displaying html form
+            'form': TestForm(depID=depID, data=request.GET or None), #for displaying html form
             'tx': json.dumps(tx), #selected transmitter from form
             'site_checked': json.dumps(site_checked), #if sites should be shown
             'selected_data': json.dumps(selected_data), #clicked point's data, note: string
@@ -227,9 +219,6 @@ def index(request):
             'selected_index_large': selected_index_large, #clicked i in pos_data
             'flot_index': json.dumps(flot_index), #flot selected i in pos_data
             'display_type': json.dumps(display_type),
-            #'dt_fr': dt_fr_sec, #not used
-            #'dt_to': dt_to_sec, #not used
-            #'tx_IDs': tx_IDs, #Don't think this is actually be used anywhere
             #'tx_IDs': tx_ID.objects.order_by('-active', 'ID').all(),
             #'zoom': json.dumps(zoom_selected), #not used anymore
             #'data_type': json.dumps(data_type), #position vs track (not used?)
@@ -251,3 +240,7 @@ def index(request):
     #response = HttpResponse(mimetype='text/plain')
     #response['Content-Disposition'] = 'attachement; filename="%s.txt"' %p.uuid
     #response.write(p.body)
+
+
+def get_view_by_depID(request, depID):
+  return HttpRequest()
