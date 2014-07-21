@@ -269,7 +269,7 @@ class Deployment(models.Model):
 
     name = models.CharField(max_length=50, null=False)
 
-    description = models.TextField()
+    description = models.TextField(blank=True)
 
     time_start = models.DecimalField(
         max_digits=16, decimal_places=6,
@@ -277,7 +277,8 @@ class Deployment(models.Model):
 
     time_end = models.DecimalField(
         max_digits=16, decimal_places=6,
-        help_text="Unix Timestamp (s.us)")  # decimal(16,6)
+        help_text="Unix Timestamp (s.us)",
+        blank=True)  # decimal(16,6)
 
     txID = models.ForeignKey(
         Tx, db_column="txID")

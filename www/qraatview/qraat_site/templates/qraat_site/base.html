@@ -30,6 +30,12 @@
                         <div class="navbar-header">
                             <a class="navbar-brand" href="/qraat/">Qraat</a>
                         </div>
+                        <ul class="nav navbar-nav" role="tablist">
+                        <li class="active" ><a href="/qraat">Home</a></li>
+                        {% for nav_option in nav_options %}
+                            <li><a href={{nav_option.url}}>{{nav_option.name}}</a></li>
+                        {% endfor %}
+                        </ul>
                         <div class="dropdown navbar-right">
                             {% if user.is_authenticated %}
                             <a class="dropdown-toggle" href="#" data-toggle="dropdown">{{user}} <span class="caret"> </span></a>
@@ -46,12 +52,12 @@
             {% endblock %}
             <div class="sidebar">
                 {% block sidebar %}
-                    <ul class="nav nav-pills nav-stacked">
-                        <li><a class="active" href="/qraat">Home</a></li>
-                        {% for nav_option in nav_options %}
-                            <li><a href={{nav_option.url}}>{{nav_option.name}}</a></li>
-                        {% endfor %}
-                    </ul>
+                    <!-- <ul class="nav nav-pills nav-stacked"> -->
+                        <!-- <li><a class="active" href="/qraat">Home</a></li> -->
+                        <!-- {% for nav_option in nav_options %} -->
+                        <!--     <li><a href={{nav_option.url}}>{{nav_option.name}}</a></li> -->
+                        <!-- {% endfor %} -->
+                    <!-- </ul> -->
                 {% endblock %}
             </div>
             <div class="content">

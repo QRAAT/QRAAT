@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from qraat_site.models import Project, Tx, Location
 from django.core.exceptions import ObjectDoesNotExist
-from qraat_site.forms import ProjectForm, EditProjectForm
+from qraat_site.forms import ProjectForm, EditProjectForm, AddTransmitterForm
 
 
 def index(request):
@@ -17,26 +17,26 @@ def index(request):
          'projects': projects})
 
 
-@login_required(login_url='/auth/login')
-def transmitters(request):
-    nav_options = get_nav_options(request)
-    tx_IDs = tx_ID.objects.all()
-    transmitters = []
+# @login_required(login_url='/auth/login')
+# def transmitters(request):
+#     nav_options = get_nav_options(request)
+#     tx_IDs = tx_ID.objects.all()
+#     transmitters = []
 
-    for tx in tx_IDs:
-        pulses = TxPulse.objects.filter(tx_ID=tx)
-        deployments = TxDeployment.objects.filter(tx_ID=tx)
-        aliases = TxAlias.objects.filter(tx_ID=tx)
-        transmitter = {}
-        transmitter["transmitter"] = tx
-        transmitter["pulses"] = pulses
-        transmitter["deployments"] = deployments
-        transmitter["aliases"] = aliases
-        transmitters.append(transmitter)
+#     for tx in tx_IDs:
+#         pulses = TxPulse.objects.filter(tx_ID=tx)
+#         deployments = TxDeployment.objects.filter(tx_ID=tx)
+#         aliases = TxAlias.objects.filter(tx_ID=tx)
+#         transmitter = {}
+#         transmitter["transmitter"] = tx
+#         transmitter["pulses"] = pulses
+#         transmitter["deployments"] = deployments
+#         transmitter["aliases"] = aliases
+#         transmitters.append(transmitter)
 
-    return render(
-        request, "qraat_site/transmitters.html",
-        {"transmitters": transmitters, 'nav_options': nav_options})
+#     return render(
+#         request, "qraat_site/transmitters.html",
+#         {"transmitters": transmitters, 'nav_options': nav_options})
 
 
 @login_required(login_url='/auth/login')
@@ -59,7 +59,8 @@ def projects(request):
     user = request.user
 
     user_projects = Project.objects.filter(ownerID=user.id)
-    public_projects = Project.objects.filter(is_public=True, is_hidden=False)
+    public_projects = [p for p in Project.objects.filter(
+        is_public=True, is_hidden=False) if p not in user_projects]
 
     nav_options = get_nav_options(request)
 
@@ -127,7 +128,41 @@ def edit_project(request, project_id):
 
         else:
             return HttpResponse(
-                "Just the project owner can access this page")
+                request, "Just the project owner can access this page")
+
+
+@login_required(login_url="/auth/login")
+def add_transmitter(request, project_id):
+    user = request.user
+    nav_options = get_nav_options(request)
+    thereisnew_transmitter = None
+
+    try:
+        project = Project.objects.get(ID=project_id)
+    except ObjectDoesNotExist:
+        return HttpResponse("Error: We didn't find this project")
+
+    if user.id == project.ownerID:
+
+        if request.method == 'POST':
+            form = AddTransmitterForm(project=project, data=request.POST)
+            if form.is_valid():
+                form.save()
+                return redirect(
+                    "../add-transmitter?new_transmitter=True")
+
+        elif request.method == 'GET':
+            thereisnew_transmitter = request.GET.get("new_transmitter")
+            form = AddTransmitterForm()
+            
+        return render(request, "qraat_site/create-transmitter.html",
+                      {"form": form,
+                       "nav_options": nav_options,
+                       "thereisnew_transmitter": thereisnew_transmitter})
+
+    else:
+        return HttpResponse(
+            request, "Just owners can add transmitters to this project.")
 
 
 def show_project(request, project_id):
@@ -161,7 +196,7 @@ def get_nav_options(request):
         if user.is_superuser:
             nav_options.append(
                 {"url": "/auth/users",
-                 "name": "Users" })
+                 "name": "Users"})
 
         nav_options.append({"url": "/qraat/projects",
                             "name": "Projects"})

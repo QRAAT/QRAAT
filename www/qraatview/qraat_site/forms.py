@@ -1,7 +1,6 @@
 from django import forms
-
-from qraat_site.models import Project, AuthProjectViewer
-from qraat_site.models import AuthProjectCollaborator
+from qraat_site.models import Project, AuthProjectViewer, Tx
+from qraat_site.models import AuthProjectCollaborator, TxMake
 from django.contrib.auth.models import User, Group
 from django.contrib.admin.widgets import FilteredSelectMultiple
 
@@ -39,6 +38,53 @@ class ProjectForm(forms.ModelForm):
         return project
 
 
+class AddTransmitterForm(forms.ModelForm):
+    class Meta:
+        model = Tx
+        exclude = ["projectID", "is_hidden"]
+
+    def __init__(self, project=None, *args, **kwargs):
+        self.project = project
+        super(AddTransmitterForm, self).__init__(*args, **kwargs)
+
+    name = forms.CharField(
+        label="Transmitter name",
+        widget=forms.TextInput(
+            attrs={"class": "form-control",
+                   "max_length": 50}))
+
+    serial_no = forms.CharField(
+        label="Serial number",
+        widget=forms.TextInput(
+            attrs={"class": "form-control",
+                   "max_length": 50}))
+
+    TMAKE_CHOICES = [ (t_make.ID, t_make) for t_make in TxMake.objects.all()]
+
+    tx_makeID = forms.ChoiceField(
+        label="Manufacturer",
+        choices = TMAKE_CHOICES,
+        widget=forms.Select(
+            attrs={"class": "form-control"}))
+
+    frequency = forms.FloatField(
+        label = "Frequency",
+        widget=forms.NumberInput(
+            attrs={"class": "form-control"}))
+
+    def clean_tx_makeID(self):
+        makeid_form_data = self.cleaned_data.get("tx_makeID")
+        return TxMake.objects.get(ID=makeid_form_data)
+
+    def save(self, commit=True):
+        Tx = super(AddTransmitterForm, self).save(commit=False)
+        Tx.projectID=self.project
+
+        if commit == True:
+            Tx.save()
+
+        return Tx
+
 class UserModelChoiceField(forms.ModelMultipleChoiceField):
     def label_from_instance(self, obj):
         return obj.get_full_name()
@@ -67,8 +113,15 @@ class EditProjectForm(ProjectForm):
 
     def save(self, commit=True):
         project = super(ProjectForm, self).save(commit=False)
-        viewer_group = Group.objects.get(name="%d_viewers" % project.ID)
-        collaborator_group = Group.objects.get(name="%id_collaborators" % project.ID)
+        gviewers_name =  "%d_viewers" % project.ID
+        gcollaborators_name = "%d_collaborators" % project.ID
+
+        viewer_group = Group.objects.get(
+            name=gviewers_name)
+        
+        collaborator_group = Group.objects.get(
+            name=gcollaborators_name)
+
         for viewer in self.cleaned_data.get("viewers"):
             viewer_group.user_set.add(viewer)
     

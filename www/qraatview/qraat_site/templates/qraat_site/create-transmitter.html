@@ -2,10 +2,11 @@
 {% load class_tag %}
 
 {% block content %}
-<div class="page-header"><h3>Project Edition</h3></div>
-{% if changed %}
-<div class="alert alert-success" role="alert"> Project was successfully changed </div>
+{% if thereisnew_transmitter %}
+ <div class="alert alert-success">Transmitter Added</div>
 {% endif %}
+
+<div class="page-header"><h3>New transmitter</h3></div>
 <div class="form-container"> 
   <form  method="post">
     {% csrf_token %}
@@ -32,11 +33,6 @@
                     <span class="input-group-addon">
                         {{field}}
                     </span>
-                {% elif field.field.widget|get_class == "FilteredSelectMultiple" %}
-                <span class="input-group-addon">{{ field.label }}</span>
-                <div class="form-row">
-                    {{field}}
-                </div>
                 {% else %}
                 <span class="input-group-addon">
                     {{ field.label_tag}}
@@ -47,7 +43,7 @@
 	{% endfor %}
 	<div class="input-group submit-btn">
 		<div class="btn-group-vertical">
-			<button class="btn btn-primary btn-lg" type="submit" value="edit-project">Save changes</button>
+			<button class="btn btn-primary btn-lg" type="submit" value="create-project">Add transmitter</button>
 		</div>
 	</div>
 	</div>

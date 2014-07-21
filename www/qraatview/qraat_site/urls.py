@@ -5,10 +5,10 @@ urlpatterns = patterns(
 
     url(r'^$', 'index'),
 
-    url(r'^transmitters/$', 'transmitters'),
+    # url(r'^transmitters/$', 'transmitters'),
 
-    url(r'^transmitters/(?P<transmitter_id>\d+)/$',
-        'get_transmitter'),
+    # url(r'^transmitters/(?P<transmitter_id>\d+)/$',
+    #     'get_transmitter'),
 
     url(r'projects/$', 'projects', name='projects'),
 
@@ -32,6 +32,18 @@ urlpatterns = patterns(
     url(
         r'^project/(?P<project_id>\d+)/edit-project/$',
         'edit_project', name='edit-project'),
+
+    url(
+        r'^project/(?P<project_id>\d+)/edit-project/add-transmitter/$', 'add_transmitter',
+        name='add-transmitter'),
+
+    url(
+        r'^project/(?P<project_id>\d+)/edit-project/add-target/$', 'add_target',
+        name='add-target'),
+
+    url(
+        r'^project/(?P<project_id>\d+)/edit-project/add-deployment$', 'add_deployment',
+        name='add-deployment'),
 
     url(r'^regular-content/$', 'regular_content'),
 )
