@@ -30,7 +30,7 @@ use POSIX qw(strftime) ;
 
 my $Debug = 0 ;					# Set to 1 for debug output, 0 to silence
 my $TableNameStats = "procount" ;		# The name of the db table
-my $TableNameSitelist = "sitelist" ;		# The name of the db table
+my $TableNameSitelist = "site" ;		# The name of the db table
 my $ProgramStartTime = undef ;
 my $Interval = 10*60 ;				# The interval for counting processing stats, in seconds
 
@@ -89,51 +89,6 @@ sub process($)
 	return 0 ;
 }
 
-sub readstatsfile($)	# Reads a CSV file of stats data and creates a hash of it, returns a reference to the hash, or undef
-{
-	my ( $filename ) = @_ ;
-	if( $Debug ) { print "debug: readstatsfile: start\n" ; }
-	if( not defined($filename) ) { return undef } ;
-	my $fd ;
-	if( not defined open($fd,"<".$filename) )
-	{
-		print "Error: cannot open data file '$filename'\n" ;
-		return undef ;
-	}
-	my @data = () ;
-	my $line ;
-	my $linecount = 0 ;
-	while( $line = <$fd> )
-	{
-		$linecount++ ;
-		chomp($line) ;
-		my @args = split /,\s*/,$line ;
-		my $argc = scalar @args ;
-		if( $argc < 2 )	# 2013-05-31 20:57:04, 1370033824.115382, 164022933, 164020000, 1.824834e-01, ...
-		{
-			if( $Debug ) { print "debug: readstatsfile: too few args: $argc on line $linecount: $line\n" ; }
-			next ;
-		}
-		my $datetime = $args[0] ;
-		if( $datetime =~ /Date/ )
-		{
-			if( $Debug ) { print "debug: readstatsfile: header line\n" ; }
-			next ;
-		}
-		if( length($datetime) != 19 )
-		{
-			if( $Debug ) { print "debug: readstatsfile: bad datetime: $datetime on line $linecount: $line\n" ; }
-			next ;
-		}
-		#
-		push @data, [ @args ] ;	# Add an array entry to @data that contains a reference to the args array
-		if( $Debug ) { print "debug: readstatsfile: read $argc values from line $linecount\n" ; }
-	}
-	close($fd) ;
-	if( $Debug ) { print "debug: readstatsfile: finish\n" ; }
-	return \@data ;
-}
-
 sub updatedatabase($)
 {
 	my ( $authfile ) = @_ ;
@@ -157,12 +112,12 @@ sub update_procount($)
 	my ( $dbh ) = @_ ;
 	if( $Debug ) { print "debug: update_procount: start\n" ; }
 	#
-	# Read a list of site names from the sitelist table
-	my $query = "select id,name from sitelist;" ;
+	# Read a list of site names from the $TableNameSitelist table
+	my $query = "select id,name from $TableNameSitelist ;" ;
 	my @sitelist = dbgetdata($dbh,$query) ;
 	if( scalar @sitelist < 1 )
 	{
-		print "Error reading sitelist table\n" ;
+		print "Error reading $TableNameSitelist table\n" ;
 		return 1 ;
 	}
 	if( $Debug ) { show_refarray(\@sitelist) ; }
@@ -207,9 +162,12 @@ sub getsitestats($$)
 {
 	my ( $dbh, $siteid ) = @_ ;
 	my %data = () ;
-	my $dtstart = strftime("%Y-%m-%d %H:%M:%S",gmtime($ProgramStartTime-$Interval)) ;
-	my $dtstop = strftime("%Y-%m-%d %H:%M:%S",gmtime($ProgramStartTime)) ;
-	my $query = "select count(id) from est where siteid = $siteid and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	#my $dtstart = strftime("%Y-%m-%d %H:%M:%S",gmtime($ProgramStartTime-$Interval)) ;
+	#my $dtstop = strftime("%Y-%m-%d %H:%M:%S",gmtime($ProgramStartTime)) ;
+	#my $query = "select count(id) from est where siteid = $siteid and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	my $dtstart = $ProgramStartTime-$Interval ;
+	my $dtstop = $ProgramStartTime ;
+	my $query = "select count(id) from est where siteid = $siteid and timestamp between \"$dtstart\" and \"$dtstop\";" ;
 	if( $Debug ) { print "debug: getsitestats: query=$query\n" ; }
 	my $estserver = dblookup($dbh,$query) ;
 	if( not defined $estserver ) { $estserver = "" ; }
@@ -218,7 +176,7 @@ sub getsitestats($$)
 	my $festserver = dblookup($dbh,$query) ;
 	if( not defined $festserver ) { $festserver = "" ; }
 	if( $Debug ) { print "debug: getsitestats: estserver=$estserver festserver=$festserver\n" ; }
-	$data{datetime} = $dtstop ;
+	$data{datetime} = strftime("%Y-%m-%d %H:%M:%S",gmtime($dtstop)) ;
 	$data{timezone} = "UTC" ;
 	$data{siteid} = $siteid ;
 	$data{estserver} = $estserver ;
