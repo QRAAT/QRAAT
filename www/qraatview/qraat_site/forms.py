@@ -1,6 +1,6 @@
 from django import forms
 from qraat_site.models import Project, AuthProjectViewer
-from qraat_site.models import Tx, Target, Deployment
+from qraat_site.models import Tx, Target, Deployment, Location
 from qraat_site.models import AuthProjectCollaborator, TxMake
 from qraat_site.models import TxMakeParameters, TxParameters
 from django.contrib.auth.models import User, Group
@@ -54,18 +54,26 @@ class ProjectElementForm(forms.ModelForm):
     def set_project(self, project):
         self.project = project
 
+    def save(self, commit=True):
+        proj_obj = super(ProjectElementForm, self).save(commit=False)
+        proj_obj.projectID = self.project
+
+        if commit:
+            proj_obj.save()
+
+        return proj_obj
+
+
+class AddLocationForm(ProjectElementForm):
+    class Meta:
+        model = Location
+        exclude = ["projectID", "is_hidden"]
+
 
 class AddTargetForm(ProjectElementForm):
     class Meta:
         model = Target
         exclude = ["projectID", "is_hidden"]
-
-    def save(self, commit=True):
-        target = super(AddTargetForm, self).save(commit=False)
-        target.projectID = self.project
-
-        if commit:
-            target.save()
 
 
 class AddDeploymentForm(ProjectElementForm):
@@ -78,9 +86,12 @@ class AddDeploymentForm(ProjectElementForm):
 
     def set_project(self, project):
         self.project = project
+        
+        # constraint project's transmitters 
         self.fields["txID"].choices = [
             (tx.ID, tx) for tx in project.get_transmitters()]
-        print project.get_transmitters()
+        
+        # constraint project's targets
         self.fields["targetID"].choices = [
             (target.ID, target) for target in project.get_targets()]
 
@@ -89,13 +100,6 @@ class AddDeploymentForm(ProjectElementForm):
 
     def clean_targetID(self):
         return Target.objects.get(ID=self.cleaned_data.get("targetID"))
-
-    def save(self, commit=True):
-        deployment = super(AddDeploymentForm, self).save(commit=False)
-        deployment.projectID = self.project
-
-        if commit:
-            deployment.save()
 
 
 class AddTransmitterForm(ProjectElementForm):

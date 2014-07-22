@@ -68,7 +68,8 @@ class Project(models.Model):
     is_hidden = models.BooleanField(default=False)  # boolean default false
 
     def get_locations(self):
-        return Location.objects.filter(projectID=self.ID).exclude(is_hidden=True)
+        return Location.objects.filter(
+            projectID=self.ID).exclude(is_hidden=True)
 
     def get_deployments(self):
         return Deployment.objects.filter(
@@ -175,7 +176,7 @@ class TxMake(models.Model):
         demod_type = models.CharField(max_length=5, choices=DEMOD_CHOICES)
 
         def __unicode__(self):
-            return u'%d %s' % (self.ID, self.model)
+            return u'%d %s %s' % (self.ID, self.manufacturer, self.model)
 
 
 class Tx(models.Model):

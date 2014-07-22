@@ -6,7 +6,7 @@ from qraat_site.models import Project, Tx, Location
 from django.core.exceptions import ObjectDoesNotExist
 from qraat_site.forms import ProjectForm, EditProjectForm, AddTransmitterForm
 from qraat_site.forms import AddManufacturerForm, AddTargetForm
-from qraat_site.forms import AddDeploymentForm
+from qraat_site.forms import AddDeploymentForm, AddLocationForm
 
 
 def index(request):
@@ -207,6 +207,17 @@ def add_manufacturer(request, project_id):
                  "project": project})
         else:
             return HttpResponse("You are not allowed to do this.")
+
+
+@login_required(login_url="auth/login")
+def add_location(request, project_id):
+    return render_project_form(
+        request=request,
+        project_id=project_id,
+        post_form=AddLocationForm(data=request.POST),
+        get_form=AddLocationForm(),
+        template_path="qraat_site/create-location.html",
+        success_url="../add-location?new_element=True")
 
 
 @login_required(login_url="/auth/login")

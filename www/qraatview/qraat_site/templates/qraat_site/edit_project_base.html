@@ -3,6 +3,16 @@
 {% if user.is_authenticated %}
 <ul class="nav nav-pills nav-stacked">
     <li class="dropdown-side-element">
+        <a class="dropdown-toggle" data-toggle="dropdown" href="#">Locations
+            <span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu" role="menu">  
+            <li>
+            <a href={%url 'qraat:add-location' project.ID %}>Add Location</a>
+            </li>
+        </ul>
+    </li>
+    <li class="dropdown-side-element">
         <a class="dropdown-toggle" data-toggle="dropdown" href="#">Transmitters
             <span class="caret"></span>
         </a>
