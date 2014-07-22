@@ -24,6 +24,7 @@
 
 .table-row{
     display: table-row;
+    cursor: pointer;
 }
 .table-cell{
     display: table-cell;

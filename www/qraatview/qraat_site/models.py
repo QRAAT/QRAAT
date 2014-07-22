@@ -68,16 +68,17 @@ class Project(models.Model):
     is_hidden = models.BooleanField(default=False)  # boolean default false
 
     def get_locations(self):
-        return Location.objects.filter(projectID=self.ID)
+        return Location.objects.filter(projectID=self.ID).exclude(is_hidden=True)
 
     def get_deployments(self):
-        return Deployment.objects.filter(projectID=self.ID).order_by('-is_active')
+        return Deployment.objects.filter(
+            projectID=self.ID).exclude(is_hidden=True).order_by('-is_active')
 
     def get_transmitters(self):
-        return Tx.objects.filter(projectID=self.ID)
+        return Tx.objects.filter(projectID=self.ID).exclude(is_hidden=True)
 
     def get_targets(self):
-        return Target.objects.filter(projectID=self.ID)
+        return Target.objects.filter(projectID=self.ID).exclude(is_hidden=True)
 
     def __unicode__(self):
         return u'ID = %d name = %s' % (self.ID, self.name)
@@ -255,7 +256,7 @@ class Target(models.Model):
         help_text="Project for which target was originally created")
 
     is_hidden = models.BooleanField(default=False)  # boolean default false
-    
+
     def __unicode__(self):
         return u'%s' % self.name
 
@@ -293,7 +294,7 @@ class Deployment(models.Model):
     is_active = models.BooleanField(default=False)
 
     is_hidden = models.BooleanField(default=False)
-    
+
     def get_start(self):
         return timestamp_todate(self.time_start)
 

@@ -5,7 +5,8 @@ from django.contrib.auth.models import Group
 from qraat_site.models import Project, Tx, Location
 from django.core.exceptions import ObjectDoesNotExist
 from qraat_site.forms import ProjectForm, EditProjectForm, AddTransmitterForm
-from qraat_site.forms import AddManufacturerForm
+from qraat_site.forms import AddManufacturerForm, AddTargetForm
+from qraat_site.forms import AddDeploymentForm
 
 
 def index(request):
@@ -118,14 +119,16 @@ def edit_project(request, project_id):
                         request, 'qraat_site/edit-project.html',
                         {'nav_options': nav_options,
                          'changed': True,
-                         'form': form})
+                         'form': form,
+                         'project': project})
             else:
                 form = EditProjectForm(instance=project)
 
             return render(
                 request, 'qraat_site/edit-project.html',
                 {'nav_options': nav_options,
-                 'form': form})
+                 'form': form,
+                 'project': project})
 
         else:
             return HttpResponse(
@@ -140,30 +143,33 @@ def add_manufacturer(request, project_id):
 
     try:
         project = Project.objects.get(ID=project_id)
-    
+
     except ObjectDoesNotExist:
         return HttpResponse("Error: we didn't find this project")
-    
+
     else:
-        if user.id == project.ownerID:
+        if user.id == project.ownerID and user.is_superuser:
             transmitter_form = AddTransmitterForm()
             if request.method == 'POST':
                 manufacturer_form = AddManufacturerForm(data=request.POST)
-                
+
                 if manufacturer_form.is_valid():
                     make_obj = manufacturer_form.save()
-                    return redirect("../add-manufacturer?newmake=True?makeid=%d" % make_obj.ID )
+                    return redirect(
+                        "../add-manufacturer?newmake=\
+                                True?makeid=%d" % make_obj.ID)
 
             elif request.method == 'GET':
                 istherenew_make = request.GET.get("newmake")
                 manufacturer_form = AddManufacturerForm()
-    
-            return render(request, "qraat_site/create-manufacturer.html",
-                    {"nav_options": nav_options,
-                     "manufacturer_form": manufacturer_form,
-                     "transmitter_form": transmitter_form,
-                     "istherenew_make": istherenew_make,
-                     "project": project})
+
+            return render(
+                request, "qraat_site/create-manufacturer.html",
+                {"nav_options": nav_options,
+                 "manufacturer_form": manufacturer_form,
+                 "transmitter_form": transmitter_form,
+                 "changed": istherenew_make,
+                 "project": project})
         else:
             return HttpResponse("You are not allowed to do this.")
 
@@ -191,11 +197,11 @@ def add_transmitter(request, project_id):
         elif request.method == 'GET':
             thereisnew_transmitter = request.GET.get("new_transmitter")
             form = AddTransmitterForm()
-            
+
         return render(request, "qraat_site/create-transmitter.html",
                       {"form": form,
                        "nav_options": nav_options,
-                       "thereisnew_transmitter": thereisnew_transmitter,
+                       "changed": thereisnew_transmitter,
                        "project": project})
 
     else:
@@ -205,12 +211,72 @@ def add_transmitter(request, project_id):
 
 @login_required(login_url="/auth/login")
 def add_target(request, project_id):
-    return HttpResponse("Not implemented yet")
+    user = request.user
+    nav_options = get_nav_options(request)
+    thereisnew_target = None
+
+    try:
+        project = Project.objects.get(ID=project_id)
+    except ObjectDoesNotExist:
+        return HttpResponse("Error: We didn't find this project")
+
+    if user.id == project.ownerID:
+
+        if request.method == 'POST':
+            form = AddTargetForm(project=project, data=request.POST)
+            if form.is_valid():
+                form.save()
+                return redirect(
+                    "../add-target?new_target=True")
+
+        elif request.method == 'GET':
+            thereisnew_target = request.GET.get("new_target")
+            form = AddTargetForm()
+
+        return render(request, "qraat_site/create-target.html",
+                      {"form": form,
+                       "nav_options": nav_options,
+                       "changed": thereisnew_target,
+                       "project": project})
+
+    else:
+        return HttpResponse(
+            request, "Just owners can add targets to this project.")
 
 
 @login_required(login_url="/auth/login")
 def add_deployment(request, project_id):
-    return HttpResponser("Not implemented yet")
+    user = request.user
+    nav_options = get_nav_options(request)
+    thereisnew_deployment = None
+
+    try:
+        project = Project.objects.get(ID=project_id)
+    except ObjectDoesNotExist:
+        return HttpResponse("Error: We didn't find this project")
+
+    if user.id == project.ownerID:
+
+        if request.method == 'POST':
+            form = AddDeploymentForm(project=project, data=request.POST)
+            if form.is_valid():
+                form.save()
+                return redirect(
+                    "../add-deployment?new_deployment=True")
+
+        elif request.method == 'GET':
+            thereisnew_deployment = request.GET.get("new_deployment")
+            form = AddDeploymentForm()
+
+        return render(request, "qraat_site/create-deployment.html",
+                      {"form": form,
+                       "nav_options": nav_options,
+                       "changed": thereisnew_deployment,
+                       "project": project})
+
+    else:
+        return HttpResponse(
+            request, "Just owners can add deployments to this project.")
 
 
 def show_project(request, project_id):
@@ -228,16 +294,15 @@ def show_project(request, project_id):
                  'nav_options': nav_options})
 
         else:
-            if user.id == project.ownerID: 
+            if user.id == project.ownerID:
                 return render(
                     request,
                     'qraat_site/display-project.html',
                     {'project': project,
-                    'nav_options': nav_options})
+                     'nav_options': nav_options})
 
             else:
                 return HttpResponse("Project is not public")
-
 
     except ObjectDoesNotExist:
         return HttpResponse("Project not found")

@@ -1,9 +1,11 @@
 from django import forms
-from qraat_site.models import Project, AuthProjectViewer, Tx
+from qraat_site.models import Project, AuthProjectViewer
+from qraat_site.models import Tx, Target, Deployment
 from qraat_site.models import AuthProjectCollaborator, TxMake
+from qraat_site.models import TxMakeParameters, TxParameters
 from django.contrib.auth.models import User, Group
 from django.contrib.admin.widgets import FilteredSelectMultiple
-
+from django.core.exceptions import ObjectDoesNotExist
 
 class ProjectForm(forms.ModelForm):
 
@@ -41,53 +43,73 @@ class ProjectForm(forms.ModelForm):
 class AddManufacturerForm(forms.ModelForm):
     class Meta:
         model = TxMake
+        labels = {"demod_type": ("Demodulation type")}
 
+
+class AddTargetForm(forms.ModelForm):
+    class Meta:
+        model = Target
+        exclude = ["projectID", "is_hidden"]
+
+    def __init__(self, project=None, *args, **kwargs):
+        self.project = project
+        super(AddTargetForm, self).__init__(*args, **kwargs)
+
+    def save(self, commit=True):
+        target = super(AddTargetForm, self).save(commit=False)
+        target.projectID = self.project
+
+        if commit:
+            target.save()
+    
+
+class AddDeploymentForm(forms.ModelForm):
+    class Meta:
+        model = Deployment
+        exclude = ["projectID", "is_hidden", "time_end"]
+
+    def __init__(self, project=None, *args, **kwargs):
+        self.project = project
+        super(AddDeploymentForm, self).__init__(*args, **kwargs)
+
+    def save(self, commit=True):
+        deployment = super(AddDeploymentForm, self).save(commit=False)
+        deployment.projectID = self.project
+
+        if commit:
+            deployment.save()
 
 class AddTransmitterForm(forms.ModelForm):
     class Meta:
         model = Tx
         exclude = ["projectID", "is_hidden"]
+        labels = {"name": ("Transmitter name"),
+                  "serial_no": ("Serial number"),
+                  "tx_makeID": ("Manufacturer"),
+                  "frequency": ("Frequency")}
 
     def __init__(self, project=None, *args, **kwargs):
         self.project = project
         super(AddTransmitterForm, self).__init__(*args, **kwargs)
-        self.fields['tx_makeID'].choices = [ (t_make.ID, t_make) for t_make in TxMake.objects.all()]
-
-    name = forms.CharField(
-        label="Transmitter name",
-        widget=forms.TextInput(
-            attrs={"class": "form-control",
-                   "max_length": 50}))
-
-    serial_no = forms.CharField(
-        label="Serial number",
-        widget=forms.TextInput(
-            attrs={"class": "form-control",
-                   "max_length": 50}))
-
-    tx_makeID = forms.ChoiceField(
-        label="Manufacturer",
-        choices = [],
-        widget=forms.Select(
-            attrs={"class": "form-control"}))
-
-    frequency = forms.FloatField(
-        label = "Frequency",
-        widget=forms.NumberInput(
-            attrs={"class": "form-control"}))
-
-    def clean_tx_makeID(self):
-        makeid_form_data = self.cleaned_data.get("tx_makeID")
-        return TxMake.objects.get(ID=makeid_form_data)
 
     def save(self, commit=True):
         Tx = super(AddTransmitterForm, self).save(commit=False)
-        Tx.projectID=self.project
+        Tx.projectID = self.project
 
-        if commit == True:
+        if commit is True:
             Tx.save()
+            Tx_make_parameters = TxMakeParameters.objects.filter(
+                tx_makeID=Tx.tx_makeID)
+
+            for parameter in Tx_make_parameters:
+                TxParameters.objects.create(
+                    txID=Tx,
+                    name=parameter.name,
+                    value=parameter.value,
+                    units=parameter.units)
 
         return Tx
+
 
 class UserModelChoiceField(forms.ModelMultipleChoiceField):
     def label_from_instance(self, obj):
@@ -110,75 +132,29 @@ class EditProjectForm(ProjectForm):
         widget=FilteredSelectMultiple(
             verbose_name="users", is_stacked=False))
 
-
     collaborators = UserModelChoiceField(
-            queryset=User.objects.all(),
-            required=False,
-            widget=FilteredSelectMultiple(
-                verbose_name="users", is_stacked=False))
+        queryset=User.objects.all(),
+        required=False,
+        widget=FilteredSelectMultiple(
+            verbose_name="users", is_stacked=False))
 
     def save(self, commit=True):
         project = super(ProjectForm, self).save(commit=False)
-        gviewers_name =  "%d_viewers" % project.ID
+        gviewers_name = "%d_viewers" % project.ID
         gcollaborators_name = "%d_collaborators" % project.ID
 
         viewer_group = Group.objects.get(
             name=gviewers_name)
-        
+
         collaborator_group = Group.objects.get(
             name=gcollaborators_name)
 
         for viewer in self.cleaned_data.get("viewers"):
             viewer_group.user_set.add(viewer)
-    
+
         for collaborator in self.cleaned_data.get("collaborators"):
             collaborator_group.user_set.add(collaborator)
 
         if commit:
             project.save()
         return project
-
-
-# class AccountChangeForm(forms.ModelForm):
-#     class Meta:
-#         model = QraatUser
-#         fields = ("first_name", "last_name")
-
-
-# class PasswordChangeForm(forms.ModelForm):
-#     cur_password = forms.CharField(
-#         label='Current password', widget=forms.PasswordInput)
-
-#     password1 = forms.CharField(
-#         label='New password', widget=forms.PasswordInput)
-
-#     password2 = forms.CharField(
-#         label='Password confirmation', widget=forms.PasswordInput)
-
-#     class Meta:
-#         model = QraatUser
-#         fields = ()
-
-#     def clean_cur_password(self):
-#         cur_password = self.cleaned_data.get("cur_password")
-#         user = super(PasswordChangeForm, self).save(commit=False)
-#         if cur_password and not user.check_password(cur_password):
-#             raise forms.ValidationError("Current password don't match")
-
-#         return cur_password
-
-#     def clean_password2(self):
-#         password1 = self.cleaned_data.get("password1")
-#         password2 = self.cleaned_data.get("password2")
-
-#         if password1 and password2 and password1 != password2:
-#             raise forms.ValidationError("Passwords don't match")
-
-#         return password2
-
-#     def save(self, commit=True):
-#         user = super(PasswordChangeForm, self).save(commit=False)
-#         user.set_password(self.cleaned_data["password1"])
-#         if commit:
-#             user.save()
-#         return user

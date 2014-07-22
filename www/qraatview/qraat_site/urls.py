@@ -46,7 +46,7 @@ urlpatterns = patterns(
         name='add-target'),
 
     url(
-        r'^project/(?P<project_id>\d+)/edit-project/add-deployment$', 'add_deployment',
+        r'^project/(?P<project_id>\d+)/edit-project/add-deployment/$', 'add_deployment',
         name='add-deployment'),
 
     url(r'^regular-content/$', 'regular_content'),
