@@ -72,6 +72,41 @@ def projects(request):
                    'nav_options': nav_options})
 
 
+def render_project_form(
+        request, project_id, post_form, get_form, template_path, success_url):
+
+    user = request.user
+    nav_options = get_nav_options(request)
+    thereis_newelement = None
+    try:
+        project = Project.objects.get(ID=project_id)
+
+    except ObjectDoesNotExist:
+        return HttpResponse("Error: We did not find this project")
+
+    else:
+        if user.id == project.ownerID:
+            if request.method == 'POST':
+                form = post_form
+                form.set_project(project)
+                if form.is_valid():
+                    form.save()
+                    return redirect(success_url)
+
+            elif request.method == 'GET':
+                thereis_newelement = request.GET.get("new_element")
+                form = get_form
+                form.set_project(project)
+
+            return render(request, template_path,
+                          {"form": form,
+                           "nav_options": nav_options,
+                           "changed": thereis_newelement,
+                           "project": project})
+        else:
+            return HttpResponse("Action not allowed")
+
+
 @login_required(login_url='/auth/login')
 def create_project(request):
 
@@ -176,107 +211,35 @@ def add_manufacturer(request, project_id):
 
 @login_required(login_url="/auth/login")
 def add_transmitter(request, project_id):
-    user = request.user
-    nav_options = get_nav_options(request)
-    thereisnew_transmitter = None
-
-    try:
-        project = Project.objects.get(ID=project_id)
-    except ObjectDoesNotExist:
-        return HttpResponse("Error: We didn't find this project")
-
-    if user.id == project.ownerID:
-
-        if request.method == 'POST':
-            form = AddTransmitterForm(project=project, data=request.POST)
-            if form.is_valid():
-                form.save()
-                return redirect(
-                    "../add-transmitter?new_transmitter=True")
-
-        elif request.method == 'GET':
-            thereisnew_transmitter = request.GET.get("new_transmitter")
-            form = AddTransmitterForm()
-
-        return render(request, "qraat_site/create-transmitter.html",
-                      {"form": form,
-                       "nav_options": nav_options,
-                       "changed": thereisnew_transmitter,
-                       "project": project})
-
-    else:
-        return HttpResponse(
-            request, "Just owners can add transmitters to this project.")
+    return render_project_form(
+        request=request,
+        project_id=project_id,
+        post_form=AddTransmitterForm(data=request.POST),
+        get_form=AddTransmitterForm(),
+        template_path="qraat_site/create-transmitter.html",
+        success_url="../add-transmitter?new_element=True")
 
 
 @login_required(login_url="/auth/login")
 def add_target(request, project_id):
-    user = request.user
-    nav_options = get_nav_options(request)
-    thereisnew_target = None
-
-    try:
-        project = Project.objects.get(ID=project_id)
-    except ObjectDoesNotExist:
-        return HttpResponse("Error: We didn't find this project")
-
-    if user.id == project.ownerID:
-
-        if request.method == 'POST':
-            form = AddTargetForm(project=project, data=request.POST)
-            if form.is_valid():
-                form.save()
-                return redirect(
-                    "../add-target?new_target=True")
-
-        elif request.method == 'GET':
-            thereisnew_target = request.GET.get("new_target")
-            form = AddTargetForm()
-
-        return render(request, "qraat_site/create-target.html",
-                      {"form": form,
-                       "nav_options": nav_options,
-                       "changed": thereisnew_target,
-                       "project": project})
-
-    else:
-        return HttpResponse(
-            request, "Just owners can add targets to this project.")
+    return render_project_form(
+        request=request,
+        project_id=project_id,
+        post_form=AddTargetForm(data=request.POST),
+        get_form=AddTargetForm(),
+        template_path="qraat_site/create-target.html",
+        success_url="../add-target?new_element=True")
 
 
 @login_required(login_url="/auth/login")
 def add_deployment(request, project_id):
-    user = request.user
-    nav_options = get_nav_options(request)
-    thereisnew_deployment = None
-
-    try:
-        project = Project.objects.get(ID=project_id)
-    except ObjectDoesNotExist:
-        return HttpResponse("Error: We didn't find this project")
-
-    if user.id == project.ownerID:
-
-        if request.method == 'POST':
-            form = AddDeploymentForm(project=project, data=request.POST)
-            if form.is_valid():
-                form.save()
-                return redirect(
-                    "../add-deployment?new_deployment=True")
-
-        elif request.method == 'GET':
-            thereisnew_deployment = request.GET.get("new_deployment")
-            form = AddDeploymentForm()
-
-        return render(request, "qraat_site/create-deployment.html",
-                      {"form": form,
-                       "nav_options": nav_options,
-                       "changed": thereisnew_deployment,
-                       "project": project})
-
-    else:
-        return HttpResponse(
-            request, "Just owners can add deployments to this project.")
+    return render_project_form(
+        request=request,
+        project_id=project_id,
+        post_form=AddDeploymentForm(data=request.POST),
+        get_form=AddDeploymentForm(),
+        template_path="qraat_site/create-deployment.html",
+        success_url="../add-deployment?new_element=True")
 
 
 def show_project(request, project_id):

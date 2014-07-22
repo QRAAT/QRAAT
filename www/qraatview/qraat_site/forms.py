@@ -5,7 +5,7 @@ from qraat_site.models import AuthProjectCollaborator, TxMake
 from qraat_site.models import TxMakeParameters, TxParameters
 from django.contrib.auth.models import User, Group
 from django.contrib.admin.widgets import FilteredSelectMultiple
-from django.core.exceptions import ObjectDoesNotExist
+
 
 class ProjectForm(forms.ModelForm):
 
@@ -46,14 +46,19 @@ class AddManufacturerForm(forms.ModelForm):
         labels = {"demod_type": ("Demodulation type")}
 
 
-class AddTargetForm(forms.ModelForm):
+class ProjectElementForm(forms.ModelForm):
+    def __init__(self, project=None, *args, **kwargs):
+        self.project = project
+        super(ProjectElementForm, self).__init__(*args, **kwargs)
+
+    def set_project(self, project):
+        self.project = project
+
+
+class AddTargetForm(ProjectElementForm):
     class Meta:
         model = Target
         exclude = ["projectID", "is_hidden"]
-
-    def __init__(self, project=None, *args, **kwargs):
-        self.project = project
-        super(AddTargetForm, self).__init__(*args, **kwargs)
 
     def save(self, commit=True):
         target = super(AddTargetForm, self).save(commit=False)
@@ -61,16 +66,29 @@ class AddTargetForm(forms.ModelForm):
 
         if commit:
             target.save()
-    
 
-class AddDeploymentForm(forms.ModelForm):
+
+class AddDeploymentForm(ProjectElementForm):
     class Meta:
         model = Deployment
         exclude = ["projectID", "is_hidden", "time_end"]
 
-    def __init__(self, project=None, *args, **kwargs):
+    txID = forms.ChoiceField()
+    targetID = forms.ChoiceField()
+
+    def set_project(self, project):
         self.project = project
-        super(AddDeploymentForm, self).__init__(*args, **kwargs)
+        self.fields["txID"].choices = [
+            (tx.ID, tx) for tx in project.get_transmitters()]
+        print project.get_transmitters()
+        self.fields["targetID"].choices = [
+            (target.ID, target) for target in project.get_targets()]
+
+    def clean_txID(self):
+        return Tx.objects.get(ID=self.cleaned_data.get("txID"))
+
+    def clean_targetID(self):
+        return Target.objects.get(ID=self.cleaned_data.get("targetID"))
 
     def save(self, commit=True):
         deployment = super(AddDeploymentForm, self).save(commit=False)
@@ -79,7 +97,8 @@ class AddDeploymentForm(forms.ModelForm):
         if commit:
             deployment.save()
 
-class AddTransmitterForm(forms.ModelForm):
+
+class AddTransmitterForm(ProjectElementForm):
     class Meta:
         model = Tx
         exclude = ["projectID", "is_hidden"]
@@ -87,10 +106,6 @@ class AddTransmitterForm(forms.ModelForm):
                   "serial_no": ("Serial number"),
                   "tx_makeID": ("Manufacturer"),
                   "frequency": ("Frequency")}
-
-    def __init__(self, project=None, *args, **kwargs):
-        self.project = project
-        super(AddTransmitterForm, self).__init__(*args, **kwargs)
 
     def save(self, commit=True):
         Tx = super(AddTransmitterForm, self).save(commit=False)
