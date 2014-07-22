@@ -6,7 +6,15 @@
  <div class="alert alert-success">Transmitter Added</div>
 {% endif %}
 
-<div class="page-header"><h3>New transmitter</h3></div>
+<div class="page-header">
+    <h3>New transmitter
+    <div class="btn-group" style="margin-left:15%">
+        <a href="../add-manufacturer">
+            <input type="button" class="btn btn-primary" value="Add manufacturer" name="add-manufacturer" />
+        </a>
+    </div>
+    </h3>
+</div>
 <div class="form-container"> 
   <form  method="post">
     {% csrf_token %}

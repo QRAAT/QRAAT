@@ -34,6 +34,10 @@ urlpatterns = patterns(
         'edit_project', name='edit-project'),
 
     url(
+        r'^project/(?P<project_id>\d+)/edit-project/add-manufacturer/$',
+        'add_manufacturer', name='add_manufacturer'),
+
+    url(
         r'^project/(?P<project_id>\d+)/edit-project/add-transmitter/$', 'add_transmitter',
         name='add-transmitter'),
 

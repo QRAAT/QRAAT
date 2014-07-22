@@ -5,6 +5,7 @@ from django.contrib.auth.models import Group
 from qraat_site.models import Project, Tx, Location
 from django.core.exceptions import ObjectDoesNotExist
 from qraat_site.forms import ProjectForm, EditProjectForm, AddTransmitterForm
+from qraat_site.forms import AddManufacturerForm
 
 
 def index(request):
@@ -132,6 +133,42 @@ def edit_project(request, project_id):
 
 
 @login_required(login_url="/auth/login")
+def add_manufacturer(request, project_id):
+    user = request.user
+    nav_options = get_nav_options(request)
+    istherenew_make = None
+
+    try:
+        project = Project.objects.get(ID=project_id)
+    
+    except ObjectDoesNotExist:
+        return HttpResponse("Error: we didn't find this project")
+    
+    else:
+        if user.id == project.ownerID:
+            transmitter_form = AddTransmitterForm()
+            if request.method == 'POST':
+                manufacturer_form = AddManufacturerForm(data=request.POST)
+                
+                if manufacturer_form.is_valid():
+                    make_obj = manufacturer_form.save()
+                    return redirect("../add-manufacturer?newmake=True?makeid=%d" % make_obj.ID )
+
+            elif request.method == 'GET':
+                istherenew_make = request.GET.get("newmake")
+                manufacturer_form = AddManufacturerForm()
+    
+            return render(request, "qraat_site/create-manufacturer.html",
+                    {"nav_options": nav_options,
+                     "manufacturer_form": manufacturer_form,
+                     "transmitter_form": transmitter_form,
+                     "istherenew_make": istherenew_make,
+                     "project": project})
+        else:
+            return HttpResponse("You are not allowed to do this.")
+
+
+@login_required(login_url="/auth/login")
 def add_transmitter(request, project_id):
     user = request.user
     nav_options = get_nav_options(request)
@@ -158,16 +195,28 @@ def add_transmitter(request, project_id):
         return render(request, "qraat_site/create-transmitter.html",
                       {"form": form,
                        "nav_options": nav_options,
-                       "thereisnew_transmitter": thereisnew_transmitter})
+                       "thereisnew_transmitter": thereisnew_transmitter,
+                       "project": project})
 
     else:
         return HttpResponse(
             request, "Just owners can add transmitters to this project.")
 
 
+@login_required(login_url="/auth/login")
+def add_target(request, project_id):
+    return HttpResponse("Not implemented yet")
+
+
+@login_required(login_url="/auth/login")
+def add_deployment(request, project_id):
+    return HttpResponser("Not implemented yet")
+
+
 def show_project(request, project_id):
 
     nav_options = get_nav_options(request)
+    user = request.user
 
     try:
         project = Project.objects.get(ID=project_id)
@@ -179,7 +228,17 @@ def show_project(request, project_id):
                  'nav_options': nav_options})
 
         else:
-            return HttpResponse("Project is not public")
+            if user.id == project.ownerID: 
+                return render(
+                    request,
+                    'qraat_site/display-project.html',
+                    {'project': project,
+                    'nav_options': nav_options})
+
+            else:
+                return HttpResponse("Project is not public")
+
+
     except ObjectDoesNotExist:
         return HttpResponse("Project not found")
 

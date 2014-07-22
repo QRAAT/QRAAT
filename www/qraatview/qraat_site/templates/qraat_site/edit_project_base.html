@@ -8,7 +8,7 @@
         </a>
         <ul class="dropdown-menu" role="menu">  
             <li>
-                <a href="add-transmitter">Add Transmitter</a>
+            <a href={%url 'qraat:add-transmitter' project.ID %}>Add Transmitter</a>
             </li>
         </ul>
     </li>
@@ -18,7 +18,7 @@
         </a>
         <ul class="dropdown-menu">
             <li>
-                <a href="add-target">Add Target</a>
+            <a href={% url 'qraat:add-target' project.ID %}>Add Target</a>
             </li>
         </ul>
     </li>
@@ -28,7 +28,7 @@
         </a>
         <ul class="dropdown-menu">
             <li>
-                <a href="add-deployment">Add Deployment</a>
+            <a href={% url 'qraat:add-deployment' project.ID %}>Add Deployment</a>
             </li>
         </ul>
     </li>

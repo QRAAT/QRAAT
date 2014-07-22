@@ -38,6 +38,11 @@ class ProjectForm(forms.ModelForm):
         return project
 
 
+class AddManufacturerForm(forms.ModelForm):
+    class Meta:
+        model = TxMake
+
+
 class AddTransmitterForm(forms.ModelForm):
     class Meta:
         model = Tx
@@ -46,6 +51,7 @@ class AddTransmitterForm(forms.ModelForm):
     def __init__(self, project=None, *args, **kwargs):
         self.project = project
         super(AddTransmitterForm, self).__init__(*args, **kwargs)
+        self.fields['tx_makeID'].choices = [ (t_make.ID, t_make) for t_make in TxMake.objects.all()]
 
     name = forms.CharField(
         label="Transmitter name",
@@ -59,11 +65,9 @@ class AddTransmitterForm(forms.ModelForm):
             attrs={"class": "form-control",
                    "max_length": 50}))
 
-    TMAKE_CHOICES = [ (t_make.ID, t_make) for t_make in TxMake.objects.all()]
-
     tx_makeID = forms.ChoiceField(
         label="Manufacturer",
-        choices = TMAKE_CHOICES,
+        choices = [],
         widget=forms.Select(
             attrs={"class": "form-control"}))
 
@@ -101,13 +105,15 @@ class EditProjectForm(ProjectForm):
     #           '/static/admin/js/SelectBox.js']
 
     viewers = UserModelChoiceField(
-        queryset=User.objects.all(), 
+        queryset=User.objects.all(),
+        required=False,
         widget=FilteredSelectMultiple(
             verbose_name="users", is_stacked=False))
 
 
     collaborators = UserModelChoiceField(
             queryset=User.objects.all(),
+            required=False,
             widget=FilteredSelectMultiple(
                 verbose_name="users", is_stacked=False))
 
