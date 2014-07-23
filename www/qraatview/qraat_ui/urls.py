@@ -5,9 +5,8 @@ from django.contrib import admin
 admin.autodiscover()
 
 urlpatterns = patterns('qraat_ui.views',
-    url(r'^/$', 'index' ),
-    url(r'^index.html', 'index'),
-    url(r'^depID/(?P<depID>\d+)/$', 'get_view_by_depID')
+    url(r'^$', 'index'),
+    url(r'^deployment/(?P<depID>\d+)/$', 'view_by_dep_id')
 )
 urlpatterns += patterns('',
   url(r'^admin/', include(admin.site.urls)),

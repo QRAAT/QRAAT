@@ -59,7 +59,7 @@ project_patterns = patterns('qraatview.views',
 
 
 urlpatterns = patterns('qraatview.views',
-  url(r'^qraat_ui/', include('qraat_ui.urls', namespace="ui")),
+  url(r'^ui/', include('qraat_ui.urls', namespace="ui")),
   url(r'^admin/', include(admin.site.urls)),
   url(r'^auth/', include('qraat_auth.urls', namespace="auth")),
   url(r'^jsi18n/$', javascript_catalog),
