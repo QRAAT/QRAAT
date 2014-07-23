@@ -484,5 +484,9 @@ def index(request, depID=None):
 
 
 
-def view_by_dep_id(request, depID):
-  return HttpResponse('Not implemneted yet.')
+def view_by_dep_id(request, dep_id):
+  return HttpResponse('Not implemneted yet. (depID=%s)' % dep_id)
+
+
+
+

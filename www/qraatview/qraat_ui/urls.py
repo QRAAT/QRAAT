@@ -6,7 +6,7 @@ admin.autodiscover()
 
 urlpatterns = patterns('qraat_ui.views',
     url(r'^$', 'index'),
-    url(r'^deployment/(?P<depID>\d+)/$', 'view_by_dep_id')
+    url(r'^deployment/(?P<dep_id>\d+)/$', 'view_by_dep_id')
 )
 urlpatterns += patterns('',
   url(r'^admin/', include(admin.site.urls)),
