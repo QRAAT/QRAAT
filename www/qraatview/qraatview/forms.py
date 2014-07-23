@@ -33,10 +33,58 @@ class ProjectForm(forms.ModelForm):
 
     def save(self, commit=True):
         project = super(ProjectForm, self).save(commit=False)
-        project.ownerID = self.ownerID
         if commit:
+            project.ownerID = self.ownerID
             project.save()
 
+        return project
+
+
+class UserModelChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, obj):
+        return obj.get_full_name()
+
+
+class EditProjectForm(ProjectForm):
+
+    def __init__(self, user=None, *args, **kwargs):
+        super(EditProjectForm, self).__init__(user, *args, **kwargs)
+        project = super(ProjectForm, self).save(commit=False)
+        self.viewers = User.objects.all().exclude(id=project.ownerID)
+        self.fields["viewers"].queryset = self.viewers 
+
+    viewers = UserModelChoiceField(
+        queryset=User.objects.all(),
+        required=False,
+        widget=FilteredSelectMultiple(
+            verbose_name="users", is_stacked=False))
+
+    collaborators = UserModelChoiceField(
+        queryset=User.objects.all(),
+        required=False,
+        widget=FilteredSelectMultiple(
+            verbose_name="users", is_stacked=False))
+
+    def save(self, commit=True):
+        project = super(ProjectForm, self).save(commit=False)
+        gviewers_name = "%d_viewers" % project.ID
+        gcollaborators_name = "%d_collaborators" % project.ID
+
+        viewer_group = Group.objects.get(
+            name=gviewers_name)
+
+        collaborator_group = Group.objects.get(
+            name=gcollaborators_name)
+
+        for viewer in self.cleaned_data.get("viewers"):
+            viewer_group.user_set.add(viewer)
+            self.viewers.remove(viewer)
+
+        for collaborator in self.cleaned_data.get("collaborators"):
+            collaborator_group.user_set.add(collaborator)
+
+        if commit:
+            project.save()
         return project
 
 
@@ -128,52 +176,3 @@ class AddTransmitterForm(ProjectElementForm):
                     units=parameter.units)
 
         return Tx
-
-
-class UserModelChoiceField(forms.ModelMultipleChoiceField):
-    def label_from_instance(self, obj):
-        return obj.get_full_name()
-
-
-class EditProjectForm(ProjectForm):
-    # class Media:
-    #     css = {
-    #             'all':['admin/css/widgets.css',
-    #                    'admin/css/uid-manage-form.css'],
-    #             }
-    #     js = ['/jsi18n/', '/static/admin/js/jquery.js',
-    #           '/static/admin/js/core.js',
-    #           '/static/admin/js/SelectBox.js']
-
-    viewers = UserModelChoiceField(
-        queryset=User.objects.all(),
-        required=False,
-        widget=FilteredSelectMultiple(
-            verbose_name="users", is_stacked=False))
-
-    collaborators = UserModelChoiceField(
-        queryset=User.objects.all(),
-        required=False,
-        widget=FilteredSelectMultiple(
-            verbose_name="users", is_stacked=False))
-
-    def save(self, commit=True):
-        project = super(ProjectForm, self).save(commit=False)
-        gviewers_name = "%d_viewers" % project.ID
-        gcollaborators_name = "%d_collaborators" % project.ID
-
-        viewer_group = Group.objects.get(
-            name=gviewers_name)
-
-        collaborator_group = Group.objects.get(
-            name=gcollaborators_name)
-
-        for viewer in self.cleaned_data.get("viewers"):
-            viewer_group.user_set.add(viewer)
-
-        for collaborator in self.cleaned_data.get("collaborators"):
-            collaborator_group.user_set.add(collaborator)
-
-        if commit:
-            project.save()
-        return project
