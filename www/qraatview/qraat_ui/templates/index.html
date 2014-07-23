@@ -403,9 +403,11 @@ function initialize(){
   var display_type = {{display_type}};
 
   // Display marker points if html pref is set to display them
-  if ((display_type != null)&& (display_type==2)) {
+  if ((display_type != null) && 
+      (display_type==2) && 
+      (flight_latlon_pos.length > 0)) {
     
-    for (i=0; i < flight_latlon_pos.length-1; i++) {
+    for (i=0; i < flight_latlon_pos.length; i++) {
     
       marker = new google.maps.Marker({
         position: new google.maps.LatLng(

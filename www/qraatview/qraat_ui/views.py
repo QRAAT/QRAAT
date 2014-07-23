@@ -55,7 +55,7 @@ def index(request, depID=None):
 
   #if 'trans' in request.GET and not depID:
   #  tx = request.GET['trans']
- 
+  dep_list = [] 
   if 'trans' in request.GET and not depID:
     dep_list = request.GET.getlist('trans')
     #dep_list_length = len(dep_list)
@@ -113,6 +113,7 @@ def index(request, depID=None):
   # Declare empty lists and variables
 
   pos_filtered_list = []
+  pos_filtered_list1 = []
   selected_data = []
   selected_message = "[ Nothing clicked, or no points detected nearby ]"
   selected_index = None
@@ -125,7 +126,7 @@ def index(request, depID=None):
 
 
   #if form.is_valid():
-  if datetime_from and datetime_to:
+  if datetime_from and datetime_to and dep_list:
     datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
     datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
     
@@ -190,8 +191,6 @@ def index(request, depID=None):
 
 
 
-
-    pos_filtered_list1 = []
 
     if (len(dep_list) >= 2):
       pos_query1 = db_sel.objects.filter(
