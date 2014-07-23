@@ -1,9 +1,9 @@
 # from hello.models import Position
 from django.contrib import admin
-from qraat_site.models import Track, Tx, TxMake, Deployment
-from qraat_site.models import Site, Location, Project
-from qraat_site.models import AuthProjectCollaborator, AuthProjectViewer
-from qraat_site.models import TxParameters, TxMakeParameters
+from models import Track, Tx, TxMake, Deployment
+from models import Site, Location, Project
+from models import AuthProjectCollaborator, AuthProjectViewer
+from models import TxParameters, TxMakeParameters
 
 
 class SiteAdmin(admin.ModelAdmin):

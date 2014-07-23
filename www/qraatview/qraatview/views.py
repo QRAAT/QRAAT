@@ -2,11 +2,11 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
-from qraat_site.models import Project, Tx, Location
 from django.core.exceptions import ObjectDoesNotExist
-from qraat_site.forms import ProjectForm, EditProjectForm, AddTransmitterForm
-from qraat_site.forms import AddManufacturerForm, AddTargetForm
-from qraat_site.forms import AddDeploymentForm, AddLocationForm
+from models import Project, Tx, Location
+from forms import ProjectForm, EditProjectForm, AddTransmitterForm
+from forms import AddManufacturerForm, AddTargetForm
+from forms import AddDeploymentForm, AddLocationForm
 
 
 def index(request):

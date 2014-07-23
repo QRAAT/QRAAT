@@ -1,8 +1,8 @@
 from django import forms
-from qraat_site.models import Project, AuthProjectViewer
-from qraat_site.models import Tx, Target, Deployment, Location
-from qraat_site.models import AuthProjectCollaborator, TxMake
-from qraat_site.models import TxMakeParameters, TxParameters
+from models import Project, AuthProjectViewer
+from models import Tx, Target, Deployment, Location
+from models import AuthProjectCollaborator, TxMake
+from models import TxMakeParameters, TxParameters
 from django.contrib.auth.models import User, Group
 from django.contrib.admin.widgets import FilteredSelectMultiple
 

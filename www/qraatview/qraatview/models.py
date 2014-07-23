@@ -1,7 +1,7 @@
 # File: qraat_site models.py
 
 from django.db import models
-from qraat_site.utils import timestamp_todate
+from utils import timestamp_todate
 
 QRAAT_APP_LABEL = 'qraat_site'
 

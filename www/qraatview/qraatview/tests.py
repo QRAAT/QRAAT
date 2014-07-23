@@ -1,5 +1,5 @@
 from django.test import TestCase
-from qraat_site.models import Project, Target
+from models import Project, Target
 
 """
 class TransmitterTestCase(TestCase):
