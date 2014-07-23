@@ -16,7 +16,7 @@
     {% for project in user_projects %}
     <div class="list-group">
         <h4 class="list-group item-heading">
-            <a href="/qraat/project/{{project.ID}}">{{project.name}}</a>
+            <a href="/project/{{project.ID}}">{{project.name}}</a>
         </h4>
         <p class="list-group item-text">{{project.description}}</p>
     </div>
@@ -30,7 +30,7 @@
     </div>
     {% for project in public_projects %}
     <div class="list-group">
-        <h4 class="list-group item-heading"><a href="/qraat/project/{{project.ID}}">{{project.name}}</a></h4>
+        <h4 class="list-group item-heading"><a href="/project/{{project.ID}}">{{project.name}}</a></h4>
         <p class="list-group item-text">{{project.description}}</p>
     </div>
     {%endfor%}
