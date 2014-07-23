@@ -39,7 +39,8 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
     'django.contrib.admin',
     'qraat_ui',
-    'qraat_auth'
+    'qraat_auth',
+    'qraatview'
 )
 
 MIDDLEWARE_CLASSES = (

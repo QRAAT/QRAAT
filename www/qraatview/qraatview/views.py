@@ -122,7 +122,7 @@ def create_project(request):
             Group.objects.create(name="%d_viewers" % project.ID)
             Group.objects.create(name="%d_collaborators" % project.ID)
 
-            return redirect('/qraat/project/%d' % project.ID)
+            return redirect('/project/%d' % project.ID)
     else:
         form = ProjectForm()
 

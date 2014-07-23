@@ -13,14 +13,14 @@ from django.contrib.auth.models import User
 def index(request):
     if not request.user.is_authenticated():
         return redirect('login/?next=%s' % request.path)
-    return redirect('/qraat/')
+    return redirect('/')
 
 
 def user_logout(request):
     if request.user.is_authenticated():
         logout(request)
 
-    return redirect("/qraat/")
+    return redirect("/")
 
 
 def user_login(request):
@@ -31,7 +31,7 @@ def user_login(request):
             if user is not None:
                 if user.is_active:
                     login(request, user)
-                    return redirect('/qraat/')
+                    return redirect('/')
                 else:
                     return HttpResponse("Innactive user!")
     else:

@@ -23,6 +23,8 @@ class DatabaseAppsRouter(object):
  
     def db_for_write(self, model, **hints):
         """Point all write operations to the specific database."""
+        if model._meta.app_label == 'qraat_site':
+          return 'qraat'
         if settings.DATABASE_APPS_MAPPING.has_key(model._meta.app_label):
             return settings.DATABASE_APPS_MAPPING[model._meta.app_label]
         return None
