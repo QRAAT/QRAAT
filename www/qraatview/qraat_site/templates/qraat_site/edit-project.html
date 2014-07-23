@@ -1,6 +1,17 @@
 {% extends "qraat_site/edit_project_base.html" %}
 {% load class_tag %}
 
+{% block css %}
+
+<script type="text/javascript" src="/static/admin/js/jquery.init.js"></script>
+<script type="text/javascript" src="/jsi18n/"></script>
+<script type="text/javascript" src="/static/admin/js/core.js"></script>
+<script type="text/javascript" src="/static/admin/js/SelectBox.js"></script>
+<script type="text/javascript" src="/static/admin/js/SelectFilter2.js"></script>
+<link href="/static/admin/css/widgets.css" rel="stylesheet">
+
+{% endblock %}
+
 {% block content %}
 <div class="page-header"><h3>Project Edition</h3></div>
 {% if changed %}
@@ -33,7 +44,9 @@
                         {{field}}
                     </span>
                 {% elif field.field.widget|get_class == "FilteredSelectMultiple" %}
-                <span class="input-group-addon">{{ field.label }}</span>
+                <h5>
+                {{ field.label }}:
+                </h5>
                 <div class="form-row">
                     {{field}}
                 </div>
@@ -46,7 +59,7 @@
 			</div>
 	{% endfor %}
 	<div class="input-group submit-btn">
-		<div class="btn-group-vertical">
+		<div class="btn-group">
 			<button class="btn btn-primary btn-lg" type="submit" value="edit-project">Save changes</button>
 		</div>
 	</div>

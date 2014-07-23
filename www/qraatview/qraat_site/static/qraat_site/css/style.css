@@ -7,6 +7,38 @@
     width: 80%;
 }
 
+.form-row {
+    font-size: 11px;
+    height: inherit;
+    padding: inherit;
+    display: inherit;
+    box-sizing: inherit;
+    border: 1px solid #EEE;
+}
+
+.form-row input, form-row textarea, form-row h2{
+    border: 1px solid #CCC;
+}
+
+.form-row input, form-row textarea, form-row select, form-row p{
+    margin: 2px 0px;
+    padding: 2px 3px;
+    vertical-align: middle;
+    font-family: "Lucida Grande",Verdana,Arial,sans-serif;
+    font-weight: normal;
+    font-size: 11px;
+}
+
+.selector h2 {
+    margin: 0px;
+    padding: 2px 5px 3px;
+    font-size: 11px;
+    text-align: left;
+    font-weight: bold;
+    background: url('../img/default-bg.gif') repeat-x scroll left top #7CA0C7;
+    color: #FFF;
+}
+
 .table-body{
     display: table;
     width: 100%;
