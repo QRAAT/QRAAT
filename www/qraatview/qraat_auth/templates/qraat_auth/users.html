@@ -1,17 +1,8 @@
 {% extends "qraat_auth/base.html" %}
 
 {% block content %}
-{% if thereis_newuser %}
-<div class="alert alert-success" role="alert">User created!</div>
-
-{% endif %}
 <div class="page-header">
     <h2>Users
-        <small>
-            <a href={% url 'auth:create-user' %} >
-            <input type="button" style="margin-left:15%;" class="btn btn-lg btn-primary" value="Create user" name="create-user" />
-        </a>
-        <small>
     </h2>
 </div>
 <div class="table-body">
