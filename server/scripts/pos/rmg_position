@@ -39,7 +39,7 @@ parser.description = '''\
 Calculate the position of a target transmitter of a specified time 
 range. Times are given as seconds as floating points. For example,
 to calculate the position of transmitter ID=12 from 1:30PM on
-June 14, 1999 to now, do "rmg_position --tx-id=12 
+June 14, 1999 to now, do "rmg_position --dep-id=12 
 --t-start=$(date --date='19990614 1330' +%s) --t-end=$(date +%s) 
 --plot". This program is part of QRAAT, an automated animal tracking 
 system based on GNU Radio.   
@@ -49,8 +49,8 @@ parser.add_option('--cal-id', type='int', metavar='INT', default=3,
                   help="Calibration ID, the serial identifier in the database "
                        "context identifying a calibration run. (Default is 3.)")
 
-parser.add_option('--tx-id', type='int', metavar='INT', default=51,
-                  help="Serial ID of the target transmitter in the database "
+parser.add_option('--dep-id', type='int', metavar='INT', default=51,
+                  help="Serial ID of the target and transmitter in the database "
                        "context.")
 
 parser.add_option('--t-delta', type='float', metavar='SEC', default=1.0,
@@ -111,7 +111,7 @@ try:
 
     print "position: fetching chunk %d of %d." % (i+1, len(chunks)) 
     
-    est_ids = get_est_ids(db_con, options.tx_id, chunks[i], chunks[i] + options.t_chunk)
+    est_ids = get_est_ids(db_con, options.dep_id, chunks[i], chunks[i] + options.t_chunk)
     sig = qraat.srv.position.signal(db_con, est_ids)
 
     if len(sig) == 0:
@@ -126,7 +126,7 @@ try:
                                                         center,
                                                         options.t_window, 
                                                         options.t_delta, 
-                                                        options.tx_id,
+                                                        options.dep_id,
                                                         options.verbose) 
 
     print "position: inserting positions (%d)." % (len(position))

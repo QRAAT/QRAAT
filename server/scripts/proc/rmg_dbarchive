@@ -1,0 +1,751 @@
+#!/usr/bin/perl
+#
+# This script is part of the QRAAT system.
+#
+# Copyright (C) 2013 Marcel Losekoot
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# This script is part of the backup system and is used to export data from the qraat database tables.
+# It is designed to be run periodically and be self configuring in that it checks for and deals with
+# new tables and keeps a cursor table of the ID value of dumped records.
+# The dump files are limited to a maximum number of records determined by a column in the cursor table.
+#
+#
+#
+
+use strict ;
+use warnings ;
+use DBI ;	# for database connector
+
+my $Debug = 0 ;
+my $ENV_NAME_DB_AUTH = "RMG_SERVER_DB_AUTH" ;	# The name of the environment variable for the DB_AUTH filename
+my $Archive_Config_Table_Name = "Archive_Config" ;
+my $Archive_Log_Table_Name = "Archive_Log" ;
+my $Default_Archive = "TRUE" ;		# TRUE means do archive this table, FALSE means don't
+my $Default_LastID = 0 ;		# Start at 0, meaning nothing written yet
+my $Default_Chunk_Size = 1000000 ;	# General value for largest chunk size, in records
+my $Maximum_Query_Size = 1000000 ;	# Maximum sensible query size when chuking is disabled
+my $Default_DT_Column_Name = "datetime" ;	# FIXME Make this a Config item
+my $Default_TS_Column_Name = "timestamp" ;	# FIXME Make this a Config item
+
+sub usage()
+{
+	print "Usage: $0 [table] path\n" ;
+	print "Archives table data to files under path. File format is CSV with fields terminated by ' and one header row\n" ;
+	print "Uses the environment variable '$ENV_NAME_DB_AUTH' to identify a database and obtain login credentials.\n" ;
+	print "Reads a list of tables to be archived from the database table '$Archive_Config_Table_Name'.\n" ;
+	print "If 'table' is provided, only that table is archived, otherwise all tables with the 'archive' column set are archived.\n" ;
+	print "If tables are present in the database that are not in the list of tables, the list is updated but 'archive' is disabled by default.\n" ;
+	print "Archive actions are recorded in the database table '$Archive_Log_Table_Name'.\n" ;
+}
+
+sub main()
+{
+	print localtime()." Starting\n" ;
+	my $argc = scalar @ARGV ;
+	if( $argc < 1 )
+	{
+		usage() ;
+		return 1 ;
+	}
+	my $table = undef ;
+	my $path = undef ;
+	if( $argc == 1 )
+	{
+		$path = $ARGV[0] ;
+	}
+	if( $argc == 2 )
+	{
+		$table = $ARGV[0] ;
+		$path = $ARGV[1] ;
+	}
+        if( (not defined $path) || ($path eq "") )
+        {
+                print "Missing value for 'path'\n" ;
+                return 1 ;
+        }
+        if( not -d $path )
+        {
+                print "Path does not exist: '$path'\n" ;
+                return 1 ;
+        }
+	my $authfilename = $ENV{$ENV_NAME_DB_AUTH} ;
+	if( (not defined $authfilename) || ($authfilename eq "") )
+	{
+                print "Environment variable '$ENV_NAME_DB_AUTH' is not defined.\n" ;
+                return 1 ;
+	}
+        if( not -e $authfilename )
+        {
+                print "File does not exist: '$authfilename'\n" ;
+                return 1 ;
+        }
+	my $dbh = opendatabase($authfilename,"writer") ;
+	if( not defined $dbh )
+	{
+		# opendatabase() already explains the error
+		#print "ERROR: cannot open database defined in authfile '$authfile'\n" ;
+		return 1 ;
+	}
+	my $err = 0 ;
+	if( (not defined $table) || ($table eq "") )
+	{
+		$err = archive_database($dbh,$path) ;
+	}
+	else
+	{
+		$err = archive_table($dbh,$table,$path) ;
+	}
+	closedatabase($dbh) ;
+	print localtime()." Finished\n" ;
+	return $err ;
+}
+
+sub archive_database($$)	# Archive all tables in the database
+{
+	my ( $dbh, $path ) = @_ ;
+	my @table_list = get_table_names($dbh) ;
+	my $count = scalar @table_list ;
+	if( $count < 1 )
+	{
+		print "Cannot get a list of tables in database.\n" ;
+		return 1 ;
+	}
+	print "Archiving $count tables\n" ;
+	if( check_for_archive_config_table($dbh) )	# Checks for entries in table Arhive_Config_Table_Name
+	{
+		return 1 ;
+	}
+	my $err = 0 ;
+	my $overall_err = 0 ;
+	for my $table_name ( @table_list )
+	{
+		$err = archive_table($dbh,$table_name,$path) ;
+		if( $err )
+		{
+			print "Error writing data for table '$table_name'.\n" ;
+			$overall_err = 1 ;
+		}
+	}
+	return $overall_err ;
+}
+
+sub opendatabase($$)	# gets the credentials from the given rmg authfile, connects to the database, returns the database handle
+{
+	my ( $authfile, $view ) = @_ ;
+	# BTW, here is how you call rmg_csv: rmg_csv --row view=writer user password name </rmg_server/db_auth
+	my $credstring = `rmg_csv --row view=$view user password name < $authfile` ;
+	if( $Debug ) { print "debug: credstring=$credstring\n" ; }
+	my ( $user, $pass, $database ) = split("\n",$credstring) ;
+	if( not defined $user or $user eq "" )
+	{
+		print "ERROR: cannot read user from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $pass or $pass eq "")
+	{
+		print "ERROR: cannot read pass from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	if( not defined $database or $database eq "" )
+	{
+		print "ERROR: cannot read database from authfile '$authfile'\n" ;
+		return undef ;
+	}
+	my $host = "localhost" ;
+	my $port = 3306 ;
+	my $timeout = 10 ;
+	my $dsn = "DBI:mysql:database=$database;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
+	my $dbh = DBI->connect($dsn,$user,$pass) ;
+	if( not $dbh )
+	{
+		print "ERROR: cannot connect to database host: $DBI::errstr\n" ;
+		return undef ;
+	}
+	return $dbh ;
+}
+
+sub closedatabase($)
+{
+	my ( $dbh ) = @_ ;
+	if( not $dbh->disconnect() )
+	{
+		print "ERROR: cannot close database: $DBI::errstr\n" ;
+	}
+}
+
+sub dblookup($$)	# executes a given query, assumed to produce one result item, returned
+{
+	#
+	# Executes the given query to return one value, or undef
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	my $matches = $sth->rows() ;
+	if( not $matches )
+	{
+		return undef ;
+	}
+	my $ref_row = $sth->fetchrow_arrayref ;
+	if( not defined($ref_row) )
+	{
+		return undef ;
+	}
+	return $ref_row->[0] ;
+}
+
+sub dbexecute($$)	# executes a given query, returns 0 for OK, 1 for error
+{
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	return 0 ;
+}
+
+sub dbdata($$)		# generic database read function, returns an array of data resulting from the given query
+{
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	my $matches = $sth->rows() ;
+	if( $matches == 0 )
+	{
+		if( $Debug ) { print "debug: dbdata: no matches\n" ; }
+		$sth->finish() ;
+		return 1 ;
+	}
+	my $ref_row ;
+	my @data = () ;
+	while( my $ref_row = $sth->fetchrow_arrayref() )
+	{
+		if( defined($ref_row) )
+		{
+			if( defined($ref_row->[0]) )
+			{
+				push @data, [ @$ref_row ] ;
+			}
+		}
+	}
+	$sth->finish() ;
+	return @data ;
+}
+
+sub get_table_names($)	# Gets a list of tables for this database using the "show tables" command
+{
+	my ( $dbh ) = @_ ;
+	my $query = "show tables" ;
+	my @data = dbdata($dbh,$query) ;
+	my $count = scalar @data ;
+	if( $count < 1 )
+	{
+		print "Error: cannot find any tables in database.\n" ;
+		return undef ;
+	}
+	my @tablenames = () ;
+	for my $refrow ( @data )
+	{
+		my @row = @$refrow ;
+		my $column = $row[0] ;
+		if( defined $column )
+		{
+			push @tablenames,$column ;
+		}
+	}
+	return @tablenames ;
+}
+
+sub check_for_archive_config_table($)	# Checks to see if the table Archive_Config_Table_Name exits and has something in it
+{
+	my ( $dbh ) = @_ ;
+	my $query = "select count(*) from `$Archive_Config_Table_Name`" ;
+	if( $Debug ) { print "debug: check_archive_config_table: query=$query\n" ; }
+	my $count = dblookup($dbh,$query) ;
+	if( (not defined $count) || ($count eq "") )
+	{
+		print "Cannot get data from '$Archive_Config_Table_Name'.\n" ;
+		return 1 ;
+	}
+	print "Table '$Archive_Config_Table_Name' has $count entries.\n" ;
+	return 0 ;
+}
+
+sub archive_table($$$)	# Archives the named table using context information from Archive_Config_Table_Name, writes records to file
+{
+	my ( $dbh, $tablename, $path ) = @_ ;
+	my $err ;	# 1 for error, 0 for all OK
+	my $archive ;	# a flag that enables archiving of that table
+	my $lastid ;	# the largest id value that has previously been written
+	my $chunk ;	# the largest number of entries that can be written to each file
+	print "Archiving table '$tablename'\n" ;
+	( $err, $archive, $lastid, $chunk ) = get_archive_config($dbh,$tablename) ;
+	if( $err )
+	{
+		if( $Debug ) { print "debug: archive_table: getconfig returned err\n" ; }
+		return 1 ;
+	}
+	if( not $archive )
+	{
+		print "Archiving disabled for table '$tablename'.\n" ;
+		return 0 ;
+	}
+	my $nextid = $lastid ;
+	do
+	{
+		$lastid = $nextid ;	# do this to advance the lastid after looping
+		( $err, $nextid ) = archive_chunk($dbh,$tablename,$path,$lastid,$chunk) ;
+		if( $Debug ) { print "debug: archive_table: archive_chunk returned err=$err nextid=$nextid\n" ; }
+		if( $err )
+		{
+			if( $Debug ) { print "debug: archive_table: archive_chunk returned err\n" ; }
+			return 1 ;
+		}
+		if( $chunk > 0 )	# update lastid if chunking is enabled (chunk is set to 0 to disable chunking)
+		{
+			$err = update_last_id($dbh,$tablename,$nextid) ;
+		}
+		if( $Debug ) { print "debug: archive_table: update_last_id returned err=$err\n" ; }
+		if( $err )
+		{
+			if( $Debug ) { print "debug: archive_table: update_last_id returned err\n" ; }
+			return 1 ;
+		}
+	}while( ($chunk > 0) && ($nextid > $lastid) ) ;
+	if( $Debug ) { print "debug: archive_table: returning $err\n" ; }
+	return $err ;
+}
+
+sub get_archive_config($$$)	# queries the database table Archive_Config_Table_Name for config data about the named table
+{
+	my ( $dbh, $tablename ) = @_ ;
+	my $query = "select count(*) from `$Archive_Config_Table_Name` where tablename='$tablename'" ;
+	if( $Debug ) { print "debug: get_config: query=$query\n" ; }
+	my $count = dblookup($dbh,$query) ;
+	if( $count < 1 )
+	{
+		print "Creating new entry for '$tablename' in table '$Archive_Config_Table_Name'\n" ;
+		# Add an entry
+		$query = "insert into $Archive_Config_Table_Name ( tablename, archive, lastid, chunk ) values ( '$tablename', '$Default_Archive', '$Default_LastID', '$Default_Chunk_Size' )" ;
+		if( $Debug ) { print "debug: get_config: query=$query\n" ; }
+		my $err = dbexecute($dbh,$query) ;
+		if( $err ) { return ( 1 ) ; }
+	}
+	else
+	{
+		if( $count > 1 ) { print "Found $count entries for '$tablename'\n" ; }
+	}
+	$query = "select archive,lastid,chunk from `$Archive_Config_Table_Name` where tablename='$tablename' order by id desc limit 1" ;
+	if( $Debug ) { print "debug: get_config: query=$query\n" ; }
+	my @data = dbdata($dbh,$query) ;
+	$count = scalar @data ;
+	if( $count != 1 )
+	{
+		print "Unexpected data for tablename '$tablename'.\n" ;
+		return ( 1 ) ;
+	}
+	my $refrow = $data[0] ;
+	my ( $archive, $lastid, $chunk ) = @$refrow ;
+	if( (not defined $archive) || ($archive eq "") )
+	{
+		print "Archive flag not defined.\n" ;
+		return ( 1 ) ;
+	}
+	if( (not defined $lastid) || ($lastid eq "") )
+	{
+		print "Lastid value not defined.\n" ;
+		return ( 1 ) ;
+	}
+	if( (not defined $chunk) || ($chunk eq "") )
+	{
+		print "Chunk value not defined.\n" ;
+		return ( 1 ) ;
+	}
+	return ( 0, $archive, $lastid, $chunk ) ;
+}
+
+sub archive_chunk($$$$$)
+{
+	my ( $dbh, $tablename, $path, $lastid, $chunk ) = @_ ;
+	if( $Debug ) { print "debug: archive_chunk: tablename=$tablename path=$path lastid=$lastid chunk=$chunk\n" ; }
+	if( (not defined $path) || ($path eq "") )
+	{
+		print "No path defined.\n" ;
+		return ( 1, 0 ) ;
+	}
+	if( (not defined $tablename) || ($tablename eq "") )
+	{
+		print "No table name defined.\n" ;
+		return ( 1, 0 ) ;
+	}
+	if( (not defined $lastid) || ($lastid eq "") )
+	{
+		print "Last ID not defined, assuming 0.\n" ;
+		$lastid = 0 ;
+	}
+	if( (not defined $chunk) || ($chunk eq "") )
+	{
+		print "Chunk size not defined, assuming $Default_Chunk_Size.\n" ;
+		$chunk = $Default_Chunk_Size ;
+	}
+	# Get table column names
+	my @column_names = get_column_names($dbh,$tablename) ;
+	if( scalar @column_names <= 0 )
+	{
+		print "Cannot get column names for table '$tablename'\n" ;
+		return ( 1, 0 ) ;
+	}
+	# Find the primary key column name
+	my $pk_column_name = get_pk_column_name($dbh,$tablename) ;
+	if( (not defined $pk_column_name) || ($pk_column_name eq "") )
+	{
+		print "Cannot archive table '$tablename', it must have exactly one primary key.\n" ;	# FIXME make me smarter than this
+		return ( 1, 0 ) ;
+	}
+	my $columns = "`".join("`,`",@column_names)."`" ;	# need to enclose column names in back ticks to protect names that are keywords
+	# Check for being done
+	my $query = "select count(`$pk_column_name`) from `$tablename`" ;	# check table size because max on an empty table returns null 
+	if( $Debug ) { print "debug: archive_chunk: query=$query\n" ; }
+	my $tablesize = dblookup($dbh,$query) ;
+	if( (not defined $tablesize) || ($tablesize eq "") )
+	{
+		print "Cannot determine table size.\n" ;
+		return ( 1, 0 ) ;
+	}
+	if( $tablesize == 0 )
+	{
+		print "Table has no data.\n" ;
+		return ( 0, $lastid ) ;
+	}
+	$query = "select max(`$pk_column_name`) from `$tablename`" ;
+	if( $Debug ) { print "debug: archive_chunk: query=$query\n" ; }
+	my $endid = dblookup($dbh,$query) ;
+	if( (not defined $endid) || ($endid eq "") )
+	{
+		print "Cannot determine end of table.\n" ;
+		return ( 1, 0 ) ;
+	}
+	my $remaining = $endid - $lastid ;
+	if( $remaining <= 0 )
+	{
+		print "No more data to write.\n" ;
+		return ( 0, $lastid ) ;
+	}
+	if( ($remaining < 2) && ($tablename eq $Archive_Log_Table_Name) )
+	{
+		return ( 0, $lastid ) ;
+	}
+	my $limit_clause = "limit $chunk" ;
+	if( $chunk == 0 )
+	{
+		$limit_clause = "limit $Maximum_Query_Size" ;
+	}
+	# Actually get the data: named columns, rows for which the primary key is greater than the lastid, but limit response size
+	$query = "select $columns from `$tablename` where `$pk_column_name` > '$lastid' order by `$pk_column_name` asc $limit_clause" ;
+	if( $Debug ) { print "debug: archive_chunk: query=$query\n" ; }
+	my @data = dbdata($dbh,$query) ;
+	my $column_index = get_column_index($pk_column_name,\@column_names) ;	# get the index for the primary key column in the list of column names
+	my $startid = get_column_value(\@data,$column_index,"min",0) ;		# get the minimum value for the primary key column in the data chunk
+	if( (not defined $startid) || ($startid eq "") || ($startid == 0) )
+	{
+		print "Cannot locate first record in chunk.\n" ;
+		return ( 1, 0 ) ;
+	}
+	my $finishid = get_column_value(\@data,$column_index,"max",0) ;		# get the maximum value for the primary key column in the data chunk
+	if( (not defined $finishid) || ($finishid eq "") || ($finishid == 0) )
+	{
+		print "Cannot locate last record in chunk.\n" ;
+		return ( 1, 0 ) ;
+	}
+	my $count = scalar @data ;
+	# Lookup min & max datetime values in data chunk
+	$column_index = get_column_index($Default_DT_Column_Name,\@column_names) ;	# FIXME make this a config item
+	my $mindt = get_column_value(\@data,$column_index,"min",1) ;		# get the minimum value for the string datetime in the data chunk
+	if( not defined $mindt )
+	{
+		$mindt = "" ;
+	}
+	my $maxdt = get_column_value(\@data,$column_index,"max",1) ;		# get the maximum value for the string datetime  in the data chunk
+	if( not defined $maxdt )
+	{
+		$maxdt = "" ;
+	}
+	# Lookup min & max timestamp values in data chunk
+	$column_index = get_column_index($Default_TS_Column_Name,\@column_names) ;	# FIXME make this a config item
+	my $mints = get_column_value(\@data,$column_index,"min",0) ;		# get the minimum value for the number timestamp in the data chunk
+	if( not defined $mints )
+	{
+		$mints = "" ;
+	}
+	my $maxts = get_column_value(\@data,$column_index,"max",0) ;		# get the maximum value for the number timestamp in the data chunk
+	if( not defined $maxts )
+	{
+		$maxts = "" ;
+	}
+	# Create a filename for the chunk
+	my $padstartid = sprintf("%.16d",$startid) ;
+	my $padfinishid = sprintf("%.16d",$finishid) ;
+	my $filename = "$path/${tablename}_${padstartid}_${padfinishid}.txt" ;
+	print "Writing $count records from table $tablename to file $filename.\n" ;
+	my $fd ;
+	if( not defined open($fd,">",$filename) )
+	{
+		print "Cannot open file '$filename' to write data.\n" ;
+		return ( 1, 0 ) ;
+	}
+	my $err = writedata($columns,\@data,$fd) ;
+	close($fd) ;
+	if( $err )
+	{
+		print "Error writing data to file '$filename'.\n" ;
+		return ( 1, $lastid ) ;
+	}
+	my $timestamp = time() ;
+	$err = log_chunk($dbh,$timestamp,$filename,$tablename,$startid,$finishid,$mindt,$maxdt,$mints,$maxts) ;
+	return ( 0, $finishid ) ;
+}
+
+sub get_column_value($$$$)
+{
+	my ( $refdata, $index, $operation, $is_string ) = @_ ;
+	my $value = undef ;
+	if( (not defined $index) || ($index eq "") )
+	{
+		return undef ;
+	}
+	for my $refrow ( @$refdata )
+	{
+		my $column = $refrow->[$index] ;
+		if( not defined $value ) { $value = $column ; }
+		if( $operation =~ /^min$/i )
+		{
+			if( $is_string )
+			{
+				if( $column lt $value ) { $value = $column ; }
+			}
+			else
+			{
+				if( $column < $value ) { $value = $column ; }
+			}
+		}
+		if( $operation =~ /^max$/i )
+		{
+			if( $is_string )
+			{
+				if( $column gt $value ) { $value = $column ; }
+			}
+			else
+			{
+				if( $column > $value ) { $value = $column ; }
+			}
+		}
+	}
+	if( $Debug ) { print "debug: get_column_value index=$index operation=$operation is_string=$is_string, value=$value\n" ; }
+	return $value ;
+}
+
+sub get_column_names($$)	# Returns an array of column names from the named table
+{
+	my ( $dbh, $tablename ) = @_ ;
+	my $query = "select column_name from information_schema.columns where table_schema = 'qraat' and table_name = '$tablename'" ;
+	# TODO make the database name come from the dbauth file
+	if( $Debug ) { print "debug: get_column_names: query=$query\n" ; }
+	my @data = dbdata($dbh,$query) ;
+	my $count = scalar @data ;
+	if( $count < 1 )
+	{
+		print "Cannot retrieve column names for table '$tablename'.\n" ;
+		return () ;
+	}
+	my @columns = () ;
+	for my $refrow ( @data )
+	{
+		my $name = $refrow->[0] ;
+		if( defined $name )
+		{
+			push @columns, $name ;
+		}
+	}
+	return @columns ;
+}
+
+sub get_column_index($$)
+{
+	my ( $column_name, $refcolumn_names ) = @_ ;
+	my $max = scalar @$refcolumn_names ;
+	my $index ;
+	for( $index = 0 ; $index < $max ; $index++ )
+	{
+		if( $refcolumn_names->[$index] eq $column_name )
+		{
+			return $index ;
+		}
+	}
+	return undef ;
+}
+
+sub get_pk_column_name($$)	# Returns the name of the column that contains the primary key
+{
+	my ( $dbh, $tablename ) = @_ ;
+	my $query = "select column_name from information_schema.columns where table_schema = 'qraat' and table_name = '$tablename' and column_key = 'PRI'" ;
+	if( $Debug ) { print "debug: get_pk_column_name: query=$query\n" ; }
+	# TODO make the database name come from the dbauth file
+	my @data = dbdata($dbh,$query) ;
+	my $count = scalar @data ;
+	if( $count < 1 )
+	{
+		print "Cannot retrieve primary key column names for table '$tablename'.\n" ;
+		return () ;
+	}
+	if( $count > 1 )
+	{
+		print "Cannot handle multiple primary key column names for table '$tablename'.\n" ;
+		return () ;
+	}
+	my $column_name = $data[0]->[0] ;
+	if( (not defined $column_name) || ($column_name eq "") )
+	{
+		print "Cannot retrieve primary key column names for table '$tablename'.\n" ;
+		return () ;
+	}
+	if( $Debug ) { print "debug: get_pk_column_name: $column_name=$column_name\n" ; }
+	return $column_name ;
+}
+
+sub writedata($$$)
+{
+	my ( $columns, $refdata, $fd ) = @_ ;
+	my $write_ok = 1 ;
+	# write header
+	$write_ok = print $fd "$columns\n" ;
+	if( not $write_ok )
+	{
+		print "Error writing header.\n" ;
+		return 1 ;
+	}
+	# write data
+	for my $refrow ( @$refdata )
+	{
+		my $rowstring = "" ;
+		my $separator = "" ;
+		my @row = @$refrow ;
+		#if( $Debug ) { print "debug: writedata: row=@row\n" ; }
+		for my $column ( @row )
+		{
+			my $safe_column = $column ;
+			if( not defined $safe_column )
+			{
+				$safe_column = "" ;
+			}
+			$rowstring .= "$separator'$safe_column'" ;
+			$separator = "," ;
+		}
+		$write_ok = print $fd "$rowstring\n" ;
+		if( not $write_ok )
+		{
+			print "Error writing data.\n" ;
+			return 1 ;
+		}
+	}
+	return 0 ;
+}
+
+sub update_last_id($$$)
+{
+	my ( $dbh, $tablename, $lastid ) = @_ ;
+	if( $Debug ) { print "debug: update_last_id: writing lastid=$lastid to table $tablename\n" ; }
+	my $query = "update $Archive_Config_Table_Name set lastid = '$lastid' where tablename = '$tablename'" ;
+	if( $Debug ) { print "debug: update_last_id: query=$query\n" ; }
+	my $err = dbexecute($dbh,$query) ;
+	return $err ;
+}
+
+sub log_chunk($$$$$$$$$)	# returns 1 when an error occurs, 0 when the log was written correctly
+{
+	my ( $dbh, $timestamp, $filename, $tablename, $startid, $finishid, $mindt, $maxdt, $mints, $maxts ) = @_ ;
+	if( (not defined $filename) || ($filename eq "") )
+	{
+		print "Undefined filename, cannot update archive log.\n" ;
+		return 1 ;
+	}
+	if( (not defined $tablename) || ($tablename eq "") )
+	{
+		print "Undefined tablename, cannot update archive log.\n" ;
+		return 1 ;
+	}
+	if( (not defined $startid) || ($startid eq "") || ( $startid == 0) )
+	{
+		print "Undefined startid, cannot update archive log.\n" ;
+		return 1 ;
+	}
+	if( (not defined $finishid) || ($finishid eq "") || ( $finishid == 0) )
+	{
+		print "Undefined finishid, cannot update archive log.\n" ;
+		return 1 ;
+	}
+	if( not defined $mindt )
+	{
+		$mindt = "" ;
+	}
+	if( not defined $maxdt )
+	{
+		$maxdt = "" ;
+	}
+	if( not defined $mints )
+	{
+		$mints = "" ;
+	}
+	if( not defined $maxts )
+	{
+		$maxts = "" ;
+	}
+	my $query = "insert into $Archive_Log_Table_Name ( `timestamp`, `filename`, `tablename`, `startid`, `finishid`, `mindt`, `maxdt`, `mints`, `maxts` ) values ( '$timestamp', '$filename', '$tablename', '$startid', '$finishid', '$mindt', '$maxdt', '$mints', '$maxts' )" ;
+	if( $Debug ) { print "debug: log_chunk: query=$query\n" ; }
+	my $err = dbexecute($dbh,$query) ;
+	if( $err )
+	{
+		return 1 ;
+	}
+	return 0 ;
+}
+
+exit main() ;
+
+#END
