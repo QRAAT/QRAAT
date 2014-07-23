@@ -293,10 +293,10 @@ def get_nav_options(request):
     if user.is_authenticated():
         if user.is_superuser:
             nav_options.append(
-                {"url": "/auth/users",
+                {"url": "auth:users",
                  "name": "Users"})
 
-        nav_options.append({"url": "/qraat/projects",
+        nav_options.append({"url": "qraat:projects",
                             "name": "Projects"})
 
     return nav_options

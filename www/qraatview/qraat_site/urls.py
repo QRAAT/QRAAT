@@ -3,7 +3,7 @@ from django.conf.urls import patterns, url
 urlpatterns = patterns(
     'qraat_site.views',
 
-    url(r'^$', 'index'),
+    url(r'^$', 'index', name="index"),
 
     # url(r'^transmitters/$', 'transmitters'),
 
