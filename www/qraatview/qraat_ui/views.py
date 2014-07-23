@@ -4,23 +4,27 @@ from django.template import Context, loader, RequestContext
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import render, render_to_response, get_object_or_404
 from django.core.urlresolvers import reverse
+from django.db.models import Q
+
 # uncomment next line for for attachment download
 # from django.core.servers.basehttp import FileWrapper
+
 import qraat, time, datetime, json, utm, math
+from pytz import utc, timezone
 
 from qraat_ui.models import Position, track, Deployment, Site
 from qraat_ui.forms import TestForm
 from decimal import Decimal
 
+
+
+
 def index(request, depID=None):
-  #to pass strings to js, use |safe in template.
-  #site list
-  sites = []
-  for s in Site.objects.all():
-    sites.append((s.ID, s.name, float(s.latitude), float(s.longitude), float(s.easting), float(s.northing), s.utm_zone_number, s.utm_zone_letter, float(s.elevation)))
+  
 
+                # STORE ALL THE GET DATA FROM HTML FORM
 
-#index for clicked point in flot
+  # Index for clicked point in flot
   if ('flot_index' in request.GET) and (request.GET['flot_index'] != ""):
     flot_index = int(request.GET['flot_index'])
   else:
@@ -45,8 +49,19 @@ def index(request, depID=None):
     zoom_selected = int(request.GET['zoom'])
   else:
     zoom_selected = 14
+ 
+
+
+
+  #if 'trans' in request.GET and not depID:
+  #  tx = request.GET['trans']
+ 
   if 'trans' in request.GET and not depID:
-    tx = request.GET['trans']
+    dep_list = request.GET.getlist('trans')
+    #dep_list_length = len(dep_list)
+
+
+
   else:
     tx = depID
   if 'data_type' in request.GET:
@@ -91,140 +106,367 @@ def index(request, depID=None):
     display_type = int(request.GET['display_type'])
   else:
     display_type = None
-  
-  #old
-  if 'lng_input' in request.GET:
-    lng_in = request.GET['lng_input']
-  else:
-    lng_in = None
-  
+ 
+
+
+
+  # Declare empty lists and variables
+
   pos_filtered_list = []
   selected_data = []
   selected_message = "[ Nothing clicked, or no points detected nearby ]"
   selected_index = None
   selected_index_large = None
 
+
+
+
+  # Convert time strings to Davis-timezone timestamps in seconds
+
+
   #if form.is_valid():
   if datetime_from and datetime_to:
-    datetime_from_sec = float(time.mktime(datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()))
+    datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
     datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
     
-    #if summer: 7 / if fall: 8 - for daylight savings
+   
+    #temporary fix that doesn't take into account daylight savings
     datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference
     datetime_to_sec_davis = datetime_to_sec + 7*60*60
 
+    #datetime_test = float(time.mktime(timezone('US/Pacific').(datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple())))
+
+    print datetime_from_sec
+    #print datetime_test 
+
+
+
+
+                  # QUERY DB FROM HTML SETTINGS
+
+
     db_sel = Position   #can change database
-    pos_query = db_sel.objects.filter(
+
+    #dep_filter = ""
+    #for d in dep_list:
+    #  dep_filter += "Q(deploymentID = %d), "
+    #print dep_filter
+    
+
+    if (len(dep_list) >= 1):
+      pos_query = db_sel.objects.filter(
+                          deploymentID = dep_list[0],
                           timestamp__gte = datetime_from_sec_davis,
                           timestamp__lte = datetime_to_sec_davis,
-                          deploymentID = tx,
                           likelihood__gte = lk_l,
                           likelihood__lte = lk_h,
                           activity__gte = act_l,
                           activity__lte = act_h
                           )
-    for q in pos_query:
 
-      (lat, lon) = utm.to_latlon(float(q.easting), 
+        
+      for q in pos_query:
+      # Calculate lat, lons each point
+        (lat, lon) = utm.to_latlon(
+                  float(q.easting), 
                   float(q.northing),
                   q.utm_zone_number,
                   q.utm_zone_letter)
-      pos_filtered_list.append((q.ID, q.deploymentID, float(q.timestamp), 
-                      float(q.easting), float(q.northing),
-                      q.utm_zone_number,
-                      float(q.likelihood), float(q.activity),
-                      (lat, lon), q.utm_zone_letter))
+    
+      # Store django objects as a python list of tuples
+        pos_filtered_list.append(
+            (
+            q.ID, 
+            q.deploymentID, 
+            float(q.timestamp), 
+            float(q.easting), 
+            float(q.northing),
+            q.utm_zone_number,
+            float(q.likelihood), 
+            float(q.activity),
+            (lat, lon), 
+            q.utm_zone_letter
+            ))
 
-#get clicked lat, lon from js event --> html form
-#convert them to utm
+
+
+
+    pos_filtered_list1 = []
+
+    if (len(dep_list) >= 2):
+      pos_query1 = db_sel.objects.filter(
+                          deploymentID = dep_list[1],
+                          timestamp__gte = datetime_from_sec_davis,
+                          timestamp__lte = datetime_to_sec_davis,
+                          likelihood__gte = lk_l,
+                          likelihood__lte = lk_h,
+                          activity__gte = act_l,
+                          activity__lte = act_h
+                          )
+
+      for q in pos_query1:
+        # Calculate lat, lons each point
+        (lat, lon) = utm.to_latlon(
+                  float(q.easting), 
+                  float(q.northing),
+                  q.utm_zone_number,
+                  q.utm_zone_letter)
+    
+      # Store django objects as a python list of tuples
+        pos_filtered_list1.append(
+            (
+            q.ID, 
+            q.deploymentID, 
+            float(q.timestamp), 
+            float(q.easting), 
+            float(q.northing),
+            q.utm_zone_number,
+            float(q.likelihood), 
+            float(q.activity),
+            (lat, lon), 
+            q.utm_zone_letter
+            ))
+
+
+    print len(pos_filtered_list)
+    print len(pos_filtered_list1)
+    print dep_list
+    print len(dep_list)
+
+
+    if (len(dep_list) >= 3):
+      pos_query2 = db_sel.objects.filter(
+                          deploymentID = dep_list[2],
+                          timestamp__gte = datetime_from_sec_davis,
+                          timestamp__lte = datetime_to_sec_davis,
+                          likelihood__gte = lk_l,
+                          likelihood__lte = lk_h,
+                          activity__gte = act_l,
+                          activity__lte = act_h
+                          )
+
+    if (len(dep_list) >= 4):
+      pos_query3 = db_sel.objects.filter(
+                          deploymentID = dep_list[3],
+                          timestamp__gte = datetime_from_sec_davis,
+                          timestamp__lte = datetime_to_sec_davis,
+                          likelihood__gte = lk_l,
+                          likelihood__lte = lk_h,
+                          activity__gte = act_l,
+                          activity__lte = act_h
+                          ) 
+
+    #pos_query = db_sel.objects.filter(
+    #                      # Q is used for or. These need to be in beginning
+    #                      
+    #                      #Q(deploymentID = 63) | Q(deploymentID = 64),
+    #                      deploymentID = 63,
+    #                      timestamp__gte = datetime_from_sec_davis,
+    #                      timestamp__lte = datetime_to_sec_davis,
+    #                      likelihood__gte = lk_l,
+    #                      likelihood__lte = lk_h,
+    #                      activity__gte = act_l,
+    #                      activity__lte = act_h
+    #                      )
+
+
+  # Note: To pass strings to js using json, use |safe in template.
+
+
+
+  # Site list
+  sites = []
+  for s in Site.objects.all():
+    sites.append((
+      s.ID,                   # [0] 
+      s.name,                 # [1]
+      float(s.latitude),      # [2]
+      float(s.longitude),     # [3]
+      float(s.easting),       # [4]
+      float(s.northing),      # [5]
+      s.utm_zone_number,      # [6]
+      s.utm_zone_letter,      # [7]
+      float(s.elevation)))    # [8]
+
+
+
+
+                # FIND NEAREST POINT WHEN MAP IS CLICKED
+
+
+  # Get clicked lat, lon from js event --> html form
+  # Convert them to utm
   if lat_clicked and lng_clicked:  
-    selected_data.append(float(lat_clicked))
-    selected_data.append(float(lng_clicked))
-    (easting_c, northing_c, utm_zone_number_c, utm_zone_letter_c) = utm.from_latlon(float(lat_clicked), float(lng_clicked))
+        
+    (easting_clicked, northing_clicked, utm_zone_number_clicked, utm_zone_letter_clicked) = utm.from_latlon(float(lat_clicked), float(lng_clicked))
 
-#truncate northing and easting for the query
-#divide by 10 (click needs to be closer) or 100 (less accurate) to increase the distance allowed between the clicked point and the actual point
-    northing_c_trunc = (int(northing_c))/1000
-    easting_c_trunc = (int(easting_c))/1000
-# query the data that matches the northing and easting 
+  # Truncate northing and easting for the query
+  # Divide by 10 (click needs to be closer) or 100 (less accurate) to increase the distance allowed between the clicked point and the actual point
+    northing_clicked_trunc = (int(northing_clicked))/1000
+    easting_clicked_trunc = (int(easting_clicked))/1000
+
+  # Query the data that matches the northing and easting 
     filtered_list = pos_query.filter(
-      northing__startswith=northing_c_trunc, 
-      easting__startswith=easting_c_trunc).order_by('-northing', '-easting')
+      northing__startswith=northing_clicked_trunc, 
+      easting__startswith=easting_clicked_trunc).order_by('-northing', '-easting')
     selected_list = []
     for f in filtered_list:
       selected_list.append(
         math.sqrt(
-        (northing_c - float(f.northing)) * (northing_c - float(f.northing))
-        + (easting_c - float(f.easting)) * (easting_c - float(f.easting))
-        ))
-#get the index of the smallest distance
+        (northing_clicked - float(f.northing)) *
+          (northing_clicked - float(f.northing))
+        + (easting_clicked - float(f.easting)) * 
+          (easting_clicked - float(f.easting))
+        )
+      )
+  
+  # Get the index of the smallest distance
     if filtered_list:
       selected_message = ""
       selected_index = selected_list.index(min(selected_list))
-#get the data corresponding to the selected index
+  
+  # Get the data corresponding to the selected index
       sel = filtered_list[selected_index]
-      selected_data.append(sel.ID)
-      selected_data.append(sel.deploymentID)
-       # time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(sel.timestamp)))
-      # if (selected_data = filtered_list)
 
-      selected_data.append(float(sel.timestamp))
-      selected_data.append(float(sel.easting)) 
-      selected_data.append(float(sel.northing)) 
-      selected_data.append(sel.utm_zone_number) 
-      selected_data.append(float(sel.likelihood)) 
-      selected_data.append(float(sel.activity))
+      (lat_clicked_point, lng_clicked_point) = utm.to_latlon(
+                                          float(sel.easting), 
+                                          float(sel.northing),
+                                          sel.utm_zone_number,
+                                          sel.utm_zone_letter
+                                          )
+      selected_data.append(
+      (
+        float(lat_clicked),
+        float(lng_clicked),
+        sel.ID,                 # [2]: position ID
+        sel.deploymentID,       # [3]: deploymentID
+        float(sel.timestamp),   # [4]: timestamp UTC seconds
+        float(sel.easting),     # [5]: easting
+        float(sel.northing),    # [6]: northing
+        sel.utm_zone_number,    # [7]: utm zone number
+        float(sel.likelihood),  # [8]: likelihood
+        float(sel.activity),    # [9]: activity
+          (
+          float(lat_clicked_point),    # [10][0]: lat of db data closest to click
+          float(lng_clicked_point)     # [10][1]: lng of db data closest to click
+          ),
+        time.strftime(           # [11]: date string in Davis time
+          '%Y-%m-%d %H:%M:%S', 
+          time.localtime(float(sel.timestamp-7*60*60))
+          ),
+        sel.utm_zone_letter     # utm zone letter
+      ))
+    
 
-      (lat_c, lon_c) = utm.to_latlon(float(sel.easting), 
-                  float(sel.northing),
-                  sel.utm_zone_number,
-                  sel.utm_zone_letter)
-      selected_data.append((lat_c, lon_c))
-      selected_data.append( time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(sel.timestamp-7*60*60))) )
-      selected_data.append(sel.utm_zone_letter)
-    #get the index in the original filtered list, for the clicked pt
+  #get the index in the original filtered list, for the clicked pt
       pos_filtered_list_IDs = [int(x[0]) for x in pos_filtered_list]
-      selected_index_large = pos_filtered_list_IDs.index(long(selected_data[2]))
+      selected_index_large = pos_filtered_list_IDs.index(long(selected_data[0][2]))
 
-#the date & time string. didn't work when in the sel list
+
+
+
+
+
+                  # IF FLOT IS SELECTED:
+          # Populate selected_data list with data based on index
+          # This could probably be changed to work with flight_latlon_pos
 
   elif flot_index:
-    selected_data.append(None) #no clicked lat
-    selected_data.append(None) #no clicked lng
-    selected_data.append(pos_filtered_list[flot_index][0]) #position ID
-    selected_data.append(pos_filtered_list[flot_index][1]) #deployment ID
-    selected_data.append(float(pos_filtered_list[flot_index][2])) #timestamp
-    selected_data.append(float(pos_filtered_list[flot_index][3])) #easting
-    selected_data.append(float(pos_filtered_list[flot_index][4])) #northing
-    selected_data.append(pos_filtered_list[flot_index][5]) #utm zone number
-    selected_data.append(float(pos_filtered_list[flot_index][6])) #likelihood
-    selected_data.append(float(pos_filtered_list[flot_index][7])) #activity
-    selected_data.append((float(pos_filtered_list[flot_index][8][0]) , float(pos_filtered_list[flot_index][8][1]))) #lon
-    selected_data.append( time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(pos_filtered_list[flot_index][2]-7*60*60))) )
-    selected_data.append(pos_filtered_list[flot_index][9])
-  
+    print flot_index
+    selected_data.append((
+        None,   # [0]: nothing clicked
+        None,   # [1]: nothing clicked
+        pos_filtered_list[flot_index][0],   # [2]: ID
+        pos_filtered_list[flot_index][1],   # [3]: deploymentID
+        float(pos_filtered_list[flot_index][2]), # [4]: timestamp
+        float(pos_filtered_list[flot_index][3]), # [5]: easting
+        float(pos_filtered_list[flot_index][4]), # [6]: northing
+        pos_filtered_list[flot_index][5], # [7]: utm zone number
+        float(pos_filtered_list[flot_index][6]), # [8]: likelihood
+        float(pos_filtered_list[flot_index][7]), # [9]: activity
+        
+        # [10]: tuple: [10][0]: lat, [10][1]: lon
+        (
+          float(pos_filtered_list[flot_index][8][0]),
+          float(pos_filtered_list[flot_index][8][1])
+        ), #lon
+        
+        # [11] Davis time string converted from timestamp UTC seconds
+        time.strftime(
+          '%Y-%m-%d %H:%M:%S', 
+          time.localtime(
+            float(pos_filtered_list[flot_index][2]-7*60*60)
+          )
+        ),
+        
+        # [12] utm zone letter
+        pos_filtered_list[flot_index][9]
+      ))
+
+
 
 
   context = {
-            'pos_data': json.dumps(pos_filtered_list), #plot & related data
-            'positions': pos_filtered_list, #for getting the no. of positions
-            'siteslist': json.dumps(sites), #for plotting the site markers
-            'form': TestForm(depID=depID, data=request.GET or None), #for displaying html form
-            'tx': json.dumps(tx), #selected transmitter from form
-            'site_checked': json.dumps(site_checked), #if sites should be shown
-            'selected_data': json.dumps(selected_data), #clicked point's data, note: string
-            'graph_data': json.dumps(graph_data), #actvty vs lklhood graphed
-            'selected_message': selected_message, #if pos successfully clicked
-            'selected_index': selected_index, #map-clicked i in filtered pos_data
-            'selected_index_large': selected_index_large, #clicked i in pos_data
-            'flot_index': json.dumps(flot_index), #flot selected i in pos_data
+
+            #plot & related data
+            'pos_data': json.dumps(pos_filtered_list),             
+            
+            #for getting the no. of positions
+            'positions': pos_filtered_list,
+
+            #2nd deployment js array
+            'pos_data1': json.dumps(pos_filtered_list1),
+
+            #2nd deployment django array
+            'positions1': pos_filtered_list1,
+            
+            #for plotting the site markers
+            'siteslist': json.dumps(sites), 
+            
+            #for displaying html form
+            'form': TestForm(depID=depID, data=request.GET or None), 
+            
+            #selected transmitter from form
+            #'tx': json.dumps(tx), 
+            
+            #if sites should be shown
+            'site_checked': json.dumps(site_checked), 
+            
+            #clicked point's data, note: string
+            'selected_data': json.dumps(selected_data), 
+            
+            #actvty vs lklhood graphed
+            'graph_data': json.dumps(graph_data), 
+            
+            #if pos successfully clicked
+            'selected_message': selected_message, 
+            
+            #map-clicked i in filtered pos_data
+            'selected_index': selected_index, 
+            
+            #clicked i in pos_data
+            'selected_index_large': selected_index_large, 
+            
+            #flot selected i in pos_data
+            'flot_index': json.dumps(flot_index), 
+            
+            #graph queried data as lines or points on map
             'display_type': json.dumps(display_type),
+            
             #'tx_IDs': tx_ID.objects.order_by('-active', 'ID').all(),
-            #'zoom': json.dumps(zoom_selected), #not used anymore
-            #'data_type': json.dumps(data_type), #position vs track (not used?)
+            #'zoom': json.dumps(zoom_selected), 
+              #not used anymore
+            #'data_type': json.dumps(data_type), 
+              #position vs track (not used?)
+        
             }
 
   return render(request, 'index.html', context)
+
+
+
+
+
 # another view, for exporting/downloading kml file attachment
 #def export(request):
 #  response = HttpResponse(content_type='text/csv')
@@ -240,6 +482,7 @@ def index(request, depID=None):
     #response = HttpResponse(mimetype='text/plain')
     #response['Content-Disposition'] = 'attachement; filename="%s.txt"' %p.uuid
     #response.write(p.body)
+
 
 
 def get_view_by_depID(request, depID):
