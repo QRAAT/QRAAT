@@ -24,5 +24,6 @@ install(FILES
     accumulator.h
     detectmod_detect.h
     peak_detect.h
+    continuous_covariance.h
     DESTINATION include/rmg
 )
