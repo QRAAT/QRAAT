@@ -129,40 +129,38 @@ continuous_covariance::work (int noutput_items,
 			       gr_vector_const_void_star &input_items,
 			       gr_vector_void_star &output_items)
 {
-
-  
   
   int count = 0;
+  int j, first_channel, second_channel;
   gr_complex *ch1;
   gr_complex *ch2;
-  float real_part, imag_part;
+  double real_part, imag_part;
+  float* real_f, imag_f;
   while (count++ < noutput_items)
   {
-    for (int first_channel = 0; first_channel < num_ch; first_channel++){
+    for (first_channel = 0; first_channel < num_ch; first_channel++){
       ch1 = input_items[first_channel] + count;
-      for (int second_channel = first_channel; second_channel < num_ch; second_channel++){
+      real_part = 0.0;
+      for (j = 0; j < cov_len; j++){
+        real_part += ch1[j].real() * ch1[j].real() + ch1[j].imag() * ch1[j].imag();
+      }
+      real_f* = (float)real_part;
+      fwrite(real_f,sizeof(float),1,fd);
+      for (second_channel = first_channel+1; second_channel < num_ch; second_channel++){
         ch2 = input_items[second_channel] + count;
         real_part = 0.0;
         imag_part = 0.0;
-        for (int j = 0; j < cov_len; j++){
+        for (j = 0; j < cov_len; j++){
           real_part += ch1[j].real() * ch2[j].real() + ch1[j].imag() * ch2[j].imag();
           imag_part += ch1[j].imag() * ch2[j].real() - ch1[j].real() * ch2[j].imag();
         }
-
-        if (first_channel == second_channel){
-          //write real_part
-          fwrite(&real_part,sizeof(float),1,fd);
-        }
-        else {
-          //write real_part,imag_part
-          fwrite(&real_part,sizeof(float),1,fd);
-          fwrite(&imag_part,sizeof(float),1,fd);
-        }
+        real_f* = (float)real_part;
+        imag_f* = (float)imag_part;
+        fwrite(real_f,sizeof(float),1,fd);
+        fwrite(imag_f,sizeof(float),1,fd);
       }
     }
-
   }
-
 
   return noutput_items;
 }
