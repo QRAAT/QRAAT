@@ -1,9 +1,8 @@
 from django import forms
-from models import Project, AuthProjectViewer
+from models import Project, TxMake
 from models import Tx, Target, Deployment, Location
-from models import AuthProjectCollaborator, TxMake
 from models import TxMakeParameters, TxParameters
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User
 from django.contrib.admin.widgets import FilteredSelectMultiple
 
 
@@ -50,8 +49,20 @@ class EditProjectForm(ProjectForm):
     def __init__(self, user=None, *args, **kwargs):
         super(EditProjectForm, self).__init__(user, *args, **kwargs)
         project = super(ProjectForm, self).save(commit=False)
-        self.viewers = User.objects.all().exclude(id=project.ownerID)
-        self.fields["viewers"].queryset = self.viewers 
+
+        # Set values for selection
+        viewers_selected_choices = [
+            u.pk for u in project.get_viewers_group().user_set.all()]
+        viewers_choices = User.objects.exclude(id=project.ownerID)
+        # selected values
+        self.fields["viewers"].initial = viewers_selected_choices
+        self.fields["viewers"].queryset = viewers_choices  # all values
+
+        collaborators_selected_choices = [
+            u.pk for u in project.get_collaborators_group().user_set.all()]
+        collaborators_choices = User.objects.exclude(id=project.ownerID)
+        self.fields["collaborators"].initial = collaborators_selected_choices
+        self.fields["collaborators"].queryset = collaborators_choices
 
     viewers = UserModelChoiceField(
         queryset=User.objects.all(),
@@ -67,24 +78,29 @@ class EditProjectForm(ProjectForm):
 
     def save(self, commit=True):
         project = super(ProjectForm, self).save(commit=False)
-        gviewers_name = "%d_viewers" % project.ID
-        gcollaborators_name = "%d_collaborators" % project.ID
 
-        viewer_group = Group.objects.get(
-            name=gviewers_name)
+        viewers_group = project.get_viewers_group()
+        collaborators_group = project.get_collaborators_group()
+        users = User.objects.all().exclude(id=project.ownerID)
 
-        collaborator_group = Group.objects.get(
-            name=gcollaborators_name)
+        viewers = self.cleaned_data.get("viewers")
+        collaborators = self.cleaned_data.get("collaborators")
 
-        for viewer in self.cleaned_data.get("viewers"):
-            viewer_group.user_set.add(viewer)
-            self.viewers.remove(viewer)
+        for user in users:
+            if user in viewers:
+                viewers_group.user_set.add(user)
+            elif user not in viewers and user in viewers_group.user_set.all():
+                viewers_group.user_set.remove(user)
 
-        for collaborator in self.cleaned_data.get("collaborators"):
-            collaborator_group.user_set.add(collaborator)
+            if user in collaborators:
+                collaborators_group.user_set.add(user)
+            elif user not in collaborators and\
+                    user in collaborators_group.user_set.all():
+                collaborators_group.user_set.remove(user)
 
         if commit:
             project.save()
+
         return project
 
 
@@ -134,11 +150,11 @@ class AddDeploymentForm(ProjectElementForm):
 
     def set_project(self, project):
         self.project = project
-        
-        # constraint project's transmitters 
+
+        # constraint project's transmitters
         self.fields["txID"].choices = [
             (tx.ID, tx) for tx in project.get_transmitters()]
-        
+
         # constraint project's targets
         self.fields["targetID"].choices = [
             (target.ID, target) for target in project.get_targets()]

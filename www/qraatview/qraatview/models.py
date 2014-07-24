@@ -1,6 +1,7 @@
 # File: qraat_site models.py
 
 from django.db import models
+from django.contrib.auth.models import Group
 from utils import timestamp_todate
 
 QRAAT_APP_LABEL = 'qraat_site'
@@ -80,6 +81,17 @@ class Project(models.Model):
 
     def get_targets(self):
         return Target.objects.filter(projectID=self.ID).exclude(is_hidden=True)
+
+    def get_group(self, group_id):
+        return Group.objects.get(id=group_id)
+
+    def get_viewers_group(self):
+        group_id = AuthProjectViewer.objects.get(projectID=self.ID).groupID
+        return self.get_group(group_id)
+    
+    def get_collaborators_group(self):
+        group_id = AuthProjectCollaborator.objects.get(projectID=self.ID).groupID
+        return self.get_group(group_id)
 
     def __unicode__(self):
         return u'ID = %d name = %s' % (self.ID, self.name)

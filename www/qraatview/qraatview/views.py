@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from models import Project, Tx, Location
+from models import AuthProjectCollaborator, AuthProjectViewer
 from forms import ProjectForm, EditProjectForm, AddTransmitterForm
 from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
@@ -119,8 +120,14 @@ def create_project(request):
 
         if form.is_valid():
             project = form.save()
-            Group.objects.create(name="%d_viewers" % project.ID)
-            Group.objects.create(name="%d_collaborators" % project.ID)
+            viewers_group = Group.objects.create(name="%d_viewers" % project.ID)
+            collaborators_group = Group.objects.create(name="%d_collaborators" % project.ID)
+            
+            AuthProjectViewer.objects.create(
+                groupID=viewers_group.id, projectID=project)
+
+            AuthProjectCollaborator.objects.create(
+                groupID=collaborators_group.id, projectID=project)
 
             return redirect('/project/%d' % project.ID)
     else:
