@@ -12,14 +12,14 @@ from django.db.models import Q
 import qraat, time, datetime, json, utm, math
 from pytz import utc, timezone
 
-from qraat_ui.models import Position, track, Deployment, Site
-from qraat_ui.forms import TestForm
+from qraatview.models import Position, Track, Deployment, Site, Project
+from qraat_ui.forms import Form
 from decimal import Decimal
 
 
 
 
-def index(request, depID=None):
+def get_context(request, deps=[], req_deps=[]):
   
 
                 # STORE ALL THE GET DATA FROM HTML FORM
@@ -50,20 +50,7 @@ def index(request, depID=None):
   else:
     zoom_selected = 14
  
-
-
-
-  #if 'trans' in request.GET and not depID:
-  #  tx = request.GET['trans']
-  dep_list = [] 
-  if 'trans' in request.GET and not depID:
-    dep_list = request.GET.getlist('trans')
-    #dep_list_length = len(dep_list)
-
-
-
-  else:
-    tx = depID
+  
   if 'data_type' in request.GET:
     data_type = request.GET['data_type']
   else:
@@ -98,11 +85,11 @@ def index(request, depID=None):
     lat_in = request.GET['lat_input']
   else: 
     lat_in = None
-  if 'graph_data' in request.GET:
+  if ('graph_data' in request.GET) and (request.GET['graph_data']!= ""):
     graph_data = int(request.GET['graph_data'])
   else:
     graph_data = None
-  if 'display_type' in request.GET:
+  if ('display_type' in request.GET) and (request.GET['display_type']!=""):
     display_type = int(request.GET['display_type'])
   else:
     display_type = None
@@ -126,7 +113,7 @@ def index(request, depID=None):
 
 
   #if form.is_valid():
-  if datetime_from and datetime_to and dep_list:
+  if datetime_from and datetime_to and deps != []:
     datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
     datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
     
@@ -149,14 +136,14 @@ def index(request, depID=None):
     db_sel = Position   #can change database
 
     #dep_filter = ""
-    #for d in dep_list:
+    #for d in dep_ids:
     #  dep_filter += "Q(deploymentID = %d), "
     #print dep_filter
     
-
-    if (len(dep_list) >= 1):
-      pos_query = db_sel.objects.filter(
-                          deploymentID = dep_list[0],
+    if (datetime_from_sec_davis) and (datetime_to_sec_davis) and (lk_l) and (lk_h) and (act_l) and (act_h):
+      if (len(req_deps) >= 1):
+        pos_query = db_sel.objects.filter(
+                          deploymentID = req_deps[0].ID,
                           timestamp__gte = datetime_from_sec_davis,
                           timestamp__lte = datetime_to_sec_davis,
                           likelihood__gte = lk_l,
@@ -166,96 +153,115 @@ def index(request, depID=None):
                           )
 
         
-      for q in pos_query:
-      # Calculate lat, lons each point
-        (lat, lon) = utm.to_latlon(
+        for q in pos_query:
+          # Calculate lat, lons each point
+          (lat, lon) = utm.to_latlon(
                   float(q.easting), 
                   float(q.northing),
                   q.utm_zone_number,
                   q.utm_zone_letter)
-    
+          
+          # Convert timestamps to datetime strings and subtract 7 hrs
+          # Not sure if localtime is the correct way to do this...
+          date_string = time.strftime(
+            '%Y-%m-%d %H:%M:%S',
+            time.localtime(float(q.timestamp-7*60*60))
+            )
+
       # Store django objects as a python list of tuples
-        pos_filtered_list.append(
+          pos_filtered_list.append(
             (
-            q.ID, 
-            q.deploymentID, 
-            float(q.timestamp), 
-            float(q.easting), 
-            float(q.northing),
-            q.utm_zone_number,
-            float(q.likelihood), 
-            float(q.activity),
-            (lat, lon), 
-            q.utm_zone_letter
+            q.ID,                 #0 
+            q.deploymentID,       #1
+            float(q.timestamp),   #2
+            float(q.easting),     #3
+            float(q.northing),    #4
+            q.utm_zone_number,    #5
+            float(q.likelihood),  #6
+            float(q.activity),    #7
+            (lat, lon),           #8
+            q.utm_zone_letter,    #9
+            date_string           #10
             ))
+            
 
 
 
+      if (len(req_deps) >= 2):
+        pos_query1 = db_sel.objects.filter(
+                            deploymentID = req_deps[1].ID,
+                            timestamp__gte = datetime_from_sec_davis,
+                            timestamp__lte = datetime_to_sec_davis,
+                            likelihood__gte = lk_l,
+                            likelihood__lte = lk_h,
+                            activity__gte = act_l,
+                            activity__lte = act_h
+                            )
 
-    if (len(dep_list) >= 2):
-      pos_query1 = db_sel.objects.filter(
-                          deploymentID = dep_list[1],
-                          timestamp__gte = datetime_from_sec_davis,
-                          timestamp__lte = datetime_to_sec_davis,
-                          likelihood__gte = lk_l,
-                          likelihood__lte = lk_h,
-                          activity__gte = act_l,
-                          activity__lte = act_h
-                          )
-
-      for q in pos_query1:
-        # Calculate lat, lons each point
-        (lat, lon) = utm.to_latlon(
+        for q in pos_query1:
+          # Calculate lat, lons each point
+          (lat, lon) = utm.to_latlon(
                   float(q.easting), 
                   float(q.northing),
                   q.utm_zone_number,
                   q.utm_zone_letter)
-    
-      # Store django objects as a python list of tuples
-        pos_filtered_list1.append(
+            
+          date_string = time.strftime(
+            '%Y-%m-%d %H:%M:%S',
+            time.localtime(float(q.timestamp-7*60*60))
+          )
+
+   
+        # Store django objects as a python list of tuples
+          pos_filtered_list1.append(
             (
-            q.ID, 
-            q.deploymentID, 
-            float(q.timestamp), 
-            float(q.easting), 
-            float(q.northing),
-            q.utm_zone_number,
-            float(q.likelihood), 
-            float(q.activity),
-            (lat, lon), 
-            q.utm_zone_letter
+            q.ID,                 #0
+            q.deploymentID,       #1
+            float(q.timestamp),   #2
+            float(q.easting),     #3
+            float(q.northing),    #4
+            q.utm_zone_number,    #5
+            float(q.likelihood),  #6
+            float(q.activity),    #7
+            (lat, lon),           #8
+            q.utm_zone_letter,    #9
+            date_string           #10
             ))
 
 
-    print len(pos_filtered_list)
-    print len(pos_filtered_list1)
-    print dep_list
-    print len(dep_list)
+      print len(pos_filtered_list)
+      print len(pos_filtered_list1)
+      print req_deps
+      print len(req_deps)
 
 
-    if (len(dep_list) >= 3):
-      pos_query2 = db_sel.objects.filter(
-                          deploymentID = dep_list[2],
-                          timestamp__gte = datetime_from_sec_davis,
-                          timestamp__lte = datetime_to_sec_davis,
-                          likelihood__gte = lk_l,
-                          likelihood__lte = lk_h,
-                          activity__gte = act_l,
-                          activity__lte = act_h
-                          )
+      if (len(req_deps) >= 3):
+        pos_query2 = db_sel.objects.filter(
+                            deploymentID = req_deps[2].ID,
+                            timestamp__gte = datetime_from_sec_davis,
+                            timestamp__lte = datetime_to_sec_davis,
+                            likelihood__gte = lk_l,
+                            likelihood__lte = lk_h,
+                            activity__gte = act_l,
+                            activity__lte = act_h
+                            )
 
-    if (len(dep_list) >= 4):
-      pos_query3 = db_sel.objects.filter(
-                          deploymentID = dep_list[3],
-                          timestamp__gte = datetime_from_sec_davis,
-                          timestamp__lte = datetime_to_sec_davis,
-                          likelihood__gte = lk_l,
-                          likelihood__lte = lk_h,
-                          activity__gte = act_l,
-                          activity__lte = act_h
-                          ) 
+      if (len(req_deps) >= 4):
+        pos_query3 = db_sel.objects.filter(
+                            deploymentID = req_deps[3].ID,
+                            timestamp__gte = datetime_from_sec_davis,
+                            timestamp__lte = datetime_to_sec_davis,
+                            likelihood__gte = lk_l,
+                            likelihood__lte = lk_h,
+                            activity__gte = act_l,
+                            activity__lte = act_h
+                            ) 
 
-    #pos_query = db_sel.objects.filter(
+
+            #OLD WAY TO QUERY, either with only one deployment, 
+            #or trying to make multiple querysets without repeating code
+
+#pos_query = db_sel.objects.filter(
     #                      # Q is used for or. These need to be in beginning
     #                      
     #                      #Q(deploymentID = 63) | Q(deploymentID = 64),
@@ -279,14 +285,16 @@ def index(request, depID=None):
     sites.append((
       s.ID,                   # [0] 
       s.name,                 # [1]
-      float(s.latitude),      # [2]
-      float(s.longitude),     # [3]
-      float(s.easting),       # [4]
-      float(s.northing),      # [5]
-      s.utm_zone_number,      # [6]
-      s.utm_zone_letter,      # [7]
-      float(s.elevation)))    # [8]
+      s.location,             # [2]
+      float(s.latitude),      # [3]
+      float(s.longitude),     # [4]
+      float(s.easting),       # [5]
+      float(s.northing),      # [6]
+      s.utm_zone_number,      # [7]
+      s.utm_zone_letter,      # [8]
+      float(s.elevation)))    # [9]
 
+  print sites
 
 
 
@@ -295,7 +303,7 @@ def index(request, depID=None):
 
   # Get clicked lat, lon from js event --> html form
   # Convert them to utm
-  if lat_clicked and lng_clicked:  
+  if pos_filtered_list and lat_clicked and lng_clicked:  
         
     (easting_clicked, northing_clicked, utm_zone_number_clicked, utm_zone_letter_clicked) = utm.from_latlon(float(lat_clicked), float(lng_clicked))
 
@@ -404,6 +412,9 @@ def index(request, depID=None):
 
 
 
+  #the following lines sets the default as '63' for deploymentID
+  #index_form.fields['trans'].initial = ['63']
+  
 
   context = {
 
@@ -423,7 +434,7 @@ def index(request, depID=None):
             'siteslist': json.dumps(sites), 
             
             #for displaying html form
-            'form': TestForm(depID=depID, data=request.GET or None), 
+            'form': Form(deps=deps, data=request.GET or None), 
             
             #selected transmitter from form
             #'tx': json.dumps(tx), 
@@ -459,8 +470,8 @@ def index(request, depID=None):
               #position vs track (not used?)
         
             }
-
-  return render(request, 'index.html', context)
+  
+  return context
 
 
 
@@ -483,6 +494,39 @@ def index(request, depID=None):
     #response.write(p.body)
 
 
+def index(request):
+  ''' Compile a list of public deployments, make this available. 
+      Don't initially display anything. ''' 
 
-def view_by_dep_id(request, depID):
-  return HttpResponse('Not implemneted yet.')
+  #''' SELECT * FROM deployment JOIN project 
+  #      ON deployment.projectID = project.ID 
+  #   WHERE project.is_public = True ''' 
+  # TODO filter deps by form data. 
+  if request.GET.getlist('trans') != None:
+    req_deps = Deployment.objects.filter(ID__in=request.GET.getlist('trans'))
+  else: 
+    req_deps = []
+  
+  deps = Deployment.objects.filter(is_active=True,
+          projectID__in=Project.objects.filter(
+            is_public=True).values('ID'))
+
+  context = get_context(request, deps, req_deps)
+  return render(request, 'index.html', context)
+
+def view_by_dep(request, dep_id):
+  ''' Compile a list of deployments associated with `dep_id`. ''' 
+  deps = Deployment.objects.filter(ID=dep_id)
+  context = get_context(request, deps, deps)
+  return render(request, 'index.html', context)
+
+def view_by_target(request, target_id): 
+  ''' Compile a list of deployments associated with `target_id`. ''' 
+  return HttpResponse('Not implemneted yet. (targetID=%s)' % target_id)
+
+def view_by_tx(request, tx_id): 
+  ''' Compile a list of deployments associated with `tx_id`. ''' 
+  return HttpResponse('Not implemneted yet. (txID=%s)' % tx_id)
+
+
+
