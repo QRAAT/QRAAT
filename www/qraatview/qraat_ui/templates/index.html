@@ -434,6 +434,9 @@ function initialize(){
           });
       
 
+
+
+
     // submit clicked marker lat,lng to django server to find nearby pts
     google.maps.event.addListener(marker, 'click',
       function(event)
@@ -754,19 +757,128 @@ function initialize(){
     } // end for loop through queried data points
 
     
-  // Draw the polyline
-
+ // Draw the polyline
     var flightPath = new google.maps.Polyline({
       path: flightPlanCoordinates,
+      infoWindowIndex: i,
       geodesic: true,
       strokeColor: '#8383FF',
       strokeOpacity: 1.0,
-      strokeWeight: 1
+      strokeWeight: 2
     }); // end drawing the Polyline
 
 
+
     flightPath.setMap(map);
-     
+    
+  google.maps.event.addListener(flightPath, 'mouseover', function(event) {
+    
+    //Attempt to get the index of the closest point to the mouse location
+
+    //var distance = Infinity;
+    //var vertex=0;
+    //for (var i=0; i < flightPath.getVertexCount(); i++) {
+    //  var dist = point.distanceFrom(flightPath.getVertex(i));
+    //  if dist < distance {
+    //    vertex = i;
+    //    distance = dist;
+    //  }
+    //}
+    var vertex;
+    var i;
+    for (i=0; i < flight_latlon_pos.length; i ++) {
+      if ((event.latLng.lat().toFixed(3) == flight_latlon_pos[i][8][0].toFixed(3)) && (event.latLng.lng().toFixed(3) == flight_latlon_pos[i][8][1].toFixed(3))) {
+              vertex = i;
+      }
+    }
+
+    if (vertex != null) {
+    document.getElementById('m_lat_lon').innerHTML = 
+      flight_latlon_pos[vertex][8][0].toFixed(6) + ', ' + // lat of actual pt in db
+      flight_latlon_pos[vertex][8][1].toFixed(6);          // lng of point in db
+    document.getElementById('m_east_north').innerHTML = 
+      flight_latlon_pos[vertex][3] + ', ' +   // easting 
+      flight_latlon_pos[vertex][4] + ', ' +   // northing
+      flight_latlon_pos[vertex][5] + ' ' +    // zone number
+      flight_latlon_pos[vertex][9];          // zone letter
+    document.getElementById('m_date').innerHTML = 
+      flight_latlon_pos[vertex][10];          // date string of timestamp
+    document.getElementById('m_activity').innerHTML = 
+      flight_latlon_pos[vertex][7].toFixed(6);  // activity
+    document.getElementById('m_likelihood').innerHTML = 
+      flight_latlon_pos[vertex][6].toFixed(6); // likelihood
+    document.getElementById('m_ID').innerHTML = 
+      flight_latlon_pos[vertex][0];
+    document.getElementById('m_transmitter').innerHTML = 
+      flight_latlon_pos[vertex][1];
+  } // end if vertex
+  
+  }); // end event mouseover eventListener
+
+
+
+
+
+    
+  google.maps.event.addListener(flightPath, 'click', function(event) {
+    
+    //Attempt to get the index of the closest point to the mouse location
+
+    //var distance = Infinity;
+    //var vertex=0;
+    //for (var i=0; i < flightPath.getVertexCount(); i++) {
+    //  var dist = point.distanceFrom(flightPath.getVertex(i));
+    //  if dist < distance {
+    //    vertex = i;
+    //    distance = dist;
+    //  }
+    //}
+    var vertex;
+    var i;
+    for (i=0; i < flight_latlon_pos.length; i ++) {
+      if ((event.latLng.lat().toFixed(3) == flight_latlon_pos[i][8][0].toFixed(3)) && (event.latLng.lng().toFixed(3) == flight_latlon_pos[i][8][1].toFixed(3))) {
+              vertex = i;
+      }
+    }
+
+    if (vertex != null) {
+    document.getElementById('m_lat_lon').innerHTML = 
+      flight_latlon_pos[vertex][8][0].toFixed(6) + ', ' + // lat of actual pt in db
+      flight_latlon_pos[vertex][8][1].toFixed(6);          // lng of point in db
+    document.getElementById('m_east_north').innerHTML = 
+      flight_latlon_pos[vertex][3] + ', ' +   // easting 
+      flight_latlon_pos[vertex][4] + ', ' +   // northing
+      flight_latlon_pos[vertex][5] + ' ' +    // zone number
+      flight_latlon_pos[vertex][9];          // zone letter
+    document.getElementById('m_date').innerHTML = 
+      flight_latlon_pos[vertex][10];          // date string of timestamp
+    document.getElementById('m_activity').innerHTML = 
+      flight_latlon_pos[vertex][7].toFixed(6);  // activity
+    document.getElementById('m_likelihood').innerHTML = 
+      flight_latlon_pos[vertex][6].toFixed(6); // likelihood
+    document.getElementById('m_ID').innerHTML = 
+      flight_latlon_pos[vertex][0];
+    document.getElementById('m_transmitter').innerHTML = 
+      flight_latlon_pos[vertex][1];
+  } // end if vertex
+  
+  }); // end event mouseover eventListener
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
               // Polyline for Deployment 2
 
