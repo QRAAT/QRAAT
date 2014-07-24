@@ -12,14 +12,14 @@ from django.db.models import Q
 import qraat, time, datetime, json, utm, math
 from pytz import utc, timezone
 
-from qraat_ui.models import Position, track, Deployment, Site
-from qraat_ui.forms import TestForm
+from qraatview.models import Position, Track, Deployment, Site, Project
+from qraat_ui.forms import Form
 from decimal import Decimal
 
 
 
 
-def index(request, depID=None):
+def get_context(request, deps=[], req_deps=[]):
   
 
                 # STORE ALL THE GET DATA FROM HTML FORM
@@ -50,20 +50,7 @@ def index(request, depID=None):
   else:
     zoom_selected = 14
  
-
-
-
-  #if 'trans' in request.GET and not depID:
-  #  tx = request.GET['trans']
-  dep_list = [] 
-  if 'trans' in request.GET and not depID:
-    dep_list = request.GET.getlist('trans')
-    #dep_list_length = len(dep_list)
-
-
-
-  else:
-    tx = depID
+  
   if 'data_type' in request.GET:
     data_type = request.GET['data_type']
   else:
@@ -126,7 +113,7 @@ def index(request, depID=None):
 
 
   #if form.is_valid():
-  if datetime_from and datetime_to and dep_list:
+  if datetime_from and datetime_to and deps != []:
     datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
     datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
     
@@ -149,14 +136,14 @@ def index(request, depID=None):
     db_sel = Position   #can change database
 
     #dep_filter = ""
-    #for d in dep_list:
+    #for d in dep_ids:
     #  dep_filter += "Q(deploymentID = %d), "
     #print dep_filter
     
 
-    if (len(dep_list) >= 1):
+    if (len(req_deps) >= 1):
       pos_query = db_sel.objects.filter(
-                          deploymentID = dep_list[0],
+                          deploymentID = req_deps[0].ID,
                           timestamp__gte = datetime_from_sec_davis,
                           timestamp__lte = datetime_to_sec_davis,
                           likelihood__gte = lk_l,
@@ -192,9 +179,9 @@ def index(request, depID=None):
 
 
 
-    if (len(dep_list) >= 2):
+    if (len(req_deps) >= 2):
       pos_query1 = db_sel.objects.filter(
-                          deploymentID = dep_list[1],
+                          deploymentID = req_deps[1].ID,
                           timestamp__gte = datetime_from_sec_davis,
                           timestamp__lte = datetime_to_sec_davis,
                           likelihood__gte = lk_l,
@@ -229,13 +216,13 @@ def index(request, depID=None):
 
     print len(pos_filtered_list)
     print len(pos_filtered_list1)
-    print dep_list
-    print len(dep_list)
+    print req_deps
+    print len(req_deps)
 
 
-    if (len(dep_list) >= 3):
+    if (len(req_deps) >= 3):
       pos_query2 = db_sel.objects.filter(
-                          deploymentID = dep_list[2],
+                          deploymentID = req_deps[2].ID,
                           timestamp__gte = datetime_from_sec_davis,
                           timestamp__lte = datetime_to_sec_davis,
                           likelihood__gte = lk_l,
@@ -244,9 +231,9 @@ def index(request, depID=None):
                           activity__lte = act_h
                           )
 
-    if (len(dep_list) >= 4):
+    if (len(req_deps) >= 4):
       pos_query3 = db_sel.objects.filter(
-                          deploymentID = dep_list[3],
+                          deploymentID = req_deps[3].ID,
                           timestamp__gte = datetime_from_sec_davis,
                           timestamp__lte = datetime_to_sec_davis,
                           likelihood__gte = lk_l,
@@ -423,7 +410,7 @@ def index(request, depID=None):
             'siteslist': json.dumps(sites), 
             
             #for displaying html form
-            'form': TestForm(depID=depID, data=request.GET or None), 
+            'form': Form(deps=deps, data=request.GET or None), 
             
             #selected transmitter from form
             #'tx': json.dumps(tx), 
@@ -459,8 +446,8 @@ def index(request, depID=None):
               #position vs track (not used?)
         
             }
-
-  return render(request, 'index.html', context)
+  
+  return context
 
 
 
@@ -483,10 +470,39 @@ def index(request, depID=None):
     #response.write(p.body)
 
 
+def index(request):
+  ''' Compile a list of public deployments, make this available. 
+      Don't initially display anything. ''' 
 
-def view_by_dep_id(request, dep_id):
-  return HttpResponse('Not implemneted yet. (depID=%s)' % dep_id)
+  #''' SELECT * FROM deployment JOIN project 
+  #      ON deployment.projectID = project.ID 
+  #   WHERE project.is_public = True ''' 
+  # TODO filter deps by form data. 
+  if request.GET.getlist('trans') != None:
+    req_deps = Deployment.objects.filter(ID__in=request.GET.getlist('trans'))
+  else: 
+    req_deps = []
+  
+  deps = Deployment.objects.filter(is_active=True,
+          projectID__in=Project.objects.filter(
+            is_public=True).values('ID'))
 
+  context = get_context(request, deps, req_deps)
+  return render(request, 'index.html', context)
+
+def view_by_dep(request, dep_id):
+  ''' Compile a list of deployments associated with `dep_id`. ''' 
+  deps = Deployment.objects.filter(ID=dep_id)
+  context = get_context(request, deps, deps)
+  return render(request, 'index.html', context)
+
+def view_by_target(request, target_id): 
+  ''' Compile a list of deployments associated with `target_id`. ''' 
+  return HttpResponse('Not implemneted yet. (targetID=%s)' % target_id)
+
+def view_by_tx(request, tx_id): 
+  ''' Compile a list of deployments associated with `tx_id`. ''' 
+  return HttpResponse('Not implemneted yet. (txID=%s)' % tx_id)
 
 
 
