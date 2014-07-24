@@ -10,7 +10,7 @@ https://docs.djangoproject.com/en/1.6/ref/settings/
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 
 # Quick-start development settings - unsuitable for production
@@ -38,9 +38,9 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.admin',
-	'qraat_ui',
-	'qraat_auth',
-	'qraat_site',
+    'qraat_ui',
+    'qraat_auth',
+    'qraatview'
 )
 
 MIDDLEWARE_CLASSES = (
@@ -56,7 +56,6 @@ ROOT_URLCONF = 'qraatview.urls'
 
 WSGI_APPLICATION = 'qraatview.wsgi.application'
 #AUTH_USER_MODEL = 'qraat_auth.QraatUser'
-AUTHENTICATION_BACKENDS = ('django.contrib.auth.backends.ModelBackend', )
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
@@ -76,9 +75,8 @@ DATABASES = {
 	},
 }
 
-DATABASE_ROUTERS = [ 'qraat_site.router.DatabaseAppsRouter',]
-DATABASE_APPS_MAPPING = {'qraat_site':'qraat',
-                         'qraat_ui': 'qraat' }	
+DATABASE_ROUTERS = [ 'qraatview.router.DatabaseAppsRouter',]
+DATABASE_APPS_MAPPING = {'qraat_ui': 'qraat' }	
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/

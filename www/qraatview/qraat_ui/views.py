@@ -521,5 +521,5 @@ def index(request, depID=None):
 
 
 
-def get_view_by_depID(request, depID):
-  return HttpRequest()
+def view_by_dep_id(request, depID):
+  return HttpResponse('Not implemneted yet.')

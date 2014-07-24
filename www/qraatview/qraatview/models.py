@@ -1,7 +1,7 @@
 # File: qraat_site models.py
 
 from django.db import models
-from qraat_site.utils import timestamp_todate
+from utils import timestamp_todate
 
 QRAAT_APP_LABEL = 'qraat_site'
 
@@ -68,16 +68,18 @@ class Project(models.Model):
     is_hidden = models.BooleanField(default=False)  # boolean default false
 
     def get_locations(self):
-        return Location.objects.filter(projectID=self.ID)
+        return Location.objects.filter(
+            projectID=self.ID).exclude(is_hidden=True)
 
     def get_deployments(self):
-        return Deployment.objects.filter(projectID=self.ID).order_by('-is_active')
+        return Deployment.objects.filter(
+            projectID=self.ID).exclude(is_hidden=True).order_by('-is_active')
 
     def get_transmitters(self):
-        return Tx.objects.filter(projectID=self.ID)
+        return Tx.objects.filter(projectID=self.ID).exclude(is_hidden=True)
 
     def get_targets(self):
-        return Target.objects.filter(projectID=self.ID)
+        return Target.objects.filter(projectID=self.ID).exclude(is_hidden=True)
 
     def __unicode__(self):
         return u'ID = %d name = %s' % (self.ID, self.name)
@@ -174,7 +176,7 @@ class TxMake(models.Model):
         demod_type = models.CharField(max_length=5, choices=DEMOD_CHOICES)
 
         def __unicode__(self):
-            return u'%d %s' % (self.ID, self.model)
+            return u'%d %s %s' % (self.ID, self.manufacturer, self.model)
 
 
 class Tx(models.Model):
@@ -255,7 +257,7 @@ class Target(models.Model):
         help_text="Project for which target was originally created")
 
     is_hidden = models.BooleanField(default=False)  # boolean default false
-    
+
     def __unicode__(self):
         return u'%s' % self.name
 
@@ -269,7 +271,7 @@ class Deployment(models.Model):
 
     name = models.CharField(max_length=50, null=False)
 
-    description = models.TextField()
+    description = models.TextField(blank=True)
 
     time_start = models.DecimalField(
         max_digits=16, decimal_places=6,
@@ -277,7 +279,8 @@ class Deployment(models.Model):
 
     time_end = models.DecimalField(
         max_digits=16, decimal_places=6,
-        help_text="Unix Timestamp (s.us)")  # decimal(16,6)
+        help_text="Unix Timestamp (s.us)",
+        blank=True)  # decimal(16,6)
 
     txID = models.ForeignKey(
         Tx, db_column="txID")
@@ -292,7 +295,7 @@ class Deployment(models.Model):
     is_active = models.BooleanField(default=False)
 
     is_hidden = models.BooleanField(default=False)
-    
+
     def get_start(self):
         return timestamp_todate(self.time_start)
 

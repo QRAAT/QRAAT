@@ -1,9 +1,9 @@
 # from hello.models import Position
 from django.contrib import admin
-from qraat_site.models import Track, Tx, TxMake, Deployment
-from qraat_site.models import Site, Location, Project
-from qraat_site.models import AuthProjectCollaborator, AuthProjectViewer
-from qraat_site.models import TxParameters, TxMakeParameters
+from models import Track, Tx, TxMake, Deployment
+from models import Site, Location, Project
+from models import AuthProjectCollaborator, AuthProjectViewer
+from models import TxParameters, TxMakeParameters
 
 
 class SiteAdmin(admin.ModelAdmin):
@@ -69,6 +69,23 @@ class TransmitterAdmin(admin.ModelAdmin):
     def Manufacturer(self, obj):
         return obj.tx_makeID.manufacturer
 
+    def save_model(self, request, obj, form, change):
+        """
+        Overrided method to add tx_parameters after inserting tx
+        """
+        super(TransmitterAdmin, self).save_model(request, obj, form, change)
+        Tx = obj
+        Tx_make_parameters = TxMakeParameters.objects.filter(
+                tx_makeID=Tx.tx_makeID)
+        
+        # Add tx_parameters for each make_parameter
+        for parameter in Tx_make_parameters:
+            TxParameters.objects.create(
+                txID=Tx,
+                name=parameter.name,
+                value=parameter.value,
+                units=parameter.units)
+
 
 class TransmitterInline(admin.StackedInline):
     model = Tx
@@ -97,7 +114,7 @@ class TxParametersAdmin(admin.ModelAdmin):
 
 class TxMakeParametersAdmin(admin.ModelAdmin):
     list_display = ('ID', 'name', 'value', 'units',
-            'tx_makeID', 'Tx_model')
+                    'tx_makeID', 'Tx_model')
     ordering = ('ID',)
 
     def Tx_model(self, obj):

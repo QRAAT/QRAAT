@@ -29,22 +29,25 @@ class UserForm(forms.ModelForm):
         return password2
 
     def clean_email(self):
-        email = self.cleaned_data.get("email")
+        self.email = self.cleaned_data.get("email")
         user = None
 
         try:
-            user = User.objects.get(email=email)
-        except Exception:
-            if user is not None:
-                raise forms.ValidationError("Email already exists")
-            else:
-                return email
+            user = User.objects.get(email=self.email)
+        except User.DoesNotExist:
+            return self.email
+        
+        raise forms.ValidationError("Email already exists")
+
+    
+    def clean_username(self):
+        return self.email
+    
 
     def save(self, commit=True):
         user = super(UserForm, self).save(commit=False)
         user.set_password(self.cleaned_data["password1"])
-        username = self.clean_email()
-        user.username = username
+        user.username = self.email
         if commit:
             user.save()
         return user

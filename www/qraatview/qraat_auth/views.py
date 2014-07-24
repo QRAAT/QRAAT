@@ -13,14 +13,14 @@ from django.contrib.auth.models import User
 def index(request):
     if not request.user.is_authenticated():
         return redirect('login/?next=%s' % request.path)
-    return redirect('/qraat/')
+    return redirect('/')
 
 
 def user_logout(request):
     if request.user.is_authenticated():
         logout(request)
 
-    return redirect("/qraat/")
+    return redirect("/")
 
 
 def user_login(request):
@@ -31,7 +31,7 @@ def user_login(request):
             if user is not None:
                 if user.is_active:
                     login(request, user)
-                    return redirect('/qraat/')
+                    return redirect('/')
                 else:
                     return HttpResponse("Innactive user!")
     else:
@@ -40,6 +40,23 @@ def user_login(request):
     return render(
         request, 'qraat_auth/loginform.html', {'login_form': login_form})
 
+
+@login_required(login_url='auth')
+def show_users(request):
+    user = request.user
+    if request.method == 'GET':
+        thereis_newuser = request.GET.get("newuser")
+
+        if user.is_superuser:
+            users = User.objects.all()
+            return render(
+                request, 'qraat_auth/users.html',
+                {'users': users,
+                 'thereis_newuser': thereis_newuser})
+        else:
+            return HttpResponse("Restricted area!")
+
+    return HttpResponse("Try a get!")
 
 @login_required(login_url='/auth')
 def user_logged_in(request):
@@ -53,18 +70,9 @@ def createUserForm(request):
     if request.method == 'POST':
         user_form = UserForm(request.POST)
         if user_form.is_valid():
-            # creates user here
-            # form.cleaned_data as required
-            username = user_form.clean_username()
-            password = user_form.clean_password2()
             user_form.save()
 
-            user = authenticate(username=username,
-                                password=password)
-
-            login(request, user)
-
-            return HttpResponseRedirect('user-created')
+            return redirect('/auth/users?newuser=True')
 
     else:
         user_form = UserForm()
@@ -74,15 +82,21 @@ def createUserForm(request):
 
 
 @login_required(login_url='/auth')
-def user_account(request):
-    return render(request, 'qraat_auth/user-account.html', {'user': request.user})
+def user_account(request, user_id=None):
+    if request.user.is_superuser and user_id:
+        user = User.objects.get(id=user_id)
+    else:
+        user = request.user
+    
+    return render(
+        request, 'qraat_auth/user-account.html', {'user': user})
 
 
 @login_required(login_url='/auth')
 def edit_account(request):
-    user = request.user 
+    user = request.user
     form = AccountChangeForm(instance=user)
-    
+
     if request.method == 'POST':
         form = AccountChangeForm(request.POST, instance=user)
         if form.is_valid():
@@ -96,7 +110,7 @@ def edit_account(request):
 
 @login_required(login_url='/auth')
 def change_password(request):
-    user = request.user 
+    user = request.user
     form = PasswordChangeForm(instance=user)
 
     if request.method == 'POST':
