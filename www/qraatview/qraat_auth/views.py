@@ -41,18 +41,16 @@ def user_login(request):
         request, 'qraat_auth/loginform.html', {'login_form': login_form})
 
 
-@login_required(login_url='auth')
+@login_required(login_url='/auth')
 def show_users(request):
     user = request.user
     if request.method == 'GET':
-        thereis_newuser = request.GET.get("newuser")
 
         if user.is_superuser:
             users = User.objects.all()
             return render(
                 request, 'qraat_auth/users.html',
-                {'users': users,
-                 'thereis_newuser': thereis_newuser})
+                {'users': users})
         else:
             return HttpResponse("Restricted area!")
 
@@ -62,23 +60,6 @@ def show_users(request):
 def user_logged_in(request):
     username = request.user.username
     return render(request, 'qraat_auth/loggedin.html', {'username': username})
-
-
-@login_required(login_url='/auth')
-def createUserForm(request):
-
-    if request.method == 'POST':
-        user_form = UserForm(request.POST)
-        if user_form.is_valid():
-            user_form.save()
-
-            return redirect('/auth/users?newuser=True')
-
-    else:
-        user_form = UserForm()
-
-    return render(
-        request, 'qraat_auth/newuserform.html', {'user_form': user_form})
 
 
 @login_required(login_url='/auth')

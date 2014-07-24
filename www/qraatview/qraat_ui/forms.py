@@ -36,34 +36,22 @@ GRAPH_CHOICES = [
 
 # Choices for transmitter dropdown menu. Sorted by "Active", then number
 
-def get_choices(depID=None):
+def get_choices(deps=[]):
   #print "==========" + str(depID)
   choices_list = []
-  #choices_list.append((0, "Select transmitter..."))
-  if depID is not None:
-    print depID
-    for d in Deployment.objects.filter(ID=depID):
-      choices_list.append(d.ID)
-    print choices_list
-  else:
-    for d in Deployment.objects.order_by('-is_active', 'ID'):
-      if (d.is_active == 0):
-        d.is_active = "inactive"
-      elif (d.is_active == 1):
-        d.is_active = "ACTIVE"
-      choices_list.append((d.ID, str(d.ID)+' - '+d.is_active))
-  
+  for dep in deps:
+    choices_list.append((dep.ID, dep.ID))
   return choices_list
 
-class TransChoiceField(forms.ChoiceField):
-  def __init__(self, depID=None, *args, **kwargs):
-    super(TransChoiceField, self).__init__(
-      choices=get_choices(depID),*args, **kwargs)
- 
 
 
 #Fields for html form that queries and sets preferences
 class Form(forms.Form):
+
+  def __init__(self, deps=[], data=None):
+    #self.deployment_id = depID
+    super(forms.Form, self).__init__(data)
+    self.fields['trans'].choices = get_choices(deps)
   
   #def clean_my_field(self):
   #  if len(self.clearned_data['trans']) > 3:
@@ -167,9 +155,4 @@ class Form(forms.Form):
       #   label="Show Likelihood", 
       #   initial=True)
 
-class TestForm(Form): 
-  def __init__(self, depID=None, data=None):
-    self.deployment_id = depID
-    super(TestForm, self).__init__(data)
-    self.trans = TransChoiceField(depID=depID)
 
