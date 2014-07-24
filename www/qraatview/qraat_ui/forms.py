@@ -39,7 +39,7 @@ GRAPH_CHOICES = [
 def get_choices(depID=None):
   #print "==========" + str(depID)
   choices_list = []
-  choices_list.append((0, "Select transmitter..."))
+  #choices_list.append((0, "Select transmitter..."))
   if depID is not None:
     print depID
     for d in Deployment.objects.filter(ID=depID):
@@ -79,10 +79,14 @@ class Form(forms.Form):
 
   trans = forms.MultipleChoiceField(
             choices = get_choices(),
-            widget = forms.CheckboxSelectMultiple,
+            widget = forms.SelectMultiple(),
+            #widget = forms.CheckboxSelectMultiple,
             required = True,
             label = 'DeploymentID',
             #initial = '63'
+              #Note: initial doesn't work. it sets choices to '6' and '3'
+              #To set initial value, in views.py:
+                #instance_of_form.fields['trans'].initial = ['63']
             )
 
   #for integration with user authentication 

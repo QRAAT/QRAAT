@@ -98,11 +98,11 @@ def index(request, depID=None):
     lat_in = request.GET['lat_input']
   else: 
     lat_in = None
-  if 'graph_data' in request.GET:
+  if ('graph_data' in request.GET) and (request.GET['graph_data']!= ""):
     graph_data = int(request.GET['graph_data'])
   else:
     graph_data = None
-  if 'display_type' in request.GET:
+  if ('display_type' in request.GET) and (request.GET['display_type']!=""):
     display_type = int(request.GET['display_type'])
   else:
     display_type = None
@@ -126,21 +126,31 @@ def index(request, depID=None):
 
 
   #if form.is_valid():
-  if datetime_from and datetime_to and dep_list:
-    datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
-    datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
-    
-   
-    #temporary fix that doesn't take into account daylight savings
-    datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference
-    datetime_to_sec_davis = datetime_to_sec + 7*60*60
+  if datetime_from and datetime_to:
+    try:
+      datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
+      datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
+      
+      #make sure these are numbers
+      float(lk_l)
+      float(lk_h)
+      float(act_l)
+      float(act_h)
+      
+      #temporary fix that doesn't take into account daylight savings
+      datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference
+      datetime_to_sec_davis = datetime_to_sec + 7*60*60
 
-    #datetime_test = float(time.mktime(timezone('US/Pacific').(datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple())))
+      #datetime_test = float(time.mktime(timezone('US/Pacific').(datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple())))
 
-    print datetime_from_sec
-    #print datetime_test 
+      print datetime_from_sec
+      #print datetime_test 
 
-
+    except:
+      datetime_from_sec = None
+      datetime_to_sec = None
+      datetime_from_sec_davis = None
+      datetime_to_sec_davis = None
 
 
                   # QUERY DB FROM HTML SETTINGS
@@ -153,9 +163,9 @@ def index(request, depID=None):
     #  dep_filter += "Q(deploymentID = %d), "
     #print dep_filter
     
-
-    if (len(dep_list) >= 1):
-      pos_query = db_sel.objects.filter(
+    if (datetime_from_sec_davis) and (datetime_to_sec_davis) and (lk_l) and (lk_h) and (act_l) and (act_h):
+      if (len(dep_list) >= 1):
+        pos_query = db_sel.objects.filter(
                           deploymentID = dep_list[0],
                           timestamp__gte = datetime_from_sec_davis,
                           timestamp__lte = datetime_to_sec_davis,
@@ -166,34 +176,42 @@ def index(request, depID=None):
                           )
 
         
-      for q in pos_query:
-      # Calculate lat, lons each point
-        (lat, lon) = utm.to_latlon(
+        for q in pos_query:
+          # Calculate lat, lons each point
+          (lat, lon) = utm.to_latlon(
                   float(q.easting), 
                   float(q.northing),
                   q.utm_zone_number,
                   q.utm_zone_letter)
-    
+          
+          # Convert timestamps to datetime strings and subtract 7 hrs
+          # Not sure if localtime is the correct way to do this...
+          date_string = time.strftime(
+            '%Y-%m-%d %H:%M:%S',
+            time.localtime(float(q.timestamp-7*60*60))
+            )
+
       # Store django objects as a python list of tuples
-        pos_filtered_list.append(
+          pos_filtered_list.append(
             (
-            q.ID, 
-            q.deploymentID, 
-            float(q.timestamp), 
-            float(q.easting), 
-            float(q.northing),
-            q.utm_zone_number,
-            float(q.likelihood), 
-            float(q.activity),
-            (lat, lon), 
-            q.utm_zone_letter
+            q.ID,                 #0 
+            q.deploymentID,       #1
+            float(q.timestamp),   #2
+            float(q.easting),     #3
+            float(q.northing),    #4
+            q.utm_zone_number,    #5
+            float(q.likelihood),  #6
+            float(q.activity),    #7
+            (lat, lon),           #8
+            q.utm_zone_letter,    #9
+            date_string           #10
             ))
+            
 
 
 
-
-    if (len(dep_list) >= 2):
-      pos_query1 = db_sel.objects.filter(
+      if (len(dep_list) >= 2):
+        pos_query1 = db_sel.objects.filter(
                           deploymentID = dep_list[1],
                           timestamp__gte = datetime_from_sec_davis,
                           timestamp__lte = datetime_to_sec_davis,
@@ -203,59 +221,71 @@ def index(request, depID=None):
                           activity__lte = act_h
                           )
 
-      for q in pos_query1:
-        # Calculate lat, lons each point
-        (lat, lon) = utm.to_latlon(
+        for q in pos_query1:
+          # Calculate lat, lons each point
+          (lat, lon) = utm.to_latlon(
                   float(q.easting), 
                   float(q.northing),
                   q.utm_zone_number,
                   q.utm_zone_letter)
-    
+          
+          date_string = time.strftime(
+            '%Y-%m-%d %H:%M:%S',
+            time.localtime(float(q.timestamp-7*60*60))
+          )
+
+ 
       # Store django objects as a python list of tuples
-        pos_filtered_list1.append(
+          pos_filtered_list1.append(
             (
-            q.ID, 
-            q.deploymentID, 
-            float(q.timestamp), 
-            float(q.easting), 
-            float(q.northing),
-            q.utm_zone_number,
-            float(q.likelihood), 
-            float(q.activity),
-            (lat, lon), 
-            q.utm_zone_letter
+            q.ID,                 #0
+            q.deploymentID,       #1
+            float(q.timestamp),   #2
+            float(q.easting),     #3
+            float(q.northing),    #4
+            q.utm_zone_number,    #5
+            float(q.likelihood),  #6
+            float(q.activity),    #7
+            (lat, lon),           #8
+            q.utm_zone_letter,    #9
+            date_string           #10
             ))
 
 
-    print len(pos_filtered_list)
-    print len(pos_filtered_list1)
-    print dep_list
-    print len(dep_list)
+      #print len(pos_filtered_list)
+      #print len(pos_filtered_list1)
+      #print dep_list
+      #print len(dep_list)
 
 
-    if (len(dep_list) >= 3):
-      pos_query2 = db_sel.objects.filter(
-                          deploymentID = dep_list[2],
-                          timestamp__gte = datetime_from_sec_davis,
-                          timestamp__lte = datetime_to_sec_davis,
-                          likelihood__gte = lk_l,
-                          likelihood__lte = lk_h,
-                          activity__gte = act_l,
-                          activity__lte = act_h
-                          )
+      #if (len(dep_list) >= 3):
+      #  pos_query2 = db_sel.objects.filter(
+      #                    deploymentID = dep_list[2],
+      #                    timestamp__gte = datetime_from_sec_davis,
+      #                    timestamp__lte = datetime_to_sec_davis,
+      #                    likelihood__gte = lk_l,
+      #                    likelihood__lte = lk_h,
+      #                    activity__gte = act_l,
+      #                    activity__lte = act_h
+      #                    )
 
-    if (len(dep_list) >= 4):
-      pos_query3 = db_sel.objects.filter(
-                          deploymentID = dep_list[3],
-                          timestamp__gte = datetime_from_sec_davis,
-                          timestamp__lte = datetime_to_sec_davis,
-                          likelihood__gte = lk_l,
-                          likelihood__lte = lk_h,
-                          activity__gte = act_l,
-                          activity__lte = act_h
-                          ) 
+      #if (len(dep_list) >= 4):
+      #  pos_query3 = db_sel.objects.filter(
+      #                    deploymentID = dep_list[3],
+      #                    timestamp__gte = datetime_from_sec_davis,
+      #                    timestamp__lte = datetime_to_sec_davis,
+      #                    likelihood__gte = lk_l,
+      #                    likelihood__lte = lk_h,
+      #                    activity__gte = act_l,
+      #                    activity__lte = act_h
+      #                    ) 
 
-    #pos_query = db_sel.objects.filter(
+
+
+            #OLD WAY TO QUERY, either with only one deployment, 
+            #or trying to make multiple querysets without repeating code
+
+#pos_query = db_sel.objects.filter(
     #                      # Q is used for or. These need to be in beginning
     #                      
     #                      #Q(deploymentID = 63) | Q(deploymentID = 64),
@@ -279,14 +309,16 @@ def index(request, depID=None):
     sites.append((
       s.ID,                   # [0] 
       s.name,                 # [1]
-      float(s.latitude),      # [2]
-      float(s.longitude),     # [3]
-      float(s.easting),       # [4]
-      float(s.northing),      # [5]
-      s.utm_zone_number,      # [6]
-      s.utm_zone_letter,      # [7]
-      float(s.elevation)))    # [8]
+      s.location,             # [2]
+      float(s.latitude),      # [3]
+      float(s.longitude),     # [4]
+      float(s.easting),       # [5]
+      float(s.northing),      # [6]
+      s.utm_zone_number,      # [7]
+      s.utm_zone_letter,      # [8]
+      float(s.elevation)))    # [9]
 
+  print sites
 
 
 
@@ -295,7 +327,7 @@ def index(request, depID=None):
 
   # Get clicked lat, lon from js event --> html form
   # Convert them to utm
-  if lat_clicked and lng_clicked:  
+  if pos_filtered_list and lat_clicked and lng_clicked:  
         
     (easting_clicked, northing_clicked, utm_zone_number_clicked, utm_zone_letter_clicked) = utm.from_latlon(float(lat_clicked), float(lng_clicked))
 
@@ -404,6 +436,11 @@ def index(request, depID=None):
 
 
 
+  index_form = TestForm(depID=depID, data=request.GET or None)
+  
+  #the following lines sets the default as '63' for deploymentID
+  #index_form.fields['trans'].initial = ['63']
+  
 
   context = {
 
@@ -423,7 +460,7 @@ def index(request, depID=None):
             'siteslist': json.dumps(sites), 
             
             #for displaying html form
-            'form': TestForm(depID=depID, data=request.GET or None), 
+            'form': index_form, 
             
             #selected transmitter from form
             #'tx': json.dumps(tx), 
