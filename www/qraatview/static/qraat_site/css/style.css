@@ -7,6 +7,11 @@
     width: 80%;
 }
 
+.manage-button{
+    float: right;
+    margin-right: 50%;
+}
+
 .form-row {
     font-size: 11px;
     height: inherit;
