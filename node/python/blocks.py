@@ -212,7 +212,7 @@ class software_backend(gr.hier_block2):
         self.disable()
         self.enable(bands)
 
-def afsk_demod(gr.hier_block2):
+class afsk_demod(gr.hier_block2):
 
   def __init__(self, input_rate, min_output_rate, mark_freq, space_freq):
     
