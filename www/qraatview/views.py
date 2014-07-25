@@ -347,12 +347,16 @@ def get_nav_options(request):
     user = request.user
 
     if user.is_authenticated():
-        if user.is_superuser:
-            nav_options.append(
-                {"url": "auth:users",
-                 "name": "Users"})
-
         nav_options.append({"url": "qraat:projects",
                             "name": "Projects"})
+        
+        if user.is_superuser:
+            super_user_opts = [
+                {"url": "auth:users",
+                 "name": "Users"},
+                {"url": "admin:index",
+                 "name": "Admin Pages"}]
 
+            for opt in super_user_opts: # Add admin options
+                nav_options.append(opt)
     return nav_options
