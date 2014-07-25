@@ -79,7 +79,32 @@
   var mapCenter;
   var markers = [];
 
+function hideFormFields() {
+  if ({{view_type|safe}} == "deployment") {
+    document.getElementById('id_trans').style.display = 'none';
+    document.querySelector("label[for='id_trans_0']").style.display = "none";
+    //this doesn't work...
 
+    //var labels = document.getElementsByTagName('label');
+    //for (var i=0; i <labels.length; i++) {
+    //  var attr = labels[i].getAttribute('for');
+    //  if (attr === this.id_trans_0) {
+    //    labels[i].style.visibility = 'hidden';
+    //  }
+   // }
+    //$('label[for="id_trans"]').style.visibility = 'hidden';
+    //document.querySelector("label[for='id_trans']").style.display = "none";
+  }
+}
+
+window.onload = function() {
+  hideFormFields();
+};
+
+
+function submitForm() {
+  document.getElementById('form').submit();
+}
 
   // Show alert, called by html button. for testing purposes
 function showDjango() {
@@ -229,17 +254,17 @@ function initialize(){
   // Map listens for clicks on the map
   // Submits clicked lat,lng to django (server to calculate closest point)
 
-  google.maps.event.addListener(map, 'click', function(event){
-    // if statement may be redundant
-    if ((event.latLng.lat() !==null) && (event.latLng.lng() !==null)) {
-      // populates hidden html field in form
-      document.getElementById('lat_clicked').value = event.latLng.lat()
-      document.getElementById('lng_clicked').value = event.latLng.lng()
-    
-      // auto-submits the form
-      document.getElementById("form").submit();
-    } // end if
-  }); // end click addListener
+  //google.maps.event.addListener(map, 'click', function(event){
+  //  // if statement may be redundant
+  //  if ((event.latLng.lat() !==null) && (event.latLng.lng() !==null)) {
+  //    // populates hidden html field in form
+  //    document.getElementById('lat_clicked').value = event.latLng.lat()
+  //    document.getElementById('lng_clicked').value = event.latLng.lng()
+  //  
+  //    // auto-submits the form
+  //    document.getElementById("form").submit();
+  //  } // end if
+  //}); // end click addListener
 
 
 
@@ -403,11 +428,18 @@ function initialize(){
   var display_type = {{display_type}};
 
   // Display marker points if html pref is set to display them
-  if ((display_type != null) && 
-      (display_type==2) && 
-      (flight_latlon_pos.length > 0)) {
+ //Uncommenting to show on public
+ 
+ 
+ if (
+      ((display_type != null) && 
+      (display_type==1) && 
+      (flight_latlon_pos.length > 0))
+      ||
+      ({{view_type|safe}} == "deployment") && (display_type!=2)
+      ) {
     
-    for (i=0; i < flight_latlon_pos.length; i++) {
+    for (i=0; i < flight_latlon_pos.length-1; i++) {
     
       marker = new google.maps.Marker({
         position: new google.maps.LatLng(
@@ -484,7 +516,26 @@ function initialize(){
       flight_latlon_pos[this.infoWindowIndex][1];
   
     }); // end mouseover event function
+
+
+    google.maps.event.addListener(marker, 'mouseout', function() {
       
+
+    document.getElementById('m_lat_lon').innerHTML = "" 
+    document.getElementById('m_east_north').innerHTML = "" 
+    document.getElementById('m_date').innerHTML = ""
+    document.getElementById('m_activity').innerHTML = "" 
+    document.getElementById('m_likelihood').innerHTML = ""
+    document.getElementById('m_ID').innerHTML = ""
+    document.getElementById('m_transmitter').innerHTML = ""
+  
+    }); // end mouseout event function
+
+
+
+
+
+
     // close infowindows on mousing out of marker
     google.maps.event.addListener(marker, 'mouseout', function() {
       infoWindows_querydata[this.infoWindowIndex].close();
@@ -513,7 +564,7 @@ function initialize(){
   var display_type = {{display_type}};
 
   // Display marker points if html pref is set to display them
-  if ((display_type != null)&& (display_type==2)) {
+  if ((display_type != null)&& (display_type==1)) {
     
     for (i=0; i < flight_latlon_pos1.length-1; i++) {
     
@@ -583,6 +634,26 @@ function initialize(){
       flight_latlon_pos1[this.infoWindowIndex][1];
   
     }); // end mouseover event function
+
+
+  // on mousing out of markers for data points, don't show info
+    google.maps.event.addListener(marker, 'mouseout', function() {
+      
+
+    document.getElementById('m_lat_lon').innerHTML = "" 
+    document.getElementById('m_east_north').innerHTML = "" 
+    document.getElementById('m_date').innerHTML = ""
+    document.getElementById('m_activity').innerHTML = "" 
+    document.getElementById('m_likelihood').innerHTML = ""
+    document.getElementById('m_ID').innerHTML = ""
+    document.getElementById('m_transmitter').innerHTML = ""
+  
+    }); // end mouseout event function
+
+
+
+
+
 
 
 // Uncomment following lines for pop-up infowindow on mouseover of 2nd deployment data points
@@ -673,8 +744,19 @@ function initialize(){
 
 
 
+
+
+
+
+
+
+
+
 // WHEN FLOT POINT IS CLICKED, add a highlight marker to the point
 
+  var selectedMarkers = new Array();
+
+    
   var flot_index ={{flot_index}}; // index of data in large queried array
 
   if (flot_index != null) {
@@ -693,8 +775,8 @@ function initialize(){
     });
     
 
-    var content =   '<b>Data ID: </b>' + selected_data[0][2] +
-                    '<br><b>Deployment ID: </b>' + selected_data[0][3] + 
+    var content =   '<b>Deployment ID: </b>' + selected_data[0][3] +
+                    '<br><b>Data ID: </b>' + selected_data[0][2] + 
                     '<br><b>Lat, Lon: </b> ' +
                     selected_data[0][10][0].toFixed(6) + ', ' +
                     selected_data[0][10][1].toFixed(6) +
@@ -731,7 +813,7 @@ function initialize(){
 
 
   // push the selected_data marker
-  markers.push(marker);
+  selectedMarkers.push(marker);
 
 
 
@@ -741,7 +823,7 @@ function initialize(){
 
                   // WHEN HTML PREF IS SET TO 'Lines':
 
-  if ((display_type != null) && (display_type == 1)) {
+  if ((display_type != null) && (display_type == 2)) {
 
 
                   // Polyline for Deployment 1
@@ -816,32 +898,96 @@ function initialize(){
   }); // end event mouseover eventListener
 
 
+    google.maps.event.addListener(flightPath, 'mouseout', function() {
+    document.getElementById('m_lat_lon').innerHTML = "" 
+    document.getElementById('m_east_north').innerHTML = "" 
+    document.getElementById('m_date').innerHTML = ""
+    document.getElementById('m_activity').innerHTML = "" 
+    document.getElementById('m_likelihood').innerHTML = ""
+    document.getElementById('m_ID').innerHTML = ""
+    document.getElementById('m_transmitter').innerHTML = ""
+  
+    }); // end mouseout event function
 
 
 
     
   google.maps.event.addListener(flightPath, 'click', function(event) {
-    
     //Attempt to get the index of the closest point to the mouse location
-
-    //var distance = Infinity;
-    //var vertex=0;
-    //for (var i=0; i < flightPath.getVertexCount(); i++) {
-    //  var dist = point.distanceFrom(flightPath.getVertex(i));
-    //  if dist < distance {
-    //    vertex = i;
-    //    distance = dist;
-    //  }
-    //}
     var vertex;
     var i;
-    for (i=0; i < flight_latlon_pos.length; i ++) {
-      if ((event.latLng.lat().toFixed(3) == flight_latlon_pos[i][8][0].toFixed(3)) && (event.latLng.lng().toFixed(3) == flight_latlon_pos[i][8][1].toFixed(3))) {
+    for (i=0; i < flight_latlon_pos.length-1; i ++) {
+      if ((event.latLng.lat().toFixed(2) == flight_latlon_pos[i][8][0].toFixed(2)) && (event.latLng.lng().toFixed(2) == flight_latlon_pos[i][8][1].toFixed(2))) {
               vertex = i;
       }
     }
 
-    if (vertex != null) {
+  if (vertex != null) {
+          document.getElementById('lat_clicked').value = event.latLng.lat()
+          document.getElementById('lng_clicked').value = event.latLng.lng()
+          
+          // submits html form
+          document.getElementById("form").submit();
+          marker.setMap(null); 
+    
+    //if (marker){
+    //  marker.setMap(null);
+  
+      // There is a bug; when a point is clicked in flot, 
+      //the marker stays there when a point in google maps is clicked too. 
+      //The Lines click in maps doesn't get passed to flot either 
+      //because the html form input for lat_clicked and lng_clicked
+      //are not submitted to calculate index for selected_data
+      //Also, the map doesn't reload so the marker stays there.
+      //need to figure out how to set markers declared elsewhere to "null"
+
+      //selectedMarkers.setMap(null);
+   // }
+
+    marker = new google.maps.Marker({
+      position: new google.maps.LatLng
+        (
+        flight_latlon_pos[vertex][8][0], 
+        flight_latlon_pos[vertex][8][1]
+        ),
+      map: map,
+      zIndex: google.maps.Marker.MAX_ZINDEX + 1
+      // zIndex sets marker on top of all other markers
+      
+      // Note: When no icon, uses default large/red marker
+      // icon: 'http://maps.google.com/mapfiles/ms/micons/red-dot.png'
+    }); // end setting marker data
+
+
+    // Set on click infoWindow content for highlighted data marker
+    var content = '<b>Deployment ID: </b>' + flight_latlon_pos[vertex][1] +
+            '<br><b>Data ID: </b>' + flight_latlon_pos[vertex][0] + 
+            '<br><b>Lat, Lon: </b> ' +
+            flight_latlon_pos[vertex][8][0].toFixed(6) + ', ' +
+            flight_latlon_pos[vertex][8][1].toFixed(6) +
+            '<br><b>Easting, Northing, Zone: </b> ' + 
+            flight_latlon_pos[vertex][3] + ', ' + 
+            flight_latlon_pos[vertex][4] + ', ' + 
+            flight_latlon_pos[vertex][5] +
+            flight_latlon_pos[vertex][10] +
+            '<br><b>Date/Time: </b>'  + flight_latlon_pos[vertex][9] + 
+            '<br><b>Activity: </b>' +  flight_latlon_pos[vertex][7] +
+            '<br><b>Likelihood: </b>' + flight_latlon_pos[vertex][6];
+
+    var infoWindow = new google.maps.InfoWindow({content: content});
+    
+    
+  // click Listener for markers
+    google.maps.event.addListener(marker, 'click', 
+      function (event)
+        {
+          infoWindow.open(map, this);
+        } // end event function
+    ); // end click Listener
+  
+
+    //Populate the html sidebar with related data
+
     document.getElementById('m_lat_lon').innerHTML = 
       flight_latlon_pos[vertex][8][0].toFixed(6) + ', ' + // lat of actual pt in db
       flight_latlon_pos[vertex][8][1].toFixed(6);          // lng of point in db
@@ -970,7 +1116,8 @@ $(function() {
   var graph_data = {{graph_data}};
   var label, min, max;
 
-  if (graph_data ==1) { //likelihood
+  if ( (graph_data ==1)  || 
+        (({{view_type|safe}} == "deployment") && (graph_data!=2))) { //likelihood
     for (var i=0; i < positions.length; i++) {
       d.push([positions[i][2]*1000-7*60*60*1000, positions[i][6]]);
     }
@@ -1003,7 +1150,7 @@ $(function() {
     grid: { hoverable: true, clickable: true },
     xaxis: { 
       mode: "time", 
-      tickSize: [4, "hour"], 
+      //tickSize: [4, "hour"], 
       timeformat: "%m-%d %H:%M" 
     },  //does this work?
     //yaxis: {min: min, max: max},
@@ -1205,13 +1352,22 @@ $(function() {
 <!-- <button onclick="showDjango()">Show Django</button> -->
 
 <center>
-<div id="page_title"><a href=''>QRAAT Data</a></div>
+<div id="page_title"><a href='/ui/'>QRAAT Data</a></div>
  <!--onclick='initialize(38.487828027, -122.149419006, 14);'-->
 <!-- <a href="index.html" target="export">Export view as .kml</a><br>-->
 </center>
 <br />
 
+
+
+
+<b><center><u>PREFERENCES</u> <button onclick="submitForm()">Set Preferences</button> </center></b>
+<font size="2">
 <div id ="prefs">
+
+<form name="form" id="form" action ="" name="settings" method="get">
+<!-- <center><input type="submit" value="SUBMIT PREFERENCES" /></center> -->
+
 
 <script type="text/javascript">
 //for submitting form automatically when fields have been entered
@@ -1232,8 +1388,6 @@ $(function() {
 
 
 
-<b><center><u>SET PREFERENCES</u></center></b>
-<font size="2"><form name="form" id="form" action ="" name="settings" method="get">
 {% for field in form %}
 {{ field.label_tag}} {{field}}<br>
 {% endfor %}
@@ -1244,7 +1398,6 @@ $(function() {
 <!-- will be replaced by javascript -->
 <!--Latitude: <input type="text" id="lat_input" name="lat_input" value="38.486877">
 <br>Longitude: <input type="text" id="lng_input" name="lng_input" value="-122.156418"> -->
-<center><input type="submit" value="SUBMIT" /></center>
 </form>
 
 
@@ -1256,14 +1409,16 @@ $(function() {
 <br>
 
 
-
-<div id="mouseover">
 <b><u><center>MAP INFO</center></u></b>
+<div id="mouseover">
 <font size="2">
+{{view_type}}<br>
+<b>Deployment Displayed: </b>{{positions.1.1}}<br>
 <b>No. of Data Points Displayed (dep = {{positions.1.1}})</b>: {{positions|length}}
 <br><b>No. of Data Points Displayed (dep = {{positions1.1.1}})</b>: {{positions1|length}}
-<br><b>Mouseover Lat, Lon: </b> <input type="text" class="current_info" id="latlong" style="width:300px; border:1px inset black;"></span>
-<br><b>Clicked Lat, Lon: </b><input type="text" class="current_info" id="clicked_lat_lng" style="width:300px; border:1px inset black;"></span>
+<br>
+<br><b>Mouseover Lat, Lon: </b> <input type="text" class="current_info" id="latlong" style="width:150px; border:1px inset black;"></span>
+<br><b>Clicked Lat, Lon: </b><input type="text" class="current_info" id="clicked_lat_lng" style="width:150px; border:1px inset black;"></span>
 <br><b>Map Bounds: <font size="1"></b><span id="bounds"></span></font>
 <br><b>Map Center: </b><span id="current_center"></span>
 <br><b>Map Zoom: </b><span id="current_zoom"></span>
@@ -1271,23 +1426,21 @@ $(function() {
 <br></font>
 </div>
 <br>
-<div id="clicked">
-<!-- <b>Window Bounds Lat, Long:</b><br>
-Lat: <p id="latspan"></p>
-Lng: <p id ="lngspan"></p> -->
+
 
 
 
 <center><u><b>DATA FOR CLICKED POSITION</b></u></center>
-<font size="2">
 
+<div id="clicked">
+<font size="2">
 {% if selected_message%}
  {% if flot_index == None %}
 <br><center><i>{{selected_message}}</i></center>
   {% endif %}
 {% endif %}
 
-<br><b>Transmitter ID: </b><span id="m_transmitter"></span>
+<b>Deployment ID: </b><span id="m_transmitter"></span>
 <br><b>Data Point ID: </b><span id="m_ID"></span>
 <br>
 <br><b>Lat, Lon: </b><span id="m_lat_lon"></span>
@@ -1313,6 +1466,7 @@ Lng: <p id ="lngspan"></p> -->
 <!-- FLOT CHART -->
 <div id="right_side">
   <div id="content">
+  <center><b><u>
   {% ifequal graph_data "1" %}
   Likelihood vs. Time
   {% endifequal %}
@@ -1320,7 +1474,8 @@ Lng: <p id ="lngspan"></p> -->
   {% ifequal graph_data "2" %}
   Activity vs. Time
   {% endifequal %}
-
+  
+  </u></b>
 
 <!-- <button data-index="4">Highlight 5th point</button> -->
 <button data-index="{{selected_index_large}}" id="selectedIndexSubmit" style="display: none;">Selected Index</button>
@@ -1343,11 +1498,12 @@ Lng: <p id ="lngspan"></p> -->
 
 <div id="content2">
   <!-- sets the width of the total container of both the main graph and the small overview graph -->
-  <div class="demo-container2" style="width: 660px;">
+  <div class="demo-container2" style="width:550px;">
   <!-- sets the width of the main/large graph -->
-  <div id="placeholder2" class="demo-placeholder" style="float:left; width:500px; height: 200px;"></div>
-  <!--small overview graph -->
-  <div id="overview" class="demo-placeholder" style="float: right; width: 150px; height: 125px;"></div>
+  <div id="placeholder2" class="demo-placeholder" style="float:left; width:550px; height: 200px;"></div>
+
+<!-- uncomment next line for small overview graph -->
+<!--   <div id="overview" class="demo-placeholder" style="float: right; width: 100px; height: 125px;"></div> -->
  
   </div>
 </div> <!-- end div right_side2 -->
