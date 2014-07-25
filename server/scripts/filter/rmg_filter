@@ -1,5 +1,5 @@
 #!/usr/bin/python2
-# rmg_template
+# rmg_filter
 # Time filters a range of points specified by a starting and ending UNIX
 # timestamp.  This program is part of QRAAT, an automated animal tracking
 # system based on GNU Radio. 
@@ -19,19 +19,34 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import qraat
+import qraat, qraat.srv
 import time, os, sys, commands
 import MySQLdb as mdb
 import traceback
 from optparse import OptionParser
+    
+# Right now this rescores points within time range *only* when a score has
+# not already been computed. Could change this to delete all those scores
+# (and interval_cache values) and then not do a join filter. But what we do
+# not want, I'm pretty sure, is more than one score per point.
+score_query = '''SELECT t.ID FROM estscore 
+             RIGHT JOIN (SELECT ID 
+                           FROM est 
+                          WHERE siteID = %s 
+                            AND deploymentID = %s 
+                            AND timestamp >= %s 
+                            AND timestamp <= %s) 
+                     AS t ON t.ID = estscore.estID 
+                  WHERE estscore.estid IS NULL;'''
+# cursor query:
+# q = 'insert into `cursor` (name, value) values (%s, 1)'
 
-import qraat.srv
 
 # Check for running instances of this program. 
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
 if int(output) > 1: 
-  print >>sys.stderr, "template: error: attempted reentry, exiting"
+  print >>sys.stderr, "filter: error: attempted reentry, exiting"
   sys.exit(1)
 
 parser = OptionParser()
@@ -46,14 +61,13 @@ parser.add_option('-z', '--t-end', action='store', type='int')
 
 try: 
   start = time.time()
-  print "template: start time:", time.asctime(time.localtime(start))
+  print "filter: start time:", time.asctime(time.localtime(start))
 
   db_con = qraat.util.get_db('reader')
 
   chunk_size = int(60 * 60)		# One hour (in seconds)
 
   t_start, t_end = options.t_start, options.t_end
-
   site_id, dep_id = options.site_id, options.dep_id
 
   total_chunks = int((t_end - t_start) / float(chunk_size)) + 1
@@ -61,16 +75,10 @@ try:
   intervals = [(x, min(t_end, x + chunk_size)) for x in start_times]
   print 'There are {} intervals'.format(len(intervals))
   change_handler = qraat.srv.signal_filter.init_change_handler()
+  
   for start, end in intervals:
-    # Right now this rescores points within time range *only* when a score has
-    # not already been computed. Could change this to delete all those scores
-    # (and interval_cache values) and then not do a join filter. But what we do
-    # not want, I'm pretty sure, is more than one score per point.
-    q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteID = %s and deploymentID = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
-    # cursor query:
-    # q = 'insert into `cursor` (name, value) values (%s, 1)'
 
-    cur = change_handler.add_sql(q, (site_id, dep_id, start, end))
+    cur = change_handler.add_sql(score_query, (site_id, dep_id, start, end))
 
     l = []
     while True:
@@ -87,9 +95,10 @@ try:
       print 'Here goes.'
       qraat.srv.signal_filter.score(l)
       print 'Done.'
-    
+  
+
 except mdb.Error, e:
-  print >>sys.stderr, "template: eror: [%d] %s" % (e.args[0], e.args[1])
+  print >>sys.stderr, "filter: eror: [%d] %s" % (e.args[0], e.args[1])
   #with open('/home/qraat/error.log', 'w') as f:
   #  traceback.print_exc(file=f)
   #  for k, vs in qraat.srv.signal_filter.reasoning.items():
@@ -100,7 +109,7 @@ except mdb.Error, e:
   # sys.exit(1)
 
 except qraat.error.QraatError, e:
-  print >>sys.stderr, "template: error: %s." % e
+  print >>sys.stderr, "filter: error: %s." % e
 
 finally: 
-  print "template: finished in %.2f seconds." % (time.time() - start)
+  print "filter: finished in %.2f seconds." % (time.time() - start)
