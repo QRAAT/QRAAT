@@ -37,7 +37,7 @@
             <span id="dropdown-list-toggle" class="caret"></span>
             </a>
             {% if project|is_owner:user or project|is_collaborator:user %}
-            <a href="#test" class="manage-button">
+            <a href={% url 'qraat:manage-locations' project.ID %} class="manage-button">
                 <button type="button" class="btn btn-danger btn-xs">
                     <span class="glyphincon glyphicon-pencil"></span>
                     Manage
@@ -85,7 +85,7 @@
             <span id="dropdown-list-toggle" class="caret"></span>
             </a>
             {% if project|is_owner:user or project|is_collaborator:user %}
-            <a href="#test" class="manage-button">
+            <a href={% url 'qraat:manage-deployments' project.ID %} class="manage-button">
                 <button type="button" class="btn btn-danger btn-xs">
                     <span class="glyphincon glyphicon-pencil"></span>
                     Manage
@@ -134,7 +134,7 @@
             <span id="dropdown-list-toggle" class="caret"></span>
             </a>
             {% if project|is_owner:user or project|is_collaborator:user %}
-            <a href="#test" class="manage-button">
+            <a href={% url 'qraat:manage-transmitters' project.ID %} class="manage-button">
                 <button type="button" class="btn btn-danger btn-xs">
                     <span class="glyphincon glyphicon-pencil"></span>
                     Manage
@@ -174,7 +174,7 @@
             <span id="dropdown-list-toggle" class="caret"></span>
             </a>
             {% if project|is_owner:user or project|is_collaborator:user %}
-            <a href="#test" class="manage-button">
+            <a href={% url 'qraat:manage-targets' project.ID %} class="manage-button">
                 <button type="button" class="btn btn-danger btn-xs">
                     <span class="glyphincon glyphicon-pencil"></span>
                     Manage

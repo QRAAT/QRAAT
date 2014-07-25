@@ -21,6 +21,22 @@ project_patterns = patterns('qraatview.views',
     url(
         r'^(?P<project_id>\d+)/$', 'show_project',
         name='show-project'),
+    
+    url(
+        r'^(?P<project_id>\d+)/manage-locations/$', 'manage_locations',
+        name='manage-locations'),
+    
+    url(
+        r'^(?P<project_id>\d+)/manage-transmitters/$', 'manage_transmitters',
+        name='manage-transmitters'),
+    
+    url(
+        r'^(?P<project_id>\d+)/manage-deployments/$', 'manage_deployments',
+        name='manage-deployments'),
+    
+    url(
+        r'^(?P<project_id>\d+)/manage-targets/$', 'manage_targets',
+        name='manage-targets'),
 
     url(
         r'^(?P<project_id>\d+)/transmitter/(?P<transmitter_id>\d+)/$',
@@ -64,6 +80,5 @@ urlpatterns = patterns('qraatview.views',
   url(r'^auth/', include('qraat_auth.urls', namespace="auth")),
   url(r'^jsi18n/$', javascript_catalog),
   url(r'^$', 'index', name="index"),
-  url(r'^regular-content/$', 'regular_content'),
   url(r'^project/', include((project_patterns, 'qraat', 'qraatview')))
 )
