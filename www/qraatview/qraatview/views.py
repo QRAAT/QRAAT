@@ -148,16 +148,8 @@ def create_project(request):
 
         if form.is_valid():
             project = form.save()
-            viewers_group = Group.objects.create(
-                name="%d_viewers" % project.ID)
-            collaborators_group = Group.objects.create(
-                name="%d_collaborators" % project.ID)
-
-            AuthProjectViewer.objects.create(
-                groupID=viewers_group.id, projectID=project)
-
-            AuthProjectCollaborator.objects.create(
-                groupID=collaborators_group.id, projectID=project)
+            viewers_group = project.create_viewers_group()
+            collaborators_group = project.create_collaborators_group()
 
             # set groups permissions
             project.set_permissions(viewers_group)
