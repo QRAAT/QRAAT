@@ -6,16 +6,14 @@ from django.shortcuts import render, redirect
 
 # Select position or track data.
 DATA_CHOICES = [
-  ('0', 'Select data type...'),
   ('1', 'Position'),
   ('2', 'Track'),
 ]
 
 # Display data points as lines or as marker points.
 DISPLAY_CHOICES = [
-  ('0', 'Select display type...'),
-  ('1', 'Lines'),
-  ('2', 'Points'),
+  ('1', 'Points'),
+  ('2', 'Lines'),
 ]
   
   # Select default zoom. Currently disabled because it's annoying when
@@ -67,10 +65,10 @@ class Form(forms.Form):
 
   trans = forms.MultipleChoiceField(
             choices = get_choices(),
-            widget = forms.SelectMultiple(),
-            #widget = forms.CheckboxSelectMultiple,
+            #widget = forms.SelectMultiple(),
+            widget = forms.CheckboxSelectMultiple(),
             required = True,
-            label = 'DeploymentID',
+            label = 'DeploymentID(s)',
             #initial = '63'
               #Note: initial doesn't work. it sets choices to '6' and '3'
               #To set initial value, in views.py:
@@ -86,7 +84,7 @@ class Form(forms.Form):
             choices=DISPLAY_CHOICES, 
             required=True, 
             label='Display Type', 
-            initial="2")
+            initial="1")
 
   dt_fr = forms.DateTimeField(
             required = True, 
