@@ -114,14 +114,22 @@ def get_context(request, deps=[], req_deps=[]):
   ''' If at least one deployment is selected from the deployment url, 
     automatically show data filtered for min/max range in the database
     for date, likelihood, and activity. '''
-  if len(deps) != 0 and len(req_deps)!=0:
-    view_type = "deployment"
-  else:
+  
+  print "lendeps", len(deps)
+#  if deps[0].ID != None:
+#    print "deps0", deps[0].ID
+#  if deps[1].ID != None:
+#    print "deps1", deps[1].ID
+#  if req_deps[0].ID != None:
+#    print "reqo", req_deps[0].ID
+
+  if len(deps) != 1:
     view_type = "public"
+  else:
+    view_type = "deployment"
 
   if len(req_deps) > 0:
     
-    view_type = "deployment"
     
     dep_query = Position.objects.filter(deploymentID = req_deps[0].ID) 
     ''' Query db for min/max value for selected deployment.
@@ -731,6 +739,7 @@ def get_context(request, deps=[], req_deps=[]):
         # [12] utm zone letter
         pos_filtered_list[flot_index][9]
       ))
+
 
 
 

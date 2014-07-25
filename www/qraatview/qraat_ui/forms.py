@@ -56,13 +56,7 @@ class Form(forms.Form):
   #    raise forms.ValidationError('Select no more than 3.')
   #  return self.cleaned_data['trans']
 
-  data_type = forms.ChoiceField(
-            choices=DATA_CHOICES, 
-            required=True, 
-            label='Data Type', 
-            initial='1'
-            )
-
+  
   trans = forms.MultipleChoiceField(
             choices = get_choices(),
             #widget = forms.SelectMultiple(),
@@ -79,7 +73,15 @@ class Form(forms.Form):
   #trans = TransChoiceField(
   #        label='Transmitter', 
   #        initial=63)
+ 
   
+  data_type = forms.ChoiceField(
+            choices=DATA_CHOICES, 
+            required=True, 
+            label='Data Type', 
+            initial='1'
+            )
+ 
   display_type = forms.ChoiceField(
             choices=DISPLAY_CHOICES, 
             required=True, 
