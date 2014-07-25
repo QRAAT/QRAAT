@@ -1,10 +1,15 @@
 # File: qraat_site models.py
 
 from django.db import models
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from utils import timestamp_todate
 
-QRAAT_APP_LABEL = 'qraat_site'
+QRAAT_APP_LABEL = 'qraatview'
+COLLABORATOR_PERMISSIONS = (
+    ("can_change", "Users can change the project data"),
+    ("can_hide", "Users can hide a project"))
+VIEWER_PERMISSIONS = (
+    ("can_view", "Users can view the project data"),)
 
 
 class Site(models.Model):
@@ -49,9 +54,16 @@ class Site(models.Model):
 
 
 class Project(models.Model):
+
+    def __init__(self, *args, **kwargs):
+        super(Project, self).__init__(*args, **kwargs)
+        self._collaborator_permissions = COLLABORATOR_PERMISSIONS
+        self._viewer_permissions = VIEWER_PERMISSIONS
+
     class Meta:
         app_label = QRAAT_APP_LABEL
         db_table = "project"
+        permissions = COLLABORATOR_PERMISSIONS + VIEWER_PERMISSIONS
 
     ID = models.AutoField(primary_key=True)
 
@@ -67,6 +79,17 @@ class Project(models.Model):
         default=False, null=False)  # tinyint(1) not nul
 
     is_hidden = models.BooleanField(default=False)  # boolean default false
+
+    def add_collaborator_permissions(self, group):
+        [group.permissions.add(permission)
+            for permission in map(lambda p: Permission.objects.get(codename=p[0]),
+                                  (self._collaborator_permissions
+                                      + self._viewer_permissions))]
+
+    def add_viewers_permissions(self, group):
+        [group.permissions.add(permission)
+            for permission in map(lambda p: Permission.objects.get(codename=p[0]),
+                                  self._viewer_permissions)]
 
     def get_locations(self):
         return Location.objects.filter(
@@ -88,10 +111,26 @@ class Project(models.Model):
     def get_viewers_group(self):
         group_id = AuthProjectViewer.objects.get(projectID=self.ID).groupID
         return self.get_group(group_id)
-    
+
     def get_collaborators_group(self):
-        group_id = AuthProjectCollaborator.objects.get(projectID=self.ID).groupID
+        group_id = AuthProjectCollaborator.objects.get(
+            projectID=self.ID).groupID
         return self.get_group(group_id)
+
+    def is_owner(self, user):
+        return user.id == self.ownerID
+
+    def is_collaborator(self, user):
+        return user in self.get_collaborators_group().user_set.all()
+
+    def is_viewer(self, user):
+        return user in self.get_viewers_group().user_set.all()
+
+    def set_permissions(self, group):
+        if group == self.get_viewers_group():
+            self.add_viewers_permissions(group)
+        elif group == self.get_collaborators_group():
+            self.add_collaborator_permissions(group)
 
     def __unicode__(self):
         return u'ID = %d name = %s' % (self.ID, self.name)
@@ -106,9 +145,10 @@ class AuthProjectViewer(models.Model):
 
     groupID = models.IntegerField(
         null=False,
+        unique=True,
         help_text="References GUID in web forntend, i.e. django.auth_group.id")
 
-    projectID = models.ForeignKey(Project, db_column="projectID")
+    projectID = models.ForeignKey(Project, db_column="projectID", unique=True)
 
 
 class AuthProjectCollaborator(models.Model):
@@ -120,9 +160,10 @@ class AuthProjectCollaborator(models.Model):
 
     groupID = models.IntegerField(
         null=False,
+        unique=True,
         help_text="References GUID in web frontend, i.e. django.auth.group.id")
 
-    projectID = models.ForeignKey(Project, db_column="projectID")
+    projectID = models.ForeignKey(Project, db_column="projectID", unique=True)
 
 
 class Position(models.Model):
@@ -223,6 +264,7 @@ class TxParameters(models.Model):
         app_label = QRAAT_APP_LABEL
         db_table = "tx_parameters"
         unique_together = ("ID", "txID", "name")  # set multiple fields as keys
+        verbose_name_plural = "Tx Parameters"
 
     ID = models.AutoField(primary_key=True)
 
@@ -240,6 +282,7 @@ class TxMakeParameters(models.Model):
         app_label = QRAAT_APP_LABEL
         db_table = "tx_make_parameters"
         unique_together = ('ID', 'tx_makeID', 'name')
+        verbose_name_plural = "Tx Make Parameters"
 
     ID = models.AutoField(primary_key=True)
 

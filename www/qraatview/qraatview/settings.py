@@ -76,7 +76,7 @@ DATABASES = {
 }
 
 DATABASE_ROUTERS = [ 'qraatview.router.DatabaseAppsRouter',]
-DATABASE_APPS_MAPPING = {'qraat_ui': 'qraat' }	
+DATABASE_APPS_MAPPING = {'qraat_ui': 'qraat', 'qraatview': 'qraat' }	
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/
