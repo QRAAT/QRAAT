@@ -8,16 +8,26 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/1.6/ref/settings/
 """
 
-# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+import qraat
 
+# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.6/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '8%a3r^oveg!z)o^%-87*+kns2c$qma^(=g@%_7ua19q9ug&=5+'
+try:
+  base = qraat.csv.csv(os.environ['RMG_SERVER_UI_KEYS']).get(name='django_base')
+
+except KeyError:
+  raise qraat.error.QraatError("undefined environment variables. Try `source rmg_env`")
+  
+except IOError, e:
+  raise qraat.error.QraatError("missing DB credential file '%s'" % e.filename)
+
+SECRET_KEY = base.key
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -76,7 +86,7 @@ DATABASES = {
 }
 
 DATABASE_ROUTERS = [ 'qraatview.router.DatabaseAppsRouter',]
-DATABASE_APPS_MAPPING = {'qraat_ui': 'qraat' }	
+DATABASE_APPS_MAPPING = {'qraat_ui': 'qraat', 'qraatview': 'qraat' }	
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/

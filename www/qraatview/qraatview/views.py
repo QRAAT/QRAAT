@@ -1,9 +1,11 @@
+from django.db.models import Q
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from models import Project, Tx, Location
+from models import AuthProjectCollaborator, AuthProjectViewer
 from forms import ProjectForm, EditProjectForm, AddTransmitterForm
 from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
@@ -11,12 +13,18 @@ from forms import AddDeploymentForm, AddLocationForm
 
 def index(request):
     nav_options = get_nav_options(request)
-    projects = Project.objects.filter(is_public=True, is_hidden=False)
+    user = request.user
 
-    return render(
-        request, "qraat_site/index.html",
-        {'nav_options': nav_options,
-         'projects': projects})
+    if user.is_authenticated():
+        return projects(request)
+    else:
+        public_projects = Project.objects.filter(
+            is_public=True, is_hidden=False)
+
+        return render(
+            request, "qraat_site/index.html",
+            {'nav_options': nav_options,
+             'projects': public_projects})
 
 
 # @login_required(login_url='/auth/login')
@@ -60,15 +68,32 @@ def show_location(request, project_id, location_id):
 def projects(request):
     user = request.user
 
-    user_projects = Project.objects.filter(ownerID=user.id)
+    user_projects = Project.objects.filter(
+        ownerID=user.id).exclude(is_hidden=True)
+
+    collaborate_with = [project
+                        # exclude hidden projects or owned projects
+                        for project in Project.objects.exclude(
+                            Q(ownerID=user.id) | Q(is_hidden=True))
+                        if project.is_collaborator(user)]
+
+    can_visualize = [project
+                     for project in Project.objects.exclude(
+                         Q(ownerID=user.id) | Q(is_hidden=True))
+                     if project not in collaborate_with
+                     and project.is_viewer(user)]
+
     public_projects = [p for p in Project.objects.filter(
-        is_public=True, is_hidden=False) if p not in user_projects]
+        is_public=True, is_hidden=False) if p not in user_projects
+        and p not in collaborate_with and p not in can_visualize]
 
     nav_options = get_nav_options(request)
 
     return render(request, 'qraat_site/projects.html',
                   {'public_projects': public_projects,
                    'user_projects': user_projects,
+                   'collaborate_with': collaborate_with,
+                   'can_visualize': can_visualize ,
                    'nav_options': nav_options})
 
 
@@ -85,7 +110,11 @@ def render_project_form(
         return HttpResponse("Error: We did not find this project")
 
     else:
-        if user.id == project.ownerID:
+        # Checking has_perm we can have different permissions for group
+        if project.is_owner(user) or\
+                (project.is_collaborator(user)
+                    and user.has_perm("qraatview.can_change")):
+
             if request.method == 'POST':
                 form = post_form
                 form.set_project(project)
@@ -119,8 +148,12 @@ def create_project(request):
 
         if form.is_valid():
             project = form.save()
-            Group.objects.create(name="%d_viewers" % project.ID)
-            Group.objects.create(name="%d_collaborators" % project.ID)
+            viewers_group = project.create_viewers_group()
+            collaborators_group = project.create_collaborators_group()
+
+            # set groups permissions
+            project.set_permissions(viewers_group)
+            project.set_permissions(collaborators_group)
 
             return redirect('/project/%d' % project.ID)
     else:
@@ -144,8 +177,13 @@ def edit_project(request, project_id):
     except ObjectDoesNotExist:
         return HttpResponse("Error: We did not find this project")
 
+    except Exception, e:
+        return HttpResponse("Error: %s please contact administration" % str(e))
+
     else:
-        if user.id == project.ownerID:
+        if project.is_owner(user)\
+                or (project.is_collaborator(user)
+                    and user.has_perm("qraatview.can_change")):
             if request.method == 'POST':
                 form = EditProjectForm(data=request.POST, instance=project)
                 if form.is_valid():
@@ -166,8 +204,7 @@ def edit_project(request, project_id):
                  'project': project})
 
         else:
-            return HttpResponse(
-                request, "Just the project owner can access this page")
+            return HttpResponse("You're not allowed edit this project")
 
 
 @login_required(login_url="/auth/login")
@@ -268,15 +305,20 @@ def show_project(request, project_id):
                  'nav_options': nav_options})
 
         else:
-            if user.id == project.ownerID:
-                return render(
-                    request,
-                    'qraat_site/display-project.html',
-                    {'project': project,
-                     'nav_options': nav_options})
+            if project.is_owner(user)\
+                    or ((project.is_collaborator(user)
+                        or project.is_viewer(user))
+                        and user.has_perm("qraatview.can_view")):
+
+                    return render(
+                        request,
+                        'qraat_site/display-project.html',
+                        {'project': project,
+                         'nav_options': nav_options})
 
             else:
-                return HttpResponse("Project is not public")
+                return HttpResponse(
+                    "You're not allowed to visualize this project")
 
     except ObjectDoesNotExist:
         return HttpResponse("Project not found")

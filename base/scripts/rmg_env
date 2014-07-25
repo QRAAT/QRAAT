@@ -58,6 +58,11 @@ export RMG_SERVER_TXLIST="$RMG_SERVER_METADATA_DIR/tx.csv"
 # This file is used by server scripts to access the database.
 export RMG_SERVER_DB_AUTH="$RMG_SERVER_METADATA_DIR/db_auth"
 
+# Keys related to web-based user interface. The Django 
+# project 'qraatview' expects values for 'google_maps_js_api' 
+# and 'django_base'. 
+export RMG_SERVER_UI_KEYS="$RMG_SERVER_METADATA_DIR/ui_keys"
+
 # The location on the server for det files from remote sites.
 export RMG_SERVER_DET_DIR="$RMG_SERVER_DIR/det_files"
 
