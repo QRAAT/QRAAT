@@ -204,7 +204,7 @@ def edit_project(request, project_id):
                  'project': project})
 
         else:
-            return HttpResponse("You're not allowed edit this project")
+            return HttpResponse("You're not allowed to edit this project")
 
 
 @login_required(login_url="/auth/login")

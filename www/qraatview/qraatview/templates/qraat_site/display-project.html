@@ -1,13 +1,14 @@
 {% extends "qraat_site/base.html" %}
+{% load project_filters %}
 
 {% block content %}
 
 <script>
     $(document).ready(function(){
-            $(".dropdown-list-heading").click(
+            $(".dropdown-list-title").click(
                 function(){
                     $(this).parent().children("a").toggleClass(" dropup")
-                    $(this).parent().children(".dropdown-list-table").slideToggle("fast");
+                    $(this).parents().children(".dropdown-list-table").slideToggle("fast");
                 }    
             );
     });
@@ -29,9 +30,23 @@
 </div>
 
 <div class="dropdown-list">
-    <a href="#locations" class="dropdown-list-heading">
-        <h4>Locations  <span id="dropdown-list-toggle" class="caret"></span></h4>
+  <div class="dropdown-list-heading">
+        <h4>
+            <a href="#locations" class="dropdown-list-title">
+                Locations
+            <span id="dropdown-list-toggle" class="caret"></span>
+            </a>
+            {% if project|is_owner:user or project|is_collaborator:user %}
+            <a href="#test" class="manage-button">
+                <button type="button" class="btn btn-danger btn-xs">
+                    <span class="glyphincon glyphicon-pencil"></span>
+                    Manage
+                </button>
+            </a>
+            {% endif %}
+        </h4>
     </a>
+  </div>
     <div id="locations" class="dropdown-list-table" style="display: none;">
     <div class="table-body">
         <div class="table-element table-row">
@@ -63,10 +78,23 @@
 </div>
 
 <div class="dropdown-list">
-    <a href="#deployments" class="dropdown-list-heading">
-        <h4>Deployments <span id="dropdown-list-toggle" class="caret">
+  <div class="dropdown-list-heading">
+        <h4>
+            <a href="#deployments" class="dropdown-list-title">
+               Deployments 
+            <span id="dropdown-list-toggle" class="caret"></span>
+            </a>
+            {% if project|is_owner:user or project|is_collaborator:user %}
+            <a href="#test" class="manage-button">
+                <button type="button" class="btn btn-danger btn-xs">
+                    <span class="glyphincon glyphicon-pencil"></span>
+                    Manage
+                </button>
+            </a>
+            {% endif %}
         </h4>
     </a>
+  </div>
     <div id="deployments" class="dropdown-list-table" style="display: none;">
         <div class="table-body"> 
             <div class="table-element table-row">
@@ -99,11 +127,23 @@
 </div>
 
 <div class="dropdown-list">
-    <a href="#transmitters" class="dropdown-list-heading">
-    <h4>Transmitters
-        <span id="dropdown-list-toggle" class="caret"></span>
-    </h4>
+  <div class="dropdown-list-heading">
+        <h4>
+            <a href="#transmitters" class="dropdown-list-title">
+                Transmitters
+            <span id="dropdown-list-toggle" class="caret"></span>
+            </a>
+            {% if project|is_owner:user or project|is_collaborator:user %}
+            <a href="#test" class="manage-button">
+                <button type="button" class="btn btn-danger btn-xs">
+                    <span class="glyphincon glyphicon-pencil"></span>
+                    Manage
+                </button>
+            </a>
+            {% endif %}
+        </h4>
     </a>
+  </div>
     <div id="transmitters" class="dropdown-list-table" style="display: none;">
         <div class="table-body">
             <div class="table-element table-row">
@@ -127,11 +167,23 @@
 </div>
 
 <div class="dropdown-list">
-    <a href="#targets" class="dropdown-list-heading">
-        <h4> Targets
-            <span class="caret"></span>
+  <div class="dropdown-list-heading">
+        <h4>
+            <a href="#targets" class="dropdown-list-title">
+               Targets 
+            <span id="dropdown-list-toggle" class="caret"></span>
+            </a>
+            {% if project|is_owner:user or project|is_collaborator:user %}
+            <a href="#test" class="manage-button">
+                <button type="button" class="btn btn-danger btn-xs">
+                    <span class="glyphincon glyphicon-pencil"></span>
+                    Manage
+                </button>
+            </a>
+            {% endif %}
         </h4>
     </a>
+  </div>
     <div id="targets" class="dropdown-list-table" style="display: none;">
         <div class="table-body">
             <div class="table-element table-row">
