@@ -15,7 +15,7 @@ class DatabaseAppsRouter(object):
  
     def db_for_read(self, model, **hints):
         """"Point all read operations to the specific database."""
-        if model._meta.app_label == 'qraat_site':
+        if model._meta.app_label == 'qraatview':
           return 'qraat'
         if settings.DATABASE_APPS_MAPPING.has_key(model._meta.app_label):
             return settings.DATABASE_APPS_MAPPING[model._meta.app_label]
@@ -23,7 +23,7 @@ class DatabaseAppsRouter(object):
  
     def db_for_write(self, model, **hints):
         """Point all write operations to the specific database."""
-        if model._meta.app_label == 'qraat_site':
+        if model._meta.app_label == 'qraatview':
           return 'qraat'
         if settings.DATABASE_APPS_MAPPING.has_key(model._meta.app_label):
             return settings.DATABASE_APPS_MAPPING[model._meta.app_label]
@@ -42,7 +42,9 @@ class DatabaseAppsRouter(object):
  
     def allow_syncdb(self, db, model):
         """Make sure that apps only appear in the related database."""
-        if db in settings.DATABASE_APPS_MAPPING.values():
+        if db == 'qraat':
+            return False
+        elif db in settings.DATABASE_APPS_MAPPING.values():
             return settings.DATABASE_APPS_MAPPING.get(model._meta.app_label) == db
         elif settings.DATABASE_APPS_MAPPING.has_key(model._meta.app_label):
             return False

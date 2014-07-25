@@ -103,8 +103,3 @@ def change_password(request):
                 {'form': form, 'changed': True})
 
     return render(request, 'qraat_auth/change-password.html', {'form': form})
-
-
-@login_required(login_url='/auth')
-def userCreated(request):
-    return HttpResponse("User Created!")
