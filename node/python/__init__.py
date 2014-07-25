@@ -43,6 +43,7 @@ if _RTLD_GLOBAL != 0:
 
 # import swig generated symbols into the rmg namespace
 from rmg_swig import detect
+from rmg_swig import continuous_covariance
 
 # import any pure python here
 import run

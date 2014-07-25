@@ -120,7 +120,7 @@ class software_backend(gr.hier_block2):
     def __init__(self, channels, be_param, directory = "./det_files"):
 
         gr.hier_block2.__init__(self, "software_backend",
-                                gr.io_signature(4, 4, gr.sizeof_gr_complex), # Input signature
+                                gr.io_signature(channels, channels, gr.sizeof_gr_complex), # Input signature
                                 gr.io_signature(0, 0, 0))                    # Output signature
 
         band_rate = be_param.bw
@@ -211,5 +211,60 @@ class software_backend(gr.hier_block2):
         bands = self.current_bands
         self.disable()
         self.enable(bands)
+
+def afsk_demod(gr.hier_block2):
+
+  def __init__(self, input_rate, min_output_rate, mark_freq, space_freq):
+    
+    gr.hier_block2.__init__(self, "afsk_demod",
+                                gr.io_signature(1, 1, gr.sizeof_gr_complex), # Input signature
+                                gr.io_signature(1, 1, gr.sizeof_float))     # Output signature
+
+    ny_samples = int(round(input_rate/float(abs(mark_freq - space_freq))))
+
+    gf_rate = input_rate/float(ny_samples)
+    if gf_rate > min_output_rate:
+      num_filters = 1
+    else:
+      if min_output_rate % gf_rate == 0:
+        num_filters = int(min_output_rate/gf_rate)
+      else:
+        num_filters = int(min_output_rate/gf_rate)+1
+      
+    self.output_rate = input_rate/float(ny_samples)*num_filters
+    print "AFSK_Demod output rate: {0} Hz".format(self.output_rate)
+
+    demod = gr.quadrature_demod_cf(1)
+
+    self.connect(self, demod)
+
+    goertzel_filter_A = []
+    goertzel_filter_B = []
+    delay_A = []
+    delay_B = []
+    for j in range(num_filters):
+      goertzel_filter_A.append(gr.goertzel_fc(input_rate, ny_samples, mark_freq))
+      goertzel_filter_B.append(gr.goertzel_fc(input_rate, ny_samples, space_freq))
+
+    for j in range(num_filters-1):
+      delay_A.append(gr.delay(gr.sizeof_float, int((j+1)*ny_samples/num_filters)))
+      delay_B.append(gr.delay(gr.sizeof_float, int((j+1)*ny_samples/num_filters)))
+
+    self.connect(demod, goertzel_filter_A[0])
+    self.connect(demod, goertzel_filter_B[0])
+
+    for j in range(num_filters-1):
+      self.connect(demod, delay_A[j], goertzel_filter_A[j+1])
+      self.connect(demod, delay_B[j], goertzel_filter_B[j+1])
+
+    interleave = gr.interleave(gr.sizeof_gr_complex)
+
+    for j in range(num_filters):
+      self.connect(goertzel_filter_A[j], (interleave, 2*(num_filters - j - 1)))
+      self.connect(goertzel_filter_B[j], (interleave, 2*(num_filters - j - 1) + 1))
+
+    ctof = gr.complex_to_mag()
+
+    self.connect(interleave, ctof, self)
 
 

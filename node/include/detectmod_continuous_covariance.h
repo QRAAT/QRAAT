@@ -18,14 +18,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef INCLUDED_continuous_covariance_H
-#define INCLUDED_continuous_covariance_H
+#ifndef INCLUDED_detectmod_continuous_covariance_H
+#define INCLUDED_detectmod_continuous_covariance_H
 
 #include <qraat/rmg_api.h>
 #include <gr_sync_block.h>
 
 
-class continuous_covariance;
+class detectmod_continuous_covariance;
 
 /*
  * GNU Radio uses boost smart pointers for all access to signal processing
@@ -33,7 +33,7 @@ class continuous_covariance;
  * greatly simplifies storage management issues. This is especially helpful
  * in our hypric C++ / Python system. 
  */
-typedef boost::shared_ptr<continuous_covariance> continuous_covariance_sptr;
+typedef boost::shared_ptr<detectmod_continuous_covariance> detectmod_continuous_covariance_sptr;
 
 /*!
  * \brief Return a shared_ptr to a new instance of continuous_covariance.
@@ -42,7 +42,7 @@ typedef boost::shared_ptr<continuous_covariance> continuous_covariance_sptr;
  * pointers, the object's constructor is declared private. This is the 
  * public interface.
  */
-RMG_API continuous_covariance_sptr make_continuous_covariance (
+RMG_API detectmod_continuous_covariance_sptr detectmod_make_continuous_covariance (
     int num_channels, 
     int cov_len, 
     const char *directory, 
@@ -52,11 +52,11 @@ RMG_API continuous_covariance_sptr make_continuous_covariance (
  * A pulse detector block for GNU Radio. Input a four channel signal from   
  * a USRP device (uhd_source). Output a .det file when a pulse is detected. 
  */
-class RMG_API continuous_covariance : public gr_sync_block
+class RMG_API detectmod_continuous_covariance : public gr_sync_block
 {
 private:
 
-  friend RMG_API continuous_covariance_sptr make_continuous_covariance (
+  friend RMG_API detectmod_continuous_covariance_sptr detectmod_make_continuous_covariance (
     int num_channels, 
     int cov_len, 
     const char *directory, 
@@ -81,6 +81,9 @@ private:
   //! A file descriptor used for data output (pulses or continuous). 
   void	       *d_fp;
 
+  //! Generates file name
+  char *get_filename();
+
   /*!
    * \brief Open a file for writing in binary mode. 
    * Once upon a time, the detetor class wrote det files directly. 
@@ -95,7 +98,7 @@ private:
   void close();
 
   //! Private constructor. 
-  continuous_covariance (
+  detectmod_continuous_covariance (
     int num_channels, 
     int cov_len, 
     const char *directory, 
@@ -104,7 +107,7 @@ private:
 public:
 
   //! Public destructor.
-  ~continuous_covariance ();	
+  ~detectmod_continuous_covariance ();	
 
   /*! 
    * Work function for signal processing block. This is the meat 
@@ -118,4 +121,4 @@ public:
 
 };
 
-#endif /* INCLUDED_continuous_covariance_h*/
+#endif /* INCLUDED_detectmod_continuous_covariance_h*/
