@@ -2,10 +2,8 @@ from django.db.models import Q
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from models import Project, Tx, Location
-from models import AuthProjectCollaborator, AuthProjectViewer
 from forms import ProjectForm, EditProjectForm, AddTransmitterForm
 from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
@@ -93,7 +91,7 @@ def projects(request):
                   {'public_projects': public_projects,
                    'user_projects': user_projects,
                    'collaborate_with': collaborate_with,
-                   'can_visualize': can_visualize ,
+                   'can_visualize': can_visualize,
                    'nav_options': nav_options})
 
 
@@ -204,7 +202,7 @@ def edit_project(request, project_id):
                  'project': project})
 
         else:
-            return HttpResponse("You're not allowed edit this project")
+            return HttpResponse("You're not allowed to edit this project")
 
 
 @login_required(login_url="/auth/login")
@@ -324,8 +322,24 @@ def show_project(request, project_id):
         return HttpResponse("Project not found")
 
 
-def regular_content(request):
-    return redirect('/hello/index.html')
+@login_required(login_url="/auth/login")
+def manage_targets(request, project_id):
+    return HttpResponse("Not implemented yet")
+
+
+@login_required(login_url="/auth/login")
+def manage_locations(request, project_id):
+    return HttpResponse("Not implemented yet")
+
+
+@login_required(login_url="/auth/login")
+def manage_transmitters(request, project_id):
+    return HttpResponse("Not implemented yet")
+
+
+@login_required(login_url="/auth/login")
+def manage_deployments(request, project_id):
+    return HttpResponse("Not implemented yet")
 
 
 def get_nav_options(request):

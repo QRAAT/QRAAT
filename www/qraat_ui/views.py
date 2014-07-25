@@ -844,13 +844,13 @@ def index(request):
             is_public=True).values('ID'))
 
   context = get_context(request, deps, req_deps)
-  return render(request, 'index.html', context)
+  return render(request, 'qraat_ui/index.html', context)
 
 def view_by_dep(request, dep_id):
   ''' Compile a list of deployments associated with `dep_id`. ''' 
   deps = Deployment.objects.filter(ID=dep_id)
   context = get_context(request, deps, deps)
-  return render(request, 'index.html', context)
+  return render(request, 'qraat_ui/index.html', context)
 
 def view_by_target(request, target_id): 
   ''' Compile a list of deployments associated with `target_id`. ''' 
