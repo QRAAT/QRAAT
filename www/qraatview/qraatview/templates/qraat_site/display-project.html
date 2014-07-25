@@ -4,7 +4,15 @@
 {% block content %}
 
 <script>
+    var proj_objs = ["locations", "transmitters",
+        "deployments", "targets"];
+    
     $(document).ready(function(){
+            //Initialize tooltip for proj_objs
+            for(var i = 0; i<proj_objs.length; i++){
+                $("#manage-" + proj_objs[i] ).tooltip(); 
+            }
+
             $(".dropdown-list-title").click(
                 function(){
                     $(this).parent().children("a").toggleClass(" dropup")
@@ -30,24 +38,25 @@
 </div>
 
 <div class="dropdown-list">
-  <div class="dropdown-list-heading">
+  <div id="locations" class="dropdown-list-heading">
         <h4>
             <a href="#locations" class="dropdown-list-title">
                 Locations
             <span id="dropdown-list-toggle" class="caret"></span>
             </a>
             {% if project|is_owner:user or project|is_collaborator:user %}
-            <a href={% url 'qraat:manage-locations' project.ID %} class="manage-button">
+            <a id="manage-locations" title="Manage locations"\
+                href={% url 'qraat:manage-locations' project.ID %} class="manage-button">
                 <button type="button" class="btn btn-danger btn-xs">
                     <span class="glyphincon glyphicon-pencil"></span>
-                    Manage
+                    <!-- Manage -->
                 </button>
             </a>
             {% endif %}
         </h4>
     </a>
   </div>
-    <div id="locations" class="dropdown-list-table" style="display: none;">
+    <div class="dropdown-list-table" style="display: none;">
     <div class="table-body">
         <div class="table-element table-row">
             <span class="table-element table-cell">Name</span>
@@ -78,24 +87,25 @@
 </div>
 
 <div class="dropdown-list">
-  <div class="dropdown-list-heading">
+  <div id="deployments" class="dropdown-list-heading">
         <h4>
             <a href="#deployments" class="dropdown-list-title">
                Deployments 
             <span id="dropdown-list-toggle" class="caret"></span>
             </a>
             {% if project|is_owner:user or project|is_collaborator:user %}
-            <a href={% url 'qraat:manage-deployments' project.ID %} class="manage-button">
+            <a id="manage-deployments" title="Manage deployments"\
+                href={% url 'qraat:manage-deployments' project.ID %} class="manage-button">
                 <button type="button" class="btn btn-danger btn-xs">
                     <span class="glyphincon glyphicon-pencil"></span>
-                    Manage
+                    <!-- Manage -->
                 </button>
             </a>
             {% endif %}
         </h4>
     </a>
   </div>
-    <div id="deployments" class="dropdown-list-table" style="display: none;">
+    <div class="dropdown-list-table" style="display: none;">
         <div class="table-body"> 
             <div class="table-element table-row">
                 <span class="table-element table-cell">Name</span>
@@ -115,9 +125,9 @@
                 <span class="table-element table-cell">{{deployment.txID}}</span>
                 <span class="table-element table-cell">{{deployment.targetID}}</span>
                 <span class="table-element table-cell">{% if deployment.is_active %}
-                     <span class="glyphicon glyphicon-ok-sign"></span>
+                     <span style="color:green;" class="glyphicon glyphicon-ok-sign"></span>
                     {% else %}
-                    <span class="glyphicon glyphicon-remove-sign"></span>
+                    <span style="color:red;" class="glyphicon glyphicon-remove-sign"></span>
                     {%endif%}
                 </span>
             </a>
@@ -127,24 +137,25 @@
 </div>
 
 <div class="dropdown-list">
-  <div class="dropdown-list-heading">
+  <div id="transmitters"  class="dropdown-list-heading">
         <h4>
             <a href="#transmitters" class="dropdown-list-title">
                 Transmitters
             <span id="dropdown-list-toggle" class="caret"></span>
             </a>
             {% if project|is_owner:user or project|is_collaborator:user %}
-            <a href={% url 'qraat:manage-transmitters' project.ID %} class="manage-button">
+            <a id="manage-transmitters" title="Manage transmitters"\
+                href={% url 'qraat:manage-transmitters' project.ID %} class="manage-button">
                 <button type="button" class="btn btn-danger btn-xs">
                     <span class="glyphincon glyphicon-pencil"></span>
-                    Manage
+                    <!-- Manage -->
                 </button>
             </a>
             {% endif %}
         </h4>
     </a>
   </div>
-    <div id="transmitters" class="dropdown-list-table" style="display: none;">
+    <div class="dropdown-list-table" style="display: none;">
         <div class="table-body">
             <div class="table-element table-row">
                 <span class="table-element table-cell">Name</span>
@@ -167,24 +178,25 @@
 </div>
 
 <div class="dropdown-list">
-  <div class="dropdown-list-heading">
+  <div id="targets" class="dropdown-list-heading">
         <h4>
             <a href="#targets" class="dropdown-list-title">
                Targets 
             <span id="dropdown-list-toggle" class="caret"></span>
             </a>
             {% if project|is_owner:user or project|is_collaborator:user %}
-            <a href={% url 'qraat:manage-targets' project.ID %} class="manage-button">
-                <button type="button" class="btn btn-danger btn-xs">
+            <a id="manage-targets" title="Manage targets"\
+                href={% url 'qraat:manage-targets' project.ID %} class="manage-button">
+                <button  type="button" class="btn btn-danger btn-xs">
                     <span class="glyphincon glyphicon-pencil"></span>
-                    Manage
+                    <!-- Manage -->
                 </button>
             </a>
             {% endif %}
         </h4>
     </a>
   </div>
-    <div id="targets" class="dropdown-list-table" style="display: none;">
+    <div class="dropdown-list-table" style="display: none;">
         <div class="table-body">
             <div class="table-element table-row">
                 <span class="table-element table-cell">Name</span>
