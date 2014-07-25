@@ -4,7 +4,7 @@ from django.template import Context, loader, RequestContext
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import render, render_to_response, get_object_or_404
 from django.core.urlresolvers import reverse
-from django.db.models import Q
+from django.db.models import Q, Max, Min
 
 # uncomment next line for for attachment download
 # from django.core.servers.basehttp import FileWrapper
@@ -95,10 +95,14 @@ def get_context(request, deps=[], req_deps=[]):
     display_type = None
  
 
+  #print 'deps', deps[0].ID
+  #print 'req_deps', req_deps[0].ID
+  
 
+  index_form = Form(deps=deps, data=request.GET or None)
 
   # Declare empty lists and variables
-
+  view_type = ""
   pos_filtered_list = []
   pos_filtered_list1 = []
   selected_data = []
@@ -107,42 +111,120 @@ def get_context(request, deps=[], req_deps=[]):
   selected_index_large = None
 
 
+  ''' If at least one deployment is selected from the deployment url, 
+    automatically show data filtered for min/max range in the database
+    for date, likelihood, and activity. '''
+  if len(deps) != 0 and len(req_deps)!=0:
+    view_type = "deployment"
+  else:
+    view_type = "public"
 
-
-  # Convert time strings to Davis-timezone timestamps in seconds
-
-
-  #if form.is_valid():
-  if datetime_from and datetime_to and deps != []:
-    datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
-    datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
+  if len(req_deps) > 0:
     
-   
-    #temporary fix that doesn't take into account daylight savings
-    datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference
-    datetime_to_sec_davis = datetime_to_sec + 7*60*60
-
-    #datetime_test = float(time.mktime(timezone('US/Pacific').(datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple())))
-
-    print datetime_from_sec
-    #print datetime_test 
-
-
-
-
-                  # QUERY DB FROM HTML SETTINGS
-
-
-    db_sel = Position   #can change database
-
-    #dep_filter = ""
-    #for d in dep_ids:
-    #  dep_filter += "Q(deploymentID = %d), "
-    #print dep_filter
+    view_type = "deployment"
     
-    if (datetime_from_sec_davis) and (datetime_to_sec_davis) and (lk_l) and (lk_h) and (act_l) and (act_h):
-      if (len(req_deps) >= 1):
-        pos_query = db_sel.objects.filter(
+    dep_query = Position.objects.filter(deploymentID = req_deps[0].ID) 
+    ''' Query db for min/max value for selected deployment.
+        Used to automatically populate html form intial values. '''
+    datetime_end =    float( dep_query.aggregate(Max('timestamp'))
+                            ['timestamp__max'] )
+    datetime_end_str = time.strftime('%Y-%m-%d %H:%M:%S',
+              time.localtime(float(datetime_end-7*60*60)))
+
+    #datetime_start =  float( dep_query.aggregate(Min('timestamp'))
+    #                        ['timestamp__min'] )
+    
+    #last day that there's data for
+    datetime_start = float(datetime_end - 86400.00)
+    datetime_start_str = time.strftime('%Y-%m-%d %H:%M:%S',
+              time.localtime(float(datetime_start-7*60*60)))
+    likelihood_low =  str ((dep_query.aggregate(Min('likelihood'))
+                            ['likelihood__min']) )
+    likelihood_high = str( (dep_query.aggregate(Max('likelihood'))
+                            ['likelihood__max']) )
+    activity_low =    str( (dep_query.aggregate(Min('activity'))
+                            ['activity__min']) )
+    activity_high =   str( (dep_query.aggregate(Max('activity'))
+                            ['activity__max']) )
+    print datetime_start, datetime_end, likelihood_low, likelihood_high, activity_low, activity_high
+
+  
+    index_form.fields['dt_fr'].initial = datetime_start_str
+    index_form.fields['dt_to'].initial = datetime_end_str
+    index_form.fields['lk_l'].initial = likelihood_low
+    index_form.fields['lk_h'].initial = likelihood_high
+    index_form.fields['act_l'].initial = activity_low
+    index_form.fields['act_h'].initial = activity_high
+ 
+
+    ''' If there is no GET data '''
+    ''' Should be changed so that default is the min/max, for values that
+      are not entered in the form. The user should notified too. '''
+
+    if datetime_from == None:
+      pos_query = Position.objects.filter(
+                          deploymentID = req_deps[0].ID,
+                          timestamp__gte = datetime_start,
+                          timestamp__lte = datetime_end,
+                          likelihood__gte = likelihood_low,
+                          likelihood__lte = likelihood_high,
+                          activity__gte = activity_low,
+                          activity__lte = activity_high
+                          )
+
+      for q in pos_query:
+          # Calculate lat, lons each point
+        (lat, lon) = utm.to_latlon(
+                  float(q.easting), 
+                  float(q.northing),
+                  q.utm_zone_number,
+                  q.utm_zone_letter)
+          
+          # Convert timestamps to datetime strings and subtract 7 hrs
+          # Not sure if localtime is the correct way to do this...
+        date_string = time.strftime('%Y-%m-%d %H:%M:%S',
+            time.localtime(float(q.timestamp-7*60*60)))
+
+      # Store django objects as a python list of tuples
+        pos_filtered_list.append(
+            (
+            q.ID,                 #0 
+            q.deploymentID,       #1
+            float(q.timestamp),   #2
+            float(q.easting),     #3
+            float(q.northing),    #4
+            q.utm_zone_number,    #5
+            float(q.likelihood),  #6
+            float(q.activity),    #7
+            (lat, lon),           #8
+            q.utm_zone_letter,    #9
+            date_string           #10
+            ))
+    else: 
+          #if datetime_from and datetime_to and deps != []:
+      try:
+        datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
+        datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
+        #temporary fix that doesn't take into account daylight savings
+        datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference
+        datetime_to_sec_davis = datetime_to_sec + 7*60*60
+      #datetime_test = float(time.mktime(timezone('US/Pacific').(datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple())))
+        float(act_h)
+        float(act_l)
+        float(lk_l)
+        float(lk_h)
+      except:
+        datetime_from_sec = None
+        datetime_to_sec = None
+        datetime_from_sec_davis = None
+        datetime_to_sec_davis = None
+        act_h = None
+        act_l = None
+        lk_l = None
+        lk_h = None
+
+      
+      pos_query = Position.objects.filter(
                           deploymentID = req_deps[0].ID,
                           timestamp__gte = datetime_from_sec_davis,
                           timestamp__lte = datetime_to_sec_davis,
@@ -152,7 +234,258 @@ def get_context(request, deps=[], req_deps=[]):
                           activity__lte = act_h
                           )
 
-        
+      for q in pos_query:
+          # Calculate lat, lons each point
+        (lat, lon) = utm.to_latlon(
+                  float(q.easting), 
+                  float(q.northing),
+                  q.utm_zone_number,
+                  q.utm_zone_letter)
+          
+          # Convert timestamps to datetime strings and subtract 7 hrs
+          # Not sure if localtime is the correct way to do this...
+        date_string = time.strftime('%Y-%m-%d %H:%M:%S',
+            time.localtime(float(q.timestamp-7*60*60)))
+
+      # Store django objects as a python list of tuples
+        pos_filtered_list.append(
+            (
+            q.ID,                 #0 
+            q.deploymentID,       #1
+            float(q.timestamp),   #2
+            float(q.easting),     #3
+            float(q.northing),    #4
+            q.utm_zone_number,    #5
+            float(q.likelihood),  #6
+            float(q.activity),    #7
+            (lat, lon),           #8
+            q.utm_zone_letter,    #9
+            date_string           #10
+            ))
+ 
+
+
+  # Convert time strings to Davis-timezone timestamps in seconds
+  else:  #when a dep is not given (i.e public)
+                  # QUERY DB FROM HTML SETTINGS
+    
+    try:
+      datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
+      datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
+        #temporary fix that doesn't take into account daylight savings
+      datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference
+      datetime_to_sec_davis = datetime_to_sec + 7*60*60
+      #datetime_test = float(time.mktime(timezone('US/Pacific').(datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple())))
+      float(act_h)
+      float(act_l)
+      float(lk_l)
+      float(lk_h)
+    except:
+      datetime_from_sec = None
+      datetime_to_sec = None
+      datetime_from_sec_davis = None
+      datetime_to_sec_davis = None
+      act_h = None
+      act_l = None
+      lk_l = None
+      lk_h = None
+
+
+    
+    
+    db_sel = Position   #can change database
+
+    #dep_filter = ""
+    #for d in dep_ids:
+    #  dep_filter += "Q(deploymentID = %d), "
+    #print dep_filter
+  
+
+  
+
+
+
+
+
+  # 2nd deployment
+  if len(req_deps) > 1:
+    
+    dep_query = Position.objects.filter(deploymentID = req_deps[1].ID) 
+    ''' Query db for min/max value for selected deployment.
+        Used to automatically populate html form intial values. '''
+    datetime_end =    float( dep_query.aggregate(Max('timestamp'))
+                            ['timestamp__max'] )
+    datetime_end_str = time.strftime('%Y-%m-%d %H:%M:%S',
+              time.localtime(float(datetime_end-7*60*60)))
+
+    #datetime_start =  float( dep_query.aggregate(Min('timestamp'))
+    #                        ['timestamp__min'] )
+    
+    #last day that there's data for
+    datetime_start = float(datetime_end - 86400.00)
+    datetime_start_str = time.strftime('%Y-%m-%d %H:%M:%S',
+              time.localtime(float(datetime_start-7*60*60)))
+    likelihood_low =  str ((dep_query.aggregate(Min('likelihood'))
+                            ['likelihood__min']) )
+    likelihood_high = str( (dep_query.aggregate(Max('likelihood'))
+                            ['likelihood__max']) )
+    activity_low =    str( (dep_query.aggregate(Min('activity'))
+                            ['activity__min']) )
+    activity_high =   str( (dep_query.aggregate(Max('activity'))
+                            ['activity__max']) )
+    print datetime_start, datetime_end, likelihood_low, likelihood_high, activity_low, activity_high
+
+  
+    index_form.fields['dt_fr'].initial = datetime_start_str
+    index_form.fields['dt_to'].initial = datetime_end_str
+    index_form.fields['lk_l'].initial = likelihood_low
+    index_form.fields['lk_h'].initial = likelihood_high
+    index_form.fields['act_l'].initial = activity_low
+    index_form.fields['act_h'].initial = activity_high
+ 
+
+    ''' If there is no GET data '''
+    ''' Should be changed so that default is the min/max, for values that
+      are not entered in the form. The user should notified too. '''
+
+    if datetime_from == None:
+      pos_query = Position.objects.filter(
+                          deploymentID = req_deps[1].ID,
+                          timestamp__gte = datetime_start,
+                          timestamp__lte = datetime_end,
+                          likelihood__gte = likelihood_low,
+                          likelihood__lte = likelihood_high,
+                          activity__gte = activity_low,
+                          activity__lte = activity_high
+                          )
+
+      for q in pos_query:
+          # Calculate lat, lons each point
+        (lat, lon) = utm.to_latlon(
+                  float(q.easting), 
+                  float(q.northing),
+                  q.utm_zone_number,
+                  q.utm_zone_letter)
+          
+          # Convert timestamps to datetime strings and subtract 7 hrs
+          # Not sure if localtime is the correct way to do this...
+        date_string = time.strftime('%Y-%m-%d %H:%M:%S',
+            time.localtime(float(q.timestamp-7*60*60)))
+
+      # Store django objects as a python list of tuples
+        pos_filtered_list1.append(
+            (
+            q.ID,                 #0 
+            q.deploymentID,       #1
+            float(q.timestamp),   #2
+            float(q.easting),     #3
+            float(q.northing),    #4
+            q.utm_zone_number,    #5
+            float(q.likelihood),  #6
+            float(q.activity),    #7
+            (lat, lon),           #8
+            q.utm_zone_letter,    #9
+            date_string           #10
+            ))
+    else: 
+          #if datetime_from and datetime_to and deps != []:
+      try:
+        datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
+        datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
+        #temporary fix that doesn't take into account daylight savings
+        datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference
+        datetime_to_sec_davis = datetime_to_sec + 7*60*60
+      #datetime_test = float(time.mktime(timezone('US/Pacific').(datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple())))
+        float(act_h)
+        float(act_l)
+        float(lk_l)
+        float(lk_h)
+      except:
+        datetime_from_sec = None
+        datetime_to_sec = None
+        datetime_from_sec_davis = None
+        datetime_to_sec_davis = None
+        act_h = None
+        act_l = None
+        lk_l = None
+        lk_h = None
+
+      
+      pos_query1 = Position.objects.filter(
+                          deploymentID = req_deps[1].ID,
+                          timestamp__gte = datetime_from_sec_davis,
+                          timestamp__lte = datetime_to_sec_davis,
+                          likelihood__gte = lk_l,
+                          likelihood__lte = lk_h,
+                          activity__gte = act_l,
+                          activity__lte = act_h
+                          )
+
+      for q in pos_query1:
+          # Calculate lat, lons each point
+        (lat, lon) = utm.to_latlon(
+                  float(q.easting), 
+                  float(q.northing),
+                  q.utm_zone_number,
+                  q.utm_zone_letter)
+          
+          # Convert timestamps to datetime strings and subtract 7 hrs
+          # Not sure if localtime is the correct way to do this...
+        date_string = time.strftime('%Y-%m-%d %H:%M:%S',
+            time.localtime(float(q.timestamp-7*60*60)))
+
+      # Store django objects as a python list of tuples
+        pos_filtered_list1.append(
+            (
+            q.ID,                 #0 
+            q.deploymentID,       #1
+            float(q.timestamp),   #2
+            float(q.easting),     #3
+            float(q.northing),    #4
+            q.utm_zone_number,    #5
+            float(q.likelihood),  #6
+            float(q.activity),    #7
+            (lat, lon),           #8
+            q.utm_zone_letter,    #9
+            date_string           #10
+            ))
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    if (datetime_from_sec_davis) and (datetime_to_sec_davis) and (lk_l) and (lk_h) and (act_l) and (act_h):
+      
+      
+    
+      if (len(req_deps) >= 1):
+        pos_query = Position.objects.filter(
+                          deploymentID = req_deps[0].ID,
+                          timestamp__gte = datetime_from_sec_davis,
+                          timestamp__lte = datetime_to_sec_davis,
+                          likelihood__gte = lk_l,
+                          likelihood__lte = lk_h,
+                          activity__gte = act_l,
+                          activity__lte = act_h
+                          )
+
         for q in pos_query:
           # Calculate lat, lons each point
           (lat, lon) = utm.to_latlon(
@@ -163,10 +496,8 @@ def get_context(request, deps=[], req_deps=[]):
           
           # Convert timestamps to datetime strings and subtract 7 hrs
           # Not sure if localtime is the correct way to do this...
-          date_string = time.strftime(
-            '%Y-%m-%d %H:%M:%S',
-            time.localtime(float(q.timestamp-7*60*60))
-            )
+          date_string = time.strftime('%Y-%m-%d %H:%M:%S',
+            time.localtime(float(q.timestamp-7*60*60)))
 
       # Store django objects as a python list of tuples
           pos_filtered_list.append(
@@ -183,12 +514,12 @@ def get_context(request, deps=[], req_deps=[]):
             q.utm_zone_letter,    #9
             date_string           #10
             ))
-            
+        
 
 
-
+  '''
       if (len(req_deps) >= 2):
-        pos_query1 = db_sel.objects.filter(
+        pos_query1 = Position.objects.filter(
                             deploymentID = req_deps[1].ID,
                             timestamp__gte = datetime_from_sec_davis,
                             timestamp__lte = datetime_to_sec_davis,
@@ -229,11 +560,6 @@ def get_context(request, deps=[], req_deps=[]):
             ))
 
 
-      print len(pos_filtered_list)
-      print len(pos_filtered_list1)
-      print req_deps
-      print len(req_deps)
-
 
       if (len(req_deps) >= 3):
         pos_query2 = db_sel.objects.filter(
@@ -256,7 +582,7 @@ def get_context(request, deps=[], req_deps=[]):
                             activity__gte = act_l,
                             activity__lte = act_h
                             ) 
-
+  '''
 
             #OLD WAY TO QUERY, either with only one deployment, 
             #or trying to make multiple querysets without repeating code
@@ -294,7 +620,6 @@ def get_context(request, deps=[], req_deps=[]):
       s.utm_zone_letter,      # [8]
       float(s.elevation)))    # [9]
 
-  print sites
 
 
 
@@ -357,10 +682,8 @@ def get_context(request, deps=[], req_deps=[]):
           float(lat_clicked_point),    # [10][0]: lat of db data closest to click
           float(lng_clicked_point)     # [10][1]: lng of db data closest to click
           ),
-        time.strftime(           # [11]: date string in Davis time
-          '%Y-%m-%d %H:%M:%S', 
-          time.localtime(float(sel.timestamp-7*60*60))
-          ),
+        time.strftime('%Y-%m-%d %H:%M:%S', # [11]: date string in Davis time
+          time.localtime(float(sel.timestamp-7*60*60))),
         sel.utm_zone_letter     # utm zone letter
       ))
     
@@ -379,7 +702,6 @@ def get_context(request, deps=[], req_deps=[]):
           # This could probably be changed to work with flight_latlon_pos
 
   elif flot_index:
-    print flot_index
     selected_data.append((
         None,   # [0]: nothing clicked
         None,   # [1]: nothing clicked
@@ -414,9 +736,10 @@ def get_context(request, deps=[], req_deps=[]):
 
   #the following lines sets the default as '63' for deploymentID
   #index_form.fields['trans'].initial = ['63']
-  
 
   context = {
+            #public, deployment, project, etc.
+            'view_type': json.dumps(view_type),
 
             #plot & related data
             'pos_data': json.dumps(pos_filtered_list),             
@@ -434,8 +757,8 @@ def get_context(request, deps=[], req_deps=[]):
             'siteslist': json.dumps(sites), 
             
             #for displaying html form
-            'form': Form(deps=deps, data=request.GET or None), 
-            
+            #'form': Form(deps=deps, data=request.GET or None), 
+            'form': index_form,
             #selected transmitter from form
             #'tx': json.dumps(tx), 
             
@@ -506,7 +829,7 @@ def index(request):
     req_deps = Deployment.objects.filter(ID__in=request.GET.getlist('trans'))
   else: 
     req_deps = []
-  
+
   deps = Deployment.objects.filter(is_active=True,
           projectID__in=Project.objects.filter(
             is_public=True).values('ID'))
