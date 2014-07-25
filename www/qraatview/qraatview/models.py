@@ -2,6 +2,7 @@
 
 from django.db import models
 from django.contrib.auth.models import Group, Permission
+from django.core.exceptions import ObjectDoesNotExist
 from utils import timestamp_todate
 
 QRAAT_APP_LABEL = 'qraatview'
@@ -82,14 +83,16 @@ class Project(models.Model):
 
     def add_collaborator_permissions(self, group):
         [group.permissions.add(permission)
-            for permission in map(lambda p: Permission.objects.get(codename=p[0]),
-                                  (self._collaborator_permissions
-                                      + self._viewer_permissions))]
+            for permission in map(
+                lambda p: Permission.objects.get(codename=p[0]),
+                              (self._collaborator_permissions
+                                  + self._viewer_permissions))]
 
     def add_viewers_permissions(self, group):
         [group.permissions.add(permission)
-            for permission in map(lambda p: Permission.objects.get(codename=p[0]),
-                                  self._viewer_permissions)]
+            for permission in map(
+                lambda p: Permission.objects.get(
+                    codename=p[0]), self._viewer_permissions)]
 
     def get_locations(self):
         return Location.objects.filter(
@@ -105,16 +108,51 @@ class Project(models.Model):
     def get_targets(self):
         return Target.objects.filter(projectID=self.ID).exclude(is_hidden=True)
 
+    def create_viewers_group(self):
+        try:
+            group = Group.objects.create(
+                name="%d_viewers" % self.ID)
+
+        except Exception, e:
+            raise e
+
+        else:
+            AuthProjectViewer.objects.create(
+                groupID=group.id,
+                projectID=self)
+
+        return group
+
+    def create_collaborators_group(self):
+        try:
+            group = Group.objects.create(
+                name="%d_collaborators" % self.ID)
+        except Exception, e:
+            raise e
+
+        else:
+            AuthProjectCollaborator.objects.create(
+                groupID=group.id, projectID=self)
+        return group
+
     def get_group(self, group_id):
         return Group.objects.get(id=group_id)
 
     def get_viewers_group(self):
-        group_id = AuthProjectViewer.objects.get(projectID=self.ID).groupID
+        try:
+            group_id = AuthProjectViewer.objects.get(projectID=self.ID).groupID
+        except ObjectDoesNotExist:  # for some reason group wasn't created
+            group_id = self.create_viewers_group().id
+
         return self.get_group(group_id)
 
     def get_collaborators_group(self):
-        group_id = AuthProjectCollaborator.objects.get(
-            projectID=self.ID).groupID
+        try:
+            group_id = AuthProjectCollaborator.objects.get(
+                projectID=self.ID).groupID
+        except ObjectDoesNotExist:
+            group_id = self.create_collaborators_group().id
+
         return self.get_group(group_id)
 
     def is_owner(self, user):
