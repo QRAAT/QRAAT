@@ -114,14 +114,22 @@ def get_context(request, deps=[], req_deps=[]):
   ''' If at least one deployment is selected from the deployment url, 
     automatically show data filtered for min/max range in the database
     for date, likelihood, and activity. '''
-  if len(deps) != 0 and len(req_deps)!=0:
-    view_type = "deployment"
-  else:
+  
+  print "lendeps", len(deps)
+#  if deps[0].ID != None:
+#    print "deps0", deps[0].ID
+#  if deps[1].ID != None:
+#    print "deps1", deps[1].ID
+#  if req_deps[0].ID != None:
+#    print "reqo", req_deps[0].ID
+
+  if len(deps) != 1:
     view_type = "public"
+  else:
+    view_type = "deployment"
 
   if len(req_deps) > 0:
     
-    view_type = "deployment"
     
     dep_query = Position.objects.filter(deploymentID = req_deps[0].ID) 
     ''' Query db for min/max value for selected deployment.
@@ -180,7 +188,7 @@ def get_context(request, deps=[], req_deps=[]):
                   q.utm_zone_letter)
           
           # Convert timestamps to datetime strings and subtract 7 hrs
-          # Not sure if localtime is the correct way to do this...
+          # Not sure if localtime is the correct way to do this... FIXME
         date_string = time.strftime('%Y-%m-%d %H:%M:%S',
             time.localtime(float(q.timestamp-7*60*60)))
 
@@ -272,7 +280,7 @@ def get_context(request, deps=[], req_deps=[]):
       datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
       datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
         #temporary fix that doesn't take into account daylight savings
-      datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference
+      datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference # FIXME
       datetime_to_sec_davis = datetime_to_sec + 7*60*60
       #datetime_test = float(time.mktime(timezone('US/Pacific').(datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple())))
       float(act_h)
@@ -730,6 +738,7 @@ def get_context(request, deps=[], req_deps=[]):
         # [12] utm zone letter
         pos_filtered_list[flot_index][9]
       ))
+
 
 
 

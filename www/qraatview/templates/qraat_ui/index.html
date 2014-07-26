@@ -35,9 +35,11 @@
     
     #page_title { font-size: 18px; font-weight:bold; }
     
+    .section_title { font-size: 15px; font-weight:bold; text-align:center;}
+    
     #prefs {
       border-style:solid; border-width: 1px; 
-      height: 38%; overflow: scroll; padding: 5px; 
+      height: 32%; overflow: scroll; padding: 5px; 
       }
     
     #mouseover {
@@ -68,6 +70,8 @@
 <script type="text/javascript" 
   src="https://maps.googleapis.com/maps/api/js?key={% load google_maps_api %}&sensor=false">
 </script>
+<link href="/static/flot/example.css" rel="stylesheet" type="text/css">
+
 
 
 <script type="text/javascript">
@@ -110,6 +114,14 @@ function submitForm() {
 function showDjango() {
     var selected_flot = document.getElementById("flot_index").value;
       window.alert(selected_flot);
+}
+
+
+
+function setCenter() {
+  
+  map.panTo(new google.maps.LatLng(38.487828027, -122.149419006));
+  //return false;
 }
 
 
@@ -285,8 +297,11 @@ function initialize(){
   
   google.maps.event.addListener(map, 'tilesloaded', function() {
     if (selected_index !=null) {
-      document.getElementById('selectedIndexSubmit').click();
-    } // end if selected_index
+      document.getElementById('mapsIndexSubmit').click();
+    } // end if selected_index, click hidden button that highlights flot
+    if (flot_index != null) {
+      document.getElementById('flotIndexSubmit').click();
+    } // end if flot_index, click hidden button that highlights flot
   }); // end tilesloaded Listener
 
 
@@ -380,9 +395,9 @@ function initialize(){
     if (locations.length>0) {
       var content = '<b>Site ID:</b> ' + locations[i][2] + 
                     ' or "' + locations[i][3]+'"' + 
-                    '<br><br>' + '<b>Location:</b> ' + locations[i][4] + ',<br>' + 
+                    '<br><b>Location:</b> ' + locations[i][4] + ', ' + 
                     '(' + locations[i][0] + ', ' + locations[i][1] + 
-                    ') <br><br><b>Elevation:</b> ' + locations[i][5];
+                    ')<b><br>Elevation:</b> ' + locations[i][5];
     }
     var infoWindow = new google.maps.InfoWindow({content: content});
     
@@ -1078,8 +1093,6 @@ google.maps.event.addDomListener(window, 'load', initialize);
 
                             <!-- FLOT GRAPH -->
 
-<link href="/static/flot/example.css" rel="stylesheet" type="text/css">
-
 
 <!-- if there is queried data (this is a messy if check)
       then display flot graph -->
@@ -1318,10 +1331,13 @@ $(function() {
 //the following shows the point that the user just clicked, by pushing the flot index button
 //must place it at the end, otherwise it will execute before flot draws the chart,
 //(I'm assuming that's the reason), and then the point won't get highlighted
-  var flot_index = {{flot_index}};
-    if (flot_index != null) {
-      document.getElementById('flotIndexSubmit').click();
-  }
+
+//this doesn't work
+
+//  var flot_index = {{flot_index}};
+//    if (flot_index != null) {
+//      document.getElementById('flotIndexSubmit').click();
+//  }
 
 }); //end the function for flot
 
@@ -1352,16 +1368,15 @@ $(function() {
 <!-- <button onclick="showDjango()">Show Django</button> -->
 
 <center>
-<div id="page_title"><a href='/ui/'>QRAAT Data</a></div>
+<div id="page_title"><a href='/ui/'>QRAAT DATA</a></div>
  <!--onclick='initialize(38.487828027, -122.149419006, 14);'-->
 <!-- <a href="index.html" target="export">Export view as .kml</a><br>-->
 </center>
 <br />
+<!-- <button onclick="setCenter()">Re-center Map</button> -->
 
-
-
-
-<b><center><u>PREFERENCES</u> <button onclick="submitForm()">Set Preferences</button> </center></b>
+<div class="section_title">PREFERENCES
+<button onclick="submitForm()">Submit Form</button></div>
 <font size="2">
 <div id ="prefs">
 
@@ -1389,7 +1404,7 @@ $(function() {
 
 
 {% for field in form %}
-{{ field.label_tag}} {{field}}<br>
+<b>{{ field.label_tag}}</b> {{field}}<br>
 {% endfor %}
 </font>
 <input type="hidden" name="lat_clicked" id="lat_clicked">
@@ -1409,14 +1424,18 @@ $(function() {
 <br>
 
 
-<b><u><center>MAP INFO</center></u></b>
+<div class="section_title">MAP INFO</div>
 <div id="mouseover">
 <font size="2">
-{{view_type}}<br>
-<b>Deployment Displayed: </b>{{positions.1.1}}<br>
-<b>No. of Data Points Displayed (dep = {{positions.1.1}})</b>: {{positions|length}}
-<br><b>No. of Data Points Displayed (dep = {{positions1.1.1}})</b>: {{positions1|length}}
-<br>
+View Type: {{view_type}}<br>
+{% if positions %} <b>Deployment Displayed: </b>{{positions.1.1}} {% endif %}
+{% if positions %} 
+<br><b>No. of Data Points Displayed (dep = {{positions.1.1}})</b>: {{positions|length}}<br>
+{% endif %}
+
+{% if positions1 %}
+<b>No. of Data Points Displayed (dep = {{positions1.1.1}})</b>: {{positions1|length}} <br>
+{% endif %}
 <br><b>Mouseover Lat, Lon: </b> <input type="text" class="current_info" id="latlong" style="width:150px; border:1px inset black;"></span>
 <br><b>Clicked Lat, Lon: </b><input type="text" class="current_info" id="clicked_lat_lng" style="width:150px; border:1px inset black;"></span>
 <br><b>Map Bounds: <font size="1"></b><span id="bounds"></span></font>
@@ -1430,7 +1449,7 @@ $(function() {
 
 
 
-<center><u><b>DATA FOR CLICKED POSITION</b></u></center>
+<div class="section_title">DATA FOR CLICKED POSITION</div>
 
 <div id="clicked">
 <font size="2">
@@ -1468,17 +1487,17 @@ $(function() {
   <div id="content">
   <center><b><u>
   {% ifequal graph_data "1" %}
-  Likelihood vs. Time
+  LIKELIHOOD vs. TIME
   {% endifequal %}
 
   {% ifequal graph_data "2" %}
-  Activity vs. Time
+  ACTIVITY vs. TIME
   {% endifequal %}
   
   </u></b>
 
 <!-- <button data-index="4">Highlight 5th point</button> -->
-<button data-index="{{selected_index_large}}" id="selectedIndexSubmit" style="display: none;">Selected Index</button>
+<button data-index="{{selected_index_large}}" id="mapsIndexSubmit" style="display: none;">Selected Index</button>
 <button data-index="{{flot_index}}" id="flotIndexSubmit" style="display: none;">Flot Index</button> 
 <!-- Google Maps clicked Index: {{selected_index_large}}
     Flot graph Clicked Index: {{flot_index}}
