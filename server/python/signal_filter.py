@@ -54,6 +54,11 @@ CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD = 0.25
 # Minimum number of points before intervals are calculated. If less than this number is found, items are given a score of -1.
 CONFIG_MINIMUM_POINT_COUNT = 20
 
+
+def debug_print(string): 
+  if True: 
+    print >>sys.stderr, "signal_filter: debug:", string
+
 class Registry:
 
 	def __init__(self, args):
@@ -378,8 +383,7 @@ class ChangeHandler:
 		assert self.mode in VALID_MODES
 		if self.mode == 'db':
 			self.buffer = []
-			db_con = qraat.util.get_db('writer')
-			self.obj = db_con
+			self.obj = qraat.util.get_db('writer')
 		elif self.mode == 'fileinc':
 			self.obj = obj # A filename is this case
 			self.current_index = 1
@@ -747,13 +751,17 @@ def already_scored_filter(db_con, ids):
 
 
 # Input: a sequence of ids, each of which is the value of the ID field of an
-#	entry in the est table. Nothing in here should be brand new...a slight delay is applied in the higher-level program that makes sure there is context for scoring/interval calculation.
+#	 entry in the est table. Nothing in here should be brand new...a slight
+#        delay is applied in the higher-level program that makes sure there is 
+#        context for scoring/interval calculation. Inputs are for one transmitter
+#        and one receiver. 
+
 # Output: none explicit - implicitly, score entries added for each id in ids
 
 def score(ids):
 	global reasoning
 	reasoning = defaultdict(list)
-	print 'Initial call to score {} ID(s)'.format(len(ids))
+	debug_print('Initial call to score {} ID(s)'.format(len(ids)))
 	change_handler = init_change_handler()
 	db_con = qraat.util.get_db('writer')
 
@@ -765,34 +773,33 @@ def score(ids):
 
 	id_set = set(ids)
 
-	print 'Got ID set:', id_set
+	#debug_print('Got ID set:' + str(id_set))
 
 	# Get the data from the est table for these IDs and any other est records
 	# associated with something within the time range defined by these IDs.
 	# Context is the number of seconds around the min and max timestamp defined
 	# by the ID set to include in the data returned. (Only affects things if
 	# expanded=true).
-	print 'Preparing to get data...'
 	data = read_est_records(db_con, ids, expanded=True, context=300)
-	print 'Got data.'
 
 	# I assume that all IDs being scored in a call to score() are from the same
 	# txid and siteid. This restriction can probably be relaxed, but this will
 	# make people explicitly aware when this is done.
-	cur = db_con.cursor()
-	ids_template = ', '.join(map(lambda x : '{}', ids))
-	id_string = ids_template.format(*ids)
-	print 'Preparing to hit database again'
-	q = 'SELECT DISTINCT siteID, deploymentID from est WHERE ID IN ({});'.format(id_string)
-	rows = cur.execute(q)
-	r = cur.fetchone()
-	assert rows == 1
-	siteid, txid = r
-	print 'Got siteid={}, txid={}'.format(siteid, txid)
+	#cur = db_con.cursor()
+	#ids_template = ', '.join(map(lambda x : '{}', ids))
+	#id_string = ids_template.format(*ids)
+	#print 'Preparing to hit database again'
+	#q = 'SELECT DISTINCT siteID, deploymentID from est WHERE ID IN ({});'.format(id_string)
+	#rows = cur.execute(q)
+	#r = cur.fetchone()
+	#assert rows == 1
+	#siteid, txid = r
+	#print 'Got siteid={}, txid={}'.format(siteid, txid)
 
 	# Get all of these IDs that might have been scored already and store for
 	# after-action report.
 	already_scored = already_scored_filter(db_con, ids)
+        debug_print('{} points were already scored'.format(len(already_scored)))
 
 	# Returns a tuple (a, b, c) where a is the sequence of out-of-order IDs
 	# (those occurring in a region with an already defined interval value), b
@@ -803,37 +810,34 @@ def score(ids):
 	# Note: id_to_interval.keys() == out_of_order_ids.
 
 	out_of_order_ids, in_order_ids, id_to_interval = partition_by_interval_calculation(db_con, ids, siteid, txid)
-
-	print '{} out of order IDs, {} in order IDs'.format(len(out_of_order_ids), len(in_order_ids))
+	debug_print('{} out of order IDs, {} in order IDs'.format(len(out_of_order_ids), len(in_order_ids)))
 
 	# test_condition = set(id_to_interval.keys()) == set(out_of_order_ids)
-    #
 	# if not test_condition:
 	# 	import code
 	# 	code.interact(local=locals())
-    #
 	# assert test_condition
 
-	print 'Found {} out of order, {} in order'.format(len(out_of_order_ids), len(in_order_ids))
+	#print 'Found {} out of order, {} in order'.format(len(out_of_order_ids), len(in_order_ids))
 
 	# Returns the subset of keys of data which represent data which passes the
 	# parametric filters (lowpass filters on band3 and band10 and a rate
 	# limiting filter).
-	all_that_passed_filter_ids = parametrically_filter(db_con, data)
-	print 'Top-level: just got {} passed'.format(len(all_that_passed_filter_ids))
-
+        all_that_passed_filter_ids = parametrically_filter(db_con, data)
+	debug_output('data contains {} parametrically good points'.format(len(all_that_passed_filter_ids)))
 	passed_filter_ids_set = set(all_that_passed_filter_ids)
-	print 'De-duplicated:', len(passed_filter_ids_set)
+	debug_output('discounting duplicates, we get ' + str( len(passed_filter_ids_set)))
+        # TODO why would there be duplicates from parametrically_filte? 
 
 	# The larger set of parametrically passing points is needed during scoring,
 	# but the intersection of this and the original ID set defines those that
 	# require time filtering.
 	new_filtered_ids = id_set.intersection(passed_filter_ids_set)
-	print 'Intersected, leaves:', len(new_filtered_ids)
+	debug_print('we will time filter {} points'.format( len(new_filtered_ids)))
+        # FIXME <--------------------------------------------------------------------------------------- Here I am
 
 	# This is the set that requires time filtering, but the scores must be updated, not inserted
 	updatable_ids = passed_filter_ids_set.difference(id_set)
-
 	print '{} items passed parametric filter'.format(len(new_filtered_ids))
 
 	

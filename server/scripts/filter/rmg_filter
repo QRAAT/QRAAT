@@ -78,6 +78,7 @@ try:
   
   for start, end in intervals:
 
+    # NOTE This seems to only grab some est ID's. 
     cur = change_handler.add_sql(score_query, (site_id, dep_id, start, end))
 
     l = []
@@ -88,6 +89,7 @@ try:
       l.append(r[0])
 
     print 'Got {} items: {}'.format(len(l), l[:10])
+    # NOTE end
 
     if len(l) == 0:
       print 'No IDs to process.'
