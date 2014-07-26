@@ -134,8 +134,7 @@ def get_context(request, deps=[], req_deps=[]):
     dep_query = Position.objects.filter(deploymentID = req_deps[0].ID) 
     ''' Query db for min/max value for selected deployment.
         Used to automatically populate html form intial values. '''
-    datetime_end =    float( dep_query.aggregate(Max('timestamp'))
-                            ['timestamp__max'] )
+    datetime_end =    float( dep_query.aggregate(Max('timestamp'))['timestamp__max'] )
     datetime_end_str = time.strftime('%Y-%m-%d %H:%M:%S',
               time.localtime(float(datetime_end-7*60*60)))
 
@@ -846,10 +845,37 @@ def index(request):
   context = get_context(request, deps, req_deps)
   return render(request, 'qraat_ui/index.html', context)
 
-def view_by_dep(request, dep_id):
+def view_by_dep(request, project_id, dep_id):
   ''' Compile a list of deployments associated with `dep_id`. ''' 
-  deps = Deployment.objects.filter(ID=dep_id)
-  context = get_context(request, deps, deps)
+  try:
+    project = Project.objects.get(ID=project_id)
+  except ObjectDoesNotExist:
+    return HttpResponse("We didn't find this project") 
+  
+  if not project.is_public:
+    if request.user.is_authenticated():
+      user = request.user
+      if project.is_owner(user)\
+           or (user.has_perm("can_view")
+               and (project.is_collaborator(user)
+                    or project.is_viewer(user))):
+
+        deps = project.get_deployments() 
+      else:
+        return HttpResponse("You're not allowed to view this.")
+    
+    else:
+      return HttpResponse("You're not allowed to visualize this")
+
+  else:
+    deps = project.get_deployments()
+    
+  positions = Position.objects.filter(deploymentID__in=deps.values("ID") )
+  if len(positions) >0:
+    context = get_context(request, deps, deps)
+  else:
+    context = {}
+
   return render(request, 'qraat_ui/index.html', context)
 
 def view_by_target(request, target_id): 

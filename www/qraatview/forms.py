@@ -7,6 +7,7 @@ from django.contrib.admin.widgets import FilteredSelectMultiple
 
 
 class ProjectForm(forms.ModelForm):
+    """Django's model form to create a project"""
 
     def __init__(self, user=None, *args, **kwargs):
         super(ProjectForm, self).__init__(*args, **kwargs)
@@ -31,6 +32,7 @@ class ProjectForm(forms.ModelForm):
         required=False)
 
     def save(self, commit=True):
+        """Overriden method to set project ownerID"""
         project = super(ProjectForm, self).save(commit=False)
         if commit:
             project.ownerID = self.ownerID
@@ -40,11 +42,16 @@ class ProjectForm(forms.ModelForm):
 
 
 class UserModelChoiceField(forms.ModelMultipleChoiceField):
+    """Django's ModelMultipleChoiceField for ProjectEditForm"""
+
     def label_from_instance(self, obj):
+        # Ovirriden method to display the choices as user full name
         return obj.get_full_name()
 
 
 class EditProjectForm(ProjectForm):
+    """Django's ModelForm to edit projects
+       Extends ProjectForm"""
 
     def __init__(self, user=None, *args, **kwargs):
         super(EditProjectForm, self).__init__(user, *args, **kwargs)
@@ -77,6 +84,7 @@ class EditProjectForm(ProjectForm):
             verbose_name="users", is_stacked=False))
 
     def save(self, commit=True):
+        """Overriden method that add and remove users from groups"""
         project = super(ProjectForm, self).save(commit=False)
 
         viewers_group = project.get_viewers_group()
@@ -86,16 +94,21 @@ class EditProjectForm(ProjectForm):
         viewers = self.cleaned_data.get("viewers")
         collaborators = self.cleaned_data.get("collaborators")
 
+        # loop over users to add or remove them form groups
         for user in users:
             if user in viewers:
                 viewers_group.user_set.add(user)
+                # user is in viewer's group but was removed in the form
             elif user not in viewers and user in viewers_group.user_set.all():
+                # remove user from viewers group
                 viewers_group.user_set.remove(user)
 
             if user in collaborators:
                 collaborators_group.user_set.add(user)
+                # user is in collaborator's group but was removed in the form
             elif user not in collaborators and\
                     user in collaborators_group.user_set.all():
+                # remove user from collaborators group
                 collaborators_group.user_set.remove(user)
 
         if commit:
@@ -105,15 +118,19 @@ class EditProjectForm(ProjectForm):
 
 
 class AddManufacturerForm(forms.ModelForm):
+    """Django's ModelForm to add tx_make"""
     class Meta:
         model = TxMake
         labels = {"demod_type": ("Demodulation type")}
 
 
 class ProjectElementForm(forms.ModelForm):
+    """Django's ModelForm base class to add Project's
+       elements i.e Locations, Transmitters, etc..."""
+
     def __init__(self, project=None, *args, **kwargs):
-        self.project = project
         super(ProjectElementForm, self).__init__(*args, **kwargs)
+        self.set_project(project)
 
     def set_project(self, project):
         self.project = project
@@ -129,18 +146,27 @@ class ProjectElementForm(forms.ModelForm):
 
 
 class AddLocationForm(ProjectElementForm):
+    """Django's ModelForm to create a location 
+       extends ProjectElementForm"""
+
     class Meta:
         model = Location
         exclude = ["projectID", "is_hidden"]
 
 
 class AddTargetForm(ProjectElementForm):
+    """Django's ModelForm to create a target 
+       extends ProjectElementForm"""
+
     class Meta:
         model = Target
         exclude = ["projectID", "is_hidden"]
 
 
 class AddDeploymentForm(ProjectElementForm):
+    """Django's ModelForm to create a deployment
+       extends ProjectElementForm"""
+
     class Meta:
         model = Deployment
         exclude = ["projectID", "is_hidden", "time_end"]
@@ -149,8 +175,7 @@ class AddDeploymentForm(ProjectElementForm):
     targetID = forms.ChoiceField()
 
     def set_project(self, project):
-        self.project = project
-
+        super(AddDeploymentForm, self).set_project(project)
         # constraint project's transmitters
         self.fields["txID"].choices = [
             (tx.ID, tx) for tx in project.get_transmitters()]
@@ -167,6 +192,9 @@ class AddDeploymentForm(ProjectElementForm):
 
 
 class AddTransmitterForm(ProjectElementForm):
+    """Django's ModelForm that creates a transmitter
+       extends ProjectElementForm"""
+
     class Meta:
         model = Tx
         exclude = ["projectID", "is_hidden"]
@@ -176,6 +204,10 @@ class AddTransmitterForm(ProjectElementForm):
                   "frequency": ("Frequency")}
 
     def save(self, commit=True):
+        """Overriden method to set the right tx_make and
+           create the list of parameters from tx_make_parameters
+           in tx_parameters"""
+
         Tx = super(AddTransmitterForm, self).save(commit=False)
         Tx.projectID = self.project
 
@@ -184,6 +216,7 @@ class AddTransmitterForm(ProjectElementForm):
             Tx_make_parameters = TxMakeParameters.objects.filter(
                 tx_makeID=Tx.tx_makeID)
 
+            # creates parameters from tx_make_parameters in tx_parameters
             for parameter in Tx_make_parameters:
                 TxParameters.objects.create(
                     txID=Tx,
