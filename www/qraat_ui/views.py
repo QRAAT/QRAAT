@@ -189,7 +189,7 @@ def get_context(request, deps=[], req_deps=[]):
                   q.utm_zone_letter)
           
           # Convert timestamps to datetime strings and subtract 7 hrs
-          # Not sure if localtime is the correct way to do this...
+          # Not sure if localtime is the correct way to do this... FIXME
         date_string = time.strftime('%Y-%m-%d %H:%M:%S',
             time.localtime(float(q.timestamp-7*60*60)))
 
@@ -281,7 +281,7 @@ def get_context(request, deps=[], req_deps=[]):
       datetime_from_sec = float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) )
       datetime_to_sec = float(time.mktime(datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()))
         #temporary fix that doesn't take into account daylight savings
-      datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference
+      datetime_from_sec_davis = datetime_from_sec + 7*60*60 #7 hr difference # FIXME
       datetime_to_sec_davis = datetime_to_sec + 7*60*60
       #datetime_test = float(time.mktime(timezone('US/Pacific').(datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple())))
       float(act_h)
