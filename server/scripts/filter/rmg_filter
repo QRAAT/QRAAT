@@ -76,10 +76,10 @@ try:
   print 'There are {} intervals'.format(len(intervals))
   change_handler = qraat.srv.signal_filter.init_change_handler()
   
-  for start, end in intervals:
+  for chunk_start, chunk_end in intervals:
 
     # NOTE This seems to only grab some est ID's. 
-    cur = change_handler.add_sql(score_query, (site_id, dep_id, start, end))
+    cur = change_handler.add_sql(score_query, (site_id, dep_id, chunk_start, chunk_end))
 
     l = []
     while True:
@@ -88,15 +88,11 @@ try:
       r = tuple(r)
       l.append(r[0])
 
-    print 'Got {} items: {}'.format(len(l), l[:10])
-    # NOTE end
+    #print 'Got {} items: {}'.format(len(l), l[:10])
+    # NOTE chunk_end
 
-    if len(l) == 0:
-      print 'No IDs to process.'
-    else:
-      print 'Here goes.'
+    if len(l) > 0:
       qraat.srv.signal_filter.score(l)
-      print 'Done.'
   
 
 except mdb.Error, e:
