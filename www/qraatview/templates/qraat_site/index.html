@@ -1,0 +1,18 @@
+{% extends "qraat_site/base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Qraat System </h2>
+</div>
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <h4>Public projects</h4>
+    </div>
+    {% for project in projects %}
+    <div class="list-group">
+        <h4 class="list-group item-heading"><a href="/project/{{project.ID}}">{{project.name}}</a></h4>
+        <p class="list-group item-text">{{project.description}}</p>
+    </div>
+    {%endfor%}
+</div>
+{% endblock %}
