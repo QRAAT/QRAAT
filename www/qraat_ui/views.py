@@ -859,7 +859,7 @@ def view_by_dep(request, project_id, dep_id):
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
 
-        deps = project.get_deployments() 
+        deps = project.get_deployments().filter(ID=dep_id)
       else:
         return HttpResponse("You're not allowed to view this.")
     
@@ -867,7 +867,7 @@ def view_by_dep(request, project_id, dep_id):
       return HttpResponse("You're not allowed to visualize this")
 
   else:
-    deps = project.get_deployments()
+    deps = project.get_deployments().filter(ID=dep_id)
     
   positions = Position.objects.filter(deploymentID__in=deps.values("ID") )
   if len(positions) >0:
