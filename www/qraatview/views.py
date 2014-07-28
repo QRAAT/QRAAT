@@ -1,5 +1,6 @@
 from django.db.models import Q
 from django.shortcuts import render, redirect
+from django.core.urlresolvers import reverse
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
@@ -23,28 +24,6 @@ def index(request):
             request, "qraat_site/index.html",
             {'nav_options': nav_options,
              'projects': public_projects})
-
-
-# @login_required(login_url='/auth/login')
-# def transmitters(request):
-#     nav_options = get_nav_options(request)
-#     tx_IDs = tx_ID.objects.all()
-#     transmitters = []
-
-#     for tx in tx_IDs:
-#         pulses = TxPulse.objects.filter(tx_ID=tx)
-#         deployments = TxDeployment.objects.filter(tx_ID=tx)
-#         aliases = TxAlias.objects.filter(tx_ID=tx)
-#         transmitter = {}
-#         transmitter["transmitter"] = tx
-#         transmitter["pulses"] = pulses
-#         transmitter["deployments"] = deployments
-#         transmitter["aliases"] = aliases
-#         transmitters.append(transmitter)
-
-#     return render(
-#         request, "qraat_site/transmitters.html",
-#         {"transmitters": transmitters, 'nav_options': nav_options})
 
 
 @login_required(login_url='/auth/login')
@@ -96,7 +75,8 @@ def projects(request):
 
 
 def render_project_form(
-        request, project_id, post_form, get_form, template_path, success_url):
+        request, project_id, post_form,
+        get_form, template_path, success_url):
 
     user = request.user
     nav_options = get_nav_options(request)
@@ -132,6 +112,22 @@ def render_project_form(
                            "project": project})
         else:
             return HttpResponse("Action not allowed")
+
+
+def render_manage_page(request, project, template_path, content):
+    user = request.user
+
+    if request.method == "GET":
+        content["changed"] = request.GET.get("new_element")
+
+    if project.is_owner(user) or\
+        (project.is_collaborator(user)
+            and user.has_perm("qraatview.can_change")):
+        return render(
+            request, template_path,
+            content)
+    else:
+        return HttpResponse("Action not allowed")
 
 
 @login_required(login_url='/auth/login')
@@ -263,7 +259,8 @@ def add_transmitter(request, project_id):
         post_form=AddTransmitterForm(data=request.POST),
         get_form=AddTransmitterForm(),
         template_path="qraat_site/create-transmitter.html",
-        success_url="../add-transmitter?new_element=True")
+        success_url="%s?new_element=True" % reverse(
+            "qraat:manage-transmitters", args=(project_id,)))
 
 
 @login_required(login_url="/auth/login")
@@ -334,7 +331,21 @@ def manage_locations(request, project_id):
 
 @login_required(login_url="/auth/login")
 def manage_transmitters(request, project_id):
-    return HttpResponse("Not implemented yet")
+
+    try:
+        project = Project.objects.get(ID=project_id)
+    except ObjectDoesNotExist:
+        return HttpResponse("Error: we didn't find this project")
+    else:
+        content = {}
+        content["nav_options"] = get_nav_options(request)
+        content["project"] = project
+
+        return render_manage_page(
+            request,
+            project,
+            "qraat_site/manage_transmitters.html",
+            content)
 
 
 @login_required(login_url="/auth/login")
@@ -349,7 +360,7 @@ def get_nav_options(request):
     if user.is_authenticated():
         nav_options.append({"url": "qraat:projects",
                             "name": "Projects"})
-        
+
         if user.is_superuser:
             super_user_opts = [
                 {"url": "auth:users",
@@ -357,6 +368,6 @@ def get_nav_options(request):
                 {"url": "admin:index",
                  "name": "Admin Pages"}]
 
-            for opt in super_user_opts: # Add admin options
+            for opt in super_user_opts:  # Add admin options
                 nav_options.append(opt)
     return nav_options

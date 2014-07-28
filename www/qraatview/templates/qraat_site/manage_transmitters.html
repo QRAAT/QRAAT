@@ -1,0 +1,41 @@
+{% extends "qraat_site/manage_project_base.html" %}
+{% load project_filters %}
+
+{%block success_msg %} Transmitter created {% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h4>
+        Transmitters
+        <a style="margin-left: 5%;" href={% url 'qraat:add-transmitter' project.ID %}>
+        <input type="button" class="btn btn-primary" value="Create transmitter" name="create-transmitter" />
+    </a>
+    </h4>
+</div>
+
+{% block form %} {{block.super}} {% endblock %}
+
+<br/>
+<table class="table" id="transmitters">
+    <tr>
+        <td></td>
+        <td>Name</td>
+        <td>Serial number</td>
+        <td>Model</td>
+        <td>Manufacturer</td>
+        <td>Frequency</td>
+    </tr>
+    {% for transmitter in project.get_transmitters %}
+    <tr>
+        <td><input type="checkbox" value={{transmitter.ID}}/></td>
+        <td>{{transmitter.name}}</td>
+        <td>{{transmitter.serial_no}}</td>
+        <td>{{transmitter.tx_makeID.model}}</td>
+        <td>{{transmitter.tx_makeID.manufacturer}}</td>
+        <td>{{transmitter.frequency}}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}
