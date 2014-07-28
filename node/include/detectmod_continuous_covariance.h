@@ -44,9 +44,7 @@ typedef boost::shared_ptr<detectmod_continuous_covariance> detectmod_continuous_
  */
 RMG_API detectmod_continuous_covariance_sptr detectmod_make_continuous_covariance (
     int num_channels, 
-    int cov_len, 
-    const char *directory, 
-    const char *tx_name);
+    int cov_len);
 
 /*!
  * A pulse detector block for GNU Radio. Input a four channel signal from   
@@ -58,9 +56,7 @@ private:
 
   friend RMG_API detectmod_continuous_covariance_sptr detectmod_make_continuous_covariance (
     int num_channels, 
-    int cov_len, 
-    const char *directory, 
-    const char *tx_name);
+    int cov_len);
 
   //! Number of input channels.
   int num_ch;
@@ -68,46 +64,18 @@ private:
   //! Length of covariance calculation
   int cov_len;
 
-  //! Root directory where output files are to be stored. 
-  char *directory;
-
-  /*! 
-   * \brief Transmitter identifier. 
-   * This will also be used as the file prefix for pulse data records.  
-   */
-  char *tx_name;
-
-
-  //! A file descriptor used for data output (pulses or continuous). 
-  void	       *d_fp;
-
-  //! Generates file name
-  char *get_filename();
-
-  /*!
-   * \brief Open a file for writing in binary mode. 
-   * Once upon a time, the detetor class wrote det files directly. 
-   * This routine is now only used for status.txt. Store file 
-   * descriptor in d_fp. 
-   */ 
-  bool open(const char *filename);
-
-  /*!
-   * \brief close d_fp.
-   */ 
-  void close();
-
   //! Private constructor. 
   detectmod_continuous_covariance (
     int num_channels, 
-    int cov_len, 
-    const char *directory, 
-    const char *tx_name);
+    int cov_len);
 
 public:
 
   //! Public destructor.
   ~detectmod_continuous_covariance ();	
+
+  //! Output vector length.
+  int get_output_vector_length ();
 
   /*! 
    * Work function for signal processing block. This is the meat 

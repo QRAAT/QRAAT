@@ -45,52 +45,41 @@
 RMG_API detectmod_continuous_covariance_sptr 
 detectmod_make_continuous_covariance (
     int num_channels, 
-    int cov_len, 
-    const char *directory, 
-    const char *tx_name)
+    int cov_len)
 /**
  * Public constructor used by Gnu Radio 
  */
 {
   return detectmod_continuous_covariance_sptr (
     new detectmod_continuous_covariance (num_channels, 
-                          cov_len, 
-                          directory, 
-                          tx_name)
+                          cov_len)
   );
 }
 
+int output_vector_length(int num_channels){
+  int count = 0;
+  for (int j = 1; j < num_channels; j++) count += j;
+  return num_channels + count*2;
+};
 
 
 detectmod_continuous_covariance::detectmod_continuous_covariance (
     int _num_channels, 
-    int _cov_len, 
-    const char *_directory, 
-    const char *_tx_name)
+    int _cov_len)
   : gr_sync_block ("continuous_covariance",
     gr_make_io_signature (_num_channels, _num_channels, _cov_len * sizeof (gr_complex)),
-    gr_make_io_signature (0,0,0))
+    gr_make_io_signature (1,1,output_vector_length(_num_channels)*sizeof(float)))
 /**
  * Private constructor used internally 
  */
 {
   num_ch = _num_channels;
   cov_len = _cov_len;
-  directory = new char[strlen(_directory) + 1];
-  strcpy(directory, _directory);
-
-  tx_name = new char[strlen(_tx_name) + 1]; 
-  strcpy(tx_name, _tx_name); 
-
-  d_fp = 0;
 }
 
 
 detectmod_continuous_covariance::~detectmod_continuous_covariance(){
 
-  close();
-  delete[] directory;
-  delete[] tx_name;
 }
 
 int 
@@ -98,16 +87,13 @@ detectmod_continuous_covariance::work (int noutput_items,
 			       gr_vector_const_void_star &input_items,
 			       gr_vector_void_star &output_items)
 {
-  if (d_fp == 0){
-    if (!open(get_filename())) throw std::runtime_error ("can't open file");
-    //TODO write header?
-  }
+
   int count = 0;
   int j, first_channel, second_channel;
   gr_complex *ch1;
   gr_complex *ch2;
   double real_part, imag_part;
-  float real_f, imag_f;
+  float *out = (float *)output_items[0];
   while (count++ < noutput_items)
   {
     for (first_channel = 0; first_channel < num_ch; first_channel++){
@@ -116,8 +102,8 @@ detectmod_continuous_covariance::work (int noutput_items,
       for (j = 0; j < cov_len; j++){
         real_part += ch1[j].real() * ch1[j].real() + ch1[j].imag() * ch1[j].imag();
       }
-      real_f = (float)real_part;
-      fwrite(&real_f,sizeof(float),1,(FILE *)d_fp);
+      *out = real_part;
+      out++;
       for (second_channel = first_channel+1; second_channel < num_ch; second_channel++){
         ch2 = (gr_complex*)input_items[second_channel] + count*cov_len;
         real_part = 0.0;
@@ -126,10 +112,10 @@ detectmod_continuous_covariance::work (int noutput_items,
           real_part += ch1[j].real() * ch2[j].real() + ch1[j].imag() * ch2[j].imag();
           imag_part += ch1[j].imag() * ch2[j].real() - ch1[j].real() * ch2[j].imag();
         }
-        real_f = (float)real_part;
-        imag_f = (float)imag_part;
-        fwrite(&real_f,sizeof(float),1,(FILE *)d_fp);
-        fwrite(&imag_f,sizeof(float),1,(FILE *)d_fp);
+        *out = real_part;
+        out++;
+        *out = imag_part;
+        out++;
       }
     }
   }
@@ -137,79 +123,7 @@ detectmod_continuous_covariance::work (int noutput_items,
   return noutput_items;
 }
 
-char *
-detectmod_continuous_covariance::get_filename()
-/**
- * gets full path file name from time, directory and txname
- */
-{
- //Get time
-  struct timeval tp;
-  gettimeofday(&tp, NULL);
-  void *temp;
-  struct tm *time_struct = gmtime(&(tp.tv_sec));
-  int int_seconds = (int)tp.tv_sec;
-  int int_useconds = (int)tp.tv_usec;
-
-  // Create diretory tree. 
-  char filename[256];
-  char directory_time_string[24];
-  strftime(directory_time_string, 24, "/%Y/%m/%d/%H/%M/", time_struct);
-  strcpy(filename, directory);
-  strcat(filename,directory_time_string);
-  boost::filesystem::create_directories(filename);
-
-  // Create file name.
-  char time_string[40];
-  strftime(time_string,40,"%S",time_struct);
-  char u_sec[10];
-  sprintf(u_sec,"%.6d",int_useconds);
-  strncat(time_string,u_sec,6);
-  strcat(filename, tx_name); 
-  strcat(filename, "_"); 
-  strcat(filename, time_string); 
-  strcat(filename, ".cov"); 
-
-  return filename;
+int detectmod_continuous_covariance::get_output_vector_length (){
+  return output_vector_length(num_ch);
 }
-
-bool
-detectmod_continuous_covariance::open(const char *filename)
-/** 
- * opens a file, mostly copied from gnuradio
- */
-{
-
-  int fd;
-  if ((fd = ::open (filename,
-		    O_WRONLY|O_CREAT|O_TRUNC|O_LARGEFILE|O_BINARY, 0664)) < 0){
-    perror (filename);
-    return false;
-  }
-
-  if (d_fp){		// if we've already got a new one open, close it
-    fclose((FILE *) d_fp);
-    d_fp = 0;
-  }
-  
-  if ((d_fp = fdopen (fd, "wb")) == NULL){
-    perror (filename);
-    ::close(fd);		// don't leak file descriptor if fdopen fails.
-  }
-
-  return d_fp != 0;
-}
-
-void
-detectmod_continuous_covariance::close()
-{
-  /* close file */
-
-  if (d_fp){
-    fclose((FILE *) d_fp);
-    d_fp = 0;
-  }
-  
-}
-
 
