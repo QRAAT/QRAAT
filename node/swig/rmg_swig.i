@@ -49,8 +49,11 @@
 
 %{
 #include "detectmod_detect.h"
+#include "detectmod_continuous_covariance.h"
 %}
 
 GR_SWIG_BLOCK_MAGIC(detectmod,detect);
 %include "detectmod_detect.h"
 
+GR_SWIG_BLOCK_MAGIC(detectmod,continuous_covariance);
+%include "detectmod_continuous_covariance.h"
