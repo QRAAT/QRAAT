@@ -38,6 +38,12 @@ project_patterns = patterns('qraatview.views',
         r'^(?P<project_id>\d+)/manage-targets/$', 'manage_targets',
         name='manage-targets'),
 
+    url(r'^(?P<project_id>\d+)/check-deletion/$', 'check_deletion',
+        name='check-deletion'),
+    
+    url(r'^(?P<project_id>\d+)/delete-objs/$', 'delete_objs',
+        name='delete-objs'),
+
     url(
         r'^(?P<project_id>\d+)/transmitter/(?P<transmitter_id>\d+)/$',
         'show_transmitter',

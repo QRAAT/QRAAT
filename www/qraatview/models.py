@@ -272,6 +272,7 @@ class TxMake(models.Model):
 
 class Tx(models.Model):
     class Meta:
+        verbose_name = "Transmitter"
         app_label = QRAAT_APP_LABEL
         db_table = "tx"
 
@@ -292,6 +293,22 @@ class Tx(models.Model):
     frequency = models.FloatField()
 
     is_hidden = models.BooleanField(default=False)
+
+    def verbose_name(self):
+        return self._meta.verbose_name
+
+    def hide(self):
+        objs_related = self.get_objs_related()
+
+        for obj in objs_related:
+            obj.hide()
+
+        self.is_hidden = True
+        self.save()
+
+    def get_objs_related(self):
+        objs_related = Deployment.objects.exclude(is_hidden=True).filter(txID=self)
+        return objs_related
 
     def __unicode__(self):
         return u'%s %s' % (self.name, self.serial_no)
@@ -389,11 +406,28 @@ class Deployment(models.Model):
 
     is_hidden = models.BooleanField(default=False)
 
+    def get_objs_related(self):
+        return []
+
+    def hide(self):
+        related_objs = self.get_objs_related()
+        for obj in related_objs:
+            obj.hide()
+
+        self.is_hidden = True
+        self.save()
+
+    def verbose_name(self):
+        return self._meta.verbose_name
+
     def get_start(self):
         return timestamp_todate(self.time_start)
 
     def get_end(self):
         return timestamp_todate(self.time_end)
+
+    def __unicode__(self):
+        return u'%s active %s' % (self.name, self.is_active)
 
 
 class Track(models.Model):

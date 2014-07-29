@@ -8,7 +8,6 @@
 
 $(document).ready(function(){
         var inputs = $(".input-group").children("input, select, textarea");
-        console.log(inputs);
         for(var i=0; i<inputs.length; i++){
             console.log(inputs[i]);
             $(inputs[i]).addClass("form-control");
@@ -22,6 +21,9 @@ $(document).ready(function(){
 
 {% if changed %}
 <div class="alert alert-success">{%block success_msg %} {% endblock %}</div>
+{% endif %}
+{% if deleted == "True" %}
+<div class="alert alert-danger">{%block deleted_msg %} {% endblock %}</div>
 {% endif %}
 
 {% if form %}

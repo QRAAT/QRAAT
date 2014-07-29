@@ -2,24 +2,50 @@
 {% load project_filters %}
 
 {%block success_msg %} Transmitter created {% endblock %}
+{% block deleted_msg %} Transmitters deleted {% endblock %}
 
 {% block content %}
+<script>
+    $(document).ready(function(){
+        $("#check-all").click(function(){
+            console.log($(this).prop("checked"));
+            if(!$(this).prop("checked")){
+                $(".element-check-box").each(function(){
+                    $(this).prop('checked', false);
+                });
+            }else{
+                $(".element-check-box").each(function(){
+                    $(this).prop('checked', true);
+                });
+            }
+        });
+    });
+</script>
 
 <div class="page-header">
     <h4>
         Transmitters
         <a style="margin-left: 5%;" href={% url 'qraat:add-transmitter' project.ID %}>
-        <input type="button" class="btn btn-primary" value="Create transmitter" name="create-transmitter" />
+        <input type="button" class="btn btn-primary" value="Add transmitter" name="create-transmitter" />
     </a>
     </h4>
 </div>
 
 {% block form %} {{block.super}} {% endblock %}
 
-<br/>
+<form action={%url 'qraat:check-deletion' project.ID %} method="post">
+    {% csrf_token %}
+    <button style="margin-bottom: 1%;" type="submit" class="btn btn-danger btn-sm">
+        Delete selected transmitters
+        <span class="glyphicon glyphicon-trash"></span>
+    </button>
+    <input type=hidden name="object" value="transmitter"/>
+
 <table class="table" id="transmitters">
     <tr>
-        <td></td>
+        <td>
+            <input id="check-all" type="checkbox" value="check-all" name="check-all"> </input>
+        </td>
         <td>Name</td>
         <td>Serial number</td>
         <td>Model</td>
@@ -28,7 +54,7 @@
     </tr>
     {% for transmitter in project.get_transmitters %}
     <tr>
-        <td><input type="checkbox" value={{transmitter.ID}}/></td>
+        <td><input class="element-check-box" type="checkbox" name="selected" value={{transmitter.ID}}></input></td>
         <td>{{transmitter.name}}</td>
         <td>{{transmitter.serial_no}}</td>
         <td>{{transmitter.tx_makeID.model}}</td>
@@ -37,5 +63,5 @@
     </tr>
     {% endfor %}
 </table>
-
+</form>
 {% endblock %}

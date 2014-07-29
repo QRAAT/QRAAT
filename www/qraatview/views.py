@@ -1,13 +1,58 @@
 from django.db.models import Q
 from django.shortcuts import render, redirect
 from django.core.urlresolvers import reverse
+from django.core.context_processors import csrf
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from models import Project, Tx, Location
+from models import Target, Deployment
 from forms import ProjectForm, EditProjectForm, AddTransmitterForm
 from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
+
+
+def not_allowed_page(request):
+    return HttpResponse("Action not allowed")
+
+
+def get_objs_by_type(obj_type, obj_ids):
+    query = None
+
+    #  switch query based on obj type
+    if(obj_type == "transmitter"):
+        query = lambda obj_id: Tx.objects.get(ID=obj_id)
+    elif(obj_type == "target"):
+        query = lambda obj_id: Target.objects.get(ID=obj_id)
+    elif(obj_type == "location"):
+        query = lambda obj_id: Location.objects.get(ID=obj_id)
+    elif(obj_type == "deployment"):
+        query = lambda obj_id: Deployment.objects.get(ID=obj_id)
+
+    #  maps items selected on the form in a list of objects
+    objs = map(query, obj_ids)
+
+    return objs
+
+
+def can_delete(project, user):
+    """A user can delete content in a project if the user is the project owner or
+    if the user is in the collaborators group and the group has permission
+    to delete content on the project"""
+
+    return project.is_owner(user) or\
+        (project.is_collaborator(user) and
+            user.has_perm("qraatview.can_delete"))
+
+
+def can_change(project, user):
+    """A user can change content in a project if the user is the project owner or
+    if the user is in the collaborators group and the group has permission
+    to change content on the project"""
+
+    return project.is_owner(user) or\
+        (project.is_collaborator(user)
+            and user.has_perm("qraatview.can_change"))
 
 
 def index(request):
@@ -24,6 +69,15 @@ def index(request):
             request, "qraat_site/index.html",
             {'nav_options': nav_options,
              'projects': public_projects})
+
+
+def get_project(project_id):
+    try:
+        project = Project.objects.get(ID=project_id)
+    except ObjectDoesNotExist:
+        return HttpResponse("We didn't find this project")
+    else:
+        return project
 
 
 @login_required(login_url='/auth/login')
@@ -111,7 +165,7 @@ def render_project_form(
                            "changed": thereis_newelement,
                            "project": project})
         else:
-            return HttpResponse("Action not allowed")
+            return not_allowed_page(request)
 
 
 def render_manage_page(request, project, template_path, content):
@@ -119,15 +173,65 @@ def render_manage_page(request, project, template_path, content):
 
     if request.method == "GET":
         content["changed"] = request.GET.get("new_element")
+        content["deleted"] = request.GET.get("deleted")
 
-    if project.is_owner(user) or\
-        (project.is_collaborator(user)
-            and user.has_perm("qraatview.can_change")):
+    if can_change(project, user):
+
         return render(
             request, template_path,
             content)
     else:
-        return HttpResponse("Action not allowed")
+        return not_allowed_page(request)
+
+
+@login_required(login_url='auth/login')
+def delete_objs(request, project_id):
+    user = request.user
+    project = get_project(project_id)
+
+    if can_delete(project, user):
+        if request.method == 'POST':
+            del_confirm = request.POST.get("submit")
+            obj_type = request.POST.get("object")
+            deleted = False
+
+            # requires confirmation to delete objs
+            if del_confirm == "delete":
+                objs_to_del = get_objs_by_type(
+                    obj_type, request.POST.getlist("selected"))
+
+                for obj in objs_to_del:
+                    obj.hide()
+
+                deleted = True
+
+            return redirect(
+                "%s?deleted=%s" % (
+                    reverse("qraat:manage-%ss" % obj_type, args=project_id),
+                    deleted))
+
+    return not_allowed_page(request)
+
+
+@login_required(login_url='/auth/login')
+def check_deletion(request, project_id):
+    user = request.user
+    project = get_project(project_id)
+    content = {}
+    content.update(csrf(request))
+    content["project"] = project
+    content["nav_options"] = get_nav_options(request)
+
+    if can_delete(project, user):
+        if request.method == 'POST':
+            obj_type = request.POST.get("object")
+            content["objs"] = get_objs_by_type(
+                obj_type, request.POST.getlist("selected"))
+
+            return render(request, "qraat_site/check-deletion.html",
+                          content)
+
+    return not_allowed_page(request)
 
 
 @login_required(login_url='/auth/login')
@@ -198,7 +302,7 @@ def edit_project(request, project_id):
                  'project': project})
 
         else:
-            return HttpResponse("You're not allowed to edit this project")
+            return not_allowed_page(request)
 
 
 @login_required(login_url="/auth/login")
@@ -237,7 +341,7 @@ def add_manufacturer(request, project_id):
                  "changed": istherenew_make,
                  "project": project})
         else:
-            return HttpResponse("You are not allowed to do this.")
+            return not_allowed_page(request)
 
 
 @login_required(login_url="auth/login")
@@ -312,8 +416,7 @@ def show_project(request, project_id):
                          'nav_options': nav_options})
 
             else:
-                return HttpResponse(
-                    "You're not allowed to visualize this project")
+                return not_allowed_page(request)
 
     except ObjectDoesNotExist:
         return HttpResponse("Project not found")
@@ -332,20 +435,16 @@ def manage_locations(request, project_id):
 @login_required(login_url="/auth/login")
 def manage_transmitters(request, project_id):
 
-    try:
-        project = Project.objects.get(ID=project_id)
-    except ObjectDoesNotExist:
-        return HttpResponse("Error: we didn't find this project")
-    else:
-        content = {}
-        content["nav_options"] = get_nav_options(request)
-        content["project"] = project
+    project = get_project(project_id)
+    content = {}
+    content["nav_options"] = get_nav_options(request)
+    content["project"] = project
 
-        return render_manage_page(
-            request,
-            project,
-            "qraat_site/manage_transmitters.html",
-            content)
+    return render_manage_page(
+        request,
+        project,
+        "qraat_site/manage_transmitters.html",
+        content)
 
 
 @login_required(login_url="/auth/login")
