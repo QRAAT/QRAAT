@@ -45,4 +45,10 @@
 </ul>
 
 {% endif %}
+
 {%endblock%}
+{% block content %}
+{%block form %}
+{{ block.super }}
+{% endblock %}
+{% endblock %}
