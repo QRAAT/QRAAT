@@ -1,5 +1,9 @@
 #!/usr/bin/python
 
-import time, sys
+import time, sys, datetime
 
-print time.asctime(time.localtime(float(sys.argv[1])))
+try: 
+  print time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(sys.argv[1])))
+
+except ValueError: 
+  print time.mktime(datetime.datetime.strptime(sys.argv[1], '%Y-%m-%d %H:%M:%S').timetuple())

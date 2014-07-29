@@ -4,7 +4,7 @@
 # This program is part of QRAAT, an automated animal tracking system based on
 # GNU Radio. 
 #
-# Copyright (C) 2013 Christopher Patton
+# Copyright (C) 2014 Sean Riddle
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,16 +33,6 @@ if int(output) > 1:
   print >>sys.stderr, "template: error: attempted reentry, exiting"
   sys.exit(1)
 
-parser = OptionParser()
-
-parser.description = '''This does nothing.'''
-parser.add_option('-s', '--siteid', action='store', type='int', dest='siteid')
-parser.add_option('-t', '--txid', action='store', type='int', dest='txid')
-# parser.add_option('-a', '--t_start', action='store', type='int', dest='t_start')
-# parser.add_option('-z', '--t_end', action='store', type='int', dest='t_end')
-
-(options, args) = parser.parse_args()
-
 try: 
   start = time.time()
   print "template: start time:", time.asctime(time.localtime(start))
@@ -55,10 +45,6 @@ try:
   context_length = 3 * 60
 
   chunk_size = int(60 * 60)		# One hour (in seconds)
-
-  # t_start, t_end = options.t_start, options.t_end
-
-  siteid, txid = options.siteid, options.txid
 
   # FIXME This commented out stuff came up in a merge fix. Shouldn't be a problem. 
   # total_chunks = int((t_end - t_start) / float(chunk_size)) + 1
@@ -80,41 +66,51 @@ try:
 
   cursor_value = qraat.srv.signal_filter.get_cursor_value(change_handler, 'estscore')
   print 'Got cursor_value:', cursor_value
-
-  q = 'select ID from est where siteid = %s and txid = %s and ID > %s'
+  
 
 
   cur = db_con.cursor()
-  rows = cur.execute(q, (siteid, txid, cursor_value))
-  l = []
-  while True:
-    r = cur.fetchone()
-    if r is None: break
-    r = tuple(r)
-    l.append(r[0])
-    print 'Got {} items: {}'.format(len(l), l[:10])
+  
+  # Get a set of (dep_id, site_id) pairs for which there is new data. 
+  cur.execute('''SELECT DISTINCT deploymentID, siteID 
+                   FROM est 
+                  WHERE ID > %s''', (cursor_value)) 
+  
+  for (dep_id, site_id) in cur.fetchall(): 
+    print "filter_auto: processing (depID=%d, siteID=%d)" % (dep_id, site_id)
+    rows = cur.execute('''SELECT ID 
+                            FROM est 
+                           WHERE siteID=%s 
+                             AND deploymentID=%s 
+                             AND ID > %s''', (site_id, dep_id, cursor_value))
+    l = []
+    while True:
+      r = cur.fetchone()
+      if r is None: break
+      r = tuple(r)
+      l.append(r[0])
 
-  if len(l) == 0:
-    print 'No IDs to process.'
-  else:
-    print 'Here goes.'
-    # Split into groups of 1000 each?
-    batch_size = 1000
-    max_range_float = len(l) / float(batch_size)
-    max_range = ceil(max_range_float)
-    for i in range(int(max_range)):
-      sub_l = l[i * batch_size:(i + 1) * batch_size]
-      qraat.srv.signal_filter.score(sub_l)
-      print 'Done scoring.'
-      print 'About to update cursor "{}" to {}'.format('estscore', max(l))
+    if len(l) == 0:
+      print 'filter_auto: skipping empty data set.'
+
+    else:
+      # Split into groups of 1000 each?
+      #batch_size = 1000
+      #max_range_float = len(l) / float(batch_size)
+      #max_range = ceil(max_range_float)
+      #for i in range(int(max_range)):
+      #  sub_l = l[i * batch_size:(i + 1) * batch_size]
+      #  qraat.srv.signal_filter.score(sub_l)
+      #  qraat.srv.signal_filter.update_cursor_value(change_handler, 'estscore', max(l))
+      qraat.srv.signal_filter.score(l)
       qraat.srv.signal_filter.update_cursor_value(change_handler, 'estscore', max(l))
     
 except mdb.Error, e:
-  print >>sys.stderr, "template: error: [%d] %s" % (e.args[0], e.args[1])
+  print >>sys.stderr, "filter_auto: error: [%d] %s" % (e.args[0], e.args[1])
   sys.exit(1)
 
 except qraat.error.QraatError, e:
-  print >>sys.stderr, "template: error: %s." % e
+  print >>sys.stderr, "filter_auto: error: %s." % e
 
 finally: 
   print "template: finished in %.2f seconds." % (time.time() - start)
