@@ -43,11 +43,11 @@
 
 <table class="table">
     <tr>
+        {%if objects.0 %}
         <td>
         <td>
             <input id="check-all" type="checkbox" value="check-all" name="check-all"> </input>
         </td>
-        {%if objects.0 %}
             <input type=hidden name="object" value={{objects.0.verbose_name}}></input>
             {% for field in objects.0|get_fields %}
                 {% if field.verbose_name != "is hidden" and field.verbose_name != "projectID" and field.verbose_name != "ID" %}
