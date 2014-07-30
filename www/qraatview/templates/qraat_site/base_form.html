@@ -1,0 +1,76 @@
+{% extends "qraat_site/base.html" %}
+
+{% load class_tag %}
+
+{%block script %}
+
+<script>
+
+$(document).ready(function(){
+        var inputs = $(".input-group").children("input, select, textarea");
+        for(var i=0; i<inputs.length; i++){
+            console.log(inputs[i]);
+            $(inputs[i]).addClass("form-control");
+        }
+});
+
+</script>
+{% endblock %}
+
+{% block form %}
+
+{% if changed %}
+<div class="alert alert-success">{%block success_msg %} {% endblock %}</div>
+{% endif %}
+{% if deleted == "True" %}
+<div class="alert alert-danger">{%block deleted_msg %} {% endblock %}</div>
+{% endif %}
+
+{% if form %}
+<div class="page-header">
+    <h4>{%block title_msg %} {% endblock %}</h4>
+</div>
+<div class="form-container"> 
+  <form  method="post">
+    {% csrf_token %}
+	<!-- Display form errors -->
+	{% if form.non_field_errors %}
+		<div class="alert alert-danger">
+			{{ form.non_field_errors }}
+		</div>
+	{% endif %}
+	<!-- Loop over form fields -->
+	<div class="input-group-container">
+	{% for field in form %}
+			{% if field.errors %}
+				{% for error in field.errors %}
+					<div class="input-error">
+						* {{ error|escape}}
+					</div>
+				{% endfor %}
+			{% endif %}
+		<!-- Display form fields -->
+			<div class="input-group input-lg">
+                {% if field.field.widget|get_class == "CheckboxInput" %}
+                <input class="form-control" value="{{field.label}}" disabled></input>
+                    <span class="input-group-addon">
+                        {{field}}
+                    </span>
+                {% else %}
+                <span class="input-group-addon">
+                    {{ field.label_tag}}
+                </span>
+				{{ field }}
+                {% endif %}
+			</div>
+	{% endfor %}
+	<div class="input-group submit-btn">
+		<div class="btn-group-vertical">
+            <button class="btn btn-primary btn-lg" type="submit" value="create-project">{%block button_name %} {% endblock %}</button>
+		</div>
+	</div>
+	</div>
+ </form>
+</div>
+{% endif %}
+{% endblock %}
