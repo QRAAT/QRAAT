@@ -21,6 +21,7 @@ def get_query(obj_type):
     query"""
 
     query = None
+    obj_type = obj_type.lower()
 
     try:
         #  switch query based on obj type
@@ -35,6 +36,9 @@ def get_query(obj_type):
     except ObjectDoesNotExist:
         raise ObjectDoesNotExist
     else:
+        if not query:
+            raise ObjectDoesNotExist
+
         return query
 
 
@@ -75,6 +79,17 @@ def can_change(project, user):
             and user.has_perm("qraatview.can_change"))
 
 
+def can_view(project, user):
+    """Users can view content in a project if the project is public,
+    or the user is the project owner, or the user is a project collaborator
+    or the user is a project viewer"""
+
+    return project.is_public\
+        or project.is_owner(user)\
+        or (project.is_collaborator(user) and user.has_perm("view"))\
+        or (project.is_viewer(user) and user.has_perm("view"))
+
+
 def index(request):
     nav_options = get_nav_options(request)
     user = request.user
@@ -100,19 +115,45 @@ def get_project(project_id):
         return project
 
 
-@login_required(login_url='/auth/login')
 def show_transmitter(request, project_id, transmitter_id):
-    tx = Tx.objects.get(ID=transmitter_id)
-    return HttpResponse(
-        "Transmitter: %d Model: %s Manufacturer: %s" % (
-            tx.ID, tx.tx_makeID.model, tx.tx_makeID.manufacturer))
+    user = request.user
+    project = get_project(project_id)
+
+    if can_view(project, user):
+        query = get_query("transmitter")
+        tx = query(transmitter_id)
+        return HttpResponse(
+            "Transmitter: %d Model: %s Manufacturer: %s" % (
+                tx.ID, tx.tx_makeID.model, tx.tx_makeID.manufacturer))
+    else:
+        return not_allowed_page(request)
 
 
-@login_required(login_url='auth/login')
+def show_target(request, project_id, target_id):
+
+    user = request.user
+    project = get_project(project_id)
+
+    if can_view(project, user):
+        query = get_query("target")
+        target = query(target_id)
+        return HttpResponse(target)
+    else:
+        return not_allowed_page(request)
+
+
 def show_location(request, project_id, location_id):
-    location = Location.objects.get(ID=location_id)
-    return HttpResponse(
-        "Location: %s location: %s" % (location.name, location.location))
+    user = request.user
+    project = get_project(project_id)
+
+    if can_view(project, user):
+        query = get_query("location")
+        location = query(location_id)
+
+        return HttpResponse(
+            "Location: %s location: %s" % (location.name, location.location))
+    else:
+        return not_allowed_page(request)
 
 
 @login_required(login_url='/auth/login')
@@ -435,7 +476,18 @@ def show_project(request, project_id):
 
 @login_required(login_url="/auth/login")
 def manage_targets(request, project_id):
-    return HttpResponse("Not implemented yet")
+
+    project = get_project(project_id)
+    content = {}
+    content["nav_options"] = get_nav_options(request)
+    content["project"] = project
+    content["objects"] = project.get_targets()
+
+    return render_manage_page(
+        request,
+        project,
+        "qraat_site/manage_targets.html",
+        content)
 
 
 @login_required(login_url="/auth/login")
@@ -450,6 +502,7 @@ def manage_transmitters(request, project_id):
     content = {}
     content["nav_options"] = get_nav_options(request)
     content["project"] = project
+    content["objects"] = project.get_transmitters()
 
     return render_manage_page(
         request,
@@ -471,6 +524,11 @@ def edit_transmitter(request, project_id, transmitter_id):
         template_path="qraat_site/edit-transmitter.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:edit-transmitter", args=(project_id, transmitter_id)))
+
+
+@login_required(login_url="/auth/login")
+def edit_target(request, project_id, target_id):
+    return HttpResponse("Note implemented yet")
 
 
 @login_required(login_url="/auth/login")

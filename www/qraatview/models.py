@@ -352,6 +352,7 @@ class TxMakeParameters(models.Model):
 
 class Target(models.Model):
     class Meta:
+        verbose_name = "Target"
         app_label = QRAAT_APP_LABEL
         db_table = "target"
 
@@ -367,6 +368,22 @@ class Target(models.Model):
         help_text="Project for which target was originally created")
 
     is_hidden = models.BooleanField(default=False)  # boolean default false
+    
+    def verbose_name(self):
+        return self._meta.verbose_name
+
+    def hide(self):
+        objs_related = self.get_objs_related()
+
+        for obj in objs_related:
+            obj.hide()
+
+        self.is_hidden = True
+        self.save()
+
+    def get_objs_related(self):
+        objs_related = Deployment.objects.exclude(is_hidden=True).filter(targetID=self)
+        return objs_related
 
     def __unicode__(self):
         return u'%s' % self.name

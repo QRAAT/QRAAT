@@ -10,15 +10,17 @@
     <form action={% url 'qraat:delete-objs' project.ID  %} method="post">
    {% csrf_token %}
     <ol>
-        <input type="hidden" name="object" value="transmitter"></input>
+        <input type="hidden" name="object" value={{objs.0.verbose_name|lower}}></input>
     {% for obj in objs %}
         <ol class="obj-list">
             <input type="hidden" name="selected" value={{obj.ID}} ></input>
         <span>
-        {{obj.verbose_name}}:
-        <a href={% url 'qraat:show-transmitter' project.ID obj.ID %}>
-            {{obj}}
-        </a>
+        {% with verbose_name=obj.verbose_name %}
+            {{verbose_name}}:
+            <a href={% url 'qraat:show-'|add:verbose_name|lower project.ID obj.ID %}>
+                {{obj}}
+            </a>
+        {% endwith %}
         </span>
             {% for related_obj in obj.get_objs_related  %}
                 
