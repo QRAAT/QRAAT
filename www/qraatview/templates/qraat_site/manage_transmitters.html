@@ -44,6 +44,7 @@
 <table class="table" id="transmitters">
     <tr>
         <td>
+        <td>
             <input id="check-all" type="checkbox" value="check-all" name="check-all"> </input>
         </td>
         <td>Name</td>
@@ -54,6 +55,13 @@
     </tr>
     {% for transmitter in project.get_transmitters %}
     <tr>
+        <td> 
+            <a title="Edit transmitter"\
+                href={% url 'qraat:edit-transmitter' project.ID transmitter.ID %}>
+                <button type="button" class="btn btn-default btn-xs" value="" name="">
+                    <span class="glyphicon glyphicon-pencil"></span>
+                </button>
+            </a>
         <td><input class="element-check-box" type="checkbox" name="selected" value={{transmitter.ID}}></input></td>
         <td>{{transmitter.name}}</td>
         <td>{{transmitter.serial_no}}</td>
