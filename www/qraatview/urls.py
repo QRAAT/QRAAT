@@ -36,6 +36,11 @@ project_patterns = patterns(
         name='edit-target'),
 
     url(
+        r'^(?P<project_id>\d+)/manage-locations/(?P<location_id>\d+)/$',
+        'edit_location',
+        name='edit-location'),
+
+    url(
         r'^(?P<project_id>\d+)/manage-deployments/$', 'manage_deployments',
         name='manage-deployments'),
 

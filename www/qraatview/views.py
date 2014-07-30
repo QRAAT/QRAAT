@@ -10,7 +10,7 @@ from models import Target, Deployment
 from forms import ProjectForm, EditProjectForm, AddTransmitterForm
 from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
-from forms import EditTargetForm, EditTransmitterForm
+from forms import EditTargetForm, EditTransmitterForm, EditLocationForm
 
 
 def not_allowed_page(request):
@@ -268,6 +268,9 @@ def delete_objs(request, project_id):
 
 @login_required(login_url='/auth/login')
 def check_deletion(request, project_id):
+    """View that receives from a form a list of objects to delete
+    and asks the user to confirm deletion"""
+
     user = request.user
     project = get_project(project_id)
     content = {}
@@ -278,14 +281,17 @@ def check_deletion(request, project_id):
     if can_delete(project, user):
         if request.method == 'POST':
             obj_type = request.POST.get("object").lower()
-            content["objs"] = get_objs_by_type(
-                obj_type, request.POST.getlist("selected"))
+            selected_objs = request.POST.getlist("selected")
 
             # didn't select any object
-            if len(content["objs"]) == 0:
-                return redirect("%s?deleted=0" %
+            if len(selected_objs) == 0:
+                return redirect(
+                    "%s?deleted=0" %
                     reverse("qraat:manage-%ss" % obj_type,
                             args=(project_id,)))
+
+            content["objs"] = get_objs_by_type(
+                obj_type, selected_objs)
 
             return render(request, "qraat_site/check-deletion.html",
                           content)
@@ -411,7 +417,8 @@ def add_location(request, project_id):
         post_form=AddLocationForm(data=request.POST),
         get_form=AddLocationForm(),
         template_path="qraat_site/create-location.html",
-        success_url="../add-location?new_element=True")
+        success_url="%s?new_element=True" % reverse(
+            "qraat:manage-locations", args=(project_id,)))
 
 
 @login_required(login_url="/auth/login")
@@ -434,7 +441,8 @@ def add_target(request, project_id):
         post_form=AddTargetForm(data=request.POST),
         get_form=AddTargetForm(),
         template_path="qraat_site/create-target.html",
-        success_url="../add-target?new_element=True")
+        success_url="%s?new_element=True" % reverse(
+            "qraat:manage-targets", args=(project_id,)))
 
 
 @login_required(login_url="/auth/login")
@@ -499,7 +507,18 @@ def manage_targets(request, project_id):
 
 @login_required(login_url="/auth/login")
 def manage_locations(request, project_id):
-    return HttpResponse("Not implemented yet")
+
+    project = get_project(project_id)
+    content = {}
+    content["nav_options"] = get_nav_options(request)
+    content["project"] = project
+    content["objects"] = project.get_locations()
+
+    return render_manage_page(
+        request,
+        project,
+        "qraat_site/manage_locations.html",
+        content)
 
 
 @login_required(login_url="/auth/login")
@@ -546,6 +565,21 @@ def edit_target(request, project_id, target_id):
         template_path="qraat_site/edit-target.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:edit-target", args=(project_id, target_id)))
+
+
+@login_required(login_url="/auth/login")
+def edit_location(request, project_id, location_id):
+    query = get_query("location")
+    location = query(location_id)
+
+    return render_project_form(
+        request=request,
+        project_id=project_id,
+        post_form=EditLocationForm(data=request.POST, instance=location),
+        get_form=EditLocationForm(instance=location),
+        template_path="qraat_site/edit-location.html",
+        success_url="%s?new_element=True" % reverse(
+            "qraat:edit-location", args=(project_id, location_id)))
 
 
 @login_required(login_url="/auth/login")

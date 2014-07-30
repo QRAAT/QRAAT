@@ -245,3 +245,13 @@ class EditTargetForm(AddTargetForm):
     class Meta:
         model = Target
         exclude = ["projectID", "is_hidden"]
+
+
+class EditLocationForm(AddLocationForm):
+    """Django's ModelForm to create a location
+       extends ProjectElementForm"""
+
+    class Meta:
+        model = Location
+        exclude = ["projectID", "is_hidden"]
+

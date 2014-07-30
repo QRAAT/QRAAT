@@ -1,6 +1,7 @@
-{% extends "qraat_site/edit_project_base.html" %}
+{% extends "qraat_site/manage_side_bar.html" %}
 {% load class_tag %}
 
 {%block success_msg %} Location created {% endblock %}
 {% block title_msg %} New Location {% endblock %}
 {% block button_name %} Add Location {% endblock %}
+{% block content %} {% block form %} {{block.super}} {% endblock %} {% endblock %}

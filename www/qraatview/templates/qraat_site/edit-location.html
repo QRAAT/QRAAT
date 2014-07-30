@@ -1,0 +1,15 @@
+{% extends "qraat_site/manage_side_bar.html" %}
+{% load class_tag %}
+
+{%block success_msg %} Location edited  {% endblock %}
+{% block title_msg %}
+
+Location editing 
+
+{% endblock %}
+{% block button_name %} Save {% endblock %}
+{% block content %}
+{% block form %}
+{{ block.super }}
+{% endblock %}
+{% endblock %}
