@@ -1,4 +1,5 @@
 {% extends "qraat_site/base.html" %}
+
 {% load class_tag %}
 
 {%block script %}
@@ -7,7 +8,6 @@
 
 $(document).ready(function(){
         var inputs = $(".input-group").children("input, select, textarea");
-        console.log(inputs);
         for(var i=0; i<inputs.length; i++){
             console.log(inputs[i]);
             $(inputs[i]).addClass("form-control");
@@ -17,14 +17,18 @@ $(document).ready(function(){
 </script>
 {% endblock %}
 
-{% block content %}
+{% block form %}
 
 {% if changed %}
 <div class="alert alert-success">{%block success_msg %} {% endblock %}</div>
 {% endif %}
+{% if deleted == "True" %}
+<div class="alert alert-danger">{%block deleted_msg %} {% endblock %}</div>
+{% endif %}
 
+{% if form %}
 <div class="page-header">
-    <h3>{%block title_msg %} {% endblock %}</h3>
+    <h4>{%block title_msg %} {% endblock %}</h4>
 </div>
 <div class="form-container"> 
   <form  method="post">
@@ -68,4 +72,5 @@ $(document).ready(function(){
 	</div>
  </form>
 </div>
+{% endif %}
 {% endblock %}

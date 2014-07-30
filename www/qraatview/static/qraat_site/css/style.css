@@ -1,7 +1,21 @@
 .sidebar{
+    margin-top: 3%;
     float:left;
-    width: 20%;
+    width: 17%;
+    height: 100%;
+    background-color: #F1F5F8;
+    border-radius: 10px;
+    -moz-border-radius: 10px;
+
 }
+
+.nav-stacked > li:hover{
+    -moz-border-radius: 4px;
+    border-radius: 4px;
+    background-color: #EEE;
+    width: 100%;
+}
+
 .content{
     float: right;
     width: 80%;
@@ -65,4 +79,21 @@
 }
 .table-cell{
     display: table-cell;
+}
+
+.side-bar-element{
+    width:100%;
+    display: block;
+    padding-left: 6%;
+}
+
+.obj-list{
+   display: block; 
+   background: None;
+}
+
+.obj-element{
+    background: None;
+    display: block;
+    padding-left: 2%;
 }

@@ -1,12 +1,78 @@
 from django.db.models import Q
 from django.shortcuts import render, redirect
+from django.core.urlresolvers import reverse
+from django.core.context_processors import csrf
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from models import Project, Tx, Location
+from models import Target, Deployment
 from forms import ProjectForm, EditProjectForm, AddTransmitterForm
-from forms import AddManufacturerForm, AddTargetForm
+from forms import AddManufacturerForm, AddTargetForm, EditTransmitterForm
 from forms import AddDeploymentForm, AddLocationForm
+
+
+def not_allowed_page(request):
+    return HttpResponse("Action not allowed")
+
+
+def get_query(obj_type):
+    """ Receives an object type and return it's specific
+    query"""
+
+    query = None
+
+    try:
+        #  switch query based on obj type
+        if(obj_type == "transmitter"):
+            query = lambda obj_id: Tx.objects.get(ID=obj_id)
+        elif(obj_type == "target"):
+            query = lambda obj_id: Target.objects.get(ID=obj_id)
+        elif(obj_type == "location"):
+            query = lambda obj_id: Location.objects.get(ID=obj_id)
+        elif(obj_type == "deployment"):
+            query = lambda obj_id: Deployment.objects.get(ID=obj_id)
+    except ObjectDoesNotExist:
+        raise ObjectDoesNotExist
+    else:
+        return query
+
+
+def get_objs_by_type(obj_type, obj_ids):
+    """Receives an object type and a list of ids and return a list of
+    Objects based in it's type i.e transmitter, location, target, or
+    deployment"""
+
+    try:
+        query = get_query(obj_type)
+        #  maps items selected on the form in a list of objects
+        objs = map(query, obj_ids)
+    except Exception, e:
+        raise e
+
+    else:
+        return objs
+
+
+def can_delete(project, user):
+    """A user can delete content in a project if the user is the project owner or
+    if the user is in the collaborators group and the group has permission
+    to delete content on the project"""
+
+    # With has_perm we can have different permissions for group
+    return project.is_owner(user) or\
+        (project.is_collaborator(user) and
+            user.has_perm("qraatview.can_delete"))
+
+
+def can_change(project, user):
+    """A user can change content in a project if the user is the project owner or
+    if the user is in the collaborators group and the group has permission
+    to change content on the project"""
+
+    return project.is_owner(user) or\
+        (project.is_collaborator(user)
+            and user.has_perm("qraatview.can_change"))
 
 
 def index(request):
@@ -25,26 +91,13 @@ def index(request):
              'projects': public_projects})
 
 
-# @login_required(login_url='/auth/login')
-# def transmitters(request):
-#     nav_options = get_nav_options(request)
-#     tx_IDs = tx_ID.objects.all()
-#     transmitters = []
-
-#     for tx in tx_IDs:
-#         pulses = TxPulse.objects.filter(tx_ID=tx)
-#         deployments = TxDeployment.objects.filter(tx_ID=tx)
-#         aliases = TxAlias.objects.filter(tx_ID=tx)
-#         transmitter = {}
-#         transmitter["transmitter"] = tx
-#         transmitter["pulses"] = pulses
-#         transmitter["deployments"] = deployments
-#         transmitter["aliases"] = aliases
-#         transmitters.append(transmitter)
-
-#     return render(
-#         request, "qraat_site/transmitters.html",
-#         {"transmitters": transmitters, 'nav_options': nav_options})
+def get_project(project_id):
+    try:
+        project = Project.objects.get(ID=project_id)
+    except ObjectDoesNotExist:
+        return HttpResponse("We didn't find this project")
+    else:
+        return project
 
 
 @login_required(login_url='/auth/login')
@@ -96,42 +149,100 @@ def projects(request):
 
 
 def render_project_form(
-        request, project_id, post_form, get_form, template_path, success_url):
+        request, project_id, post_form,
+        get_form, template_path, success_url):
 
     user = request.user
+    project = get_project(project_id)
     nav_options = get_nav_options(request)
     thereis_newelement = None
-    try:
-        project = Project.objects.get(ID=project_id)
 
-    except ObjectDoesNotExist:
-        return HttpResponse("Error: We did not find this project")
+    if can_change(project, user):
+        if request.method == 'POST':
+            form = post_form
+            form.set_project(project)
+            if form.is_valid():
+                form.save()
+                return redirect(success_url)
 
+        elif request.method == 'GET':
+            thereis_newelement = request.GET.get("new_element")
+            form = get_form
+            form.set_project(project)
+
+        return render(request, template_path,
+                      {"form": form,
+                       "nav_options": nav_options,
+                       "changed": thereis_newelement,
+                       "project": project})
     else:
-        # Checking has_perm we can have different permissions for group
-        if project.is_owner(user) or\
-                (project.is_collaborator(user)
-                    and user.has_perm("qraatview.can_change")):
+        return not_allowed_page(request)
 
-            if request.method == 'POST':
-                form = post_form
-                form.set_project(project)
-                if form.is_valid():
-                    form.save()
-                    return redirect(success_url)
 
-            elif request.method == 'GET':
-                thereis_newelement = request.GET.get("new_element")
-                form = get_form
-                form.set_project(project)
+def render_manage_page(request, project, template_path, content):
+    user = request.user
 
-            return render(request, template_path,
-                          {"form": form,
-                           "nav_options": nav_options,
-                           "changed": thereis_newelement,
-                           "project": project})
-        else:
-            return HttpResponse("Action not allowed")
+    if request.method == "GET":
+        content["changed"] = request.GET.get("new_element")
+        content["deleted"] = request.GET.get("deleted")
+
+    if can_change(project, user):
+
+        return render(
+            request, template_path,
+            content)
+    else:
+        return not_allowed_page(request)
+
+
+@login_required(login_url='auth/login')
+def delete_objs(request, project_id):
+    user = request.user
+    project = get_project(project_id)
+
+    if can_delete(project, user):
+        if request.method == 'POST':
+            del_confirm = request.POST.get("submit")
+            obj_type = request.POST.get("object")
+            deleted = False
+
+            # requires confirmation to delete objs
+            if del_confirm == "delete":
+                objs_to_del = get_objs_by_type(
+                    obj_type, request.POST.getlist("selected"))
+
+                for obj in objs_to_del:
+                    obj.hide()
+
+                deleted = True
+
+            return redirect(
+                "%s?deleted=%s" % (
+                    reverse("qraat:manage-%ss" % obj_type, args=project_id),
+                    deleted))
+
+    return not_allowed_page(request)
+
+
+@login_required(login_url='/auth/login')
+def check_deletion(request, project_id):
+    user = request.user
+    project = get_project(project_id)
+    content = {}
+    content.update(csrf(request))
+    content["project"] = project
+    content["nav_options"] = get_nav_options(request)
+
+    if can_delete(project, user):
+        if request.method == 'POST':
+            obj_type = request.POST.get("object")
+            content["objs"] = get_objs_by_type(
+                obj_type, request.POST.getlist("selected"))
+
+            return render(request, "qraat_site/check-deletion.html",
+                          content)
+
+    return not_allowed_page(request)
 
 
 @login_required(login_url='/auth/login')
@@ -202,7 +313,7 @@ def edit_project(request, project_id):
                  'project': project})
 
         else:
-            return HttpResponse("You're not allowed to edit this project")
+            return not_allowed_page(request)
 
 
 @login_required(login_url="/auth/login")
@@ -241,7 +352,7 @@ def add_manufacturer(request, project_id):
                  "changed": istherenew_make,
                  "project": project})
         else:
-            return HttpResponse("You are not allowed to do this.")
+            return not_allowed_page(request)
 
 
 @login_required(login_url="auth/login")
@@ -263,7 +374,8 @@ def add_transmitter(request, project_id):
         post_form=AddTransmitterForm(data=request.POST),
         get_form=AddTransmitterForm(),
         template_path="qraat_site/create-transmitter.html",
-        success_url="../add-transmitter?new_element=True")
+        success_url="%s?new_element=True" % reverse(
+            "qraat:manage-transmitters", args=(project_id,)))
 
 
 @login_required(login_url="/auth/login")
@@ -315,8 +427,7 @@ def show_project(request, project_id):
                          'nav_options': nav_options})
 
             else:
-                return HttpResponse(
-                    "You're not allowed to visualize this project")
+                return not_allowed_page(request)
 
     except ObjectDoesNotExist:
         return HttpResponse("Project not found")
@@ -334,7 +445,32 @@ def manage_locations(request, project_id):
 
 @login_required(login_url="/auth/login")
 def manage_transmitters(request, project_id):
-    return HttpResponse("Not implemented yet")
+
+    project = get_project(project_id)
+    content = {}
+    content["nav_options"] = get_nav_options(request)
+    content["project"] = project
+
+    return render_manage_page(
+        request,
+        project,
+        "qraat_site/manage_transmitters.html",
+        content)
+
+
+@login_required(login_url="/auth/login")
+def edit_transmitter(request, project_id, transmitter_id):
+    query = get_query("transmitter")
+    transmitter = query(transmitter_id)
+
+    return render_project_form(
+        request=request,
+        project_id=project_id,
+        post_form=EditTransmitterForm(data=request.POST, instance=transmitter),
+        get_form=EditTransmitterForm(instance=transmitter),
+        template_path="qraat_site/edit-transmitter.html",
+        success_url="%s?new_element=True" % reverse(
+            "qraat:edit-transmitter", args=(project_id, transmitter_id)))
 
 
 @login_required(login_url="/auth/login")
@@ -349,7 +485,7 @@ def get_nav_options(request):
     if user.is_authenticated():
         nav_options.append({"url": "qraat:projects",
                             "name": "Projects"})
-        
+
         if user.is_superuser:
             super_user_opts = [
                 {"url": "auth:users",
@@ -357,6 +493,6 @@ def get_nav_options(request):
                 {"url": "admin:index",
                  "name": "Admin Pages"}]
 
-            for opt in super_user_opts: # Add admin options
+            for opt in super_user_opts:  # Add admin options
                 nav_options.append(opt)
     return nav_options

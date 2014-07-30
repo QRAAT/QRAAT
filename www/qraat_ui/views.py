@@ -477,7 +477,7 @@ def get_context(request, deps=[], req_deps=[]):
 
 
 
-
+  '''
     if (datetime_from_sec_davis) and (datetime_to_sec_davis) and (lk_l) and (lk_h) and (act_l) and (act_h):
       
       
@@ -524,7 +524,6 @@ def get_context(request, deps=[], req_deps=[]):
         
 
 
-  '''
       if (len(req_deps) >= 2):
         pos_query1 = Position.objects.filter(
                             deploymentID = req_deps[1].ID,
