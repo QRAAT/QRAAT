@@ -1,0 +1,19 @@
+.login-form{
+	margin: auto;
+	width: 65%;
+	height: 65%;
+}
+.input-error{
+	color: #ff4444;
+}
+.submit-btn{
+    margin: auto;
+}
+.center-div{
+	margin: auto;
+	width: 65%;
+	height: 65%;
+}
+.form-label, .form-field{
+	 width: 100%;
+}
