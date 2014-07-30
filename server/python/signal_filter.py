@@ -44,31 +44,19 @@ import traceback
 import MySQLdb as mdb
 import qraat 
 
-# TODO where are the following parameters hard-coded: 
-
-# DENSITY_THRESHOLD_FACTOR = 100 
-# If the density of est's is greater than two orders of magnitude 
-# above the a priori pulse rate of the transmitter, throw out 
-# time window. 
-
-# EXPECTED_PULSERATE_WINDOW = 3 minutes
-# Compute the pairwise time difference over this time interval. 
-# Calculate and maximize over a histogram --> expected pulse 
-# interval.
-
-# FILTER_WINDOW = 30 seconds
-# Window for density filter and for scoring in the time filter. 
-
-# FILTER_ERROR = roughly 10 miliseconds? 
-# Error allowance for scoring in time filter. 
-
-
 # Distance to look for neighbors while scoring. If interval is calculated for a
 # point less than this, the time score cannot be calculated, so this is given a
-# score of -3.
+# score of -3. TODO what is this? 
 CONFIG_ERROR_ALLOWANCE = 0.2
 
-# Search this many interval distances in both directions of a point for corroborating neighbors
+# How long a period the interval should be calculated over (seconds) 
+CONFIG_INTERVAL_WINDOW_SIZE = float(3 * 60) 
+
+# Search this many interval distances in both directions of a point for corroborating neighbors.
+# Over the large time window, we calculate the expected pulse interval. (Compute pairwise time
+# differentials, the most frequent is taken to be the expected pulse interval.) Thus, the 
+# optimal number of pulses (hence the highest absscore) is CONFIG_DELTA_AWAY * 2 
+# (see _rel_score()). 
 CONFIG_DELTA_AWAY = 3
 
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
@@ -76,15 +64,13 @@ CONFIG_DELTA_AWAY = 3
 # you an inconsistent DB in addition to an inconsistent "SQL file."
 CONFIG_JUST_STAGE_CHANGES = False
 
-# How long a period the interval should be calculated over
-CONFIG_INTERVAL_WINDOW_SIZE = float(3 * 60) # Three minutes (given in seconds)
-
 # Minimum interval percentage difference which must occur from old value to
 # trigger superceding of the interval with the new ones and re-scoring of
 # slice.
 CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD = 0.25
 
-# Minimum number of points before intervals are calculated. If less than this number is found, items are given a score of -1.
+# Minimum number of points before intervals are calculated. If less than this 
+# number is found, items are given a score of -1.
 CONFIG_MINIMUM_POINT_COUNT = 20
 
 
