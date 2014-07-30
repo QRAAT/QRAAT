@@ -17,7 +17,12 @@ cursor = db_con.cursor()
 
 #get id of last processed record
 cursor.execute("SELECT value FROM qraat.cursor WHERE name='position'")
-last_processed = cursor.fetchone()[0]
+last_processed = cursor.fetchone()
+if last_processed == None:
+  cursor.execute("INSERT INTO qraat.cursor (name, value) VALUE ('position', 0)")
+  last_processed = 0
+else: 
+  last_processed = last_processed[0]
 print "Last EST record processed: {}".format(last_processed)
 
 #get deps to-be-processed
@@ -60,10 +65,10 @@ for dep in dep_list:
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
     
-    est_ids = qraat.srv.position.get_est_ids_bandfilter(db_con, 
+    est_ids = qraat.srv.position.get_est_ids_timefilter(db_con, 
                                                     dep_id, 
                                                     time_range[0]-time_window, 
-                                                    time_range[1]+time_window)
+                                                    time_range[1]+time_window, 0)
     
     sig = qraat.srv.position.signal(db_con, est_ids)
     
