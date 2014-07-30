@@ -27,6 +27,7 @@ add_library(gnuradio-rmg SHARED
   accumulator.cc 
   peak_detect.cc 
   detectmod_continuous_covariance.cc
+  detectmod_file_sink.cc
 )
 
 target_link_libraries(gnuradio-rmg rmg-pulse ${Boost_LIBRARIES} ${GRUEL_LIBRARIES} ${GNURADIO_CORE_LIBRARIES})

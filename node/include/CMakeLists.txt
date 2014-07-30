@@ -25,5 +25,6 @@ install(FILES
     detectmod_detect.h
     peak_detect.h
     detectmod_continuous_covariance.h
+    detectmod_file_sink.h
     DESTINATION include/rmg
 )
