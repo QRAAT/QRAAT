@@ -23,7 +23,9 @@ $(document).ready(function(){
 <div class="alert alert-success">{%block success_msg %} {% endblock %}</div>
 {% endif %}
 {% if deleted == "True" %}
-<div class="alert alert-danger">{%block deleted_msg %} {% endblock %}</div>
+    <div class="alert alert-danger">{%block deleted_msg %} {% endblock %}</div>
+{% elif deleted == "0" %}
+<div class="alert alert-danger"> You didn't select anything </div>
 {% endif %}
 
 {% if form %}

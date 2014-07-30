@@ -8,8 +8,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from models import Project, Tx, Location
 from models import Target, Deployment
 from forms import ProjectForm, EditProjectForm, AddTransmitterForm
-from forms import AddManufacturerForm, AddTargetForm, EditTransmitterForm
+from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
+from forms import EditTargetForm, EditTransmitterForm
 
 
 def not_allowed_page(request):
@@ -276,9 +277,15 @@ def check_deletion(request, project_id):
 
     if can_delete(project, user):
         if request.method == 'POST':
-            obj_type = request.POST.get("object")
+            obj_type = request.POST.get("object").lower()
             content["objs"] = get_objs_by_type(
                 obj_type, request.POST.getlist("selected"))
+
+            # didn't select any object
+            if len(content["objs"]) == 0:
+                return redirect("%s?deleted=0" %
+                    reverse("qraat:manage-%ss" % obj_type,
+                            args=(project_id,)))
 
             return render(request, "qraat_site/check-deletion.html",
                           content)
@@ -528,7 +535,17 @@ def edit_transmitter(request, project_id, transmitter_id):
 
 @login_required(login_url="/auth/login")
 def edit_target(request, project_id, target_id):
-    return HttpResponse("Note implemented yet")
+    query = get_query("target")
+    target = query(target_id)
+
+    return render_project_form(
+        request=request,
+        project_id=project_id,
+        post_form=EditTargetForm(data=request.POST, instance=target),
+        get_form=EditTargetForm(instance=target),
+        template_path="qraat_site/edit-target.html",
+        success_url="%s?new_element=True" % reverse(
+            "qraat:edit-target", args=(project_id, target_id)))
 
 
 @login_required(login_url="/auth/login")

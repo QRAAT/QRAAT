@@ -146,7 +146,7 @@ class ProjectElementForm(forms.ModelForm):
 
 
 class AddLocationForm(ProjectElementForm):
-    """Django's ModelForm to create a location 
+    """Django's ModelForm to create a location
        extends ProjectElementForm"""
 
     class Meta:
@@ -155,7 +155,7 @@ class AddLocationForm(ProjectElementForm):
 
 
 class AddTargetForm(ProjectElementForm):
-    """Django's ModelForm to create a target 
+    """Django's ModelForm to create a target
        extends ProjectElementForm"""
 
     class Meta:
@@ -226,10 +226,12 @@ class AddTransmitterForm(ProjectElementForm):
 
         return Tx
 
+
 class EditTransmitterForm(AddTransmitterForm):
     class Meta:
         model = Tx
-        exclude = ["projectID", "is_hidden", "serial_no", "tx_makeID", "frequency"]
+        exclude = ["projectID", "is_hidden",
+                   "serial_no", "tx_makeID", "frequency"]
         labels = {"name": ("Transmitter name")}
 
     def save(self, commit=True):
@@ -237,3 +239,9 @@ class EditTransmitterForm(AddTransmitterForm):
 
         if commit is True:
             Tx.save()
+
+
+class EditTargetForm(AddTargetForm):
+    class Meta:
+        model = Target
+        exclude = ["projectID", "is_hidden"]
