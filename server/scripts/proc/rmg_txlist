@@ -1,4 +1,9 @@
 #!/usr/bin/python2
+# Thus far, this script will only create a valid tx.csv for pulse type 
+# transmitters. We'll need to combine the parameter list for all transmitter
+# types. 
+
+
 import qraat
 import MySQLdb as mdb
 import argparse
@@ -12,36 +17,45 @@ parser.add_argument("-t", "--time_constant", type=float, help="Detector time con
 
 args = parser.parse_args()
 
-
 default_type = 'pulse'
 
-db_config = qraat.csv.csv(args.db_auth_file).get(view='reader')
-db_con = mdb.connect(db_config.host, db_config.user,
-                     db_config.password, db_config.name)
+db_con = qraat.util.get_db('reader')
 
-db_cursor = db_con.cursor()
+cur = db_con.cursor()
 
-db_cursor.execute("SELECT ID, tx_table_name from tx_type where RMG_type=%s",default_type)
-pulse_tuple = db_cursor.fetchone()
-pulse_ID = pulse_tuple[0]
-pulse_table = pulse_tuple[1]
+# Transmitters in active deployments
+cur.execute('''SELECT deployment.ID, txID, frequency 
+                 FROM deployment
+                 JOIN tx ON tx.ID = txID
+                 JOIN tx_make ON tx_make.ID = tx.tx_makeID
+                WHERE is_active = True
+                  AND demod_type = '%s' ''' % default_type)
 
-db_cursor.execute('''SELECT tx_ID.ID, {0}.frequency, {0}.pulse_width 
-                   FROM tx_ID, {0}, tx_info
-                   WHERE tx_ID.active=TRUE 
-                     AND tx_info.tx_type_ID=%s
-                     AND tx_ID.tx_info_ID=tx_info.ID
-                     AND tx_ID.ID={0}.tx_ID'''.format(pulse_table),pulse_ID)
-                   
-tx_data = db_cursor.fetchall()
+tx_dict = {}
+for (dep_id, tx_id, frequency) in cur.fetchall():
+  tx_dict[tx_id] = { 'frequency' : frequency, 'dep_id' : dep_id }
 
-csv_headers = ['ID', 'frequency', 'type', 'pulse_width', 'rise_trigger', 'time_constant']
+# Transmitter parameters
+cur.execute('''SELECT txID, name, value 
+                 FROM tx_parameters
+                WHERE txID IN (%s)''' % ', '.join(map(lambda(x) : str(x), 
+                                  tx_dict.keys())))
+              
+for (tx_id, name, value) in cur.fetchall():
+  tx_dict[tx_id][name] = value
 
-csv_table = []
+header = ['ID', 'frequency', 'type', 'pulse_width', 'rise_trigger', 'time_constant']
 
-for j in tx_data:
-  csv_table.append((j[0], float(j[1]), default_type, j[2], args.rise_trigger, args.time_constant))
+data = []
+
+for (tx_id, params) in tx_dict.iteritems():
+  data.append((params['dep_id'], 
+               float(params['frequency']), 
+               default_type, 
+               float(params['pulse_width']), 
+               args.rise_trigger, 
+               args.time_constant))
 
 txlist = qraat.csv.csv()
-txlist.initialize_from_data(csv_headers, csv_table)
+txlist.initialize_from_data(header, data)
 txlist.write(args.tx_file)

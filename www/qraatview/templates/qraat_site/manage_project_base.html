@@ -1,36 +1,31 @@
 {% extends "qraat_site/base_form.html" %}
 {% block sidebar %}
 {% if user.is_authenticated %}
-<ul class="nav nav-pills nav-stacked">
-    <li>
-        <ul role="menu">  
-            <li>
-            <a href={%url 'qraat:manage-locations' project.ID %}>Manage Locations</a>
-            </li>
-        </ul>
+<ol class="nav nav-pills nav-stacked">  
+    <li class="active">
+    <a href={% url 'qraat:edit-project' project.ID %}>Project</a>
     </li>
     <li>
-        <ul role="menu">  
-            <li>
-            <a href={%url 'qraat:manage-transmitters' project.ID %}>Manage Transmitters</a>
-            </li>
-        </ul>
+        <li class="side-bar-element">
+        <a href={%url 'qraat:manage-locations' project.ID %}>Manage Locations</a>
+        </li>
     </li>
     <li>
-        <ul>
-            <li>
-            <a href={% url 'qraat:manage-targets' project.ID %}>Manage Targets</a>
-            </li>
-        </ul>
+        <li class="side-bar-element">
+        <a href={%url 'qraat:manage-transmitters' project.ID %}>Manage Transmitters</a>
+        </li>
     </li>
     <li>
-        <ul>
-            <li>
-            <a href={% url 'qraat:manage-deployments' project.ID %}>Manage Deployments</a>
-            </li>
-        </ul>
+        <li class="side-bar-element">
+        <a href={% url 'qraat:manage-targets' project.ID %}>Manage Targets</a>
+        </li>
     </li>
-</ul>
+    <li>
+        <li class="side-bar-element">
+        <a href={% url 'qraat:manage-deployments' project.ID %}>Manage Deployments</a>
+        </li>
+    </li>
+</ol>
 
 {% endif %}
 {%endblock%}

@@ -209,9 +209,9 @@ class AddTransmitterForm(ProjectElementForm):
            in tx_parameters"""
 
         Tx = super(AddTransmitterForm, self).save(commit=False)
-        Tx.projectID = self.project
 
         if commit is True:
+            Tx.projectID = self.project
             Tx.save()
             Tx_make_parameters = TxMakeParameters.objects.filter(
                 tx_makeID=Tx.tx_makeID)
@@ -225,3 +225,15 @@ class AddTransmitterForm(ProjectElementForm):
                     units=parameter.units)
 
         return Tx
+
+class EditTransmitterForm(AddTransmitterForm):
+    class Meta:
+        model = Tx
+        exclude = ["projectID", "is_hidden", "serial_no", "tx_makeID", "frequency"]
+        labels = {"name": ("Transmitter name")}
+
+    def save(self, commit=True):
+        Tx = super(EditTransmitterForm, self).save(commit=False)
+
+        if commit is True:
+            Tx.save()

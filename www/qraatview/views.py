@@ -8,7 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from models import Project, Tx, Location
 from models import Target, Deployment
 from forms import ProjectForm, EditProjectForm, AddTransmitterForm
-from forms import AddManufacturerForm, AddTargetForm
+from forms import AddManufacturerForm, AddTargetForm, EditTransmitterForm
 from forms import AddDeploymentForm, AddLocationForm
 
 
@@ -16,23 +16,42 @@ def not_allowed_page(request):
     return HttpResponse("Action not allowed")
 
 
-def get_objs_by_type(obj_type, obj_ids):
+def get_query(obj_type):
+    """ Receives an object type and return it's specific
+    query"""
+
     query = None
 
-    #  switch query based on obj type
-    if(obj_type == "transmitter"):
-        query = lambda obj_id: Tx.objects.get(ID=obj_id)
-    elif(obj_type == "target"):
-        query = lambda obj_id: Target.objects.get(ID=obj_id)
-    elif(obj_type == "location"):
-        query = lambda obj_id: Location.objects.get(ID=obj_id)
-    elif(obj_type == "deployment"):
-        query = lambda obj_id: Deployment.objects.get(ID=obj_id)
+    try:
+        #  switch query based on obj type
+        if(obj_type == "transmitter"):
+            query = lambda obj_id: Tx.objects.get(ID=obj_id)
+        elif(obj_type == "target"):
+            query = lambda obj_id: Target.objects.get(ID=obj_id)
+        elif(obj_type == "location"):
+            query = lambda obj_id: Location.objects.get(ID=obj_id)
+        elif(obj_type == "deployment"):
+            query = lambda obj_id: Deployment.objects.get(ID=obj_id)
+    except ObjectDoesNotExist:
+        raise ObjectDoesNotExist
+    else:
+        return query
 
-    #  maps items selected on the form in a list of objects
-    objs = map(query, obj_ids)
 
-    return objs
+def get_objs_by_type(obj_type, obj_ids):
+    """Receives an object type and a list of ids and return a list of
+    Objects based in it's type i.e transmitter, location, target, or
+    deployment"""
+
+    try:
+        query = get_query(obj_type)
+        #  maps items selected on the form in a list of objects
+        objs = map(query, obj_ids)
+    except Exception, e:
+        raise e
+
+    else:
+        return objs
 
 
 def can_delete(project, user):
@@ -40,6 +59,7 @@ def can_delete(project, user):
     if the user is in the collaborators group and the group has permission
     to delete content on the project"""
 
+    # With has_perm we can have different permissions for group
     return project.is_owner(user) or\
         (project.is_collaborator(user) and
             user.has_perm("qraatview.can_delete"))
@@ -133,39 +153,30 @@ def render_project_form(
         get_form, template_path, success_url):
 
     user = request.user
+    project = get_project(project_id)
     nav_options = get_nav_options(request)
     thereis_newelement = None
-    try:
-        project = Project.objects.get(ID=project_id)
 
-    except ObjectDoesNotExist:
-        return HttpResponse("Error: We did not find this project")
+    if can_change(project, user):
+        if request.method == 'POST':
+            form = post_form
+            form.set_project(project)
+            if form.is_valid():
+                form.save()
+                return redirect(success_url)
 
+        elif request.method == 'GET':
+            thereis_newelement = request.GET.get("new_element")
+            form = get_form
+            form.set_project(project)
+
+        return render(request, template_path,
+                      {"form": form,
+                       "nav_options": nav_options,
+                       "changed": thereis_newelement,
+                       "project": project})
     else:
-        # Checking has_perm we can have different permissions for group
-        if project.is_owner(user) or\
-                (project.is_collaborator(user)
-                    and user.has_perm("qraatview.can_change")):
-
-            if request.method == 'POST':
-                form = post_form
-                form.set_project(project)
-                if form.is_valid():
-                    form.save()
-                    return redirect(success_url)
-
-            elif request.method == 'GET':
-                thereis_newelement = request.GET.get("new_element")
-                form = get_form
-                form.set_project(project)
-
-            return render(request, template_path,
-                          {"form": form,
-                           "nav_options": nav_options,
-                           "changed": thereis_newelement,
-                           "project": project})
-        else:
-            return not_allowed_page(request)
+        return not_allowed_page(request)
 
 
 def render_manage_page(request, project, template_path, content):
@@ -445,6 +456,21 @@ def manage_transmitters(request, project_id):
         project,
         "qraat_site/manage_transmitters.html",
         content)
+
+
+@login_required(login_url="/auth/login")
+def edit_transmitter(request, project_id, transmitter_id):
+    query = get_query("transmitter")
+    transmitter = query(transmitter_id)
+
+    return render_project_form(
+        request=request,
+        project_id=project_id,
+        post_form=EditTransmitterForm(data=request.POST, instance=transmitter),
+        get_form=EditTransmitterForm(instance=transmitter),
+        template_path="qraat_site/edit-transmitter.html",
+        success_url="%s?new_element=True" % reverse(
+            "qraat:edit-transmitter", args=(project_id, transmitter_id)))
 
 
 @login_required(login_url="/auth/login")
