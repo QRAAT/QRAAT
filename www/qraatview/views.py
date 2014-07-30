@@ -229,10 +229,10 @@ def render_manage_page(request, project, template_path, content):
         content["deleted"] = request.GET.get("deleted")
 
     if can_change(project, user):
-
         return render(
             request, template_path,
             content)
+
     else:
         return not_allowed_page(request)
 
@@ -260,7 +260,7 @@ def delete_objs(request, project_id):
 
             return redirect(
                 "%s?deleted=%s" % (
-                    reverse("qraat:manage-%ss" % obj_type, args=project_id),
+                    reverse("qraat:manage-%ss" % obj_type, args=(project_id,)),
                     deleted))
 
     return not_allowed_page(request)
@@ -282,7 +282,6 @@ def check_deletion(request, project_id):
         if request.method == 'POST':
             obj_type = request.POST.get("object").lower()
             selected_objs = request.POST.getlist("selected")
-
             # didn't select any object
             if len(selected_objs) == 0:
                 return redirect(
@@ -497,6 +496,7 @@ def manage_targets(request, project_id):
     content["nav_options"] = get_nav_options(request)
     content["project"] = project
     content["objects"] = project.get_targets()
+    content["obj_type"] = "target"
 
     return render_manage_page(
         request,
@@ -513,6 +513,7 @@ def manage_locations(request, project_id):
     content["nav_options"] = get_nav_options(request)
     content["project"] = project
     content["objects"] = project.get_locations()
+    content["obj_type"] = "location"
 
     return render_manage_page(
         request,
@@ -529,6 +530,7 @@ def manage_transmitters(request, project_id):
     content["nav_options"] = get_nav_options(request)
     content["project"] = project
     content["objects"] = project.get_transmitters()
+    content["obj_type"] = "transmitter"
 
     return render_manage_page(
         request,

@@ -27,7 +27,7 @@
         {% block managed_obj %} Items {% endblock %}
         <a style="margin-left: 5%;" href={% block add_url %} {% url 'index' %} {% endblock %}>
 
-            <input type="button" class="btn btn-primary" value="Add {{objects.0.verbose_name|lower}}"  name="create-transmitter" />
+            <input type="button" class="btn btn-primary" value="Add {{obj_type}}"  name="create-transmitter" />
     </a>
     </h4>
 </div>
@@ -36,44 +36,46 @@
 
 <form action={%url 'qraat:check-deletion' project.ID %} method="post">
     {% csrf_token %}
+    <input type=hidden name="object" value={{obj_type}}></input>
+{%if objects.0 %}
+
     <button style="margin-bottom: 1%;" type="submit" class="btn btn-danger btn-sm">
         Delete selected items
         <span class="glyphicon glyphicon-trash"></span>
     </button>
 
-<table class="table">
-    <tr>
-        {%if objects.0 %}
-        <td>
-        <td>
-            <input id="check-all" type="checkbox" value="check-all" name="check-all"> </input>
-        </td>
-            <input type=hidden name="object" value={{objects.0.verbose_name}}></input>
+    <table class="table">
+        <tr>
+            <td>
+            <td>
+                <input id="check-all" type="checkbox" value="check-all" name="check-all"> </input>
+            </td>
             {% for field in objects.0|get_fields %}
                 {% if field.verbose_name != "is hidden" and field.verbose_name != "projectID" and field.verbose_name != "ID" %}
                     <td>{{ field.verbose_name }}</td>
                 {% endif %}
             {% endfor %}
 
-        {% endif %}
-    </tr>
-    {% for object in objects %}
-    <tr>
-        <td> 
-            <a title="Edit item"\
-                href={% url 'qraat:edit-'|add:object.verbose_name|lower project.ID object.ID %}>
-                <button type="button" class="btn btn-default btn-xs" value="" name="">
-                    <span class="glyphicon glyphicon-pencil"></span>
-                </button>
-            </a>
-        <td><input class="element-check-box" type="checkbox" name="selected" value={{ object.ID}}></input></td>
-        {% for field in object|get_fields %}
-            {% if field.verbose_name != "is hidden" and field.verbose_name != "projectID" and field.verbose_name != "ID"%}
-                <td>{{field.value}}</td>
-            {% endif %}
+        </tr>
+        {% for object in objects %}
+        <tr>
+            <td> 
+                <a title="Edit item"\
+                    href={% url 'qraat:edit-'|add:object.verbose_name|lower project.ID object.ID %}>
+                    <button type="button" class="btn btn-default btn-xs" value="" name="">
+                        <span class="glyphicon glyphicon-pencil"></span>
+                    </button>
+                </a>
+            <td><input class="element-check-box" type="checkbox" name="selected" value={{ object.ID}}></input></td>
+            {% for field in object|get_fields %}
+                {% if field.verbose_name != "is hidden" and field.verbose_name != "projectID" and field.verbose_name != "ID"%}
+                    <td>{{field.value}}</td>
+                {% endif %}
+            {% endfor %}
+        </tr>
         {% endfor %}
-    </tr>
-    {% endfor %}
-</table>
+    </table>
+{% endif %}
+
 </form>
 {% endblock %}
