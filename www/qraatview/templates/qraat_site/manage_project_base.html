@@ -27,7 +27,7 @@
         {% block managed_obj %} Items {% endblock %}
         <a style="margin-left: 5%;" href={% block add_url %} {% url 'index' %} {% endblock %}>
 
-        <input type="button" class="btn btn-primary" value="Add transmitter" name="create-transmitter" />
+            <input type="button" class="btn btn-primary" value="Add {{objects.0.verbose_name|lower}}"  name="create-transmitter" />
     </a>
     </h4>
 </div>
