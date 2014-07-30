@@ -1683,102 +1683,19 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 # update_set will be updated and all others will be inserted. The default
 # values specify that all scores will be inserted.
 def insert_scores(change_handler, scores, update_as_needed=False, update_set=set()):
-	#print 'insert_scores()'
 
-	# for five_id in (206779849, 206779850, 206779851):
-	# 	score = scores[five_id]
-	# 	rel_score = _rel_score(score)
-	# 	_log(five_id, score, rel_score)
-		
+        db_con = change_handler.obj
 	scores = dict(scores)
 
-	if len(scores) == 0:
-		#print 'Nothing to score, returning.'
-		return
+        deletes = []; inserts = []
+        for (est_id, score) in scores.iteritems():
+          deletes.append(str(est_id))
+          inserts.append((est_id, score, _rel_score(score)))
 
-	good_property = all([x in scores for x in update_set])
-
-	if not good_property:
-		#print 'Warning: Unrecoverable error.'
-		violation_count = 0
-		for x in update_set:
-			if x not in scores:
-				violation_count += 1
-		try:
-			assert False
-		except AssertionError:
-			with open('/home/qraat/unrecov.log', 'w') as f:
-				f.write('Warning: Unrecoverable error.\n')
-				traceback.print_exc(f)
-				f.write('Scores for the following points are being inserted:\n')
-				f.write('scores.keys(): {}\n'.format(scores.keys()))
-				f.write('updatables: {}\n'.format(update_set))
-
-	        #print 'The following {} points were in the update set but not in scores:'.format(violation_count)
-
-		for x in update_set:
-			if x not in scores:
-				print '() {}'.format(x)
-
-		#print '-----'
-
-	assert all([x in scores for x in update_set])
-
-	db_con = change_handler.obj
-
-	newly_there = None
-	already_there = None
-
-	all_to_process = set(scores.keys())
-
-	if update_as_needed:
-
-		cur = db_con.cursor()
-		ids_template = ', '.join(map(lambda x : '{}', all_to_process))
-		id_string = ids_template.format(*all_to_process)
-		q = 'SELECT estid FROM estscore WHERE estid IN ({})'.format(id_string)
-		#print 'q: "{}"'.format(q)
-		rows = cur.execute(q)
-		already_there = set()
-		while True:
-			r = cur.fetchone()
-			if r is None: break
-			r = tuple(r)
-			already_there.add(r[0])
-
-		newly_there = all_to_process.difference(already_there)
-
-		
-
-		pass
-	else:
-		already_there = list(update_set)
-		newly_there = list(all_to_process.difference(update_set))
-
-	updates = []
-	for id in already_there:
-		score = scores[id]
-		rel_score = _rel_score(score)
-		updates.append((score, rel_score, id))
-
-	inserts = []
-	for id in newly_there:
-		score = scores[id]
-		assert score is not None
-		rel_score = _rel_score(score)
-		inserts.append((id, score, rel_score))
-
-	cur = db_con.cursor()
-	cur.executemany(UPDATE_TEMPLATE, updates)
-
-	#print 'Applied {} updates'.format(len(updates))
-
-	cur = db_con.cursor()
+        cur = db_con.cursor()
+        cur.execute('DELETE FROM estscore WHERE estID IN ({})'.format(
+                            ', '.join(deletes)))
 	cur.executemany(INSERT_TEMPLATE, inserts)
-
-	#print 'Applied {} insertions'.format(len(inserts))
-
-		# change_handler.db_execute_many(qraat.signal_filter.INSERT_TEMPLATE, args)
 
 class NotAllSameValueError(Exception):
 	def __init__(self):
