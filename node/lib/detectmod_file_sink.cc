@@ -107,6 +107,7 @@ void detectmod_file_sink::initialize_variables(
   header_data = new char[header_len];
   memcpy(header_data, _header_data, header_len);
 
+  d_fp = 0;
   enable_detect = 0;
 
 }
@@ -130,8 +131,8 @@ detectmod_file_sink::work (int noutput_items,
 			       gr_vector_const_void_star &input_items,
 			       gr_vector_void_star &output_items)
 {
+  int ch = input_items.size();
   if (enable_detect > 0){
-    ch = input_items.size();
     if (!d_fp) {
       gen_file_ptr();
     }
@@ -155,7 +156,6 @@ void detectmod_file_sink::gen_file_ptr(){
   //Get time
   struct timeval tp;
   gettimeofday(&tp, NULL);
-  void *temp;
   struct tm *time_struct = gmtime(&(tp.tv_sec));
   int int_seconds = (int)tp.tv_sec;
   int int_useconds = (int)tp.tv_usec;

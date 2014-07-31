@@ -66,10 +66,7 @@ private:
     const int _header_len);
 
 
-
-  //! Number of input channels.
-  int ch;
-
+public:
   //! Size of data sample
   size_t size;
 
