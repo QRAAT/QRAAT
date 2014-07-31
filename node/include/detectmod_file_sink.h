@@ -86,7 +86,7 @@ private:
 
   char *file_extension;
   char *header_data;
-  int header_len
+  int header_len;
 
   //! A file descriptor used for data output (pulses or continuous). 
   void	       *d_fp;
@@ -111,7 +111,7 @@ private:
   void close();
 
   //! Private constructor. 
-  detectmod_detect (int _num_channels, 
+  detectmod_file_sink (int _num_channels, 
     size_t _size,
     const char *_directory, 
     const char *_tx_name,
@@ -132,7 +132,7 @@ private:
 public:
 
   //! Public destructor.
-  ~detectmod_detect ();	
+  ~detectmod_file_sink();	
 
     /*!
    * Enable pulse detector with previous parameters. 

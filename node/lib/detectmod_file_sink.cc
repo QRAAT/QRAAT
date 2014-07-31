@@ -84,7 +84,7 @@ detectmod_file_sink::detectmod_file_sink (
   size = _size;
   initialize_variables(_directory, 
                        _tx_name,
-                       _file_extension
+                       _file_extension,
                        _header_data,
                        _header_len);
 
@@ -139,9 +139,8 @@ detectmod_file_sink::work (int noutput_items,
       gen_file_ptr();
     }
     for (int j = 0; j < noutput_items; j++){
-      for int k = 0; k < ch; k++){
-        fwrite(input_items[k], size, 1, d_fp);
-        input_items[k] += size;
+      for (int k = 0; k < ch; k++){
+        fwrite((char*)input_items[k]+j*size, size, 1, (FILE *)d_fp);
       }
     }
   }
@@ -184,7 +183,7 @@ void detectmod_file_sink::gen_file_ptr(){
   strcat(filename, file_extension); 
   
   if (open(filename)){
-    fwrite(header_data,sizeof(char),header_len,d_fp);
+    fwrite(header_data, sizeof(char), header_len, (FILE *)d_fp);
   }
   else{
     throw std::runtime_error("could not open file");
@@ -250,7 +249,7 @@ void detectmod_file_sink::enable(const char *_directory,
   free_dynamic_memory();
   initialize_variables(_directory, 
                        _tx_name,
-                       _file_extension
+                       _file_extension,
                        _header_data,
                        _header_len);
   
