@@ -65,8 +65,6 @@ private:
     const char *_header_data,
     const int _header_len);
 
-
-public:
   //! Size of data sample
   size_t size;
 

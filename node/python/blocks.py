@@ -24,10 +24,10 @@
 """
 
 from gnuradio import gr, blks2, uhd, gru
-from rmg_swig import detect
+from rmg_swig import detect, continuous_covariance, file_sink
 import params
 
-import sys, time
+import sys, time, struct
 
 
 class usrp_top_block(gr.top_block):
@@ -266,5 +266,56 @@ class afsk_demod(gr.hier_block2):
     ctof = gr.complex_to_mag()
 
     self.connect(interleave, ctof, self)
+
+class gps_afsk(gr.hier_block2):
+
+  def __init__(self, num_ch, input_rate, mark_freq=1200.0, space_freq=1000.0, dirname = "./", txname = "tx", afsk_output_rate = 800.0, cc_output_rate = 50.0, center_freq = 0.0):
+    gr.hier_block2.__init__(self, "afsk_demod",
+                     gr.io_signature(num_ch, num_ch, gr.sizeof_gr_complex), # Input signature
+                     gr.io_signature(0, 0, 0))     # Output signature
+
+    #afsk
+    self.afsk = afsk_demod(input_rate, afsk_output_rate, mark_freq, space_freq)
+    afsk_actual_output_rate = self.afsk.output_rate
+
+    header_fmt="ffff"
+    afsk_header = struct.pack(header_fmt,
+          float(afsk_actual_output_rate),    #sampling rate (Hz)
+          float(center_freq),                #RF center frequency (Hz)
+          float(mark_freq),                  #mark frequency (Hz)
+          float(space_freq))                 #space frequency (Hz)
+
+    self.afsk_out = file_sink(gr.sizeof_float, dirname, txname, ".afsk", afsk_header, struct.calcsize(header_fmt))
+
+    self.connect((self, 0), self.afsk, self.afsk_out)
+
+    #cov
+    cc_vlen = int(input_rate / float(cc_output_rate))
+    cc_actual_output_rate = input_rate / float(cc_vlen)
+    self.cc = continuous_covariance(num_ch, cc_vlen)
+    cc_out_vlen = self.cc.get_output_vector_length()
+
+    for j in range(num_ch):
+      self.connect((self, j), gr.stream_to_vector(gr.sizeof_gr_complex, cc_vlen), (self.cc,j))
+
+    header_fmt="iiffi"
+    cc_header = struct.pack(header_fmt, 
+          int(num_ch),                       #number of channels
+          int(cc_out_vlen),                  #number of floats per sample
+          float(cc_actual_output_rate),      #sampling rate
+          float(center_freq),                #RF center frequency
+          int(cc_vlen))                      #length of measurement in samples
+
+    self.cc_out = file_sink(gr.sizeof_float*cc_out_vlen, dirname, txname, ".cov", cc_header, struct.calcsize(header_fmt))
+
+    self.connect(self.cc, self.cc_out)
+
+  def enable(self):
+    self.afsk_out.enable()
+    self.cc_out.enable()
+
+  def disable(self):
+    self.afsk_out.disable()
+    self.cc_out.disable()
 
 
