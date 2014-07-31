@@ -7,11 +7,11 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from models import Project, Tx, Location
 from models import Target, Deployment
-from forms import ProjectForm, EditProjectForm, AddTransmitterForm
+from forms import ProjectForm, OwnersEditProjectForm, AddTransmitterForm
 from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
 from forms import EditTargetForm, EditTransmitterForm, EditLocationForm
-from forms import EditDeploymentForm
+from forms import EditDeploymentForm, EditProjectForm
 
 
 def not_allowed_page(request):
@@ -356,11 +356,15 @@ def edit_project(request, project_id):
         return HttpResponse("Error: %s please contact administration" % str(e))
 
     else:
-        if project.is_owner(user)\
-                or (project.is_collaborator(user)
-                    and user.has_perm("qraatview.can_change")):
+        if can_change(project, user):
             if request.method == 'POST':
-                form = EditProjectForm(data=request.POST, instance=project)
+                # different edition for owner and collaborators
+                if project.is_owner(user):
+                    form = OwnersEditProjectForm(
+                        data=request.POST, instance=project)
+                else:
+                    form = EditProjectForm(data=request.POST, instance=project)
+
                 if form.is_valid():
                     form.save()
                     return render(
@@ -370,7 +374,11 @@ def edit_project(request, project_id):
                          'form': form,
                          'project': project})
             else:
-                form = EditProjectForm(instance=project)
+                # different edition for owner and collaborators
+                if project.is_owner(user):
+                    form = OwnersEditProjectForm(instance=project)
+                else:
+                    form = EditProjectForm(instance=project)
 
             return render(
                 request, 'qraat_site/edit-project.html',
@@ -571,7 +579,8 @@ def manage_deployments(request, project_id):
     content["objects"] = project.get_deployments()
     content["obj_type"] = "deployment"
     content["foreign_fields"] = ["txID", "targetID"]
-    content["excluded_fields"] = ["projectID", "ID", "is_hidden", "tx_makeID", "serial_no"]
+    content["excluded_fields"] = [
+        "projectID", "ID", "is_hidden", "tx_makeID", "serial_no"]
 
     return render_manage_page(
         request,

@@ -49,12 +49,12 @@ class UserModelChoiceField(forms.ModelMultipleChoiceField):
         return obj.get_full_name()
 
 
-class EditProjectForm(ProjectForm):
+class OwnersEditProjectForm(ProjectForm):
     """Django's ModelForm to edit projects
        Extends ProjectForm"""
 
     def __init__(self, user=None, *args, **kwargs):
-        super(EditProjectForm, self).__init__(user, *args, **kwargs)
+        super(OwnersEditProjectForm, self).__init__(user, *args, **kwargs)
         project = super(ProjectForm, self).save(commit=False)
 
         # Set values for selection
@@ -112,6 +112,20 @@ class EditProjectForm(ProjectForm):
                 collaborators_group.user_set.remove(user)
 
         if commit:
+            project.save()
+
+        return project
+
+
+class EditProjectForm(ProjectForm):
+    class Meta:
+        model = Project
+        fields = ("name", "description", "is_public")
+
+    def save(self, commit=True):
+        project = super(EditProjectForm, self).save(commit=False)
+
+        if commit is True:
             project.save()
 
         return project
