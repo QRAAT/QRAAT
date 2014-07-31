@@ -1730,7 +1730,7 @@ def update_cursor_value(handler, name, value):
 	db_con = handler.obj
 	cur = db_con.cursor()
 	rows = cur.execute(q, (name, value, value))
-	print 'Update cursor "{}" returns: {}'.format(name, rows)
+	debug_print ('Update cursor "{}" returns: {}'.format(name, rows))
 
 # Returns number of rows matching. Hoping for zero.
 def explicit_check(change_handler, interval, base, duration, txid, siteid):
