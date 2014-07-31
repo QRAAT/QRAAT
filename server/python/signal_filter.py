@@ -44,9 +44,9 @@ import traceback
 import MySQLdb as mdb
 import qraat 
 
-# Distance to look for neighbors while scoring. If interval is calculated for a
-# point less than this, the time score cannot be calculated, so this is given a
-# score of -3. TODO what is this? 
+# Error tolerance for subsequent corroborating pulses. Part of the time 
+# filter. If interval is calculated for a point less than this, the time 
+# score cannot be calculated, so this is given score of -3. 
 CONFIG_ERROR_ALLOWANCE = 0.2
 
 # How long a period the interval should be calculated over (seconds) 
