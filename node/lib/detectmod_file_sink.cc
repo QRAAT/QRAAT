@@ -42,7 +42,6 @@
 
 RMG_API detectmod_file_sink_sptr 
 detectmod_make_file_sink (
-    int _num_channels, 
     size_t _size,
     const char *_directory, 
     const char *_tx_name,
@@ -54,8 +53,7 @@ detectmod_make_file_sink (
  */
 {
   return detectmod_file_sink_sptr (
-    new detectmod_file_sink (_num_channels, 
-                             _size,
+    new detectmod_file_sink (_size,
                              _directory, 
                              _tx_name,
                              _file_extension,
@@ -65,8 +63,7 @@ detectmod_make_file_sink (
 }
 
 
-detectmod_file_sink::detectmod_file_sink (
-    int _num_channels, 
+detectmod_file_sink::detectmod_file_sink ( 
     size_t _size,
     const char *_directory, 
     const char *_tx_name,
@@ -74,13 +71,12 @@ detectmod_file_sink::detectmod_file_sink (
     const char *_header_data,
     const int _header_len)
   : gr_sync_block ("detectmod_file_sink",
-    gr_make_io_signature (_num_channels, _num_channels, _size),
+    gr_make_io_signature (1, -1, _size),
     gr_make_io_signature (0,0,0))
 /**
  * Private constructor used internally 
  */
 {
-  ch = _num_channels;
   size = _size;
   initialize_variables(_directory, 
                        _tx_name,
@@ -135,6 +131,7 @@ detectmod_file_sink::work (int noutput_items,
 			       gr_vector_void_star &output_items)
 {
   if (enable_detect > 0){
+    ch = input_items.size();
     if (!d_fp) {
       gen_file_ptr();
     }

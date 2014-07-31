@@ -41,7 +41,6 @@ typedef boost::shared_ptr<detectmod_file_sink> detectmod_file_sink_sptr;
  *
  */
 RMG_API detectmod_file_sink_sptr detectmod_make_file_sink (
-    int _num_channels, 
     size_t _size,
     const char *_directory, 
     const char *_tx_name,
@@ -59,7 +58,6 @@ class RMG_API detectmod_file_sink : public gr_sync_block
 private:
 
   friend RMG_API detectmod_file_sink_sptr detectmod_make_file_sink (
-    int _num_channels, 
     size_t _size,
     const char *_directory, 
     const char *_tx_name,
@@ -111,7 +109,7 @@ private:
   void close();
 
   //! Private constructor. 
-  detectmod_file_sink (int _num_channels, 
+  detectmod_file_sink (
     size_t _size,
     const char *_directory, 
     const char *_tx_name,
