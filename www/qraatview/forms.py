@@ -176,13 +176,14 @@ class AddDeploymentForm(ProjectElementForm):
 
     def set_project(self, project):
         super(AddDeploymentForm, self).set_project(project)
-        # constraint project's transmitters
-        self.fields["txID"].choices = [
-            (tx.ID, tx) for tx in project.get_transmitters()]
+        if project:
+            # constraint project's transmitters
+            self.fields["txID"].choices = [
+                (tx.ID, tx) for tx in project.get_transmitters()]
 
-        # constraint project's targets
-        self.fields["targetID"].choices = [
-            (target.ID, target) for target in project.get_targets()]
+            # constraint project's targets
+            self.fields["targetID"].choices = [
+                (target.ID, target) for target in project.get_targets()]
 
     def clean_txID(self):
         return Tx.objects.get(ID=self.cleaned_data.get("txID"))
@@ -248,10 +249,15 @@ class EditTargetForm(AddTargetForm):
 
 
 class EditLocationForm(AddLocationForm):
-    """Django's ModelForm to create a location
-       extends ProjectElementForm"""
+    """Django's ModelForm to edit a location
+       extends AddLocationForm"""
 
     class Meta:
         model = Location
         exclude = ["projectID", "is_hidden"]
 
+
+class EditDeploymentForm(ProjectElementForm):
+    class Meta:
+        model = Deployment
+        exclude = ["projectID", "is_hidden", "time_end", "targetID", "txID"]

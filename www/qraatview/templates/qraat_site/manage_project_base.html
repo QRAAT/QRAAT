@@ -72,7 +72,7 @@
 
                 {% for field in obj|get_fields %}
                     {% if field.name not in excluded_fields and field.name not in foreign_fields %}
-                        <td>{{field.verbose_name}}</td>
+                    <td><strong>{{obj.verbose_name|lower}}</strong> {{field.verbose_name}}</td>
                     {% endif %}
                 {% endfor %}
 

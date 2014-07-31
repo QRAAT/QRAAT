@@ -11,6 +11,7 @@ from forms import ProjectForm, EditProjectForm, AddTransmitterForm
 from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
 from forms import EditTargetForm, EditTransmitterForm, EditLocationForm
+from forms import EditDeploymentForm
 
 
 def not_allowed_page(request):
@@ -126,6 +127,18 @@ def show_transmitter(request, project_id, transmitter_id):
         return HttpResponse(
             "Transmitter: %d Model: %s Manufacturer: %s" % (
                 tx.ID, tx.tx_makeID.model, tx.tx_makeID.manufacturer))
+    else:
+        return not_allowed_page(request)
+
+
+def show_deployment(request, project_id, deployment_id):
+    user = request.user
+    project = get_project(project_id)
+
+    if can_view(project, user):
+        return redirect(
+            reverse("ui:view_by_dep", args=(project_id, deployment_id))
+            )
     else:
         return not_allowed_page(request)
 
@@ -441,7 +454,8 @@ def add_target(request, project_id):
         get_form=AddTargetForm(),
         template_path="qraat_site/create-target.html",
         success_url="%s?new_element=True" % reverse(
-            "qraat:manage-targets", args=(project_id,)))
+            "qraat:manage-targets", args=(project_id,))
+        )
 
 
 @login_required(login_url="/auth/login")
@@ -452,7 +466,9 @@ def add_deployment(request, project_id):
         post_form=AddDeploymentForm(data=request.POST),
         get_form=AddDeploymentForm(),
         template_path="qraat_site/create-deployment.html",
-        success_url="../add-deployment?new_element=True")
+        success_url="%s?new_element=True" % reverse(
+            "qraat:manage-deployments", args=(project_id,))
+        )
 
 
 def show_project(request, project_id):
@@ -546,6 +562,25 @@ def manage_transmitters(request, project_id):
 
 
 @login_required(login_url="/auth/login")
+def manage_deployments(request, project_id):
+
+    project = get_project(project_id)
+    content = {}
+    content["nav_options"] = get_nav_options(request)
+    content["project"] = project
+    content["objects"] = project.get_deployments()
+    content["obj_type"] = "deployment"
+    content["foreign_fields"] = ["txID", "targetID"]
+    content["excluded_fields"] = ["projectID", "ID", "is_hidden", "tx_makeID", "serial_no"]
+
+    return render_manage_page(
+        request,
+        project,
+        "qraat_site/manage_deployments.html",
+        content)
+
+
+@login_required(login_url="/auth/login")
 def edit_transmitter(request, project_id, transmitter_id):
     query = get_query("transmitter")
     transmitter = query(transmitter_id)
@@ -591,8 +626,18 @@ def edit_location(request, project_id, location_id):
 
 
 @login_required(login_url="/auth/login")
-def manage_deployments(request, project_id):
-    return HttpResponse("Not implemented yet")
+def edit_deployment(request, project_id, deployment_id):
+    query = get_query("deployment")
+    deployment = query(deployment_id)
+
+    return render_project_form(
+        request=request,
+        project_id=project_id,
+        post_form=EditDeploymentForm(data=request.POST, instance=deployment),
+        get_form=EditDeploymentForm(instance=deployment),
+        template_path="qraat_site/edit-deployment.html",
+        success_url="%s?new_element=True" % reverse(
+            "qraat:edit-deployment", args=(project_id, deployment_id)))
 
 
 def get_nav_options(request):
