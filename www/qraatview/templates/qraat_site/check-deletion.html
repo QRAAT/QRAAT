@@ -4,7 +4,7 @@
 {% block content %}
     <div class="page-header">
         <h3>Are you sure?</h3>
-        <h4><small>You are up to delete all selected {{objs.0.verbose_name}} objects and it's related objects</small></h4>
+        <h4><small>You are up to delete all selected {{objs.0.verbose_name}} objects and their related objects</small></h4>
     </div>
 <div class="row">
     <form action={% url 'qraat:delete-objs' project.ID  %} method="post">

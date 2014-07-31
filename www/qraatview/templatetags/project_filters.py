@@ -14,6 +14,12 @@ def is_collaborator(project, user):
 
 @register.filter(name="get_fields")
 def get_fields(obj):
-    return [dict(verbose_name=field.verbose_name,
-            value=field.value_to_string(obj))
+    return [dict(name=field.name,
+                 verbose_name=field.verbose_name,
+                 string_value=field.value_to_string(obj))
             for field in obj._meta.fields]
+
+
+@register.filter(name="get_attr")
+def get_attr(obj, attr_name):
+    return getattr(obj, attr_name)

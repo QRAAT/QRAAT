@@ -497,6 +497,8 @@ def manage_targets(request, project_id):
     content["project"] = project
     content["objects"] = project.get_targets()
     content["obj_type"] = "target"
+    content["foreign_fields"] = []
+    content["excluded_fields"] = ["projectID", "ID", "is_hidden"]
 
     return render_manage_page(
         request,
@@ -514,6 +516,8 @@ def manage_locations(request, project_id):
     content["project"] = project
     content["objects"] = project.get_locations()
     content["obj_type"] = "location"
+    content["foreign_fields"] = []
+    content["excluded_fields"] = ["projectID", "ID", "is_hidden"]
 
     return render_manage_page(
         request,
@@ -531,6 +535,8 @@ def manage_transmitters(request, project_id):
     content["project"] = project
     content["objects"] = project.get_transmitters()
     content["obj_type"] = "transmitter"
+    content["foreign_fields"] = ["tx_makeID"]
+    content["excluded_fields"] = ["projectID", "ID", "is_hidden"]
 
     return render_manage_page(
         request,
