@@ -1,0 +1,22 @@
+{% extends "qraat_site/base.html" %}
+{% load class_tag %}
+
+{% block sidebar %} {% include "qraat_site/manage_side_bar.html" %} {% endblock %}
+
+{% block content %}
+
+    {% if changed %}
+        <div class="alert alert-success" role="alert">
+            {% block success_msg %} {% endblock %}
+        </div>
+    {% endif %}
+
+    <div class="page-header">
+        <h4>
+            {% block title_msg %}{% endblock %}
+        </h4>
+    </div>
+
+    {% include "qraat_site/base_form.html" %}
+
+{% endblock %} 

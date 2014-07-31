@@ -1,27 +1,37 @@
-{% extends "qraat_site/manage_side_bar.html" %}
+{% extends "qraat_site/base.html" %}
 {% load project_filters %}
 {% load class_tag %}
 
-{%block success_msg %} Item created {% endblock %}
-{% block deleted_msg %} Item deleted {% endblock %}
+{% block script %}
+    <script>
+        $(document).ready(function(){
+            $("#check-all").click(function(){
+                console.log($(this).prop("checked"));
+                if(!$(this).prop("checked")){
+                    $(".element-check-box").each(function(){
+                        $(this).prop('checked', false);
+                    });
+                }else{
+                    $(".element-check-box").each(function(){
+                        $(this).prop('checked', true);
+                    });
+                }
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block sidebar %} {% include "qraat_site/manage_side_bar.html" %} {% endblock %}
 
 {% block content %}
-<script>
-    $(document).ready(function(){
-        $("#check-all").click(function(){
-            console.log($(this).prop("checked"));
-            if(!$(this).prop("checked")){
-                $(".element-check-box").each(function(){
-                    $(this).prop('checked', false);
-                });
-            }else{
-                $(".element-check-box").each(function(){
-                    $(this).prop('checked', true);
-                });
-            }
-        });
-    });
-</script>
+    {% if changed %}
+    <div class="alert alert-success">{%block success_msg %} {% endblock %}</div>
+    {% endif %}
+    {% if deleted == "True" %}
+        <div class="alert alert-danger">{%block deleted_msg %} {% endblock %}</div>
+    {% elif deleted == "0" %}
+    <div class="alert alert-danger"> You didn't select anything </div>
+    {% endif %}
 
 <div class="page-header">
     <h4>
@@ -33,7 +43,6 @@
     </h4>
 </div>
 
-{% block form %} {{block.super}} {% endblock %}
 
 <form action={%url 'qraat:check-deletion' project.ID %} method="post">
     {% csrf_token %}

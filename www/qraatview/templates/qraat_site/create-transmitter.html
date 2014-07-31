@@ -1,6 +1,5 @@
-{% extends "qraat_site/manage_side_bar.html" %}
+{% extends "qraat_site/base_create_object.html" %}
 {% load class_tag %}
 
 {% block title_msg %} New Transmitter {% endblock %}
-{% block button_name %} Add Transmitter {% endblock %}
-{% block content %} {% block form %} {{block.super}} {% endblock %} {% endblock %}
+{% block success_msg %} Transmitter created {% endblock %}
