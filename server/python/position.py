@@ -111,7 +111,7 @@ class steering_vectors:
       cur.execute('''SELECT ID, Bearing,
                             sv1r, sv1i, sv2r, sv2i,
                             sv3r, sv3i, sv4r, sv4i
-                       FROM Steering_Vectors
+                       FROM steering_vectors
                       WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, cal_id))
       raw_data = cur.fetchall()
       prov_sv_ids = qraat.util.get_field(raw_data, 0)
