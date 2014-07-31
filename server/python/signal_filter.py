@@ -73,9 +73,11 @@ CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD = 0.25
 # number is found, items are given a score of -1.
 CONFIG_MINIMUM_POINT_COUNT = 20
 
+# Print verbose debugging info. 
+DEBUG_OUTPUT = False
 
 def debug_print(string): 
-  if True: 
+  if DEBUG_OUTPUT: 
     print >>sys.stderr, "signal_filter: debug:", string
 
 class Registry:

@@ -113,4 +113,4 @@ except qraat.error.QraatError, e:
   print >>sys.stderr, "filter_auto: error: %s." % e
 
 finally: 
-  print "template: finished in %.2f seconds." % (time.time() - start)
+  print "filter_auto: finished in %.2f seconds." % (time.time() - start)
