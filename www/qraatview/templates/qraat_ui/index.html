@@ -42,13 +42,17 @@
       height: 32%; overflow: scroll; padding: 5px; 
       }
     
+    #id_deployment {
+      list-style-type: none;
+      } /* removes the bullet points from the list of deps */
+
     #mouseover {
-      border-style:solid; border-width: 1px; height: 25%; 
+      border-style:solid; border-width: 1px; height: 15%; 
       overflow: scroll; padding: 5px;
       }
     
     #clicked {
-      border-style:solid; border-width: 1px; height: 20%; 
+      border-style:solid; border-width: 1px; height: 25%; 
       overflow: scroll; padding: 5px;
       }
     
@@ -71,6 +75,20 @@
   src="https://maps.googleapis.com/maps/api/js?key={% load google_maps_api %}&sensor=false">
 </script>
 <link href="/static/flot/example.css" rel="stylesheet" type="text/css">
+<script src="/static/flot/jquery-1.11.1.min.js"></script>
+<script src="/static/flot/jquery.flot.min.js"></script>
+<script src ="/static/flot/jquery.flot.time.min.js"></script>
+<script src ="/static/flot/jquery.flot.selection.min.js"></script>
+<script src="/static/flot/jquery.flot.threshold.min.js"></script>
+<script src="/static/flot/jquery.flot.resize.min.js"></script>
+
+
+<!-- plugins for saving graphs as images. commented out because they throw an error when a point on the flot graph is selected -->
+<!-- <script type="text/javascript" src="http://zizhujy.com/Scripts/base64.js"></script>
+<script type="text/javascript" src="http://zizhujy.com/Scripts/drawing/canvas2image.js"></script>
+<script type="text/javascript" src="http://zizhujy.com/Scripts/flot/jquery.flot.saveAsImage.js"></script>
+-->
+
 
 
 
@@ -85,19 +103,19 @@
 
 function hideFormFields() {
   if ({{view_type|safe}} == "deployment") {
-    document.getElementById('id_trans').style.display = 'none';
-    document.querySelector("label[for='id_trans_0']").style.display = "none";
-    //this doesn't work...
-
+    document.getElementById('id_deployment').style.display = 'none';
+    document.querySelector("label[for='id_deployment_0']").style.display = "none";
+    document.getElementById('id_graph_dep').style.display = 'none';
+    document.querySelector("label[for='id_graph_dep']").style.display = "none";
+    
+    //this doesn't work:
     //var labels = document.getElementsByTagName('label');
     //for (var i=0; i <labels.length; i++) {
     //  var attr = labels[i].getAttribute('for');
-    //  if (attr === this.id_trans_0) {
+    //  if (attr === this.id_deployment_0) {
     //    labels[i].style.visibility = 'hidden';
     //  }
    // }
-    //$('label[for="id_trans"]').style.visibility = 'hidden';
-    //document.querySelector("label[for='id_trans']").style.display = "none";
   }
 }
 
@@ -117,9 +135,9 @@ function showDjango() {
 }
 
 
-
-function setCenter() {
-  
+// function setCenter is not working.
+// It is intended to recenter the map on a button click.
+function setCenter() { 
   map.panTo(new google.maps.LatLng(38.487828027, -122.149419006));
   //return false;
 }
@@ -219,7 +237,11 @@ function initialize(){
       localStorage.mapLng = mapCenter.lng();
       localStorage.mapZoom = map.getZoom();
     });
-
+    
+    google.maps.event.addListener(map, "click", function(event) {
+    document.getElementById('clicked_lat_lng').value = 
+    event.latLng.lat().toFixed(6) + ', ' + event.latLng.lng().toFixed(6);
+    });
 
 // SHOW CLICKED DATA POINT INFO
   var django_position = {{pos_data|safe}}; // list of all queried data
@@ -240,23 +262,23 @@ function initialize(){
         selected_data[0][1].toFixed(6);      // lng clicked on map
       }
     
-    document.getElementById('m_lat_lon').innerHTML = 
+    document.getElementById('selected_point_latlon').innerHTML = 
       selected_data[0][10][0].toFixed(6) + ', ' + // lat of actual pt in db
       selected_data[0][10][1].toFixed(6);          // lng of point in db
-    document.getElementById('m_east_north').innerHTML = 
+    document.getElementById('selected_point_eastingnorthing').innerHTML = 
       selected_data[0][5] + ', ' +   // easting 
       selected_data[0][6] + ', ' +   // northing
       selected_data[0][7] + ' ' +    // zone number
       selected_data[0][12];          // zone letter
-    document.getElementById('m_date').innerHTML = 
+    document.getElementById('selected_point_date').innerHTML = 
       selected_data[0][11];          // date string of timestamp
-    document.getElementById('m_activity').innerHTML = 
+    document.getElementById('selected_point_activity').innerHTML = 
       selected_data[0][9].toFixed(6);  // activity
-    document.getElementById('m_likelihood').innerHTML = 
+    document.getElementById('selected_point_likelihood').innerHTML = 
       selected_data[0][8].toFixed(6); // likelihood
-    document.getElementById('m_ID').innerHTML = 
+    document.getElementById('selected_point_positionID').innerHTML = 
       selected_data[0][2];
-    document.getElementById('m_transmitter').innerHTML = 
+    document.getElementById('selected_point_deployment').innerHTML = 
       selected_data[0][3];
   
   } // end if selected_data.length > 5
@@ -288,7 +310,7 @@ function initialize(){
     selected_index = null;
   }
   else {
-    selected_index = {{selected_index}};
+    selected_index = {{selected_index_large}};
   }
 
 
@@ -368,13 +390,6 @@ function initialize(){
     locations.push([]);
   }
 
-      // Note: This is what the locations array looks like.
-        //    var locations = [
-        //      ['Site 1', 38.483052371711864, -122.14958038408795, 1],
-        //      ];
-
-
-
 
 // SET MARKERS: 
   var marker, i;
@@ -429,61 +444,62 @@ function initialize(){
 
 
 
-
-
-
-
-
-
-
 // Display markers for the data points 
   var markers_querydata = new Array();
   var infoWindows_querydata = new Array();    
-  var flight_latlon_pos = {{pos_data|safe}};
+  var position_data = {{pos_data|safe}};
   var display_type = {{display_type}};
 
   // Display marker points if html pref is set to display them
  //Uncommenting to show on public
+  var deps = {{deps_list}};
  
- 
- if (
-      ((display_type != null) && 
-      (display_type==1) && 
-      (flight_latlon_pos.length > 0))
+ if ( ((display_type != null) && (display_type==1) && 
+      (position_data.length > 0))
       ||
-      ({{view_type|safe}} == "deployment") && (display_type!=2)
-      ) {
+      ({{view_type|safe}} == "deployment") && (display_type!=2)) {
     
-    for (i=0; i < flight_latlon_pos.length-1; i++) {
-    
+    for (i=0; i < position_data.length-1; i++) {
       marker = new google.maps.Marker({
         position: new google.maps.LatLng(
-          flight_latlon_pos[i][8][0], flight_latlon_pos[i][8][1]),
+          position_data[i][8][0], position_data[i][8][1]),
         map: map,
-        icon: 'http://www.geocodezip.com/mapIcons/small_blue_dot.png',
+        //icon: 'http://www.geocodezip.com/mapIcons/small_blue_dot.png',
         infoWindowIndex: i
       });
-      
-      var content = '<b>DeploymentID: </b>' + flight_latlon_pos[0][1] + 
-                    '<br>' + flight_latlon_pos[i][8][0].toFixed(5)
-                    + ', ' + flight_latlon_pos[i][8][1].toFixed(5)+
-                    '<br><b>PosID:</b> ' + flight_latlon_pos[i][0] + 
-                    '<br><b>Time:</b> ' + flight_latlon_pos[i][10] +
-                    '<br><b>Activity:</b> ' + flight_latlon_pos[i][7] + 
-                    '<br><b>Likelihood:</b> ' + flight_latlon_pos[i][6];
+
+
+//Hard code colors for markers. If dep in array == req_deps from views, display it as a marker of a certain color.
+
+      if ( ({{view_type|safe}} == "deployment") || 
+        ( (deps.length > 0) && (position_data[i][1] == deps[0]) ) ) {
+    marker.setIcon('http://www.geocodezip.com/mapIcons/small_blue_dot.png')
+      }
+      if ((deps.length > 1) && (position_data[i][1] == deps[1])) {
+  marker.setIcon('http://www.geocodezip.com/mapIcons/small_yellow_dot.png')
+      }
+      if ((deps.length > 2) && (position_data[i][1] == deps[2])) {
+  marker.setIcon('http://www.geocodezip.com/mapIcons/small_green_dot.png')
+      }
+      if ((deps.length > 3) && (position_data[i][1] == deps[3])) {
+  marker.setIcon('http://www.geocodezip.com/mapIcons/small_red_dot.png')
+      }
+
+
+      var content = '<b>DeploymentID: </b>' + position_data[0][1] + 
+                    '<br>' + position_data[i][8][0].toFixed(5)
+                    + ', ' + position_data[i][8][1].toFixed(5)+
+                    '<br><b>PosID:</b> ' + position_data[i][0] + 
+                    '<br><b>Time:</b> ' + position_data[i][10] +
+                    '<br><b>Activity:</b> ' + position_data[i][7] + 
+                    '<br><b>Likelihood:</b> ' + position_data[i][6];
         
       var infoWindow = new google.maps.InfoWindow({ content: content, 
-          
           //Uncomment the following lines for infoWindow options
-          
           //size: new google.maps.Size(150, 50),
           disableAutoPan: true
           });
       
-
-
-
-
     // submit clicked marker lat,lng to django server to find nearby pts
     google.maps.event.addListener(marker, 'click',
       function(event)
@@ -498,216 +514,68 @@ function initialize(){
           } // end if statement for if the lat and lng are null
       }); // end event function and marker event listener
       
-   
-
-
-
     // on mousing over markers for data points, open them to show lat/lng
     google.maps.event.addListener(marker, 'mouseover', function() {
-      
       
       //Uncomment next line to show pop-up infowindows when mousing over marker data points
       //infoWindows_querydata[this.infoWindowIndex].open(map, this);
 
-
     //mouseover markers to show info in html sidebar
-    document.getElementById('m_lat_lon').innerHTML = 
-      flight_latlon_pos[this.infoWindowIndex][8][0].toFixed(6) + ', ' + // lat of actual pt in db
-      flight_latlon_pos[this.infoWindowIndex][8][1].toFixed(6);          // lng of point in db
-    document.getElementById('m_east_north').innerHTML = 
-      flight_latlon_pos[this.infoWindowIndex][3] + ', ' +   // easting 
-      flight_latlon_pos[this.infoWindowIndex][4] + ', ' +   // northing
-      flight_latlon_pos[this.infoWindowIndex][5] + ' ' +    // zone number
-      flight_latlon_pos[this.infoWindowIndex][9];          // zone letter
-    document.getElementById('m_date').innerHTML = 
-      flight_latlon_pos[this.infoWindowIndex][10];          // date string of timestamp
-    document.getElementById('m_activity').innerHTML = 
-      flight_latlon_pos[this.infoWindowIndex][7].toFixed(6);  // activity
-    document.getElementById('m_likelihood').innerHTML = 
-      flight_latlon_pos[this.infoWindowIndex][6].toFixed(6); // likelihood
-    document.getElementById('m_ID').innerHTML = 
-      flight_latlon_pos[this.infoWindowIndex][0];
-    document.getElementById('m_transmitter').innerHTML = 
-      flight_latlon_pos[this.infoWindowIndex][1];
-  
+    document.getElementById('selected_point_latlon').innerHTML = 
+      position_data[this.infoWindowIndex][8][0].toFixed(6) + ', ' +
+      position_data[this.infoWindowIndex][8][1].toFixed(6); 
+        // lat,lng of point in db
+    document.getElementById('selected_point_eastingnorthing').innerHTML = 
+      position_data[this.infoWindowIndex][3] + ', ' +   // easting 
+      position_data[this.infoWindowIndex][4] + ', ' +   // northing
+      position_data[this.infoWindowIndex][5] + ' ' +    // zone number
+      position_data[this.infoWindowIndex][9];          // zone letter
+    document.getElementById('selected_point_date').innerHTML = 
+      position_data[this.infoWindowIndex][10];// datestring timestamp
+    document.getElementById('selected_point_activity').innerHTML = 
+      position_data[this.infoWindowIndex][7].toFixed(6);  // activity
+    document.getElementById('selected_point_likelihood').innerHTML = 
+      position_data[this.infoWindowIndex][6].toFixed(6); // likelihood
+    document.getElementById('selected_point_positionID').innerHTML = 
+      position_data[this.infoWindowIndex][0];
+    document.getElementById('selected_point_deployment').innerHTML = 
+      position_data[this.infoWindowIndex][1];
     }); // end mouseover event function
 
-
     google.maps.event.addListener(marker, 'mouseout', function() {
-      
-
-    document.getElementById('m_lat_lon').innerHTML = "" 
-    document.getElementById('m_east_north').innerHTML = "" 
-    document.getElementById('m_date').innerHTML = ""
-    document.getElementById('m_activity').innerHTML = "" 
-    document.getElementById('m_likelihood').innerHTML = ""
-    document.getElementById('m_ID').innerHTML = ""
-    document.getElementById('m_transmitter').innerHTML = ""
+    document.getElementById('selected_point_latlon').innerHTML = "" 
+    document.getElementById('selected_point_eastingnorthing').innerHTML = "" 
+    document.getElementById('selected_point_date').innerHTML = ""
+    document.getElementById('selected_point_activity').innerHTML = "" 
+    document.getElementById('selected_point_likelihood').innerHTML = ""
+    document.getElementById('selected_point_positionID').innerHTML = ""
+    document.getElementById('selected_point_deployment').innerHTML = ""
   
     }); // end mouseout event function
-
-
-
-
-
 
     // close infowindows on mousing out of marker
     google.maps.event.addListener(marker, 'mouseout', function() {
       infoWindows_querydata[this.infoWindowIndex].close();
     }); // end mouseout event function
-
         infoWindows_querydata.push(infoWindow);
         markers_querydata.push(marker);
-      
     } //end for loop for query data
   } //end if statement for displaying query data as points (not lines)
-
-
-
-
-
-
-
-
-
-
-
-  //DISPLAY MARKERS (DATA POINTS) FOR 2ND DEPLOYMENT
-  var markers_querydata1 = new Array();
-  var infoWindows_querydata1 = new Array();    
-  var flight_latlon_pos1 = {{pos_data1|safe}};
-  var display_type = {{display_type}};
-
-  // Display marker points if html pref is set to display them
-  if ((display_type != null)&& (display_type==1)) {
-    
-    for (i=0; i < flight_latlon_pos1.length-1; i++) {
-    
-      marker = new google.maps.Marker({
-        position: new google.maps.LatLng(
-          flight_latlon_pos1[i][8][0], flight_latlon_pos1[i][8][1]),
-        map: map,
-        icon: 'http://www.geocodezip.com/mapIcons/small_yellow_dot.png',
-        infoWindowIndex: i
-      });
-      
-      var content = 'dep: ' + flight_latlon_pos1[0][1] +  '<br>' +
-                    flight_latlon_pos1[i][8][0].toFixed(5)
-                    + ', ' + flight_latlon_pos1[i][8][1].toFixed(5);
-        
-      var infoWindow = new google.maps.InfoWindow({ content: content });
-      
-
-//This is commented because clicking would give the related data from the first deployment, since only the index of the array is passed around, not both the index of the array and which array it is.
-
-//    // submit clicked marker lat,lng to django server to find nearby pts
-//    google.maps.event.addListener(marker, 'click',
-//      function(event)
-//      { //submit the location of the click to django
-//        if ((event.latLng.lat() !==null) && (event.latLng.lng() !==null)) {
-//          // populates hidden html fields
-//          document.getElementById('lat_clicked').value = event.latLng.lat()
-//          document.getElementById('lng_clicked').value = event.latLng.lng()
-          
-//          // submits html form
-//          document.getElementById("form").submit();
-//          } // end if statement for if the lat and lng are null
-//      }); // end event function and marker event listener
-      
-
-
-
-
-
-
-    // on mousing over markers for data points, open them to show lat/lng
-    google.maps.event.addListener(marker, 'mouseover', function() {
-      
-      
-      //Uncomment next line to show pop-up infowindows when mousing over marker data points
-      //infoWindows_querydata1[this.infoWindowIndex].open(map, this);
-
-
-    //mouseover markers to show info in html sidebar
-    document.getElementById('m_lat_lon').innerHTML = 
-      flight_latlon_pos1[this.infoWindowIndex][8][0].toFixed(6) + ', ' + // lat of actual pt in db
-      flight_latlon_pos1[this.infoWindowIndex][8][1].toFixed(6);          // lng of point in db
-    document.getElementById('m_east_north').innerHTML = 
-      flight_latlon_pos1[this.infoWindowIndex][3] + ', ' +   // easting 
-      flight_latlon_pos1[this.infoWindowIndex][4] + ', ' +   // northing
-      flight_latlon_pos1[this.infoWindowIndex][5] + ' ' +    // zone number
-      flight_latlon_pos1[this.infoWindowIndex][9];          // zone letter
-    document.getElementById('m_date').innerHTML = 
-      flight_latlon_pos1[this.infoWindowIndex][10];          // date string of timestamp
-    document.getElementById('m_activity').innerHTML = 
-      flight_latlon_pos1[this.infoWindowIndex][7].toFixed(6);  // activity
-    document.getElementById('m_likelihood').innerHTML = 
-      flight_latlon_pos1[this.infoWindowIndex][6].toFixed(6); // likelihood
-    document.getElementById('m_ID').innerHTML = 
-      flight_latlon_pos1[this.infoWindowIndex][0];
-    document.getElementById('m_transmitter').innerHTML = 
-      flight_latlon_pos1[this.infoWindowIndex][1];
-  
-    }); // end mouseover event function
-
-
-  // on mousing out of markers for data points, don't show info
-    google.maps.event.addListener(marker, 'mouseout', function() {
-      
-
-    document.getElementById('m_lat_lon').innerHTML = "" 
-    document.getElementById('m_east_north').innerHTML = "" 
-    document.getElementById('m_date').innerHTML = ""
-    document.getElementById('m_activity').innerHTML = "" 
-    document.getElementById('m_likelihood').innerHTML = ""
-    document.getElementById('m_ID').innerHTML = ""
-    document.getElementById('m_transmitter').innerHTML = ""
-  
-    }); // end mouseout event function
-
-
-
-
-
-
-
-// Uncomment following lines for pop-up infowindow on mouseover of 2nd deployment data points
-//    // on mousing over markers for data points, open them to show lat/lng
-//    google.maps.event.addListener(marker, 'mouseover', function() {
-//      infoWindows_querydata1[this.infoWindowIndex].open(map, this); 
-//    });
-      
-//    // close infowindows on mousing out of marker
-//    google.maps.event.addListener(marker, 'mouseout', function() {
-//      infoWindows_querydata1[this.infoWindowIndex].close();
-//    });
-
-        infoWindows_querydata1.push(infoWindow);
-        markers_querydata1.push(marker);
-      
-    } //end for loop for query data
-  } //end if statement for displaying query data as points (not lines)
-
-
-
-
-
-
-
-
-
-
 
 
 
 // DISPLAY MARKER / "HIGHLIGHT" SELECTED POINT (clicked in maps or in flot)
 
-
 // WHEN MAP IS CLICKED, display another marker there to highlight point
   // If valid point (corresponds to db pt) is selected on maps, display it  
   
+  var selectedMarkers = new Array();
+  
   if (selected_data.length > 0) {
-
+    for (var i =0; i < selectedMarkers.length; i++) {
+    selectedMarkers[i].setMap(null);
+    }
+ 
     marker = new google.maps.Marker({
       position: new google.maps.LatLng
         (
@@ -723,8 +591,6 @@ function initialize(){
     
     }); // end setting marker data
  
-
-
 
     // Set on click infoWindow content for highlighted data marker
 
@@ -754,14 +620,7 @@ function initialize(){
   
   } // end if selected_data
 
-
-
-
-
-
-
-
-
+  selectedMarkers.push(marker);
 
 
 
@@ -769,18 +628,16 @@ function initialize(){
 
 // WHEN FLOT POINT IS CLICKED, add a highlight marker to the point
 
-  var selectedMarkers = new Array();
-
-    
   var flot_index ={{flot_index}}; // index of data in large queried array
-
   if (flot_index != null) {
-    var flight_latlon_pos = {{pos_data|safe}};
-    
+    for (var i =0; i < selectedMarkers.length; i++) {
+    selectedMarkers[i].setMap(null);
+    }
+    var position_data = {{pos_data|safe}};
     marker = new google.maps.Marker({
       position: new google.maps.LatLng(
-        flight_latlon_pos[flot_index][8][0], 
-        flight_latlon_pos[flot_index][8][1]),
+        position_data[flot_index][8][0], 
+        position_data[flot_index][8][1]),
       map: map,
       zIndex: google.maps.Marker.MAX_ZINDEX + 1
       // zIndex sets marker on top of all other markers
@@ -789,7 +646,6 @@ function initialize(){
       //icon: 'http://maps.google.com/mapfiles/ms/micons/red-dot.png'
     });
     
-
     var content =   '<b>Deployment ID: </b>' + selected_data[0][3] +
                     '<br><b>Data ID: </b>' + selected_data[0][2] + 
                     '<br><b>Lat, Lon: </b> ' +
@@ -820,7 +676,6 @@ function initialize(){
     //var bounds = new google.maps.LatLngBounds();
     //bounds.extend(marker.position);
     //map.fitBounds(bounds);
-    
     map.panTo(marker.position);
      
   } // end if point was selected in flot (index)
@@ -835,21 +690,16 @@ function initialize(){
 
 
 
-
                   // WHEN HTML PREF IS SET TO 'Lines':
 
   if ((display_type != null) && (display_type == 2)) {
-
-
-                  // Polyline for Deployment 1
   // Populate data for the Polyline
-    
-    var flight_latlon_pos = {{pos_data|safe}};
+    var position_data = {{pos_data|safe}};
     var flightPlanCoordinates = new Array();
     
-    for (i=0; i < flight_latlon_pos.length-1; i++) {
+    for (i=0; i < position_data.length-1; i++) {
       var point = new google.maps.LatLng(
-        flight_latlon_pos[i][8][0], flight_latlon_pos[i][8][1]);
+        position_data[i][8][0], position_data[i][8][1]);
       flightPlanCoordinates.push(point);
     } // end for loop through queried data points
 
@@ -865,62 +715,50 @@ function initialize(){
     }); // end drawing the Polyline
 
 
-
     flightPath.setMap(map);
     
   google.maps.event.addListener(flightPath, 'mouseover', function(event) {
     
     //Attempt to get the index of the closest point to the mouse location
-
-    //var distance = Infinity;
-    //var vertex=0;
-    //for (var i=0; i < flightPath.getVertexCount(); i++) {
-    //  var dist = point.distanceFrom(flightPath.getVertex(i));
-    //  if dist < distance {
-    //    vertex = i;
-    //    distance = dist;
-    //  }
-    //}
     var vertex;
     var i;
-    for (i=0; i < flight_latlon_pos.length; i ++) {
-      if ((event.latLng.lat().toFixed(3) == flight_latlon_pos[i][8][0].toFixed(3)) && (event.latLng.lng().toFixed(3) == flight_latlon_pos[i][8][1].toFixed(3))) {
-              vertex = i;
-      }
+    for (i=0; i < position_data.length; i ++) {
+      if ((event.latLng.lat().toFixed(3) == position_data[i][8][0].toFixed(3)) && (event.latLng.lng().toFixed(3) == position_data[i][8][1].toFixed(3))) { vertex = i; }
     }
 
     if (vertex != null) {
-    document.getElementById('m_lat_lon').innerHTML = 
-      flight_latlon_pos[vertex][8][0].toFixed(6) + ', ' + // lat of actual pt in db
-      flight_latlon_pos[vertex][8][1].toFixed(6);          // lng of point in db
-    document.getElementById('m_east_north').innerHTML = 
-      flight_latlon_pos[vertex][3] + ', ' +   // easting 
-      flight_latlon_pos[vertex][4] + ', ' +   // northing
-      flight_latlon_pos[vertex][5] + ' ' +    // zone number
-      flight_latlon_pos[vertex][9];          // zone letter
-    document.getElementById('m_date').innerHTML = 
-      flight_latlon_pos[vertex][10];          // date string of timestamp
-    document.getElementById('m_activity').innerHTML = 
-      flight_latlon_pos[vertex][7].toFixed(6);  // activity
-    document.getElementById('m_likelihood').innerHTML = 
-      flight_latlon_pos[vertex][6].toFixed(6); // likelihood
-    document.getElementById('m_ID').innerHTML = 
-      flight_latlon_pos[vertex][0];
-    document.getElementById('m_transmitter').innerHTML = 
-      flight_latlon_pos[vertex][1];
+    document.getElementById('selected_point_latlon').innerHTML = 
+      position_data[vertex][8][0].toFixed(6) + ', ' +
+      position_data[vertex][8][1].toFixed(6);          
+        // lat, lng of actual point in db
+    document.getElementById('selected_point_eastingnorthing').innerHTML = 
+      position_data[vertex][3] + ', ' +   // easting 
+      position_data[vertex][4] + ', ' +   // northing
+      position_data[vertex][5] + ' ' +    // zone number
+      position_data[vertex][9];          // zone letter
+    document.getElementById('selected_point_date').innerHTML = 
+      position_data[vertex][10];          // date string of timestamp
+    document.getElementById('selected_point_activity').innerHTML = 
+      position_data[vertex][7].toFixed(6);  // activity
+    document.getElementById('selected_point_likelihood').innerHTML = 
+      position_data[vertex][6].toFixed(6); // likelihood
+    document.getElementById('selected_point_positionID').innerHTML = 
+      position_data[vertex][0];
+    document.getElementById('selected_point_deployment').innerHTML = 
+      position_data[vertex][1];
   } // end if vertex
   
   }); // end event mouseover eventListener
 
 
     google.maps.event.addListener(flightPath, 'mouseout', function() {
-    document.getElementById('m_lat_lon').innerHTML = "" 
-    document.getElementById('m_east_north').innerHTML = "" 
-    document.getElementById('m_date').innerHTML = ""
-    document.getElementById('m_activity').innerHTML = "" 
-    document.getElementById('m_likelihood').innerHTML = ""
-    document.getElementById('m_ID').innerHTML = ""
-    document.getElementById('m_transmitter').innerHTML = ""
+    document.getElementById('selected_point_latlon').innerHTML = "" 
+    document.getElementById('selected_point_eastingnorthing').innerHTML = "" 
+    document.getElementById('selected_point_date').innerHTML = ""
+    document.getElementById('selected_point_activity').innerHTML = "" 
+    document.getElementById('selected_point_likelihood').innerHTML = ""
+    document.getElementById('selected_point_positionID').innerHTML = ""
+    document.getElementById('selected_point_deployment').innerHTML = ""
   
     }); // end mouseout event function
 
@@ -931,11 +769,9 @@ function initialize(){
     //Attempt to get the index of the closest point to the mouse location
     var vertex;
     var i;
-    for (i=0; i < flight_latlon_pos.length-1; i ++) {
-      if ((event.latLng.lat().toFixed(2) == flight_latlon_pos[i][8][0].toFixed(2)) && (event.latLng.lng().toFixed(2) == flight_latlon_pos[i][8][1].toFixed(2))) {
-              vertex = i;
-      }
-    }
+    for (i=0; i < position_data.length-1; i ++) {
+      if ((event.latLng.lat().toFixed(2) == position_data[i][8][0].toFixed(2)) && (event.latLng.lng().toFixed(2) == position_data[i][8][1].toFixed(2))) { vertex = i; }
+  }
 
   if (vertex != null) {
           document.getElementById('lat_clicked').value = event.latLng.lat()
@@ -962,8 +798,8 @@ function initialize(){
     marker = new google.maps.Marker({
       position: new google.maps.LatLng
         (
-        flight_latlon_pos[vertex][8][0], 
-        flight_latlon_pos[vertex][8][1]
+        position_data[vertex][8][0], 
+        position_data[vertex][8][1]
         ),
       map: map,
       zIndex: google.maps.Marker.MAX_ZINDEX + 1
@@ -975,19 +811,19 @@ function initialize(){
 
 
     // Set on click infoWindow content for highlighted data marker
-    var content = '<b>Deployment ID: </b>' + flight_latlon_pos[vertex][1] +
-            '<br><b>Data ID: </b>' + flight_latlon_pos[vertex][0] + 
+    var content = '<b>Deployment ID: </b>' + position_data[vertex][1] +
+            '<br><b>Data ID: </b>' + position_data[vertex][0] + 
             '<br><b>Lat, Lon: </b> ' +
-            flight_latlon_pos[vertex][8][0].toFixed(6) + ', ' +
-            flight_latlon_pos[vertex][8][1].toFixed(6) +
+            position_data[vertex][8][0].toFixed(6) + ', ' +
+            position_data[vertex][8][1].toFixed(6) +
             '<br><b>Easting, Northing, Zone: </b> ' + 
-            flight_latlon_pos[vertex][3] + ', ' + 
-            flight_latlon_pos[vertex][4] + ', ' + 
-            flight_latlon_pos[vertex][5] +
-            flight_latlon_pos[vertex][10] +
-            '<br><b>Date/Time: </b>'  + flight_latlon_pos[vertex][9] + 
-            '<br><b>Activity: </b>' +  flight_latlon_pos[vertex][7] +
-            '<br><b>Likelihood: </b>' + flight_latlon_pos[vertex][6];
+            position_data[vertex][3] + ', ' + 
+            position_data[vertex][4] + ', ' + 
+            position_data[vertex][5] +
+            position_data[vertex][10] +
+            '<br><b>Date/Time: </b>'  + position_data[vertex][9] + 
+            '<br><b>Activity: </b>' +  position_data[vertex][7] +
+            '<br><b>Likelihood: </b>' + position_data[vertex][6];
 
     var infoWindow = new google.maps.InfoWindow({content: content});
     
@@ -1003,40 +839,27 @@ function initialize(){
 
     //Populate the html sidebar with related data
 
-    document.getElementById('m_lat_lon').innerHTML = 
-      flight_latlon_pos[vertex][8][0].toFixed(6) + ', ' + // lat of actual pt in db
-      flight_latlon_pos[vertex][8][1].toFixed(6);          // lng of point in db
-    document.getElementById('m_east_north').innerHTML = 
-      flight_latlon_pos[vertex][3] + ', ' +   // easting 
-      flight_latlon_pos[vertex][4] + ', ' +   // northing
-      flight_latlon_pos[vertex][5] + ' ' +    // zone number
-      flight_latlon_pos[vertex][9];          // zone letter
-    document.getElementById('m_date').innerHTML = 
-      flight_latlon_pos[vertex][10];          // date string of timestamp
-    document.getElementById('m_activity').innerHTML = 
-      flight_latlon_pos[vertex][7].toFixed(6);  // activity
-    document.getElementById('m_likelihood').innerHTML = 
-      flight_latlon_pos[vertex][6].toFixed(6); // likelihood
-    document.getElementById('m_ID').innerHTML = 
-      flight_latlon_pos[vertex][0];
-    document.getElementById('m_transmitter').innerHTML = 
-      flight_latlon_pos[vertex][1];
+    document.getElementById('selected_point_latlon').innerHTML = 
+      position_data[vertex][8][0].toFixed(6) + ', ' + // lat of actual pt in db
+      position_data[vertex][8][1].toFixed(6);          // lng of point in db
+    document.getElementById('selected_point_eastingnorthing').innerHTML = 
+      position_data[vertex][3] + ', ' +   // easting 
+      position_data[vertex][4] + ', ' +   // northing
+      position_data[vertex][5] + ' ' +    // zone number
+      position_data[vertex][9];          // zone letter
+    document.getElementById('selected_point_date').innerHTML = 
+      position_data[vertex][10];          // date string of timestamp
+    document.getElementById('selected_point_activity').innerHTML = 
+      position_data[vertex][7].toFixed(6);  // activity
+    document.getElementById('selected_point_likelihood').innerHTML = 
+      position_data[vertex][6].toFixed(6); // likelihood
+    document.getElementById('selected_point_positionID').innerHTML = 
+      position_data[vertex][0];
+    document.getElementById('selected_point_deployment').innerHTML = 
+      position_data[vertex][1];
   } // end if vertex
   
   }); // end event mouseover eventListener
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1087,33 +910,13 @@ function initialize(){
 google.maps.event.addDomListener(window, 'load', initialize);
 
 
-</script>
 
 
 
-                            <!-- FLOT GRAPH -->
+                            //FLOT GRAPH
 
-
-<!-- if there is queried data (this is a messy if check)
-      then display flot graph -->
-
-{% if positions %}
-
-<!-- Attach JQUERY & FLOT plugins -->
-<script src="/static/flot/jquery-1.11.1.min.js"></script>
-<script src="/static/flot/jquery.flot.min.js"></script>
-<script src ="/static/flot/jquery.flot.time.min.js"></script>
-<script src ="/static/flot/jquery.flot.selection.min.js"></script>
-<script src="/static/flot/jquery.flot.threshold.min.js"></script>
-<script src="/static/flot/jquery.flot.resize.min.js"></script>
-
-<!-- plugins for saving graphs as images. commented out because they throw an error when a point on the flot graph is selected -->
-<!-- <script type="text/javascript" src="http://zizhujy.com/Scripts/base64.js"></script>
-<script type="text/javascript" src="http://zizhujy.com/Scripts/drawing/canvas2image.js"></script>
-<script type="text/javascript" src="http://zizhujy.com/Scripts/flot/jquery.flot.saveAsImage.js"></script>
--->
-
-<script type="text/javascript">
+var positions = {{pos_data|safe}};
+if (positions.length != 0) {
 
 //declare global variables
   //global variable to be passed to google maps for the datetime
@@ -1125,76 +928,91 @@ google.maps.event.addDomListener(window, 'load', initialize);
 
 $(function() {
   var d = [];
+  var d1 = [];
+  var d2 = [];
+  var d3 = [];
+  var d4 = [];
   var positions = {{pos_data|safe}};
   var graph_data = {{graph_data}};
   var label, min, max;
+  var deps = {{deps_list}};
+  var graph_data_index;
 
-  if ( (graph_data ==1)  || 
-        (({{view_type|safe}} == "deployment") && (graph_data!=2))) { //likelihood
-    for (var i=0; i < positions.length; i++) {
-      d.push([positions[i][2]*1000-7*60*60*1000, positions[i][6]]);
-    }
+  if (graph_data!=2) { 
+  //likelihood chosen, or none chosen(i.e. default deployment page)
+    graph_data_index = 6;
+  }
+  else if (graph_data ==2) {
+    graph_data_index = 7;
   }
 
-  if (graph_data ==2) { //activity
-    for (var i=0; i < positions.length; i++) {
-      d.push([positions[i][2]*1000-7*60*60*1000, positions[i][7]]);
-      }
-    }
+    // if ( (graph_data ==1)  ||
+    //(({{view_type|safe}} == "deployment") && (graph_data!=2)) ||
+    //( ({{view_type|safe}} == "public") && (deps.length>0) ) ) {
+    
+  if ({{graph_dep}} != null) {
+    var d1=[];
+    for (var i=0; i < positions.length; i++) {    
+      if (positions[i][1] == {{graph_dep}}) {
+        d1.push([positions[i][2]*1000-7*60*60*1000, positions[i][graph_data_index]]);
+      } } }
+  else if (deps.length > 0) {
+    var d1=[];
+    for (var i=0; i < positions.length; i++) {    
+      if (positions[i][1] == deps[0] ) {
+        d1.push([positions[i][2]*1000-7*60*60*1000, positions[i][graph_data_index]]);
+      } } }
+
+
+  var data =[ { data: d1, label: "{{graph_dep}}", lines: {show:true} } ]
   
-  if (graph_data ==1) {
-    label = "Likelihood";
-    min: 0;
-    max: 1200;
-  }
+  var color = ["#8383FF", "yellow", "green", "red"]
 
-  if (graph_data==2) {
-    label = "Activity";
-    min: 0;
-    max: 1.3;
+  for (i=0; i < deps.length; i++) {
+    if ({{graph_dep}} == deps[i]) { var colorIndex = i; }
+    else { var colorIndex = 0; }
   }
-    //max for tx 63: 1.24100128851
-    //max for tx 64: 1.29677759729
-    //max for tx 52: 3.31790543425i
-
+  
   var options = {
     legend: { show: false },
     series: { lines: { show: true }, points: { show: false } },
     grid: { hoverable: true, clickable: true },
-    xaxis: { 
-      mode: "time", 
-      //tickSize: [4, "hour"], 
-      timeformat: "%m-%d %H:%M" 
-    },  //does this work?
-    //yaxis: {min: min, max: max},
+    xaxis: { mode: "time", timeformat: "%m-%d %H:%M"},
     highlightColor: 'red',
     selection: { mode: "xy" },
-    colors: ["#8383FF"] //changes flot line color. 
-        // ??? use 'colors' for 1 series & 'color' for multiple series ???
+    colors: [ color[colorIndex] ]
   };
 
+  var plot = $.plot("#placeholder2", data, options);
 
-  var plot = $.plot("#placeholder2", [{ data: d, label: label}], options);
+////  if (graph_data ==1) { label = "Likelihood"; min: 0; max: 1200; }
+////  if (graph_data==2) { label = "Activity"; min: 0; max: 4.0; }
+//
+//  
+//  data =[ { data: d1, label: "1st dep", lines: {show:true} },
+//          { data: d2, label: "2nd dep", lines: {show:true} },
+//          { data: d3, label: "3rd dep", lines: {show:true} } ]
+//
+//  var options = {
+//    legend: { show: false },
+//    series: { lines: { show: true }, points: { show: false } },
+//    grid: { hoverable: true, clickable: true },
+//    xaxis: { 
+//      mode: "time", 
+//      //tickSize: [4, "hour"], 
+//      timeformat: "%m-%d %H:%M" 
+//    },  //does this work?
+//    //yaxis: {min: min, max: max},
+//    highlightColor: 'red',
+//    selection: { mode: "xy" },
+//    colors: ["#8383FF", "yellow", "green"] //changes flot line color. 
+//        // ??? use 'colors' for 1 series & 'color' for multiple series ???
+//  };
+//
+//
+//  var plot = $.plot("#placeholder2", data, options);
+//var plot = $.plot("#placeholder2", [{ data: d, label: label}], options);
   
-
-
-
-
-  //2nd deployment
-  //var d1 = [];
-  //var positions1 = {{pos_data1|safe}};
-  
-  //if (graph_data ==1) { //likelihood
-  //  for (var i=0; i < positions1.length; i++) {
-  //    d1.push([positions1[i][2]*1000-7*60*60*1000, positions1[i][6]]);
-  //  }
-  //}
-
-  //if (graph_data ==2) { //activity
-  //  for (var i=0; i < positions1.length; i++) {
-  //    d1.push([positions1[i][2]*1000-7*60*60*1000, positions1[i][7]]);
-  //    }
-  //}
 
   //var data = [{ data: d, label: "dep1", 
   //              color: ["red"], 
@@ -1208,25 +1026,7 @@ $(function() {
   //var options = [options0, options1];
   //var plot = $.plot("#placeholder2", data, 
   //    {xaxis: {mode: "time", timeformat: "%m-%d %H:%M"}});
-
-
-
-
-
-
-
-
-
-  //$("<div id='tooltip'></div>").css({
-  //  position: "absolute",
-  //  display: "none",
-  //  border: "0.01px solid #998484",
-  //  padding: "0.02px",
-  //  "background-color": "#fee",
-  //  opacity: 0.80
-  //}).appendTo("body");
-
-  
+ 
   var dataSeriesIndex = 0;
 
   $('button').click(function(){
@@ -1237,14 +1037,12 @@ $(function() {
     //if (dataPoint != null) {
     //var dataPosition = plot.pointOffset({x:dataPoint[0], y: dataPoint[1] })
     //var tipHTML = 'Data:<br> X='+dataPoint[0] +'<br> Y=' +dataPoint[1];
-    //$('#tooltip').css({left: dataPosition.left+10, 
     // top: dataPosition.top-10}).show().html(tipHTML)
     //}
   })
 
 
-  $("#placeholder2").bind("plothover2", function (event, pos, item) {
-    
+//  $("#placeholder2").bind("plothover2", function (event, pos, item) {
     //if ($("#enablePosition2:checked").length > 0) {
       //var str = "(" + pos.x.toFixed(2) + ", " + pos.y.toFixed(2) + ")";
       //$("#hoverdata2").text(str);
@@ -1262,8 +1060,7 @@ $(function() {
       //    }
     //}
 
-  });
-
+//  });
 
   $("#placeholder2").bind("plotclick", function (event, pos, item) {
     if (item == undefined) return false;
@@ -1282,49 +1079,48 @@ $(function() {
     document.getElementById("form").submit();
   });
 
-  
 
-//create the overview plot
-  var overview = $.plot("#overview", [{ data: d, label: label}], {
-    legend: { show: false },
-    series: { lines: { show: true, lineWidth: 1 }, shadowSize: 0 },
-    xaxis: { mode: "time" }, 
-    //yaxis: { ticks: 3, min: -2, max: 2 },
-    grid: { color: "#999" },
-    selection: { mode: "xy" },
-    colors: ["#8383FF"] 
-  });
-
-
-
- //connect the 2 plots
-  $("#placeholder2").bind("plotselected", function (event, ranges) {
-    // clamp the zooming to prevent eternal zoom
-      if (ranges.xaxis.to - ranges.xaxis.from < 0.00001) {
-          ranges.xaxis.to = ranges.xaxis.from + 0.00001;
-      }
-      if (ranges.yaxis.to - ranges.yaxis.from < 0.00001) {
-          ranges.yaxis.to = ranges.yaxis.from + 0.00001;
-      }
-   // do the zooming
-
-
-
-  plot = $.plot("#placeholder2", getData(ranges.xaxis.from, ranges.xaxis.to),
-        $.extend(true, {}, options, {
-        xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to },
-        yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }
-        })
-      );
-
-  // don't fire event on the overview to prevent eternal loop
-  overview.setSelection(ranges, true);
-  });
-
-  $("#overview").bind("plotselected", function (event, ranges) {
-    plot.setSelection(ranges);
-  });
-
+// //create the overview plot
+//   var overview = $.plot("#overview", [{ data: d, label: label}], {
+//     legend: { show: false },
+//     series: { lines: { show: true, lineWidth: 1 }, shadowSize: 0 },
+//     xaxis: { mode: "time" }, 
+//     //yaxis: { ticks: 3, min: -2, max: 2 },
+//     grid: { color: "#999" },
+//     selection: { mode: "xy" },
+//     colors: ["#8383FF"] 
+//   });
+// 
+// 
+// 
+//  //connect the 2 plots
+//   $("#placeholder2").bind("plotselected", function (event, ranges) {
+//     // clamp the zooming to prevent eternal zoom
+//       if (ranges.xaxis.to - ranges.xaxis.from < 0.00001) {
+//           ranges.xaxis.to = ranges.xaxis.from + 0.00001;
+//       }
+//       if (ranges.yaxis.to - ranges.yaxis.from < 0.00001) {
+//           ranges.yaxis.to = ranges.yaxis.from + 0.00001;
+//       }
+//    // do the zooming
+// 
+// 
+// 
+//   plot = $.plot("#placeholder2", getData(ranges.xaxis.from, ranges.xaxis.to),
+//         $.extend(true, {}, options, {
+//         xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to },
+//         yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }
+//         })
+//       );
+// 
+//   // don't fire event on the overview to prevent eternal loop
+//   overview.setSelection(ranges, true);
+//   });
+// 
+//   $("#overview").bind("plotselected", function (event, ranges) {
+//     plot.setSelection(ranges);
+//   });
+// 
 
 
 //when user clicks point on flot, flot will reload...
@@ -1349,8 +1145,9 @@ $(function() {
 //set global variable for passing the timestamp to django to google maps:
 //clickedDateTime = 6;
 
+
+} //endif positions
 </script>
-{% endif %} <!-- end if there is queried data, show flot graph -->
 
 
 </head>
@@ -1377,11 +1174,46 @@ $(function() {
 
 <div class="section_title">PREFERENCES
 <button onclick="submitForm()">Submit Form</button></div>
-<font size="2">
 <div id ="prefs">
 
-<form name="form" id="form" action ="" name="settings" method="get">
-<!-- <center><input type="submit" value="SUBMIT PREFERENCES" /></center> -->
+<form id="form" action ="" name="settings" method="get">
+<!-- <input type="submit" value="SUBMIT PREFERENCES" /> -->
+<font size="2">
+{% for field in form %}
+
+{% if field.auto_id = "id_deployment"  or field.auto_id = "id_likelihood_low" or field.auto_id = "id_activity_low" %}
+<b>{{field.label_tag}}</b> {{field}}
+
+{% elif field.auto_id = "id_sites" %}
+<b>{{field.label_tag}}</b> {{field}}<br><br>
+<b><u>FILTER DATA BY:</u></b>
+<br><font size="1">Date/Time Format: YYYY-MM-DD HH:MM:SS (24hr)</font><br>
+
+{% elif field.auto_id = "id_activity_high" %}
+<b>{{field.label_tag}}</b> {{field}}<br><br>
+
+
+<b><u>GRAPH:</u></b><br>
+
+{% else %}
+<b>{{field.label_tag}}</b> {{field}}<br>
+{% endif %}
+{% endfor %}
+</font>
+
+<input type="hidden" name="lat_clicked" id="lat_clicked">
+<input type="hidden" name="lng_clicked" id="lng_clicked">
+<input type="hidden" name="flot_index" id="flot_index">
+</form>
+
+
+<!-- <button onclick="fitBounds()">Fit all positions in map window</button>-->
+
+<!-- <font size="1">date range: 2013-08-13  13:57:16 to 2014-06-16 14:28:12</font> -->
+</div><!-- end prefs -->
+
+<br>
+
 
 
 <script type="text/javascript">
@@ -1403,39 +1235,21 @@ $(function() {
 
 
 
-{% for field in form %}
-<b>{{ field.label_tag}}</b> {{field}}<br>
-{% endfor %}
-</font>
-<input type="hidden" name="lat_clicked" id="lat_clicked">
-<input type="hidden" name="lng_clicked" id="lng_clicked">
-<input type="hidden" name="flot_index" id="flot_index">
-<!-- will be replaced by javascript -->
-<!--Latitude: <input type="text" id="lat_input" name="lat_input" value="38.486877">
-<br>Longitude: <input type="text" id="lng_input" name="lng_input" value="-122.156418"> -->
-</form>
 
-
-<!-- <button onclick="fitBounds()">Fit all positions in map window</button>-->
-
-<!-- <font size="1">date range: 2013-08-13  13:57:16 to 2014-06-16 14:28:12</font> -->
-</div><!-- end prefs -->
-
-<br>
 
 
 <div class="section_title">MAP INFO</div>
 <div id="mouseover">
 <font size="2">
-View Type: {{view_type}}<br>
-{% if positions %} <b>Deployment Displayed: </b>{{positions.1.1}} {% endif %}
-{% if positions %} 
-<br><b>No. of Data Points Displayed (dep = {{positions.1.1}})</b>: {{positions|length}}<br>
+View Type: {{view_type}}
+{% if positions %}
+<br><b>Points Displayed for dep(s) {{deps}}</b>: {{positions|length}}
+{% if deps|length > 0 %} <br><b>Line Colors: Blue</b>: {{deps.0}}{% endif %}
+{% if deps|length > 1 %} | <b>Yellow:</b> {{deps.1}}{% endif %}
+{% if deps|length > 2 %} | <b>Green:</b> {{deps.2}}{% endif %}
+{% if deps|length > 3 %} | <b>Red:</b> {{deps.3}}{% endif %}
 {% endif %}
 
-{% if positions1 %}
-<b>No. of Data Points Displayed (dep = {{positions1.1.1}})</b>: {{positions1|length}} <br>
-{% endif %}
 <br><b>Mouseover Lat, Lon: </b> <input type="text" class="current_info" id="latlong" style="width:150px; border:1px inset black;"></span>
 <br><b>Clicked Lat, Lon: </b><input type="text" class="current_info" id="clicked_lat_lng" style="width:150px; border:1px inset black;"></span>
 <br><b>Map Bounds: <font size="1"></b><span id="bounds"></span></font>
@@ -1449,7 +1263,7 @@ View Type: {{view_type}}<br>
 
 
 
-<div class="section_title">DATA FOR CLICKED POSITION</div>
+<div class="section_title">DATA FOR MOUSED-OVER POSITION</div>
 
 <div id="clicked">
 <font size="2">
@@ -1459,23 +1273,19 @@ View Type: {{view_type}}<br>
   {% endif %}
 {% endif %}
 
-<b>Deployment ID: </b><span id="m_transmitter"></span>
-<br><b>Data Point ID: </b><span id="m_ID"></span>
+<b>Deployment ID: </b><span id="selected_point_deployment"></span>
+<br><b>Data Point ID: </b><span id="selected_point_positionID"></span>
 <br>
-<br><b>Lat, Lon: </b><span id="m_lat_lon"></span>
-<br><b>Easting, Northing, Zone: </b><span id="m_east_north"></span>
+<br><b>Lat, Lon: </b><span id="selected_point_latlon"></span>
+<br><b>Easting, Northing, Zone: </b><span id="selected_point_eastingnorthing"></span>
 <br>
-<br><b>Date & Time: </b><span id="m_date"></span>
-<br><b>Position Likelihood: </b><span id="m_likelihood"></span>
-<br><b>Animal Activity: </b><span id="m_activity"></span>
+<br><b>Date & Time: </b><span id="selected_point_date"></span>
+<br><b>Position Likelihood: </b><span id="selected_point_likelihood"></span>
+<br><b>Animal Activity: </b><span id="selected_point_activity"></span>
 
 </font>
-
 </div> <!-- end clicked -->
-
 </div> <!-- end text -->
-
-
 
 
 <!-- right side -->
@@ -1485,39 +1295,41 @@ View Type: {{view_type}}<br>
 <!-- FLOT CHART -->
 <div id="right_side">
   <div id="content">
-  <center><b><u>
+  <center>
   {% ifequal graph_data "1" %}
-  LIKELIHOOD vs. TIME
+  <b><u>LIKELIHOOD vs. TIME</u></b>
+  <br>Deployment Shown = 
+  {% if graph_dep_django%}
+  {{graph_dep_django}}
+  {% else %}
+  {{deps.0}}
+  {% endif %}
   {% endifequal %}
 
   {% ifequal graph_data "2" %}
-  ACTIVITY vs. TIME
+  <b><u>ACTIVITY vs. TIME</u></b>
+  <br>Deployment Shown =  {{graph_dep}}
   {% endifequal %}
-  
-  </u></b>
 
 <!-- <button data-index="4">Highlight 5th point</button> -->
 <button data-index="{{selected_index_large}}" id="mapsIndexSubmit" style="display: none;">Selected Index</button>
 <button data-index="{{flot_index}}" id="flotIndexSubmit" style="display: none;">Flot Index</button> 
 <!-- Google Maps clicked Index: {{selected_index_large}}
-    Flot graph Clicked Index: {{flot_index}}
--->
+    Flot graph Clicked Index: {{flot_index}} -->
 
 <!--Uncomment next line to display index, time, and data from clicking the flot chart -->
 <!-- <span id ="enablePosition2">Clicked: </span> -->
-  <!-- <p><label><input id="enablePosition2" type="checkbox" checked="checked"></input>Clicked: </label>
-  -->
+  <!-- <p><label><input id="enablePosition2" type="checkbox" checked="checked"></input>Clicked: </label>  -->
   <span id="hoverdata2"></span>
   <span id="clickdata2"></span>
-  <!-- <p><label><input id="enableTooltip2" type="checkbox" checked="checked"></input>Enable tooltip</label></p>
--->
+  <!-- <p><label><input id="enableTooltip2" type="checkbox" checked="checked"></input>Enable tooltip</label></p>  -->
 <br>
 <div id="right_side2">
 <!-- 2ND FLOT CHARTS -->
 
 <div id="content2">
   <!-- sets the width of the total container of both the main graph and the small overview graph -->
-  <div class="demo-container2" style="width:550px;">
+  <div class="demo-container2" style="width:550px; height: 200px;">
   <!-- sets the width of the main/large graph -->
   <div id="placeholder2" class="demo-placeholder" style="float:left; width:550px; height: 200px;"></div>
 
