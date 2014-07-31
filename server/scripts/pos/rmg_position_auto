@@ -47,7 +47,7 @@ for dep in dep_list:
   #get times of to-be-processed records
   cursor.execute('''SELECT ID, timestamp 
                       FROM est JOIN estscore
-                        ON est.ID = estscore.ID
+                        ON est.ID = estscore.estID
                      WHERE ID > %s AND deploymentID = %s 
                      ORDER BY timestamp ASC;''', (last_processed,dep_id))
   times = np.array(cursor.fetchall(),dtype=float)
