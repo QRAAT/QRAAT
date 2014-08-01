@@ -163,7 +163,7 @@ def get_context(request, deps=[], req_deps=[]):
                           likelihood__lte = likelihood_high_initial,
                           activity__gte = activity_low_initial,
                           activity__lte = activity_high_initial
-                          ).order_by('deploymentID')
+                          )
 
 
 
@@ -222,7 +222,7 @@ def get_context(request, deps=[], req_deps=[]):
         args = args | each_args
    
       # Query data. 
-      queried_objects = Position.objects.filter(*(args,), **kwargs).order_by('deploymentID')
+      queried_objects = Position.objects.filter(*(args,), **kwargs)
       
       for row in queried_objects:
         (lat, lon) = utm.to_latlon(float(row.easting), 
@@ -258,7 +258,10 @@ def get_context(request, deps=[], req_deps=[]):
   
   
   if flot_index == None and lat_clicked==None and lng_clicked==None:
-    graph_dep = deps[0].ID
+    if len(req_deps) > 0:
+      graph_dep = req_deps[0].ID
+    else:
+      graph_dep = deps[0].ID
 
 
 
