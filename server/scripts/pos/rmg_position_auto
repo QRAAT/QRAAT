@@ -9,7 +9,7 @@ import os, commands, sys
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
 if int(output) > 1: 
-  print >>sys.stderr, "position: error: attempted reentry, exiting"
+  print >>sys.stderr, "position_auto: error: attempted reentry, exiting"
   sys.exit(1)
 
 db_con = qraat.util.get_db('writer')
