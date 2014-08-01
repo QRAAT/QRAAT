@@ -21,11 +21,11 @@ def get_choices(deps=[]):
   return choices_list
 
 def get_deps(req_deps=[]):
-  print "YO", req_deps
   deps_list = []
   for d in req_deps:
-    deps_list.append((d.ID, d.ID))
-  print "deps_list", deps_list
+    #limits req_deps list to 4 deps
+    if len(deps_list) < 4:
+      deps_list.append((d.ID, d.ID))
   return deps_list
   
 #Fields for html form that queries and sets preferences
@@ -34,7 +34,8 @@ class Form(forms.Form):
     #self.deployment_id = depID
     super(forms.Form, self).__init__(data)
     self.fields['deployment'].choices = get_choices(deps)
-    self.fields['graph_dep'].choices = get_choices(req_deps)
+    self.fields['graph_dep'].choices = get_deps(req_deps)
+    #Use get_choices(req_deps) if don't need to limit num of selected deps
 
   #def clean_my_field(self):
   #  if len(self.clearned_data['deployment']) > 3:

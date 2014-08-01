@@ -475,16 +475,15 @@ function initialize(){
         ( (deps.length > 0) && (position_data[i][1] == deps[0]) ) ) {
     marker.setIcon('http://www.geocodezip.com/mapIcons/small_blue_dot.png')
       }
-      if ((deps.length > 1) && (position_data[i][1] == deps[1])) {
+      else if ((deps.length > 1) && (position_data[i][1] == deps[1])) {
   marker.setIcon('http://www.geocodezip.com/mapIcons/small_yellow_dot.png')
       }
-      if ((deps.length > 2) && (position_data[i][1] == deps[2])) {
+      else if ((deps.length > 2) && (position_data[i][1] == deps[2])) {
   marker.setIcon('http://www.geocodezip.com/mapIcons/small_green_dot.png')
       }
-      if ((deps.length > 3) && (position_data[i][1] == deps[3])) {
+     else  if ((deps.length > 3) && (position_data[i][1] == deps[3])) {
   marker.setIcon('http://www.geocodezip.com/mapIcons/small_red_dot.png')
       }
-
 
       var content = '<b>DeploymentID: </b>' + position_data[0][1] + 
                     '<br>' + position_data[i][8][0].toFixed(5)
@@ -629,6 +628,7 @@ function initialize(){
 // WHEN FLOT POINT IS CLICKED, add a highlight marker to the point
 
   var flot_index ={{flot_index}}; // index of data in large queried array
+  var selected_index_large ={{selected_index_large}}; // index of data in large queried array
   if (flot_index != null) {
     for (var i =0; i < selectedMarkers.length; i++) {
     selectedMarkers[i].setMap(null);
@@ -636,8 +636,8 @@ function initialize(){
     var position_data = {{pos_data|safe}};
     marker = new google.maps.Marker({
       position: new google.maps.LatLng(
-        position_data[flot_index][8][0], 
-        position_data[flot_index][8][1]),
+        position_data[selected_index_large][8][0], 
+        position_data[selected_index_large][8][1]),
       map: map,
       zIndex: google.maps.Marker.MAX_ZINDEX + 1
       // zIndex sets marker on top of all other markers
@@ -927,41 +927,48 @@ if (positions.length != 0) {
   var flot_clicked_datapoint;
 
 $(function() {
+ 
+  // Data arrays
   var d = [];
   var d1 = [];
   var d2 = [];
   var d3 = [];
   var d4 = [];
+
+  // Position data for all requested deployments
   var positions = {{pos_data|safe}};
+
   var graph_data = {{graph_data}};
   var label, min, max;
   var deps = {{deps_list}};
   var graph_data_index;
 
-  if (graph_data!=2) { 
-  //likelihood chosen, or none chosen(i.e. default deployment page)
-    graph_data_index = 6;
+  // graph_data_index specifies column in pos_data to display in Flot. 
+  if (graph_data!=2) { // likelihood (default)
+    graph_data_index = 6; 
   }
-  else if (graph_data ==2) {
+  else if (graph_data ==2) { // activity 
     graph_data_index = 7;
   }
 
-    // if ( (graph_data ==1)  ||
-    //(({{view_type|safe}} == "deployment") && (graph_data!=2)) ||
-    //( ({{view_type|safe}} == "public") && (deps.length>0) ) ) {
-    
+  // Should never NOT be null. Set even if GET request has no form data. 
   if ({{graph_dep}} != null) {
     var d1=[];
     for (var i=0; i < positions.length; i++) {    
       if (positions[i][1] == {{graph_dep}}) {
         d1.push([positions[i][2]*1000-7*60*60*1000, positions[i][graph_data_index]]);
-      } } }
-  else if (deps.length > 0) {
-    var d1=[];
-    for (var i=0; i < positions.length; i++) {    
-      if (positions[i][1] == deps[0] ) {
-        d1.push([positions[i][2]*1000-7*60*60*1000, positions[i][graph_data_index]]);
-      } } }
+      } 
+    } 
+  }
+
+//  else if (deps.length > 0) {
+//    var d1=[];
+//    for (var i=0; i < positions.length; i++) {    
+//      if (positions[i][1] == deps[0] ) {
+//        d1.push([positions[i][2]*1000-7*60*60*1000, positions[i][graph_data_index]]);
+//      } 
+//    } 
+//  }
 
 
   var data =[ { data: d1, label: "{{graph_dep}}", lines: {show:true} } ]
