@@ -129,10 +129,10 @@ function submitForm() {
 }
 
   // Show alert, called by html button. for testing purposes
-function showDjango() {
-    var selected_flot = document.getElementById("flot_index").value;
-      window.alert(selected_flot);
-}
+//function showDjango() {
+//    var selected_flot = document.getElementById("flot_index").value;
+//      window.alert(selected_flot);
+//}
 
 
 // function setCenter is not working.
@@ -245,7 +245,7 @@ function initialize(){
 
 // SHOW CLICKED DATA POINT INFO
   var django_position = {{pos_data|safe}}; // list of all queried data
-  var selected_data = {{selected_data|safe}}; // data for clicked point
+  //var selected_data = {{selected_data|safe}}; // data for clicked point
   // Note: |safe enables strings to be passed from django/json to js
 
 
@@ -254,35 +254,35 @@ function initialize(){
   // Date for fields in the db that are longer than 6 decimal places
   // are fixed to 6 decimal places. 
   
-  if (selected_data.length > 0) {
-    
-    if (selected_data[0][0] != null) {
-      document.getElementById('clicked_lat_lng').value = 
-        selected_data[0][0].toFixed(6)+', ' + // lat clicked on map
-        selected_data[0][1].toFixed(6);      // lng clicked on map
-      }
-    
-    document.getElementById('selected_point_latlon').innerHTML = 
-      selected_data[0][10][0].toFixed(6) + ', ' + // lat of actual pt in db
-      selected_data[0][10][1].toFixed(6);          // lng of point in db
-    document.getElementById('selected_point_eastingnorthing').innerHTML = 
-      selected_data[0][5] + ', ' +   // easting 
-      selected_data[0][6] + ', ' +   // northing
-      selected_data[0][7] + ' ' +    // zone number
-      selected_data[0][12];          // zone letter
-    document.getElementById('selected_point_date').innerHTML = 
-      selected_data[0][11];          // date string of timestamp
-    document.getElementById('selected_point_activity').innerHTML = 
-      selected_data[0][9].toFixed(6);  // activity
-    document.getElementById('selected_point_likelihood').innerHTML = 
-      selected_data[0][8].toFixed(6); // likelihood
-    document.getElementById('selected_point_positionID').innerHTML = 
-      selected_data[0][2];
-    document.getElementById('selected_point_deployment').innerHTML = 
-      selected_data[0][3];
-  
-  } // end if selected_data.length > 5
-
+  //if (selected_data.length > 0) {
+//    
+//    if (selected_data[0][0] != null) {
+//      document.getElementById('clicked_lat_lng').value = 
+//        selected_data[0][0].toFixed(6)+', ' + // lat clicked on map
+//        selected_data[0][1].toFixed(6);      // lng clicked on map
+//      }
+//    
+//    document.getElementById('selected_point_latlon').innerHTML = 
+//      selected_data[0][10][0].toFixed(6) + ', ' + // lat of actual pt in db
+//      selected_data[0][10][1].toFixed(6);          // lng of point in db
+//    document.getElementById('selected_point_eastingnorthing').innerHTML = 
+//      selected_data[0][5] + ', ' +   // easting 
+//      selected_data[0][6] + ', ' +   // northing
+//      selected_data[0][7] + ' ' +    // zone number
+//      selected_data[0][12];          // zone letter
+//    document.getElementById('selected_point_date').innerHTML = 
+//      selected_data[0][11];          // date string of timestamp
+//    document.getElementById('selected_point_activity').innerHTML = 
+//      selected_data[0][9].toFixed(6);  // activity
+//    document.getElementById('selected_point_likelihood').innerHTML = 
+//      selected_data[0][8].toFixed(6); // likelihood
+//    document.getElementById('selected_point_positionID').innerHTML = 
+//      selected_data[0][2];
+//    document.getElementById('selected_point_deployment').innerHTML = 
+//      selected_data[0][3];
+//  
+//  } // end if selected_data.length > 5
+//
 
 
   // Map listens for clicks on the map
@@ -304,13 +304,12 @@ function initialize(){
 
   // Index of selected point, in array of points near the click
   
-  var selected_index;
-  
-  if (typeof {{selected_index}} == 'undefined') {
-    selected_index = null;
+  var selected_index_large; 
+  if (typeof {{selected_index_large}} == 'undefined') {
+    selected_index_large = null;
   }
   else {
-    selected_index = {{selected_index_large}};
+    selected_index_large = {{selected_index_large}};
   }
 
 
@@ -318,7 +317,7 @@ function initialize(){
   // point on flot graph again. Otherwise, it would disappear after reload
   
   google.maps.event.addListener(map, 'tilesloaded', function() {
-    if (selected_index !=null) {
+    if (selected_index_large !=null) {
       document.getElementById('mapsIndexSubmit').click();
     } // end if selected_index, click hidden button that highlights flot
     if (flot_index != null) {
@@ -331,7 +330,7 @@ function initialize(){
   // Mousemove Listener to display lat, lng of mouse location
   
   google.maps.event.addListener(map,'mousemove',function(event){
-    // Note:  Use '.value' for <input> --> data appears in a box
+    // Note:  Use '.value' for <input>, then data appears in a box
     //        Use '.innerHTML' for <span>
     document.getElementById('latlong').value = 
       event.latLng.lat().toFixed(6) + ', ' + 
@@ -475,13 +474,13 @@ function initialize(){
         ( (deps.length > 0) && (position_data[i][1] == deps[0]) ) ) {
     marker.setIcon('http://www.geocodezip.com/mapIcons/small_blue_dot.png')
       }
-      else if ((deps.length > 1) && (position_data[i][1] == deps[1])) {
+      if ((deps.length > 1) && (position_data[i][1] == deps[1])) {
   marker.setIcon('http://www.geocodezip.com/mapIcons/small_yellow_dot.png')
       }
-      else if ((deps.length > 2) && (position_data[i][1] == deps[2])) {
+      if ((deps.length > 2) && (position_data[i][1] == deps[2])) {
   marker.setIcon('http://www.geocodezip.com/mapIcons/small_green_dot.png')
       }
-     else  if ((deps.length > 3) && (position_data[i][1] == deps[3])) {
+     if ((deps.length > 3) && (position_data[i][1] == deps[3])) {
   marker.setIcon('http://www.geocodezip.com/mapIcons/small_red_dot.png')
       }
 
@@ -569,8 +568,8 @@ function initialize(){
   // If valid point (corresponds to db pt) is selected on maps, display it  
   
   var selectedMarkers = new Array();
-  
-  if (selected_data.length > 0) {
+  var map_pos_index = {{map_pos_index}};
+  if (map_pos_index != null) {
     for (var i =0; i < selectedMarkers.length; i++) {
     selectedMarkers[i].setMap(null);
     }
@@ -578,8 +577,8 @@ function initialize(){
     marker = new google.maps.Marker({
       position: new google.maps.LatLng
         (
-        selected_data[0][10][0], 
-        selected_data[0][10][1]
+        position_data[map_pos_index][8][0],
+        position_data[map_pos_index][8][1]
         ),
       map: map,
       zIndex: google.maps.Marker.MAX_ZINDEX + 1
@@ -593,19 +592,19 @@ function initialize(){
 
     // Set on click infoWindow content for highlighted data marker
 
-    var content =   '<b>Data ID: </b>' + selected_data[0][2] +
-                    '<br><b>Deployment ID: </b>' + selected_data[0][3] + 
-                    '<br><b>Lat, Lon: </b> ' +
-                    selected_data[0][10][0].toFixed(6) + ', ' +
-                    selected_data[0][10][1].toFixed(6) +
-                    '<br><b>Easting, Northing, Zone: </b> ' + 
-                    selected_data[0][5] + ', ' + 
-                    selected_data[0][6] + ', ' + 
-                    selected_data[0][7] +
-                    selected_data[0][12] +
-                    '<br><b>Date/Time: </b>' + selected_data[0][11] + 
-                    '<br><b>Activity: </b>' + selected_data[0][9] +
-                    '<br><b>Likelihood: </b>' + selected_data[0][8];
+    var content =   '<b>Data ID: </b>' + position_data[map_pos_index][0] +
+      '<br><b>Deployment ID: </b>' + position_data[map_pos_index][1] + 
+          '<br><b>Lat, Lon: </b> ' +
+        position_data[map_pos_index][8][0].toFixed(6) + ', ' +
+    position_data[map_pos_index][8][1].toFixed(6) +
+      '<br><b>Easting, Northing, Zone: </b> ' + 
+        position_data[map_pos_index][3] + ', ' + 
+        position_data[map_pos_index][4] + ', ' + 
+      position_data[map_pos_index][5] +
+          position_data[map_pos_index][10] +
+      '<br><b>Date/Time: </b>' + position_data[map_pos_index][0][9] + 
+        '<br><b>Activity: </b>' + position_data[map_pos_index][0][7] +
+    '<br><b>Likelihood: </b>' + position_data[map_pos_index][6];
 
     var infoWindow = new google.maps.InfoWindow({content: content});
     
@@ -617,7 +616,7 @@ function initialize(){
         } // end event function
     ); // end click Listener
   
-  } // end if selected_data
+  } // end if map_pos_index
 
   selectedMarkers.push(marker);
 
@@ -627,9 +626,11 @@ function initialize(){
 
 // WHEN FLOT POINT IS CLICKED, add a highlight marker to the point
 
-  var flot_index ={{flot_index}}; // index of data in large queried array
-  var selected_index_large ={{selected_index_large}}; // index of data in large queried array
-  if (flot_index != null) {
+  var flot_index ={{flot_index}};
+  selected_index_large = {{selected_index_large}};
+
+
+  if (selected_index_large != null) {
     for (var i =0; i < selectedMarkers.length; i++) {
     selectedMarkers[i].setMap(null);
     }
@@ -646,19 +647,19 @@ function initialize(){
       //icon: 'http://maps.google.com/mapfiles/ms/micons/red-dot.png'
     });
     
-    var content =   '<b>Deployment ID: </b>' + selected_data[0][3] +
-                    '<br><b>Data ID: </b>' + selected_data[0][2] + 
-                    '<br><b>Lat, Lon: </b> ' +
-                    selected_data[0][10][0].toFixed(6) + ', ' +
-                    selected_data[0][10][1].toFixed(6) +
-                    '<br><b>Easting, Northing, Zone: </b> ' + 
-                    selected_data[0][5] + ', ' + 
-                    selected_data[0][6] + ', ' + 
-                    selected_data[0][7] +
-                    selected_data[0][12] +
-                    '<br><b>Date/Time: </b>' + selected_data[0][11] + 
-                    '<br><b>Activity: </b>' + selected_data[0][9] +
-                    '<br><b>Likelihood: </b>' + selected_data[0][8];
+    var content ='<b>Deployment ID: </b>' + position_data[selected_index_large][1] +
+      '<br><b>Data ID: </b>' + position_data[selected_index_large][0] + 
+      '<br><b>Lat, Lon: </b> ' +
+      position_data[selected_index_large][8][0].toFixed(6) + ', ' +
+      position_data[selected_index_large][8][1].toFixed(6) +
+      '<br><b>Easting, Northing, Zone: </b> ' + 
+      position_data[selected_index_large][3] + ', ' + 
+      position_data[selected_index_large][4] + ', ' + 
+      position_data[selected_index_large][5] +
+      position_data[selected_index_large][10] +
+      '<br><b>Date/Time: </b>' + position_data[selected_index_large][7] + 
+      '<br><b>Activity: </b>' + position_data[selected_index_large][5] +
+      '<br><b>Likelihood: </b>' + position_data[selected_index_large][4];
 
     var infoWindow = new google.maps.InfoWindow({content: content});
     
@@ -682,7 +683,7 @@ function initialize(){
 
 
 
-  // push the selected_data marker
+  // push the "clicked point"  marker
   selectedMarkers.push(marker);
 
 
@@ -942,6 +943,7 @@ $(function() {
   var label, min, max;
   var deps = {{deps_list}};
   var graph_data_index;
+  var flot_dep = {{flot_dep}};
 
   // graph_data_index specifies column in pos_data to display in Flot. 
   if (graph_data!=2) { // likelihood (default)
@@ -951,15 +953,21 @@ $(function() {
     graph_data_index = 7;
   }
 
+
   // Should never NOT be null. Set even if GET request has no form data. 
-  if ({{graph_dep}} != null) {
+  //if ({{graph_dep}} != null) {
     var d1=[];
     for (var i=0; i < positions.length; i++) {    
       if (positions[i][1] == {{graph_dep}}) {
         d1.push([positions[i][2]*1000-7*60*60*1000, positions[i][graph_data_index]]);
+        d2.push([positions[i][2]*1000-7*60*60*1000, //timestamp
+                positions[i][graph_data_index], //activity or likelihood
+                positions[i][0], // data ID
+                positions[i][1]]); // deploymentID
       } 
-    } 
-  }
+    }
+  //}
+
 
 //  else if (deps.length > 0) {
 //    var d1=[];
@@ -1083,6 +1091,7 @@ $(function() {
     clickedDateTime = item.dataIndex;
     
     document.getElementById('flot_index').value = item.dataIndex;
+    document.getElementById('flot_dep').value = d2[item.dataIndex][3];
     document.getElementById("form").submit();
   });
 
@@ -1211,6 +1220,7 @@ $(function() {
 <input type="hidden" name="lat_clicked" id="lat_clicked">
 <input type="hidden" name="lng_clicked" id="lng_clicked">
 <input type="hidden" name="flot_index" id="flot_index">
+<input type="hidden" name="flot_dep" id="flot_dep">
 </form>
 
 
@@ -1248,9 +1258,9 @@ $(function() {
 <div class="section_title">MAP INFO</div>
 <div id="mouseover">
 <font size="2">
-View Type: {{view_type}}
+<!-- View Type: {{view_type}} <br>-->
 {% if positions %}
-<br><b>Points Displayed for dep(s) {{deps}}</b>: {{positions|length}}
+<b>Points Displayed for dep(s) {{deps}}</b>: {{positions|length}}
 {% if deps|length > 0 %} <br><b>Line Colors: Blue</b>: {{deps.0}}{% endif %}
 {% if deps|length > 1 %} | <b>Yellow:</b> {{deps.1}}{% endif %}
 {% if deps|length > 2 %} | <b>Green:</b> {{deps.2}}{% endif %}
@@ -1319,7 +1329,7 @@ View Type: {{view_type}}
   {% endifequal %}
 
 <!-- <button data-index="4">Highlight 5th point</button> -->
-<button data-index="{{selected_index_large}}" id="mapsIndexSubmit" style="display: none;">Selected Index</button>
+<button data-index="{{map_dep_index}}" id="mapsIndexSubmit" style="display: none;">Selected Index</button>
 <button data-index="{{flot_index}}" id="flotIndexSubmit" style="display: none;">Flot Index</button> 
 <!-- Google Maps clicked Index: {{selected_index_large}}
     Flot graph Clicked Index: {{flot_index}} -->

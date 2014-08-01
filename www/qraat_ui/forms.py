@@ -34,7 +34,7 @@ class Form(forms.Form):
     #self.deployment_id = depID
     super(forms.Form, self).__init__(data)
     self.fields['deployment'].choices = get_choices(deps)
-    self.fields['graph_dep'].choices = get_deps(req_deps)
+    #self.fields['graph_dep'].choices = get_deps(req_deps)
     #Use get_choices(req_deps) if don't need to limit num of selected deps
 
   #def clean_my_field(self):
@@ -123,10 +123,10 @@ class Form(forms.Form):
 
   #graph data
 
-  graph_dep = forms.ChoiceField(
-            required = True,
-            label='Deployment displayed')
-    #dynamic choices based on form-checked deployments
+  #graph_dep = forms.ChoiceField(
+  #          required = True,
+  #          label='Deployment displayed')
+  #  #dynamic choices based on form-checked deployments
 
   graph_data = forms.ChoiceField(
             choices=GRAPH_CHOICES, 
