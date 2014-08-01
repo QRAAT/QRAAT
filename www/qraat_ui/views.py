@@ -91,6 +91,7 @@ def get_context(request, deps=[], req_deps=[]):
   view_type = ""
   queried_data = []
   req_deps_int = [] # dep_id's
+  req_deps_IDs = []
   #selected_data = []
   selected_message = "[ Nothing clicked, or no points detected nearby ]"
   selected_index = None
@@ -106,6 +107,13 @@ def get_context(request, deps=[], req_deps=[]):
   print "len deps", len(deps)
   print "len req_deps", len(req_deps)
  
+
+  if flot_index == None and lat_clicked==None and lng_clicked==None:
+    if len(req_deps) > 0:
+      graph_dep = req_deps[0].ID
+    else:
+      graph_dep = deps[0].ID
+
 
   if len(req_deps) > 0:
     ''' Either a dep is passed by URL, or dep(s) selected in html form'''
@@ -211,7 +219,7 @@ def get_context(request, deps=[], req_deps=[]):
       req_deps_IDs = []    
       for dep in req_deps_ID:
         if len(req_deps_IDs) < 4:
-          req_deps_IDs.append(dep)
+          req_deps_IDs.append(int(dep))
         
       print "req_depsIDs", req_deps_IDs
       args_deps = []
@@ -256,14 +264,6 @@ def get_context(request, deps=[], req_deps=[]):
   # Get clicked lat, lon from js event --> html form & convert to UTM
   
   
-  
-  if flot_index == None and lat_clicked==None and lng_clicked==None:
-    if len(req_deps) > 0:
-      graph_dep = req_deps[0].ID
-    else:
-      graph_dep = deps[0].ID
-
-
 
   if lat_clicked and lng_clicked and queried_data:    
     (easting_clicked, northing_clicked, utm_zone_number_clicked, utm_zone_letter_clicked) = utm.from_latlon(float(lat_clicked), float(lng_clicked))
@@ -286,7 +286,10 @@ def get_context(request, deps=[], req_deps=[]):
           (easting_clicked - float(f.easting))))
   
     # Get the index of the smallest distance
-    if filtered_list is not None:
+    print "filtered_list", filtered_list
+    print "selected_list", selected_list
+    if len(selected_list) >0:
+    #if filtered_list is not None and selected_list is not None:
       selected_message = ""
       selected_index = selected_list.index(min(selected_list))
       # Get the data corresponding to the selected index
@@ -359,7 +362,7 @@ def get_context(request, deps=[], req_deps=[]):
   if flot_index and flot_dep and queried_data:
     print "flot index", flot_index
     #if graph_dep == None:
-    graph_dep = deps[0].ID
+    #graph_dep = deps[0].ID
     graph_dep = flot_dep
     #find the deployment of the selected point in flot
 
@@ -415,6 +418,8 @@ def get_context(request, deps=[], req_deps=[]):
             'deps_list': json.dumps(req_deps_int),
             
             'deps': req_deps_int,
+
+            'deps_limit4': req_deps_IDs,
             
             #plot & related data
             'pos_data': json.dumps(queried_data),

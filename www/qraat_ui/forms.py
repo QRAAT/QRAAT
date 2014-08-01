@@ -5,10 +5,12 @@ from qraat_ui.models import Site, Deployment, Position
 from django.shortcuts import render, redirect
 
 # Select position or track data.
-DATA_CHOICES = [('1', 'Position'), ('2', 'Track')]
+DATA_CHOICES = [('1', 'Position')]
+#DATA_CHOICES = [('1', 'Position'), ('2', 'Track')]
 
 # Display data points as lines or as marker points.
-DISPLAY_CHOICES = [('1', 'Points'), ('2', 'Lines')]
+DISPLAY_CHOICES = [('1', 'Points')]
+#DISPLAY_CHOICES = [('1', 'Points'), ('2', 'Lines')]
 
 # Select whether the graph shows Likelihood or Activity data.
 GRAPH_CHOICES = [('1', 'Likelihood'), ('2', 'Activity')]
@@ -47,7 +49,7 @@ class Form(forms.Form):
             #widget = forms.SelectMultiple(), #hold down CTRL to select all
             widget = forms.CheckboxSelectMultiple(),
             required = True,
-            label = 'Deployment IDs (check maximum of 4)')
+            label = 'Deployment IDs (displays first 4)')
             #Note: initial doesn't work. it sets choices to '6' and '3'
             #In views.py: instance_of_form.fields['deployment'].initial = ['63']
  
@@ -79,7 +81,7 @@ class Form(forms.Form):
             widget = forms.TextInput(attrs={
               'class': 'filter',
               'size': '17'}),
-            initial="2014-07-17 13:57:16")
+            initial="2014-08-01 12:00:00")
   
   datetime_to = forms.DateTimeField(
             required = True, 
@@ -87,7 +89,7 @@ class Form(forms.Form):
             widget = forms.TextInput(attrs={
               'class': 'filter',
               'size': '17'}),
-            initial="2014-07-20 21:28:12")
+            initial="2014-08-01 17:00:00")
   
   likelihood_low = forms.FloatField(
             required=True, 

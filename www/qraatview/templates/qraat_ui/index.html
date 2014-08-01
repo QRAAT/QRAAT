@@ -483,7 +483,7 @@ function initialize(){
      if ((deps.length > 3) && (position_data[i][1] == deps[3])) {
   marker.setIcon('http://www.geocodezip.com/mapIcons/small_red_dot.png')
       }
-
+  
       var content = '<b>DeploymentID: </b>' + position_data[0][1] + 
                     '<br>' + position_data[i][8][0].toFixed(5)
                     + ', ' + position_data[i][8][1].toFixed(5)+
@@ -566,7 +566,8 @@ function initialize(){
 
 // WHEN MAP IS CLICKED, display another marker there to highlight point
   // If valid point (corresponds to db pt) is selected on maps, display it  
-  
+  //FIXME: The following section could probably be consolidated so that when EITHER flot OR map is clicked, the same chunk of code for marker = new google.maps.Marker.... is used. The only difference appears to be the indexes: map_pos_index vs selected_index_large.
+
   var selectedMarkers = new Array();
   var map_pos_index = {{map_pos_index}};
   if (map_pos_index != null) {
@@ -592,8 +593,8 @@ function initialize(){
 
     // Set on click infoWindow content for highlighted data marker
 
-    var content =   '<b>Data ID: </b>' + position_data[map_pos_index][0] +
-      '<br><b>Deployment ID: </b>' + position_data[map_pos_index][1] + 
+    var content =   '<b>Data ID: </b>' + position_data[map_pos_index][1] +
+      '<br><b>Deployment ID: </b>' + position_data[map_pos_index][0] + 
           '<br><b>Lat, Lon: </b> ' +
         position_data[map_pos_index][8][0].toFixed(6) + ', ' +
     position_data[map_pos_index][8][1].toFixed(6) +
@@ -601,9 +602,9 @@ function initialize(){
         position_data[map_pos_index][3] + ', ' + 
         position_data[map_pos_index][4] + ', ' + 
       position_data[map_pos_index][5] +
-          position_data[map_pos_index][10] +
-      '<br><b>Date/Time: </b>' + position_data[map_pos_index][0][9] + 
-        '<br><b>Activity: </b>' + position_data[map_pos_index][0][7] +
+          position_data[map_pos_index][9] +
+      '<br><b>Date/Time: </b>' + position_data[map_pos_index][10] + 
+        '<br><b>Activity: </b>' + position_data[map_pos_index][7] +
     '<br><b>Likelihood: </b>' + position_data[map_pos_index][6];
 
     var infoWindow = new google.maps.InfoWindow({content: content});
@@ -656,10 +657,10 @@ function initialize(){
       position_data[selected_index_large][3] + ', ' + 
       position_data[selected_index_large][4] + ', ' + 
       position_data[selected_index_large][5] +
-      position_data[selected_index_large][10] +
-      '<br><b>Date/Time: </b>' + position_data[selected_index_large][7] + 
-      '<br><b>Activity: </b>' + position_data[selected_index_large][5] +
-      '<br><b>Likelihood: </b>' + position_data[selected_index_large][4];
+      position_data[selected_index_large][9] +
+      '<br><b>Date/Time: </b>' + position_data[selected_index_large][10] + 
+      '<br><b>Activity: </b>' + position_data[selected_index_large][7] +
+      '<br><b>Likelihood: </b>' + position_data[selected_index_large][6];
 
     var infoWindow = new google.maps.InfoWindow({content: content});
     
@@ -981,7 +982,7 @@ $(function() {
 
   var data =[ { data: d1, label: "{{graph_dep}}", lines: {show:true} } ]
   
-  var color = ["#8383FF", "yellow", "green", "red"]
+  var color = ["#8383FF", "yellow", "green", "#B00000"]
 
   for (i=0; i < deps.length; i++) {
     if ({{graph_dep}} == deps[i]) { var colorIndex = i; }
@@ -1260,15 +1261,15 @@ $(function() {
 <font size="2">
 <!-- View Type: {{view_type}} <br>-->
 {% if positions %}
-<b>Points Displayed for dep(s) {{deps}}</b>: {{positions|length}}
+<b>No. of points displayed for dep(s) {{deps_limit4}}</b>: {{positions|length}}
 {% if deps|length > 0 %} <br><b>Line Colors: Blue</b>: {{deps.0}}{% endif %}
 {% if deps|length > 1 %} | <b>Yellow:</b> {{deps.1}}{% endif %}
 {% if deps|length > 2 %} | <b>Green:</b> {{deps.2}}{% endif %}
 {% if deps|length > 3 %} | <b>Red:</b> {{deps.3}}{% endif %}
-{% endif %}
+<br>{% endif %}
 
-<br><b>Mouseover Lat, Lon: </b> <input type="text" class="current_info" id="latlong" style="width:150px; border:1px inset black;"></span>
-<br><b>Clicked Lat, Lon: </b><input type="text" class="current_info" id="clicked_lat_lng" style="width:150px; border:1px inset black;"></span>
+<b>Mouseover Lat, Lon: </b> <input type="text" class="current_info" id="latlong" style="width:150px; border:1px inset black;"></span>
+<!--<br><b>Clicked Lat, Lon: </b>--><input type="hidden" class="current_info" id="clicked_lat_lng" style="width:150px; border:1px inset black;"></span>
 <br><b>Map Bounds: <font size="1"></b><span id="bounds"></span></font>
 <br><b>Map Center: </b><span id="current_center"></span>
 <br><b>Map Zoom: </b><span id="current_zoom"></span>
