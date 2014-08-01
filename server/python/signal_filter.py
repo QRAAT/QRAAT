@@ -1404,7 +1404,7 @@ def read_est_records_time_range(db_con, start, end, siteid, txid):
 	rows = None
 
 	field_string = ', '.join(fields)
-	q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s and siteid = %s and txid = %s;'.format(field_string, siteid, txid)
+	q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s and siteid = %s and deploymentid = %s;'.format(field_string, siteid, txid)
 	rows = cur.execute(q.format(field_string), (start, end))
 	
 	site_data = {}
@@ -1726,10 +1726,9 @@ def get_cursor_value(handler, name):
 # Inserts (with a fallback to update) the cursor with the specified name and
 # value.
 def update_cursor_value(handler, name, value):
-	q = 'insert into `cursor` (name, value) VALUES (%s, %s) ON DUPLICATE KEY UPDATE value = %s'
 	db_con = handler.obj
 	cur = db_con.cursor()
-	rows = cur.execute(q, (name, value, value))
+	rows = cur.execute('UPDATE cursor SET value=%s WHERE name=%s' , (value, name))
 	debug_print ('Update cursor "{}" returns: {}'.format(name, rows))
 
 # Returns number of rows matching. Hoping for zero.

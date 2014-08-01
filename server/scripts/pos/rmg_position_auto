@@ -97,5 +97,5 @@ for dep in dep_list:
     max_id = temp_max_id
 
 #store id of last processed record
-if not max_id == last_processed:
+if max_id > last_processed:
   cursor.execute("UPDATE qraat.cursor SET value=%s WHERE name='position'", (max_id,))
