@@ -232,11 +232,11 @@ def get_context(request, deps=[], req_deps=[]):
       print "req_dep_ids", req_deps_IDs
       if len(req_deps_IDs) > 0:
         dep0_count = queried_objects.filter(deploymentID=req_deps_IDs[0]).count()
-      
+        print "dep0_count", dep0_count
+
       if len(req_deps_IDs) > 1:
         dep1_count = queried_objects.filter(deploymentID=req_deps_IDs[1]).count()
-      print "dep0_count", dep0_count
-      print "dep1_count", dep1_count
+        print "dep1_count", dep1_count
       
 
       '''if len(req_deps_int) > 0:
