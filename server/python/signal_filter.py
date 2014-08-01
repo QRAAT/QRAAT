@@ -270,7 +270,7 @@ class Registry:
 		#print 'I think there are {} good points, like: {}'.format(len(good_point_ids), good_point_ids[:10])
 		bad_ids = bad_point_map.keys()
 		#print 'bad ids ({}): {}'.format(len(bad_ids), bad_ids[:10])
-		if len(bad_ids) > 0: print 'type is:', bad_ids[0].__class__
+		#if len(bad_ids) > 0: print 'type is:', bad_ids[0].__class__
 		#good_ids = [x[0] for x in points if x[0] not in bad_ids]
 
 		good_point_data, bad_point_data = [], []
@@ -322,8 +322,8 @@ class Registry:
 			if point['ID'] not in counts.keys():
 				good_points.append(point)
 		#print '|counts| = {}'.format(len(counts))
-		for (k, v) in counts.items()[:10]:
-			print 'count {} -> {}'.format(k, v)
+		#for (k, v) in counts.items()[:10]:
+		#	print 'count {} -> {}'.format(k, v)
 		return counts, good_points
 
 
@@ -1680,9 +1680,11 @@ def insert_scores(change_handler, scores, update_as_needed=False, update_set=set
           deletes.append(str(est_id))
           inserts.append((est_id, score, _rel_score(score)))
 
+        print 'signal_filter: Inserting %d scores.' % len(inserts)
         cur = db_con.cursor()
-        cur.execute('DELETE FROM estscore WHERE estID IN ({})'.format(
-                            ', '.join(deletes)))
+        if len(deletes) > 0:
+          cur.execute('DELETE FROM estscore WHERE estID IN ({})'.format(
+                              ', '.join(deletes)))
 	cur.executemany(INSERT_TEMPLATE, inserts)
 
 class NotAllSameValueError(Exception):
@@ -1715,6 +1717,8 @@ def get_cursor_value(handler, name):
 	rows = cur.execute(q, (name,))
 	if rows == 0:
 		# Default value
+		cur.execute('''INSERT INTO cursor (name, value) 
+                                     VALUE ('estscore', 0)''')
 		return 0
 	elif rows == 1:
 		r = cur.fetchone()
@@ -1728,7 +1732,7 @@ def get_cursor_value(handler, name):
 def update_cursor_value(handler, name, value):
 	db_con = handler.obj
 	cur = db_con.cursor()
-	rows = cur.execute('UPDATE cursor SET value=%s WHERE name=%s' , (value, name))
+	rows = cur.execute('UPDATE `cursor` SET value=%s WHERE name=%s' , (value, name))
 	debug_print ('Update cursor "{}" returns: {}'.format(name, rows))
 
 # Returns number of rows matching. Hoping for zero.

@@ -105,9 +105,9 @@ try:
       qraat.srv.signal_filter.score(l)
       qraat.srv.signal_filter.update_cursor_value(change_handler, 'estscore', max(l))
     
-except mdb.Error, e:
-  print >>sys.stderr, "filter_auto: error: [%d] %s" % (e.args[0], e.args[1])
-  sys.exit(1)
+#except mdb.Error, e:
+#  print >>sys.stderr, "filter_auto: error: [%d] %s" % (e.args[0], e.args[1])
+#  sys.exit(1)
 
 except qraat.error.QraatError, e:
   print >>sys.stderr, "filter_auto: error: %s." % e
