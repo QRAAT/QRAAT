@@ -475,16 +475,15 @@ function initialize(){
         ( (deps.length > 0) && (position_data[i][1] == deps[0]) ) ) {
     marker.setIcon('http://www.geocodezip.com/mapIcons/small_blue_dot.png')
       }
-      if ((deps.length > 1) && (position_data[i][1] == deps[1])) {
+      else if ((deps.length > 1) && (position_data[i][1] == deps[1])) {
   marker.setIcon('http://www.geocodezip.com/mapIcons/small_yellow_dot.png')
       }
-      if ((deps.length > 2) && (position_data[i][1] == deps[2])) {
+      else if ((deps.length > 2) && (position_data[i][1] == deps[2])) {
   marker.setIcon('http://www.geocodezip.com/mapIcons/small_green_dot.png')
       }
-      if ((deps.length > 3) && (position_data[i][1] == deps[3])) {
+     else  if ((deps.length > 3) && (position_data[i][1] == deps[3])) {
   marker.setIcon('http://www.geocodezip.com/mapIcons/small_red_dot.png')
       }
-
 
       var content = '<b>DeploymentID: </b>' + position_data[0][1] + 
                     '<br>' + position_data[i][8][0].toFixed(5)

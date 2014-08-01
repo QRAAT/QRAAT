@@ -75,20 +75,15 @@ def get_context(request, deps=[], req_deps=[]):
     lng_clicked = None
 
 
-    #Site locations
+  #Site locations
   sites = []
   for s in Site.objects.all():
     sites.append((
       s.ID, s.name, s.location, float(s.latitude), float(s.longitude), 
       float(s.easting), float(s.northing), s.utm_zone_number, 
       s.utm_zone_letter, float(s.elevation)))
-  #print 'deps', deps[0].ID
-  #print 'req_deps', req_deps[0].ID
-  print "req___deps", req_deps
   index_form = Form(deps=deps, req_deps=req_deps, data=request.GET or None)
   
-  #Note: can change database by using "db_selected = Position"
-
   view_type = ""
   queried_data = []
   req_deps_int = []
@@ -174,10 +169,6 @@ def get_context(request, deps=[], req_deps=[]):
           float(q.likelihood), float(q.activity), (lat, lon), 
           q.utm_zone_letter, date_string))
 
-      queried_data_ids = [int(x[0]) for x in queried_data]
-      selected_dep_start = queried_data_ids.index(64)
-      print "dep starts", selected_dep_start
-
       # Note: To pass strings to js using json, use |safe in template.
     
     else: 
@@ -187,12 +178,8 @@ def get_context(request, deps=[], req_deps=[]):
       req_deps_list = req_deps.values_list('ID', flat=True)    
       for dep in req_deps_list:
         req_deps_int.append(int(dep))
-      print req_deps_int
-
-      print datetime_from, datetime_to, likelihood_low, likelihood_high, activity_low, activity_high
       
       kwargs = {}
-      #kwargs['deploymentID'] = '63'
       if datetime_from:
         kwargs['timestamp__gte'] =  float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) ) + 7*60*60
       if datetime_to:
@@ -206,7 +193,17 @@ def get_context(request, deps=[], req_deps=[]):
       if activity_high:
         kwargs['activity__lte'] = activity_high
     
-      req_deps_IDs = req_deps.values_list('ID', flat=True)
+      ''' FIXME. This limits the list of req_deps to 4, otherwise the points
+      will display as the large default google maps markers.'''
+      req_deps_ID = req_deps.values_list('ID', flat=True)
+      #uncomment to stop limiting list to 4
+      #req_deps_IDs = req_deps.values_list('ID', flat=True)
+      #Delete the following 4 lines to stop limiting the list 
+      req_deps_IDs = []    
+      for dep in req_deps_ID:
+        if len(req_deps_IDs) < 4:
+          req_deps_IDs.append(dep)
+        
       print "req_depsIDs", req_deps_IDs
       args_deps = []
       for dep in req_deps_IDs:
@@ -214,8 +211,6 @@ def get_context(request, deps=[], req_deps=[]):
       args = Q()
       for each_args in args_deps:
         args = args | each_args
-      #print "req_deps_IDs", req_deps_IDs
-      print "args", args
    
       queried_objects = Position.objects.filter(*(args,), **kwargs).order_by('deploymentID')
       for row in queried_objects:
@@ -231,22 +226,37 @@ def get_context(request, deps=[], req_deps=[]):
           float(row.likelihood), float(row.activity), (lat, lon), 
           row.utm_zone_letter, date_string))
        
-      
-      queried_data_ids = [int(x[1]) for x in queried_data]
-      
-      if len(req_deps_int) > 0:
-        selected_dep_start0 = queried_data_ids.index(req_deps_int[0])
-        print "dep starts no GET", selected_dep_start0
-      if len(req_deps_int) > 1:
-        selected_dep_start1 = queried_data_ids.index(req_deps_int[1])
-        print "dep starts no GET", selected_dep_start1 
-      if len(req_deps_int) > 2:
-        selected_dep_start2 = queried_data_ids.index(req_deps_int[2])
-        print "dep starts no GET", selected_dep_start2 
-
      
-      print "len queried", len(queried_data) 
+      '''Find index of the first instance of each transmitter'''
+      queried_data_ids = [int(x[1]) for x in queried_data]
+      print "req_dep_ids", req_deps_IDs
+      if len(req_deps_IDs) > 0:
+        dep0_count = queried_objects.filter(deploymentID=req_deps_IDs[0]).count()
       
+      if len(req_deps_IDs) > 1:
+        dep1_count = queried_objects.filter(deploymentID=req_deps_IDs[1]).count()
+      print "dep0_count", dep0_count
+      print "dep1_count", dep1_count
+      
+
+      '''if len(req_deps_int) > 0:
+        try:
+          selected_dep_start0 = queried_data_ids.index(req_deps_int[0])
+          print "dep starts no GET", selected_dep_start0
+        except:
+          selected_dep_start0 = None
+      if len(req_deps_int) > 1:
+        try:
+          selected_dep_start1 = queried_data_ids.index(req_deps_int[1])
+          print "dep starts no GET", selected_dep_start1 
+        except:
+          selected_dep_start1 = selected_dep_start0
+      if len(req_deps_int) > 2:
+        try:
+          selected_dep_start2 = queried_data_ids.index(req_deps_int[2])
+          print "dep starts no GET", selected_dep_start2 
+        except:
+          selected_dep_start2 = selected_dep_start1 '''
       ''' For reference, the obsolete hardcoded query:
       pos_query = Position.objects.filter(
                           deploymentID = req_deps[0].ID,
@@ -257,10 +267,10 @@ def get_context(request, deps=[], req_deps=[]):
                           activity__gte = activity_low,
                           activity__lte = activity_high) '''
   
-#FIXME: Can remove this when nearest point on map is calculated in js.
-  # Get clicked lat, lon from js event --> html form & convert to UTM
+
+  '''FIXME: Can remove this AJAX or JS function calls between maps and flot are worked out. Calculate the nearest point on map in JS (see example code in the polyline section in index.html '''
+  #Get clicked lat, lon from js event --> html form & convert to UTM
   if queried_data and lat_clicked and lng_clicked:    
-    print "----------if anything is clicked"
     (easting_clicked, northing_clicked, utm_zone_number_clicked, utm_zone_letter_clicked) = utm.from_latlon(float(lat_clicked), float(lng_clicked))
 
   # Truncate northing and easting for the query
@@ -319,7 +329,6 @@ def get_context(request, deps=[], req_deps=[]):
           # Populate selected_data list with data based on index
           # FIXME could probably be changed to work the large list of data
   if flot_index:
-    print "-------- if flot selected"
     print "flot index", flot_index
     if graph_dep == None:
       graph_dep = req_deps[0].ID
