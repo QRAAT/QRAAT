@@ -98,7 +98,7 @@
             
             <!-- joins on the table values from foreign_keys -->
             {% for foreign_field in foreign_fields %}
-             {% with obj=objects.0|get_attr:foreign_field %}
+             {% with obj=object|get_attr:foreign_field %}
 
                 {% for field in obj|get_fields %}
                     {% if field.name not in excluded_fields and field.name not in foreign_fields %}
