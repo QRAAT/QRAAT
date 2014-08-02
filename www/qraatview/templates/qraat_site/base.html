@@ -20,7 +20,7 @@
         <div id="container" class="container">
             {% block topbar %}
                 <nav class="navbar" role="navigation">
-                    <div class="container-fluid">
+                    <div class="nav nav-inner">
                         <div class="navbar-header">
                             <a class="navbar-brand" href={% url 'index' %}>Qraat</a>
                         </div>
@@ -30,17 +30,19 @@
                         <li><a href={% url nav_option.url %}>{{nav_option.name}}</a></li>
                         {% endfor %}
                         </ul>
-                        <div class="dropdown navbar-right">
-                            {% if user.is_authenticated %}
-                            <a class="dropdown-toggle" href="#" data-toggle="dropdown">{{user}} <span class="caret"> </span></a>
-                            <ul class="dropdown-menu" role="menu">
-                                <li><a href={% url 'auth:user-account' %}>Account</a></li>
-                                <li><a href={% url 'auth:logout' %}>Logout</a></li>
-                            </ul>
-                            {% else %}
-                                <a href="/auth/login">Sign in</a>
-                            {% endif %}
-                        </div>
+                        <ul class="nav navbar-nav navbar-right dropdown" role="navigation">
+                            <li>
+                                {% if user.is_authenticated %}
+                                <a class="dropdown-toggle" href="#" data-toggle="dropdown">{{user}} <span class="caret"> </span></a>
+                                <ul class="dropdown-menu" role="menu">
+                                    <li><a href={% url 'auth:user-account' %}>Account</a></li>
+                                    <li><a href={% url 'auth:logout' %}>Logout</a></li>
+                                </ul>
+                                {% else %}
+                                    <a href="/auth/login">Sign in</a>
+                                {% endif %}
+                            </li>
+                        </ul>
                     </div>
                 </nav>
             {% endblock %}
