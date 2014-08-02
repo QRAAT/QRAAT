@@ -96,7 +96,7 @@ class Form(forms.Form):
             label="Likelihood Lowest", 
             widget = forms.TextInput(attrs={
               'class': 'filter',
-              'size': '5'}),
+              'size': '10'}),
             initial=15.0)
   
   likelihood_high = forms.FloatField(
@@ -104,7 +104,7 @@ class Form(forms.Form):
             label="Highest", 
             widget = forms.TextInput(attrs={
               'class': 'filter',
-              'size': '5'}),
+              'size': '10'}),
             initial=2000.0)
   
   activity_low = forms.FloatField(
@@ -112,7 +112,7 @@ class Form(forms.Form):
             label="Activity Lowest", 
             widget = forms.TextInput(attrs={
               'class': 'filter',
-              'size': '5'}),
+              'size': '10'}),
             initial=0.0)
   
   activity_high = forms.FloatField(
@@ -120,7 +120,7 @@ class Form(forms.Form):
             label="Highest", 
             widget = forms.TextInput(attrs={
               'class': 'filter',
-              'size': '5'}),
+              'size': '10'}),
             initial=2.0)
 
   #graph data

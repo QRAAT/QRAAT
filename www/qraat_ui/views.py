@@ -138,7 +138,15 @@ def get_context(request, deps=[], req_deps=[]):
                                     ['timestamp__max'] )
       datetime_to_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                   time.localtime(float(datetime_to_initial-7*60*60)))
-      datetime_from_initial = float(datetime_to_initial - 86400.00) #-24 hrs
+    
+      datetime_from_min_initial = float( dep_query.aggregate(
+                              Min('timestamp'))['timestamp__min'] )
+      datetime_from_day_initial = float(datetime_to_initial - 86400.00) 
+        # minus 24 hrs
+      if datetime_from_day_initial < datetime_from_min_initial:
+        datetime_from_initial = datetime_from_min_initial
+      else:
+        datetime_from_initial = datetime_from_day_initial
       datetime_from_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                   time.localtime(float(datetime_from_initial-7*60*60)))
 

@@ -371,7 +371,7 @@ function initialize(){
 
 
   // Show site markers if site is checked in preferences
-  if (site_checked ==1) {
+  if ((site_checked ==1) || ({{view_type|safe}} == "deployment")) {
     for (var i = 0; i < site_list.length; i++) {
       locations.push([
         site_list[i][3],  // [0]: site location lat
@@ -1182,7 +1182,7 @@ $(function() {
 <!-- <button onclick="showDjango()">Show Django</button> -->
 
 <center>
-<div id="page_title"><a href='/ui/'>QRAAT DATA</a></div>
+<div id="page_title"><!--<a href='/ui/'>-->QRAAT DATA<!-- </a>--></div>
  <!--onclick='initialize(38.487828027, -122.149419006, 14);'-->
 <!-- <a href="index.html" target="export">Export view as .kml</a><br>-->
 </center>
@@ -1261,12 +1261,14 @@ $(function() {
 <font size="2">
 <!-- View Type: {{view_type}} <br>-->
 {% if positions %}
-<b>No. of points displayed for dep(s) {{deps_limit4}}</b>: {{positions|length}}
-{% if deps|length > 0 %} <br><b>Line Colors: Blue</b>: {{deps.0}}{% endif %}
-{% if deps|length > 1 %} | <b>Yellow:</b> {{deps.1}}{% endif %}
+<b>No. of points displayed</b>: {{positions|length}}
+
+{% if deps|length > 1 %} <br><b>Line Colors: Blue</b>: {{deps.0}} | <b>Yellow:</b> {{deps.1}}{% endif %}
 {% if deps|length > 2 %} | <b>Green:</b> {{deps.2}}{% endif %}
 {% if deps|length > 3 %} | <b>Red:</b> {{deps.3}}{% endif %}
-<br>{% endif %}
+<br>
+
+{% endif %} <!-- endif for positions -->
 
 <b>Mouseover Lat, Lon: </b> <input type="text" class="current_info" id="latlong" style="width:150px; border:1px inset black;"></span>
 <!--<br><b>Clicked Lat, Lon: </b>--><input type="hidden" class="current_info" id="clicked_lat_lng" style="width:150px; border:1px inset black;"></span>
@@ -1314,21 +1316,25 @@ $(function() {
 <div id="right_side">
   <div id="content">
   <center>
-  {% ifequal graph_data "1" %}
+  {% if graph_data == "1" or graph_data == "null" %}
   <b><u>LIKELIHOOD vs. TIME</u></b>
   <br>Deployment Shown = 
-  {% if graph_dep_django%}
+  {% if graph_dep_django %}
   {{graph_dep_django}}
   {% else %}
   {{deps.0}}
   {% endif %}
-  {% endifequal %}
 
-  {% ifequal graph_data "2" %}
+  {% endif %}
+
+  
+
+  {% if graph_data == "2" %}
   <b><u>ACTIVITY vs. TIME</u></b>
   <br>Deployment Shown =  {{graph_dep}}
-  {% endifequal %}
+  {% endif %}
 
+  
 <!-- <button data-index="4">Highlight 5th point</button> -->
 <button data-index="{{map_dep_index}}" id="mapsIndexSubmit" style="display: none;">Selected Index</button>
 <button data-index="{{flot_index}}" id="flotIndexSubmit" style="display: none;">Flot Index</button> 
@@ -1347,9 +1353,9 @@ $(function() {
 
 <div id="content2">
   <!-- sets the width of the total container of both the main graph and the small overview graph -->
-  <div class="demo-container2" style="width:550px; height: 200px;">
+  <div class="demo-container2" style="width:650px; height: 200px;">
   <!-- sets the width of the main/large graph -->
-  <div id="placeholder2" class="demo-placeholder" style="float:left; width:550px; height: 200px;"></div>
+  <div id="placeholder2" class="demo-placeholder" style="float:left; width:650px; height: 200px;"></div>
 
 <!-- uncomment next line for small overview graph -->
 <!--   <div id="overview" class="demo-placeholder" style="float: right; width: 100px; height: 125px;"></div> -->
