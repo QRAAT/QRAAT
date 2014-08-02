@@ -51,10 +51,10 @@ def get_context(request, deps=[], req_deps=[]):
     graph_data = int(request.GET['graph_data'])
   else:
     graph_data = None
-  if 'graph_dep' in request.GET and request.GET['graph_dep'] != "":
-    graph_dep = int(request.GET['graph_dep'])
-  elif len(deps) > 0: 
-    graph_dep = deps[0].ID
+  #if 'graph_dep' in request.GET and request.GET['graph_dep'] != "":
+  #  graph_dep = int(request.GET['graph_dep'])
+  #elif len(deps) > 0: 
+  #  graph_dep = deps[0].ID
   if 'display_type' in request.GET and request.GET['display_type'] != "":
     display_type = int(request.GET['display_type'])
   else:
@@ -65,6 +65,10 @@ def get_context(request, deps=[], req_deps=[]):
     flot_index = int(request.GET['flot_index'])
   else:
     flot_index = None
+  if 'flot_dep' in request.GET and request.GET['flot_dep'] !="":
+    flot_dep = int(request.GET['flot_dep'])
+  else:
+    flot_dep = None
   if ('lat_clicked' in request.GET) and (request.GET['lat_clicked'] != ""):
     lat_clicked = request.GET['lat_clicked']
   else:
@@ -87,12 +91,13 @@ def get_context(request, deps=[], req_deps=[]):
   view_type = ""
   queried_data = []
   req_deps_int = [] # dep_id's
-  selected_data = []
+  req_deps_IDs = []
+  #selected_data = []
   selected_message = "[ Nothing clicked, or no points detected nearby ]"
   selected_index = None
   selected_index_large = None
-  
-  
+  map_dep_index = None
+  map_pos_index = None 
   # If only one dep is in the list of all deps, the view type is deployment.
   # FIXME arbitrary sets of deployments, not dependent on public or private. 
   if len(deps) != 1:
@@ -102,6 +107,13 @@ def get_context(request, deps=[], req_deps=[]):
   print "len deps", len(deps)
   print "len req_deps", len(req_deps)
  
+
+  if flot_index == None and lat_clicked==None and lng_clicked==None:
+    if len(req_deps) > 0:
+      graph_dep = req_deps[0].ID
+    else:
+      graph_dep = deps[0].ID
+
 
   if len(req_deps) > 0:
     ''' Either a dep is passed by URL, or dep(s) selected in html form'''
@@ -159,7 +171,8 @@ def get_context(request, deps=[], req_deps=[]):
                           likelihood__lte = likelihood_high_initial,
                           activity__gte = activity_low_initial,
                           activity__lte = activity_high_initial
-                          ).order_by('deploymentID')
+                          )
+
 
 
       for q in queried_objects:
@@ -206,7 +219,7 @@ def get_context(request, deps=[], req_deps=[]):
       req_deps_IDs = []    
       for dep in req_deps_ID:
         if len(req_deps_IDs) < 4:
-          req_deps_IDs.append(dep)
+          req_deps_IDs.append(int(dep))
         
       print "req_depsIDs", req_deps_IDs
       args_deps = []
@@ -217,7 +230,7 @@ def get_context(request, deps=[], req_deps=[]):
         args = args | each_args
    
       # Query data. 
-      queried_objects = Position.objects.filter(*(args,), **kwargs).order_by('deploymentID')
+      queried_objects = Position.objects.filter(*(args,), **kwargs)
       
       for row in queried_objects:
         (lat, lon) = utm.to_latlon(float(row.easting), 
@@ -233,36 +246,6 @@ def get_context(request, deps=[], req_deps=[]):
           row.utm_zone_letter, date_string))
        
      
-      '''Find index of the first instance of each transmitter'''
-      queried_data_ids = [int(x[1]) for x in queried_data]
-      print "req_dep_ids", req_deps_IDs
-      if len(req_deps_IDs) > 0:
-        dep0_count = queried_objects.filter(deploymentID=req_deps_IDs[0]).count()
-        print "dep0_count", dep0_count
-      
-      if len(req_deps_IDs) > 1:
-        dep1_count = queried_objects.filter(deploymentID=req_deps_IDs[1]).count()
-        print "dep1_count", dep1_count
-      
-
-      '''if len(req_deps_int) > 0:
-        try:
-          selected_dep_start0 = queried_data_ids.index(req_deps_int[0])
-          print "dep starts no GET", selected_dep_start0
-        except:
-          selected_dep_start0 = None
-      if len(req_deps_int) > 1:
-        try:
-          selected_dep_start1 = queried_data_ids.index(req_deps_int[1])
-          print "dep starts no GET", selected_dep_start1 
-        except:
-          selected_dep_start1 = selected_dep_start0
-      if len(req_deps_int) > 2:
-        try:
-          selected_dep_start2 = queried_data_ids.index(req_deps_int[2])
-          print "dep starts no GET", selected_dep_start2 
-        except:
-          selected_dep_start2 = selected_dep_start1 '''
       ''' For reference, the obsolete hardcoded query:
       pos_query = Position.objects.filter(
                           deploymentID = req_deps[0].ID,
@@ -276,16 +259,19 @@ def get_context(request, deps=[], req_deps=[]):
 
   '''FIXME: Can remove this AJAX or JS function calls between maps and flot are worked out. Calculate the nearest point on map in JS (see example code in the polyline section in index.html '''
   
-  ## Point on map ################################
-  # FIXME Clicking on points on map or flot. This should be done in Javascript? 
+  ## Clicking Point on map ################################
+  # FIXME This should be done in Javascript? 
   # Get clicked lat, lon from js event --> html form & convert to UTM
-  if queried_data and lat_clicked and lng_clicked:    
+  
+  
+
+  if lat_clicked and lng_clicked and queried_data:    
     (easting_clicked, northing_clicked, utm_zone_number_clicked, utm_zone_letter_clicked) = utm.from_latlon(float(lat_clicked), float(lng_clicked))
 
     # Truncate northing and easting for the query
     # Divide by 10 (click needs to be closer) or 100 (less accurate) to increase the distance allowed between the clicked point and the actual point
-    northing_clicked_trunc = (int(northing_clicked))/1000
-    easting_clicked_trunc = (int(easting_clicked))/1000
+    northing_clicked_trunc = (int(northing_clicked))/100
+    easting_clicked_trunc = (int(easting_clicked))/100
 
     # Query the data that matches the northing and easting 
     filtered_list = queried_objects.filter(
@@ -300,20 +286,49 @@ def get_context(request, deps=[], req_deps=[]):
           (easting_clicked - float(f.easting))))
   
     # Get the index of the smallest distance
-    if filtered_list is not None:
+    print "filtered_list", filtered_list
+    print "selected_list", selected_list
+    if len(selected_list) >0:
+    #if filtered_list is not None and selected_list is not None:
       selected_message = ""
       selected_index = selected_list.index(min(selected_list))
-  
       # Get the data corresponding to the selected index
       sel = filtered_list[selected_index]
-
-      # TODO Set FLOT to new deployment. 
+      
+      
+      
+      # TODO Set FLOT to new deployment.
+      
+      queried_objects_subset = queried_objects.filter(
+                                  deploymentID = sel.deploymentID)
       print 'DeploymentID of selected point',  sel.deploymentID
-  
+      print "ID of sel point", sel.ID
+      
+      #graph_dep is the dep of the clicked point in map
+      graph_dep = sel.deploymentID
+      
+      # index in subset array for clicked map pt. 
+        #(passed to html button for flot)
+      for i in range(len(queried_objects_subset)): 
+        if queried_objects_subset[i].ID == sel.ID:
+          map_dep_index = i
+      print "map_dep_index", map_dep_index
+      
+      # index in the large pos array for clicked map pt (passed to map)
+      for i in range(len(queried_objects)):
+        if queried_objects[i].ID == sel.ID:
+          map_pos_index = i
+      print "map_pos_index", map_pos_index
+      
+      queried_data_IDs = [int(x[0]) for x in queried_data]
+      selected_index_large = queried_data_IDs.index(
+                                long(sel.ID))
+
+      '''This is obsolete: 
+      
       (lat_clicked_point, lng_clicked_point) = utm.to_latlon(
           float(sel.easting), float(sel.northing),
           sel.utm_zone_number, sel.utm_zone_letter)
-
       selected_data.append((
         float(lat_clicked),
         float(lng_clicked),
@@ -331,29 +346,26 @@ def get_context(request, deps=[], req_deps=[]):
           time.localtime(float(sel.timestamp-7*60*60))),
         sel.utm_zone_letter     # utm zone letter
       ))
-
-      #get index in the original filtered list, for the clicked point
+      #get index in the original filtered list, for the clicked point      
       queried_data_IDs = [int(x[0]) for x in queried_data]
       selected_index_large = queried_data_IDs.index(
                                 long(selected_data[0][2]))
+      '''
+
+      '''FIXME needs to be changed to be the index of the subset because it is passed to flot to highlight.'''
 
                   # IF FLOT IS SELECTED:
           # Populate selected_data list with data based on index
           # FIXME could probably be changed to work the large list of data
 
-  ### Point on graph ######################
-  if flot_index:
+  ### Click Point on graph ######################
+  if flot_index and flot_dep and queried_data:
     print "flot index", flot_index
-    if graph_dep == None:
-      graph_dep = req_deps[0].ID
+    #if graph_dep == None:
+    #graph_dep = deps[0].ID
+    graph_dep = flot_dep
+    #find the deployment of the selected point in flot
 
-    #if transmitter is equal to req_deps[0].ID, do nothing
-    #if transmitter is equal to req_deps[1].ID, add flot_index += selected_dep_start1
-    #etc.
-      
-    # Index is over position data dep_id selected in Flot (graph_dep). 
-    # Filter queried_bojects for this data, select position and add it 
-    # to 
     queried_objects_dep = queried_objects.filter(
       deploymentID = graph_dep)
     
@@ -399,42 +411,62 @@ def get_context(request, deps=[], req_deps=[]):
   print "large", selected_index_large
   print "small", selected_index
   
-  print 'HOLY SHIT', graph_data 
   context = {
             #public, deployment, project, etc.
             'view_type': json.dumps(view_type),
+            
             'deps_list': json.dumps(req_deps_int),
+            
             'deps': req_deps_int,
+
+            'deps_limit4': req_deps_IDs,
+            
             #plot & related data
             'pos_data': json.dumps(queried_data),
+            
             #for getting the no. of positions
             'positions': queried_data,
+            
             #for plotting the site markers
             'siteslist': json.dumps(sites), 
+            
             #for displaying html form
             #'form': Form(deps=deps, data=request.GET or None), 
             'form': index_form,
-            'form_list': list(index_form),
+            
             #if sites should be shown
             'site_checked': json.dumps(site_checked), 
+            
             #clicked point's data, note: string
-            'selected_data': json.dumps(selected_data), 
+            #'selected_data': json.dumps(selected_data), 
 
             # Flag, either likelihood (1, default) or activity data (2) 
             'graph_data': json.dumps(graph_data),
 
             # Deployment selected for graph
             'graph_dep': json.dumps(graph_dep),
-
             'graph_dep_django': graph_dep,
+
             #if pos successfully clicked
             'selected_message': selected_message, 
+            
             #map-clicked i in filtered pos_data
             'selected_index': selected_index, 
+            
             #clicked i in pos_data
-            'selected_index_large': selected_index_large, 
+            'selected_index_large': json.dumps(selected_index_large),
+            'selected_index_large_django': selected_index_large,
+            
+            # index in large array of the clicked point in maps 
+            'map_pos_index': json.dumps(map_pos_index),
+            #index in dep array of the clicked point in maps
+            'map_dep_index': map_dep_index,
+            
             #flot selected i in pos_data
             'flot_index': json.dumps(flot_index), 
+            #dep that's displayed in flot
+            'flot_dep': json.dumps(flot_dep),
+
             #graph queried data as lines or points on map
             'display_type': json.dumps(display_type),
             'data_type': json.dumps(data_type), #position vs. track 
@@ -453,7 +485,7 @@ def index(request):
   #''' SELECT * FROM deployment JOIN project 
   #      ON deployment.projectID = project.ID 
   #   WHERE project.is_public = True ''' 
-  # TODO filter deps by form data. 
+  
   if request.GET.getlist('deployment') != None:
     req_deps = Deployment.objects.filter(ID__in=request.GET.getlist('deployment'))
   else: 
