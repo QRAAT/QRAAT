@@ -157,7 +157,7 @@ void detectmod_file_sink::gen_file_ptr(){
   struct timeval tp;
   gettimeofday(&tp, NULL);
   struct tm *time_struct = gmtime(&(tp.tv_sec));
-  int int_seconds = (int)tp.tv_sec;
+  long long ll_seconds = (long long)tp.tv_sec;
   int int_useconds = (int)tp.tv_usec;
 
   // Create diretory tree. 
@@ -180,6 +180,8 @@ void detectmod_file_sink::gen_file_ptr(){
   strcat(filename, file_extension); 
   
   if (open(filename)){
+    fwrite(&ll_seconds, sizeof(long long), 1, (FILE *)d_fp);
+    fwrite(&int_useconds, sizeof(int), 1, (FILE *)d_fp);
     fwrite(header_data, sizeof(char), header_len, (FILE *)d_fp);
   }
   else{
