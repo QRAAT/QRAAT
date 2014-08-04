@@ -68,7 +68,8 @@ MIDDLEWARE_CLASSES = (
 ROOT_URLCONF = 'qraatview.urls'
 
 WSGI_APPLICATION = 'qraatview.wsgi.application'
-#AUTH_USER_MODEL = 'qraat_auth.QraatUser'
+
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
