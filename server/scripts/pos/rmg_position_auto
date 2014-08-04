@@ -9,13 +9,13 @@ import os, commands, sys
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
 if int(output) > 1: 
-  print >>sys.stderr, "position: error: attempted reentry, exiting"
+  print >>sys.stderr, "position_auto: error: attempted reentry, exiting"
   sys.exit(1)
 
 db_con = qraat.util.get_db('writer')
 cursor = db_con.cursor()
 
-#get id of last processed record
+# Get id of last processed record (last record scored). 
 cursor.execute("SELECT value FROM qraat.cursor WHERE name='position'")
 last_processed = cursor.fetchone()
 if last_processed == None:
@@ -25,8 +25,11 @@ else:
   last_processed = last_processed[0]
 print "Last EST record processed: {}".format(last_processed)
 
-#get deps to-be-processed
-cursor.execute("select distinct(deploymentID) from est where ID > %s;", (last_processed,))
+# Get deployments that have been scored but not processed. 
+cursor.execute('''SELECT DISTINCT deploymentID 
+                    FROM est JOIN estscore 
+                      ON est.ID = estscore.estID
+                   WHERE ID > %s;''', (last_processed,))
 dep_list = cursor.fetchall()
 print "{} transmitters found in new records".format(len(dep_list))
 print dep_list
@@ -42,7 +45,11 @@ for dep in dep_list:
   dep_id = dep[0]
   print "Processing transmitter: {}".format(dep_id)
   #get times of to-be-processed records
-  cursor.execute("select ID, timestamp from est where ID > %s and deploymentID = %s order by timestamp ASC;", (last_processed,dep_id))
+  cursor.execute('''SELECT ID, timestamp 
+                      FROM est JOIN estscore
+                        ON est.ID = estscore.estID
+                     WHERE ID > %s AND deploymentID = %s 
+                     ORDER BY timestamp ASC;''', (last_processed,dep_id))
   times = np.array(cursor.fetchall(),dtype=float)
   print "Found {} records".format(times.shape[0])
   print "Calculating time range"
@@ -90,5 +97,5 @@ for dep in dep_list:
     max_id = temp_max_id
 
 #store id of last processed record
-if not max_id == last_processed:
+if max_id > last_processed:
   cursor.execute("UPDATE qraat.cursor SET value=%s WHERE name='position'", (max_id,))

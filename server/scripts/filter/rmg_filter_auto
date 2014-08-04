@@ -30,12 +30,12 @@ from optparse import OptionParser
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
 if int(output) > 1: 
-  print >>sys.stderr, "template: error: attempted reentry, exiting"
+  print >>sys.stderr, "filter_auto: error: attempted reentry, exiting"
   sys.exit(1)
 
 try: 
   start = time.time()
-  print "template: start time:", time.asctime(time.localtime(start))
+  print "filter_auto: start time:", time.asctime(time.localtime(start))
 
   # db_con = qraat.util.get_db('reader')
 
@@ -105,12 +105,12 @@ try:
       qraat.srv.signal_filter.score(l)
       qraat.srv.signal_filter.update_cursor_value(change_handler, 'estscore', max(l))
     
-except mdb.Error, e:
-  print >>sys.stderr, "filter_auto: error: [%d] %s" % (e.args[0], e.args[1])
-  sys.exit(1)
+#except mdb.Error, e:
+#  print >>sys.stderr, "filter_auto: error: [%d] %s" % (e.args[0], e.args[1])
+#  sys.exit(1)
 
 except qraat.error.QraatError, e:
   print >>sys.stderr, "filter_auto: error: %s." % e
 
 finally: 
-  print "template: finished in %.2f seconds." % (time.time() - start)
+  print "filter_auto: finished in %.2f seconds." % (time.time() - start)

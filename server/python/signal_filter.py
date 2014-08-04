@@ -44,31 +44,19 @@ import traceback
 import MySQLdb as mdb
 import qraat 
 
-# TODO where are the following parameters hard-coded: 
-
-# DENSITY_THRESHOLD_FACTOR = 100 
-# If the density of est's is greater than two orders of magnitude 
-# above the a priori pulse rate of the transmitter, throw out 
-# time window. 
-
-# EXPECTED_PULSERATE_WINDOW = 3 minutes
-# Compute the pairwise time difference over this time interval. 
-# Calculate and maximize over a histogram --> expected pulse 
-# interval.
-
-# FILTER_WINDOW = 30 seconds
-# Window for density filter and for scoring in the time filter. 
-
-# FILTER_ERROR = roughly 10 miliseconds? 
-# Error allowance for scoring in time filter. 
-
-
-# Distance to look for neighbors while scoring. If interval is calculated for a
-# point less than this, the time score cannot be calculated, so this is given a
-# score of -3.
+# Error tolerance for subsequent corroborating pulses. Part of the time 
+# filter. If interval is calculated for a point less than this, the time 
+# score cannot be calculated, so this is given score of -3. 
 CONFIG_ERROR_ALLOWANCE = 0.2
 
-# Search this many interval distances in both directions of a point for corroborating neighbors
+# How long a period the interval should be calculated over (seconds) 
+CONFIG_INTERVAL_WINDOW_SIZE = float(3 * 60) 
+
+# Search this many interval distances in both directions of a point for corroborating neighbors.
+# Over the large time window, we calculate the expected pulse interval. (Compute pairwise time
+# differentials, the most frequent is taken to be the expected pulse interval.) Thus, the 
+# optimal number of pulses (hence the highest absscore) is CONFIG_DELTA_AWAY * 2 
+# (see _rel_score()). 
 CONFIG_DELTA_AWAY = 3
 
 # False if actually apply changes to database, True if just write script to file (update.sql in cwd)
@@ -76,20 +64,20 @@ CONFIG_DELTA_AWAY = 3
 # you an inconsistent DB in addition to an inconsistent "SQL file."
 CONFIG_JUST_STAGE_CHANGES = False
 
-# How long a period the interval should be calculated over
-CONFIG_INTERVAL_WINDOW_SIZE = float(3 * 60) # Three minutes (given in seconds)
-
 # Minimum interval percentage difference which must occur from old value to
 # trigger superceding of the interval with the new ones and re-scoring of
 # slice.
 CONFIG_INTERVAL_PERCENT_DIFFERENCE_THRESHOLD = 0.25
 
-# Minimum number of points before intervals are calculated. If less than this number is found, items are given a score of -1.
+# Minimum number of points before intervals are calculated. If less than this 
+# number is found, items are given a score of -1.
 CONFIG_MINIMUM_POINT_COUNT = 20
 
+# Print verbose debugging info. 
+DEBUG_OUTPUT = False
 
 def debug_print(string): 
-  if True: 
+  if DEBUG_OUTPUT: 
     print >>sys.stderr, "signal_filter: debug:", string
 
 class Registry:
@@ -282,7 +270,7 @@ class Registry:
 		#print 'I think there are {} good points, like: {}'.format(len(good_point_ids), good_point_ids[:10])
 		bad_ids = bad_point_map.keys()
 		#print 'bad ids ({}): {}'.format(len(bad_ids), bad_ids[:10])
-		if len(bad_ids) > 0: print 'type is:', bad_ids[0].__class__
+		#if len(bad_ids) > 0: print 'type is:', bad_ids[0].__class__
 		#good_ids = [x[0] for x in points if x[0] not in bad_ids]
 
 		good_point_data, bad_point_data = [], []
@@ -334,8 +322,8 @@ class Registry:
 			if point['ID'] not in counts.keys():
 				good_points.append(point)
 		#print '|counts| = {}'.format(len(counts))
-		for (k, v) in counts.items()[:10]:
-			print 'count {} -> {}'.format(k, v)
+		#for (k, v) in counts.items()[:10]:
+		#	print 'count {} -> {}'.format(k, v)
 		return counts, good_points
 
 
@@ -1416,7 +1404,7 @@ def read_est_records_time_range(db_con, start, end, siteid, txid):
 	rows = None
 
 	field_string = ', '.join(fields)
-	q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s and siteid = %s and txid = %s;'.format(field_string, siteid, txid)
+	q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp <= %s and siteid = %s and deploymentid = %s;'.format(field_string, siteid, txid)
 	rows = cur.execute(q.format(field_string), (start, end))
 	
 	site_data = {}
@@ -1683,102 +1671,21 @@ def get_intervals_from_db(db_con, ids, insert_as_needed=False):
 # update_set will be updated and all others will be inserted. The default
 # values specify that all scores will be inserted.
 def insert_scores(change_handler, scores, update_as_needed=False, update_set=set()):
-	#print 'insert_scores()'
 
-	# for five_id in (206779849, 206779850, 206779851):
-	# 	score = scores[five_id]
-	# 	rel_score = _rel_score(score)
-	# 	_log(five_id, score, rel_score)
-		
+        db_con = change_handler.obj
 	scores = dict(scores)
 
-	if len(scores) == 0:
-		#print 'Nothing to score, returning.'
-		return
+        deletes = []; inserts = []
+        for (est_id, score) in scores.iteritems():
+          deletes.append(str(est_id))
+          inserts.append((est_id, score, _rel_score(score)))
 
-	good_property = all([x in scores for x in update_set])
-
-	if not good_property:
-		#print 'Warning: Unrecoverable error.'
-		violation_count = 0
-		for x in update_set:
-			if x not in scores:
-				violation_count += 1
-		try:
-			assert False
-		except AssertionError:
-			with open('/home/qraat/unrecov.log', 'w') as f:
-				f.write('Warning: Unrecoverable error.\n')
-				traceback.print_exc(f)
-				f.write('Scores for the following points are being inserted:\n')
-				f.write('scores.keys(): {}\n'.format(scores.keys()))
-				f.write('updatables: {}\n'.format(update_set))
-
-	        #print 'The following {} points were in the update set but not in scores:'.format(violation_count)
-
-		for x in update_set:
-			if x not in scores:
-				print '() {}'.format(x)
-
-		#print '-----'
-
-	assert all([x in scores for x in update_set])
-
-	db_con = change_handler.obj
-
-	newly_there = None
-	already_there = None
-
-	all_to_process = set(scores.keys())
-
-	if update_as_needed:
-
-		cur = db_con.cursor()
-		ids_template = ', '.join(map(lambda x : '{}', all_to_process))
-		id_string = ids_template.format(*all_to_process)
-		q = 'SELECT estid FROM estscore WHERE estid IN ({})'.format(id_string)
-		#print 'q: "{}"'.format(q)
-		rows = cur.execute(q)
-		already_there = set()
-		while True:
-			r = cur.fetchone()
-			if r is None: break
-			r = tuple(r)
-			already_there.add(r[0])
-
-		newly_there = all_to_process.difference(already_there)
-
-		
-
-		pass
-	else:
-		already_there = list(update_set)
-		newly_there = list(all_to_process.difference(update_set))
-
-	updates = []
-	for id in already_there:
-		score = scores[id]
-		rel_score = _rel_score(score)
-		updates.append((score, rel_score, id))
-
-	inserts = []
-	for id in newly_there:
-		score = scores[id]
-		assert score is not None
-		rel_score = _rel_score(score)
-		inserts.append((id, score, rel_score))
-
-	cur = db_con.cursor()
-	cur.executemany(UPDATE_TEMPLATE, updates)
-
-	#print 'Applied {} updates'.format(len(updates))
-
-	cur = db_con.cursor()
+        print 'signal_filter: Inserting %d scores.' % len(inserts)
+        cur = db_con.cursor()
+        if len(deletes) > 0:
+          cur.execute('DELETE FROM estscore WHERE estID IN ({})'.format(
+                              ', '.join(deletes)))
 	cur.executemany(INSERT_TEMPLATE, inserts)
-
-	#print 'Applied {} insertions'.format(len(inserts))
-
-		# change_handler.db_execute_many(qraat.signal_filter.INSERT_TEMPLATE, args)
 
 class NotAllSameValueError(Exception):
 	def __init__(self):
@@ -1810,6 +1717,8 @@ def get_cursor_value(handler, name):
 	rows = cur.execute(q, (name,))
 	if rows == 0:
 		# Default value
+		cur.execute('''INSERT INTO cursor (name, value) 
+                                     VALUE ('estscore', 0)''')
 		return 0
 	elif rows == 1:
 		r = cur.fetchone()
@@ -1821,11 +1730,10 @@ def get_cursor_value(handler, name):
 # Inserts (with a fallback to update) the cursor with the specified name and
 # value.
 def update_cursor_value(handler, name, value):
-	q = 'insert into `cursor` (name, value) VALUES (%s, %s) ON DUPLICATE KEY UPDATE value = %s'
 	db_con = handler.obj
 	cur = db_con.cursor()
-	rows = cur.execute(q, (name, value, value))
-	print 'Update cursor "{}" returns: {}'.format(name, rows)
+	rows = cur.execute('UPDATE `cursor` SET value=%s WHERE name=%s' , (value, name))
+	debug_print ('Update cursor "{}" returns: {}'.format(name, rows))
 
 # Returns number of rows matching. Hoping for zero.
 def explicit_check(change_handler, interval, base, duration, txid, siteid):
