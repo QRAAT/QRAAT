@@ -6,6 +6,20 @@ register = template.Library()
 def is_owner(project, user):
     return project.is_owner(user)
 
+
 @register.filter(name='is_collaborator')
 def is_collaborator(project, user):
     return project.is_collaborator(user)
+
+
+@register.filter(name="get_fields")
+def get_fields(obj):
+    return [dict(name=field.name,
+                 verbose_name=field.verbose_name,
+                 string_value=field.value_to_string(obj))
+            for field in obj._meta.fields]
+
+
+@register.filter(name="get_attr")
+def get_attr(obj, attr_name):
+    return getattr(obj, attr_name)

@@ -1,0 +1,10 @@
+{% block sidebar %}
+{% if user.is_authenticated %}
+<ol class="nav nav-pills nav-stacked">  
+    <li class="active">
+    <a href={% url 'auth:user-account-id' user.id %}>User account</a>
+    </li>
+</ol>
+
+{% endif %}
+{%endblock%}
