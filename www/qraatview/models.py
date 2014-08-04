@@ -307,7 +307,8 @@ class Tx(models.Model):
         self.save()
 
     def get_objs_related(self):
-        objs_related = Deployment.objects.exclude(is_hidden=True).filter(txID=self)
+        objs_related = Deployment.objects.exclude(
+            is_hidden=True).filter(txID=self)
         return objs_related
 
     def __unicode__(self):
@@ -352,6 +353,7 @@ class TxMakeParameters(models.Model):
 
 class Target(models.Model):
     class Meta:
+        verbose_name = "Target"
         app_label = QRAAT_APP_LABEL
         db_table = "target"
 
@@ -367,6 +369,23 @@ class Target(models.Model):
         help_text="Project for which target was originally created")
 
     is_hidden = models.BooleanField(default=False)  # boolean default false
+
+    def verbose_name(self):
+        return self._meta.verbose_name
+
+    def hide(self):
+        objs_related = self.get_objs_related()
+
+        for obj in objs_related:
+            obj.hide()
+
+        self.is_hidden = True
+        self.save()
+
+    def get_objs_related(self):
+        objs_related = Deployment.objects.exclude(
+            is_hidden=True).filter(targetID=self)
+        return objs_related
 
     def __unicode__(self):
         return u'%s' % self.name
@@ -415,6 +434,8 @@ class Deployment(models.Model):
             obj.hide()
 
         self.is_hidden = True
+        # when a deployment is hidden it is unactive
+        self.is_active = False
         self.save()
 
     def verbose_name(self):
@@ -461,6 +482,7 @@ class Track(models.Model):
 
 class Location(models.Model):
     class Meta:
+        verbose_name = "Location"
         app_label = QRAAT_APP_LABEL
         db_table = "location"
 
@@ -496,6 +518,22 @@ class Location(models.Model):
         decimal_places=2)  # decimal(7,2), default 0.00
 
     is_hidden = models.BooleanField(default=False)
+
+    def verbose_name(self):
+        return self._meta.verbose_name
+
+    def hide(self):
+        objs_related = self.get_objs_related()
+
+        for obj in objs_related:
+            obj.hide()
+
+        self.is_hidden = True
+        self.save()
+
+    def get_objs_related(self):
+        objs_related = []
+        return objs_related
 
     def __unicode__(self):
         return u'%s' % self.name

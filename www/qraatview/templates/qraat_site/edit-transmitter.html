@@ -1,4 +1,4 @@
-{% extends "qraat_site/manage_project_base.html" %}
+{% extends "qraat_site/base_create_object.html" %}
 {% load class_tag %}
 
 {%block success_msg %} Transmitter edited  {% endblock %}
@@ -11,10 +11,4 @@ Transmitter editing
     or manufacturer, you should delete this and create a new transmitter.
 </small>
 
-{% endblock %}
-{% block button_name %} Save {% endblock %}
-{% block content %}
-{% block form %}
-{{ block.super }}
-{% endblock %}
 {% endblock %}

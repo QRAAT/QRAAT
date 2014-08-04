@@ -20,6 +20,9 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # SECURITY WARNING: keep the secret key used in production secret!
 try:
   base = qraat.csv.csv(os.environ['RMG_SERVER_UI_KEYS']).get(name='django_base')
+  web_writer= qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='web_writer')
+  web_reader = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='web_reader')
+  django_admin = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='admin')
 
 except KeyError:
   raise qraat.error.QraatError("undefined environment variables. Try `source rmg_env`")
@@ -30,13 +33,13 @@ except IOError, e:
 SECRET_KEY = base.key
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False 
 
-TEMPLATE_DEBUG = True
+TEMPLATE_DEBUG = False 
 TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
 
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -74,14 +77,14 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'django',
-        'USER': 'root',
-	'PASSWORD': 'woodland', 
+        'USER': django_admin.user,
+	'PASSWORD': django_admin.password, 
         },
 	'qraat': {
 		'ENGINE': 'django.db.backends.mysql',
 		'NAME': 'qraat',
-		'USER': 'root',
-		'PASSWORD': 'woodland',
+		'USER': web_writer.user,
+		'PASSWORD': web_writer.password,
 	},
 }
 

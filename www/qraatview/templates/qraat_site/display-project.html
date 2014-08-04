@@ -203,7 +203,7 @@
                 <span class="table-element table-cell">Description</span>
             </div>
             {% for target in project.get_targets %}
-            <a href="#" class="table-element table-row">
+            <a href={% url 'qraat:show-target' project.ID target.ID %} class="table-element table-row">
                 <span class="table-element table-cell">{{target.name}}</span>
                 <span class="table-element table-cell">{{target.description}}</span>
             </a>

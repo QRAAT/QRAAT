@@ -29,6 +29,21 @@ project_patterns = patterns(
         r'^(?P<project_id>\d+)/manage-transmitters/(?P<transmitter_id>\d+)/$',
         'edit_transmitter',
         name='edit-transmitter'),
+    
+    url(
+        r'^(?P<project_id>\d+)/manage-targets/(?P<target_id>\d+)/$',
+        'edit_target',
+        name='edit-target'),
+
+    url(
+        r'^(?P<project_id>\d+)/manage-locations/(?P<location_id>\d+)/$',
+        'edit_location',
+        name='edit-location'),
+
+    url(
+        r'^(?P<project_id>\d+)/manage-deployments/(?P<deployment_id>\d+)/$',
+        'edit_deployment',
+        name='edit-deployment'),
 
     url(
         r'^(?P<project_id>\d+)/manage-deployments/$', 'manage_deployments',
@@ -53,6 +68,16 @@ project_patterns = patterns(
         r'^(?P<project_id>\d+)/location/(?P<location_id>\d+)/$',
         'show_location',
         name='show-location'),
+    
+    url(
+        r'^(?P<project_id>\d+)/target/(?P<target_id>\d+)/$',
+        'show_target',
+        name='show-target'),
+
+    url(
+        r'^(?P<project_id>\d+)/deployment/(?P<deployment_id>\d+)/$',
+        'show_deployment',
+        name='show-deployment'),
 
     url(
         r'^(?P<project_id>\d+)/edit-project/$',
