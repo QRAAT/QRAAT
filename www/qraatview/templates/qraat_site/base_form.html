@@ -1,15 +1,18 @@
 {% load class_tag %}
 
 {%block script %}
+<link rel="stylesheet" type"text/css" href="/static/qraat_site/css/jquery.datetimepicker.css" >
+<script type="text/javascript" src="/static/qraat_site/js/jquery.datetimepicker.js"></script>
 
 <script>
 
 $(document).ready(function(){
         var inputs = $(".input-group").children("input, select, textarea");
         for(var i=0; i<inputs.length; i++){
-            console.log(inputs[i]);
             $(inputs[i]).addClass("form-control");
         }
+        
+        $(".datetime").datetimepicker({format: "m/d/Y H:i:s"})
 });
 
 </script>
