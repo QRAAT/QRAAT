@@ -150,15 +150,11 @@ def get_context(request, deps=[], req_deps=[]):
       datetime_from_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                   time.localtime(float(datetime_from_initial-7*60*60)))
 
-      likelihood_low_initial = str ((dep_query.aggregate(Min('likelihood'))
-                                    ['likelihood__min']) )
-      likelihood_high_initial = str( (dep_query.aggregate(Max('likelihood'))
-                                    ['likelihood__max']) )
+      likelihood_low_initial = dep_query.aggregate(Min('likelihood'))['likelihood__min']
+      likelihood_high_initial = dep_query.aggregate(Max('likelihood'))['likelihood__max']
 
-      activity_low_initial = str( (dep_query.aggregate(Min('activity'))
-                                    ['activity__min']) )
-      activity_high_initial = str( (dep_query.aggregate(Max('activity'))
-                                    ['activity__max']) )
+      activity_low_initial = dep_query.aggregate(Min('activity'))['activity__min']
+      activity_high_initial = dep_query.aggregate(Max('activity'))['activity__max']
   
       index_form.fields['datetime_from'].initial = datetime_from_str_initial
       index_form.fields['datetime_to'].initial = datetime_to_str_initial
@@ -180,8 +176,6 @@ def get_context(request, deps=[], req_deps=[]):
                           activity__gte = activity_low_initial,
                           activity__lte = activity_high_initial
                           )
-
-
 
       for q in queried_objects:
         (lat, lon) = utm.to_latlon(float(q.easting), float(q.northing), 

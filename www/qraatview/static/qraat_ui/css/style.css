@@ -1,0 +1,55 @@
+button { 
+  font: normal 12px "omnes-pro", Helvetica, Arial, sans-serif; 
+  }
+
+html { height: 100% }
+
+body { 
+  height: 100%; margin: 0; padding: 0; 
+  font: normal 12px "omnes-pro", Helvetica, Arial, sans-serif; 
+  }
+
+#map-canvas { 
+  margin-top: 1cm; margin-right: 0.25cm; 
+  height: 60%; width: 63%; float: right; 
+  }
+
+#text {
+  width: 33%; height: 100%; float: left; 
+  font-size: 12px; margin: 1%;
+  }
+
+#page_title { font-size: 18px; font-weight:bold; }
+
+.section_title { font-size: 15px; font-weight:bold; text-align:center;}
+
+#prefs {
+  border-style:solid; border-width: 1px; 
+  height: 32%; overflow: scroll; padding: 5px; 
+  }
+
+#id_deployment {
+  list-style-type: none;
+  } /* removes the bullet points from the list of deps */
+
+#mouseover {
+  border-style:solid; border-width: 1px; height: 15%; 
+  overflow: scroll; padding: 5px;
+  }
+
+#clicked {
+  border-style:solid; border-width: 1px; height: 25%; 
+  overflow: scroll; padding: 5px;
+  }
+
+#right_side { float: center; }
+
+.current_info {
+  font: normal 12px "omnes-pro", Helvetica, Arial, sans-serif;
+  }
+
+#right_side2, #content2, .demo-placeholder2, .demo-placeholder { 
+  float: right;
+  }
+
+

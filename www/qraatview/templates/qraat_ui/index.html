@@ -6,91 +6,20 @@
 
 <head>
 
-  <title>QRAAT APP</title>
-  <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
-
-  
-  <style type="text/css">
-    
-    button { 
-      font: normal 12px "omnes-pro", Helvetica, Arial, sans-serif; 
-      }
-    
-    html { height: 100% }
-    
-    body { 
-      height: 100%; margin: 0; padding: 0; 
-      font: normal 12px "omnes-pro", Helvetica, Arial, sans-serif; 
-      }
-    
-    #map-canvas { 
-      margin-top: 1cm; margin-right: 0.25cm; 
-      height: 60%; width: 63%; float: right; 
-      }
-    
-    #text {
-      width: 33%; height: 100%; float: left; 
-      font-size: 12px; margin: 1%;
-      }
-    
-    #page_title { font-size: 18px; font-weight:bold; }
-    
-    .section_title { font-size: 15px; font-weight:bold; text-align:center;}
-    
-    #prefs {
-      border-style:solid; border-width: 1px; 
-      height: 32%; overflow: scroll; padding: 5px; 
-      }
-    
-    #id_deployment {
-      list-style-type: none;
-      } /* removes the bullet points from the list of deps */
-
-    #mouseover {
-      border-style:solid; border-width: 1px; height: 15%; 
-      overflow: scroll; padding: 5px;
-      }
-    
-    #clicked {
-      border-style:solid; border-width: 1px; height: 25%; 
-      overflow: scroll; padding: 5px;
-      }
-    
-    #right_side { float: center; }
-    
-    .current_info {
-      font: normal 12px "omnes-pro", Helvetica, Arial, sans-serif;
-      }
-    
-    #right_side2, #content2, .demo-placeholder2, .demo-placeholder { 
-      float: right;
-      }
-
-
-</style>
-
-
-<!-- Link google maps API with alisha's gmail key -->
-<script type="text/javascript" 
-  src="https://maps.googleapis.com/maps/api/js?key={% load google_maps_api %}&sensor=false">
-</script>
-<link href="/static/flot/example.css" rel="stylesheet" type="text/css">
-<script src="/static/flot/jquery-1.11.1.min.js"></script>
-<script src="/static/flot/jquery.flot.min.js"></script>
-<script src ="/static/flot/jquery.flot.time.min.js"></script>
-<script src ="/static/flot/jquery.flot.selection.min.js"></script>
-<script src="/static/flot/jquery.flot.threshold.min.js"></script>
-<script src="/static/flot/jquery.flot.resize.min.js"></script>
-
-
-<!-- plugins for saving graphs as images. commented out because they throw an error when a point on the flot graph is selected -->
-<!-- <script type="text/javascript" src="http://zizhujy.com/Scripts/base64.js"></script>
-<script type="text/javascript" src="http://zizhujy.com/Scripts/drawing/canvas2image.js"></script>
-<script type="text/javascript" src="http://zizhujy.com/Scripts/flot/jquery.flot.saveAsImage.js"></script>
--->
-
-
-
+    <title>QRAAT APP</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" type="text/css" href="/static/qraat_ui/css/style.css"/>
+    <!-- Link google maps API with alisha's gmail key -->
+    <script type="text/javascript" 
+      src="https://maps.googleapis.com/maps/api/js?key={% load google_maps_api %}&sensor=false">
+    </script>
+    <link href="/static/flot/example.css" rel="stylesheet" type="text/css">
+    <script src="/static/flot/jquery-1.11.1.min.js"></script>
+    <script src="/static/flot/jquery.flot.min.js"></script>
+    <script src ="/static/flot/jquery.flot.time.min.js"></script>
+    <script src ="/static/flot/jquery.flot.selection.min.js"></script>
+    <script src="/static/flot/jquery.flot.threshold.min.js"></script>
+    <script src="/static/flot/jquery.flot.resize.min.js"></script>
 
 <script type="text/javascript">
 
@@ -107,15 +36,6 @@ function hideFormFields() {
     document.querySelector("label[for='id_deployment_0']").style.display = "none";
     document.getElementById('id_graph_dep').style.display = 'none';
     document.querySelector("label[for='id_graph_dep']").style.display = "none";
-    
-    //this doesn't work:
-    //var labels = document.getElementsByTagName('label');
-    //for (var i=0; i <labels.length; i++) {
-    //  var attr = labels[i].getAttribute('for');
-    //  if (attr === this.id_deployment_0) {
-    //    labels[i].style.visibility = 'hidden';
-    //  }
-   // }
   }
 }
 
@@ -128,21 +48,12 @@ function submitForm() {
   document.getElementById('form').submit();
 }
 
-  // Show alert, called by html button. for testing purposes
-//function showDjango() {
-//    var selected_flot = document.getElementById("flot_index").value;
-//      window.alert(selected_flot);
-//}
-
-
 // function setCenter is not working.
 // It is intended to recenter the map on a button click.
 function setCenter() { 
   map.panTo(new google.maps.LatLng(38.487828027, -122.149419006));
   //return false;
 }
-
-
 
 function initialize(){
     
@@ -184,15 +95,7 @@ function initialize(){
 
   // If: The map hasn't loaded before (nothing saved for center or zoom)...
   // Then: Set some default map options.
-  else 
-          // this doesn't work
-              // if (((center_lat!=null) && 
-              // (center_lng !=null) && 
-              // (init_zoom !=null)) ||
-              // ((localStorage.mapLat == null) && 
-              // (localStorage.mapLng == null) &&
-              // (localStorage.mapZoom == null)))
-    {
+  else {
       var mapOptions = {
         center: myLatLng,
         zoom: 14, // Scale of 1 to 20
@@ -208,21 +111,11 @@ function initialize(){
     }; // end map options
    } // end if map hasn't been loaded before
 
-
-
 // Creates the map object, using the mapOptions set above
   var map = new google.maps.Map(document.getElementById("map-canvas"),
       mapOptions);
 
-
-
 // Listen and store center & zoom changes, to be used in map options
-
-      // I think the following 4 lines are redundant:
-      // mapCenter = map.getCenter();
-      // localStorage.mapLat = mapCenter.lat();
-      // localStorage.mapLng = mapCenter.lng();
-      // localStorage.mapZoom = map.getZoom();
 
     google.maps.event.addListener(map, "center_changed", function(){
       mapCenter = map.getCenter();
@@ -248,60 +141,6 @@ function initialize(){
   //var selected_data = {{selected_data|safe}}; // data for clicked point
   // Note: |safe enables strings to be passed from django/json to js
 
-
-  // If a point was clicked and therefore there is related data 
-  // (this is a messy check)... Then populate the data. 
-  // Date for fields in the db that are longer than 6 decimal places
-  // are fixed to 6 decimal places. 
-  
-  //if (selected_data.length > 0) {
-//    
-//    if (selected_data[0][0] != null) {
-//      document.getElementById('clicked_lat_lng').value = 
-//        selected_data[0][0].toFixed(6)+', ' + // lat clicked on map
-//        selected_data[0][1].toFixed(6);      // lng clicked on map
-//      }
-//    
-//    document.getElementById('selected_point_latlon').innerHTML = 
-//      selected_data[0][10][0].toFixed(6) + ', ' + // lat of actual pt in db
-//      selected_data[0][10][1].toFixed(6);          // lng of point in db
-//    document.getElementById('selected_point_eastingnorthing').innerHTML = 
-//      selected_data[0][5] + ', ' +   // easting 
-//      selected_data[0][6] + ', ' +   // northing
-//      selected_data[0][7] + ' ' +    // zone number
-//      selected_data[0][12];          // zone letter
-//    document.getElementById('selected_point_date').innerHTML = 
-//      selected_data[0][11];          // date string of timestamp
-//    document.getElementById('selected_point_activity').innerHTML = 
-//      selected_data[0][9].toFixed(6);  // activity
-//    document.getElementById('selected_point_likelihood').innerHTML = 
-//      selected_data[0][8].toFixed(6); // likelihood
-//    document.getElementById('selected_point_positionID').innerHTML = 
-//      selected_data[0][2];
-//    document.getElementById('selected_point_deployment').innerHTML = 
-//      selected_data[0][3];
-//  
-//  } // end if selected_data.length > 5
-//
-
-
-  // Map listens for clicks on the map
-  // Submits clicked lat,lng to django (server to calculate closest point)
-
-  //google.maps.event.addListener(map, 'click', function(event){
-  //  // if statement may be redundant
-  //  if ((event.latLng.lat() !==null) && (event.latLng.lng() !==null)) {
-  //    // populates hidden html field in form
-  //    document.getElementById('lat_clicked').value = event.latLng.lat()
-  //    document.getElementById('lng_clicked').value = event.latLng.lng()
-  //  
-  //    // auto-submits the form
-  //    document.getElementById("form").submit();
-  //  } // end if
-  //}); // end click addListener
-
-
-
   // Index of selected point, in array of points near the click
   
   var selected_index_large; 
@@ -311,7 +150,6 @@ function initialize(){
   else {
     selected_index_large = {{selected_index_large}};
   }
-
 
   // When google maps loads/refreshes, click 'button' to highlight 
   // point on flot graph again. Otherwise, it would disappear after reload
@@ -324,8 +162,6 @@ function initialize(){
       document.getElementById('flotIndexSubmit').click();
     } // end if flot_index, click hidden button that highlights flot
   }); // end tilesloaded Listener
-
-
 
   // Mousemove Listener to display lat, lng of mouse location
   
@@ -440,9 +276,6 @@ function initialize(){
   
   } //end for loop for site locations
 
-
-
-
 // Display markers for the data points 
   var markers_querydata = new Array();
   var infoWindows_querydata = new Array();    
@@ -499,17 +332,11 @@ function initialize(){
           });
       
     // submit clicked marker lat,lng to django server to find nearby pts
+    //TODO: Do not make a request to server
     google.maps.event.addListener(marker, 'click',
-      function(event)
-      { //submit the location of the click to django
-        if ((event.latLng.lat() !==null) && (event.latLng.lng() !==null)) {
-          // populates hidden html fields
-          document.getElementById('lat_clicked').value = event.latLng.lat()
-          document.getElementById('lng_clicked').value = event.latLng.lng()
-          
-          // submits html form
-          document.getElementById("form").submit();
-          } // end if statement for if the lat and lng are null
+      function(event, marker)
+      { 
+        console.log(this);
       }); // end event function and marker event listener
       
     // on mousing over markers for data points, open them to show lat/lng
@@ -519,6 +346,7 @@ function initialize(){
       //infoWindows_querydata[this.infoWindowIndex].open(map, this);
 
     //mouseover markers to show info in html sidebar
+    //TODO: Try to put pos date into marker obj
     document.getElementById('selected_point_latlon').innerHTML = 
       position_data[this.infoWindowIndex][8][0].toFixed(6) + ', ' +
       position_data[this.infoWindowIndex][8][1].toFixed(6); 
@@ -567,15 +395,14 @@ function initialize(){
 // WHEN MAP IS CLICKED, display another marker there to highlight point
   // If valid point (corresponds to db pt) is selected on maps, display it  
   //FIXME: The following section could probably be consolidated so that when EITHER flot OR map is clicked, the same chunk of code for marker = new google.maps.Marker.... is used. The only difference appears to be the indexes: map_pos_index vs selected_index_large.
-
   var selectedMarkers = new Array();
   var map_pos_index = {{map_pos_index}};
   if (map_pos_index != null) {
     for (var i =0; i < selectedMarkers.length; i++) {
-    selectedMarkers[i].setMap(null);
+    selectedMarkers[i].gmap.setMap(null);
     }
  
-    marker = new google.maps.Marker({
+    marker.gmap = new google.maps.Marker({
       position: new google.maps.LatLng
         (
         position_data[map_pos_index][8][0],
@@ -589,7 +416,6 @@ function initialize(){
       // icon: 'http://maps.google.com/mapfiles/ms/micons/red-dot.png'
     
     }); // end setting marker data
- 
 
     // Set on click infoWindow content for highlighted data marker
 
@@ -610,7 +436,7 @@ function initialize(){
     var infoWindow = new google.maps.InfoWindow({content: content});
     
     // click Listener for markers
-    google.maps.event.addListener(marker, 'click', 
+    google.maps.event.addListener(marker.gmap, 'click', 
       function (event)
         {
           infoWindow.open(map, this);
@@ -682,15 +508,8 @@ function initialize(){
      
   } // end if point was selected in flot (index)
 
-
-
   // push the "clicked point"  marker
   selectedMarkers.push(marker);
-
-
-
-
-
 
                   // WHEN HTML PREF IS SET TO 'Lines':
 
@@ -704,7 +523,6 @@ function initialize(){
         position_data[i][8][0], position_data[i][8][1]);
       flightPlanCoordinates.push(point);
     } // end for loop through queried data points
-
     
  // Draw the polyline
     var flightPath = new google.maps.Polyline({
@@ -863,9 +681,6 @@ function initialize(){
   
   }); // end event mouseover eventListener
 
-
-
-
               // Polyline for Deployment 2
 
 
@@ -902,18 +717,10 @@ function initialize(){
 
     // flightPath2.setMap(map);
 
-
-
 } //end function initialize
-
-
 
 // Load google maps on browser window load
 google.maps.event.addDomListener(window, 'load', initialize);
-
-
-
-
 
                             //FLOT GRAPH
 
@@ -953,7 +760,6 @@ $(function() {
   else if (graph_data ==2) { // activity 
     graph_data_index = 7;
   }
-
 
   // Should never NOT be null. Set even if GET request has no form data. 
   //if ({{graph_dep}} != null) {
@@ -1000,48 +806,6 @@ $(function() {
   };
 
   var plot = $.plot("#placeholder2", data, options);
-
-////  if (graph_data ==1) { label = "Likelihood"; min: 0; max: 1200; }
-////  if (graph_data==2) { label = "Activity"; min: 0; max: 4.0; }
-//
-//  
-//  data =[ { data: d1, label: "1st dep", lines: {show:true} },
-//          { data: d2, label: "2nd dep", lines: {show:true} },
-//          { data: d3, label: "3rd dep", lines: {show:true} } ]
-//
-//  var options = {
-//    legend: { show: false },
-//    series: { lines: { show: true }, points: { show: false } },
-//    grid: { hoverable: true, clickable: true },
-//    xaxis: { 
-//      mode: "time", 
-//      //tickSize: [4, "hour"], 
-//      timeformat: "%m-%d %H:%M" 
-//    },  //does this work?
-//    //yaxis: {min: min, max: max},
-//    highlightColor: 'red',
-//    selection: { mode: "xy" },
-//    colors: ["#8383FF", "yellow", "green"] //changes flot line color. 
-//        // ??? use 'colors' for 1 series & 'color' for multiple series ???
-//  };
-//
-//
-//  var plot = $.plot("#placeholder2", data, options);
-//var plot = $.plot("#placeholder2", [{ data: d, label: label}], options);
-  
-
-  //var data = [{ data: d, label: "dep1", 
-  //              color: ["red"], 
-  //              highlightColor: 'yellow'
-  //          },
-
-  //          { data: d1, label: "dep2", 
-  //            color: ["blue"], 
-  //            highlightColor: 'green'
-  //          }];
-  //var options = [options0, options1];
-  //var plot = $.plot("#placeholder2", data, 
-  //    {xaxis: {mode: "time", timeformat: "%m-%d %H:%M"}});
  
   var dataSeriesIndex = 0;
 
@@ -1050,33 +814,7 @@ $(function() {
     plot.unhighlight()
     plot.highlight(dataSeriesIndex, idx);
     var dataPoint = d[idx]; 
-    //if (dataPoint != null) {
-    //var dataPosition = plot.pointOffset({x:dataPoint[0], y: dataPoint[1] })
-    //var tipHTML = 'Data:<br> X='+dataPoint[0] +'<br> Y=' +dataPoint[1];
-    // top: dataPosition.top-10}).show().html(tipHTML)
-    //}
   })
-
-
-//  $("#placeholder2").bind("plothover2", function (event, pos, item) {
-    //if ($("#enablePosition2:checked").length > 0) {
-      //var str = "(" + pos.x.toFixed(2) + ", " + pos.y.toFixed(2) + ")";
-      //$("#hoverdata2").text(str);
-    //}
-    
-    //if ($("#enableTooltip2:checked").length > 0) {
-      //if (item) {
-      //  var x = item.datapoint[0].toFixed(2),
-      //      y = item.datapoint[1].toFixed(2);
-      //  $("#tooltip").html(x + ", " + y)
-      //    .css({top: item.pageY+5, left: item.pageX+5})
-      //    .fadeIn(200);
-      //    } else {
-      //      $("#tooltip").hide();
-      //    }
-    //}
-
-//  });
 
   $("#placeholder2").bind("plotclick", function (event, pos, item) {
     if (item == undefined) return false;
@@ -1096,84 +834,13 @@ $(function() {
     document.getElementById("form").submit();
   });
 
-
-// //create the overview plot
-//   var overview = $.plot("#overview", [{ data: d, label: label}], {
-//     legend: { show: false },
-//     series: { lines: { show: true, lineWidth: 1 }, shadowSize: 0 },
-//     xaxis: { mode: "time" }, 
-//     //yaxis: { ticks: 3, min: -2, max: 2 },
-//     grid: { color: "#999" },
-//     selection: { mode: "xy" },
-//     colors: ["#8383FF"] 
-//   });
-// 
-// 
-// 
-//  //connect the 2 plots
-//   $("#placeholder2").bind("plotselected", function (event, ranges) {
-//     // clamp the zooming to prevent eternal zoom
-//       if (ranges.xaxis.to - ranges.xaxis.from < 0.00001) {
-//           ranges.xaxis.to = ranges.xaxis.from + 0.00001;
-//       }
-//       if (ranges.yaxis.to - ranges.yaxis.from < 0.00001) {
-//           ranges.yaxis.to = ranges.yaxis.from + 0.00001;
-//       }
-//    // do the zooming
-// 
-// 
-// 
-//   plot = $.plot("#placeholder2", getData(ranges.xaxis.from, ranges.xaxis.to),
-//         $.extend(true, {}, options, {
-//         xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to },
-//         yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }
-//         })
-//       );
-// 
-//   // don't fire event on the overview to prevent eternal loop
-//   overview.setSelection(ranges, true);
-//   });
-// 
-//   $("#overview").bind("plotselected", function (event, ranges) {
-//     plot.setSelection(ranges);
-//   });
-// 
-
-
-//when user clicks point on flot, flot will reload...
-//the following shows the point that the user just clicked, by pushing the flot index button
-//must place it at the end, otherwise it will execute before flot draws the chart,
-//(I'm assuming that's the reason), and then the point won't get highlighted
-
-//this doesn't work
-
-//  var flot_index = {{flot_index}};
-//    if (flot_index != null) {
-//      document.getElementById('flotIndexSubmit').click();
-//  }
-
 }); //end the function for flot
-
-
-
-//this doesn't work
-//clickedDateTime = item.dataSeriesIndex;
-
-//set global variable for passing the timestamp to django to google maps:
-//clickedDateTime = 6;
-
 
 } //endif positions
 </script>
 
 
 </head>
-
-
-
-
-
-
 
 <body>
 
@@ -1224,7 +891,6 @@ $(function() {
 <input type="hidden" name="flot_dep" id="flot_dep">
 </form>
 
-
 <!-- <button onclick="fitBounds()">Fit all positions in map window</button>-->
 
 <!-- <font size="1">date range: 2013-08-13  13:57:16 to 2014-06-16 14:28:12</font> -->
@@ -1232,29 +898,8 @@ $(function() {
 
 <br>
 
-
-
 <script type="text/javascript">
-//for submitting form automatically when fields have been entered
-
-//function submitIfComplete()
-//{
-//  // Check the select has something selected
-//  if (
-//      document.getElementById('tx_ID').selectedIndex > 0 &&
-//      document.getElementById('data_type').selectedIndex > 0
-//      //!(document.getElementById('pref1').checked == false)
-//    {
-//    document.getElementById('formID').submit();
-//    }
-//}
 </script>
-
-
-
-
-
-
 
 <div class="section_title">MAP INFO</div>
 <div id="mouseover">
@@ -1280,9 +925,6 @@ $(function() {
 </div>
 <br>
 
-
-
-
 <div class="section_title">DATA FOR MOUSED-OVER POSITION</div>
 
 <div id="clicked">
@@ -1307,7 +949,6 @@ $(function() {
 </div> <!-- end clicked -->
 </div> <!-- end text -->
 
-
 <!-- right side -->
 <div id="map-canvas"></div>
 
@@ -1327,14 +968,11 @@ $(function() {
 
   {% endif %}
 
-  
-
   {% if graph_data == "2" %}
   <b><u>ACTIVITY vs. TIME</u></b>
   <br>Deployment Shown =  {{graph_dep}}
   {% endif %}
 
-  
 <!-- <button data-index="4">Highlight 5th point</button> -->
 <button data-index="{{map_dep_index}}" id="mapsIndexSubmit" style="display: none;">Selected Index</button>
 <button data-index="{{flot_index}}" id="flotIndexSubmit" style="display: none;">Flot Index</button> 
@@ -1364,8 +1002,5 @@ $(function() {
 </div> <!-- end div right_side2 -->
 
 {% endif %} <!-- end if positions (if there is query data) -->
-
-
-
 </body>
 </html>
