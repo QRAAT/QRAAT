@@ -21,14 +21,70 @@
     <script src="/static/flot/jquery.flot.threshold.min.js"></script>
     <script src="/static/flot/jquery.flot.resize.min.js"></script>
 
-<script type="text/javascript">
-
-  // Global variables
+<script>
+// Global variables
   var highlightedPoly;
   var selectedMarker;
   var map;
   var mapCenter;
   var markers = [];
+  selectedMarkers = new Array();
+
+
+function addSelectedPos(marker, map){
+    /*Add a marker to a selected position point*/
+            for (var i =0; i < selectedMarkers.length; i++) {
+                if(selectedMarkers[i].selected)
+                    selectedMarkers[i].selected.setMap(null);
+                else
+                    selectedMarkers[i].setMap(null);
+            }
+            console.log(marker);
+            marker.selected = new google.maps.Marker({
+                position: new google.maps.LatLng
+                (
+                    marker.qraat_pos[8][0],
+                    marker.qraat_pos[8][1]
+                ),
+                map: map,
+                zIndex: google.maps.Marker.MAX_ZINDEX + 1
+                // zIndex sets marker on top of all other markers
+            });
+
+            addInfoWindow(marker.selected, marker.qraat_pos, map);
+            // Set on click infoWindow content for highlighted data marker
+            selectedMarkers.push(marker);
+            reloadFlot();
+
+}
+
+function addInfoWindow(marker, data, map){
+    /*Add given data info to a given marker*/
+    var content =   '<b>Data ID: </b>' + data[1] +
+      '<br><b>Deployment ID: </b>' + data[0] + 
+          '<br><b>Lat, Lon: </b> ' +
+        data[8][0].toFixed(6) + ', ' +
+    data[8][1].toFixed(6) +
+      '<br><b>Easting, Northing, Zone: </b> ' + 
+        data[3] + ', ' + 
+        data[4] + ', ' + 
+      data[5] +
+          data[9] +
+      '<br><b>Date/Time: </b>' + data[10] + 
+        '<br><b>Activity: </b>' + data[7] +
+    '<br><b>Likelihood: </b>' + data[6];
+
+    var infoWindow = new google.maps.InfoWindow({content: content});
+    
+    // click Listener for markers
+    google.maps.event.addListener(marker, 'click', 
+      function (event)
+        {
+          infoWindow.open(map, this);
+        } // end event function
+    ); // end click Listener
+
+}
 
 function hideFormFields() {
   if ({{view_type|safe}} == "deployment") {
@@ -300,9 +356,7 @@ function initialize(){
         infoWindowIndex: i
       });
 
-
 //Hard code colors for markers. If dep in array == req_deps from views, display it as a marker of a certain color.
-
       if ( ({{view_type|safe}} == "deployment") || 
         ( (deps.length > 0) && (position_data[i][1] == deps[0]) ) ) {
     marker.setIcon('http://www.geocodezip.com/mapIcons/small_blue_dot.png')
@@ -333,10 +387,11 @@ function initialize(){
       
     // submit clicked marker lat,lng to django server to find nearby pts
     //TODO: Do not make a request to server
+    marker.qraat_pos = position_data[i];
     google.maps.event.addListener(marker, 'click',
-      function(event, marker)
-      { 
-        console.log(this);
+        function(){ 
+        // WHEN MAP IS CLICKED, display another marker there to highlight point
+          addSelectedPos(this, map);
       }); // end event function and marker event listener
       
     // on mousing over markers for data points, open them to show lat/lng
@@ -391,61 +446,6 @@ function initialize(){
 
 
 // DISPLAY MARKER / "HIGHLIGHT" SELECTED POINT (clicked in maps or in flot)
-
-// WHEN MAP IS CLICKED, display another marker there to highlight point
-  // If valid point (corresponds to db pt) is selected on maps, display it  
-  //FIXME: The following section could probably be consolidated so that when EITHER flot OR map is clicked, the same chunk of code for marker = new google.maps.Marker.... is used. The only difference appears to be the indexes: map_pos_index vs selected_index_large.
-  var selectedMarkers = new Array();
-  var map_pos_index = {{map_pos_index}};
-  if (map_pos_index != null) {
-    for (var i =0; i < selectedMarkers.length; i++) {
-    selectedMarkers[i].gmap.setMap(null);
-    }
- 
-    marker.gmap = new google.maps.Marker({
-      position: new google.maps.LatLng
-        (
-        position_data[map_pos_index][8][0],
-        position_data[map_pos_index][8][1]
-        ),
-      map: map,
-      zIndex: google.maps.Marker.MAX_ZINDEX + 1
-      // zIndex sets marker on top of all other markers
-      
-      // Note: When no icon, uses default large/red marker
-      // icon: 'http://maps.google.com/mapfiles/ms/micons/red-dot.png'
-    
-    }); // end setting marker data
-
-    // Set on click infoWindow content for highlighted data marker
-
-    var content =   '<b>Data ID: </b>' + position_data[map_pos_index][1] +
-      '<br><b>Deployment ID: </b>' + position_data[map_pos_index][0] + 
-          '<br><b>Lat, Lon: </b> ' +
-        position_data[map_pos_index][8][0].toFixed(6) + ', ' +
-    position_data[map_pos_index][8][1].toFixed(6) +
-      '<br><b>Easting, Northing, Zone: </b> ' + 
-        position_data[map_pos_index][3] + ', ' + 
-        position_data[map_pos_index][4] + ', ' + 
-      position_data[map_pos_index][5] +
-          position_data[map_pos_index][9] +
-      '<br><b>Date/Time: </b>' + position_data[map_pos_index][10] + 
-        '<br><b>Activity: </b>' + position_data[map_pos_index][7] +
-    '<br><b>Likelihood: </b>' + position_data[map_pos_index][6];
-
-    var infoWindow = new google.maps.InfoWindow({content: content});
-    
-    // click Listener for markers
-    google.maps.event.addListener(marker.gmap, 'click', 
-      function (event)
-        {
-          infoWindow.open(map, this);
-        } // end event function
-    ); // end click Listener
-  
-  } // end if map_pos_index
-
-  selectedMarkers.push(marker);
 
 
 
@@ -838,7 +838,6 @@ $(function() {
 
 } //endif positions
 </script>
-
 
 </head>
 
