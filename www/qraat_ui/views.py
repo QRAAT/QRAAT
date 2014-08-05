@@ -181,7 +181,7 @@ def get_context(request, deps=[], req_deps=[]):
         (lat, lon) = utm.to_latlon(float(q.easting), float(q.northing), 
           q.utm_zone_number, q.utm_zone_letter)
         date_string = time.strftime('%Y-%m-%d %H:%M:%S', 
-          time.localtime(float(q.timestamp-7*60*60))) #FIXME
+                time.localtime(float(q.timestamp-7*60*60))) #FIXME: Hardcode timestamp conversion 
 
         queried_data.append((q.ID, q.deploymentID, float(q.timestamp), 
           float(q.easting), float(q.northing), q.utm_zone_number, 
@@ -258,160 +258,9 @@ def get_context(request, deps=[], req_deps=[]):
                           activity__gte = activity_low,
                           activity__lte = activity_high) '''
   
-
-  '''FIXME: Can remove this AJAX or JS function calls between maps and flot are worked out. Calculate the nearest point on map in JS (see example code in the polyline section in index.html '''
-  
   ## Clicking Point on map ################################
   # FIXME This should be done in Javascript? 
   # Get clicked lat, lon from js event --> html form & convert to UTM
-  
-  
-
-  if lat_clicked and lng_clicked and queried_data:    
-    (easting_clicked, northing_clicked, utm_zone_number_clicked, utm_zone_letter_clicked) = utm.from_latlon(float(lat_clicked), float(lng_clicked))
-
-    # Truncate northing and easting for the query
-    # Divide by 10 (click needs to be closer) or 100 (less accurate) to increase the distance allowed between the clicked point and the actual point
-    northing_clicked_trunc = (int(northing_clicked))/100
-    easting_clicked_trunc = (int(easting_clicked))/100
-
-    # Query the data that matches the northing and easting 
-    filtered_list = queried_objects.filter(
-      northing__startswith=northing_clicked_trunc, 
-      easting__startswith=easting_clicked_trunc).order_by('-northing', '-easting')
-    selected_list = []
-    for f in filtered_list:
-      selected_list.append(
-        math.sqrt((northing_clicked - float(f.northing)) *
-          (northing_clicked - float(f.northing))
-        + (easting_clicked - float(f.easting)) * 
-          (easting_clicked - float(f.easting))))
-  
-    # Get the index of the smallest distance
-    print "filtered_list", filtered_list
-    print "selected_list", selected_list
-    if len(selected_list) >0:
-    #if filtered_list is not None and selected_list is not None:
-      selected_message = ""
-      selected_index = selected_list.index(min(selected_list))
-      # Get the data corresponding to the selected index
-      sel = filtered_list[selected_index]
-      
-      
-      
-      # TODO Set FLOT to new deployment.
-      
-      queried_objects_subset = queried_objects.filter(
-                                  deploymentID = sel.deploymentID)
-      print 'DeploymentID of selected point',  sel.deploymentID
-      print "ID of sel point", sel.ID
-      
-      #graph_dep is the dep of the clicked point in map
-      graph_dep = sel.deploymentID
-      
-      # index in subset array for clicked map pt. 
-        #(passed to html button for flot)
-      for i in range(len(queried_objects_subset)): 
-        if queried_objects_subset[i].ID == sel.ID:
-          map_dep_index = i
-      print "map_dep_index", map_dep_index
-      
-      # index in the large pos array for clicked map pt (passed to map)
-      for i in range(len(queried_objects)):
-        if queried_objects[i].ID == sel.ID:
-          map_pos_index = i
-      print "map_pos_index", map_pos_index
-      
-      queried_data_IDs = [int(x[0]) for x in queried_data]
-      selected_index_large = queried_data_IDs.index(
-                                long(sel.ID))
-
-      '''This is obsolete: 
-      
-      (lat_clicked_point, lng_clicked_point) = utm.to_latlon(
-          float(sel.easting), float(sel.northing),
-          sel.utm_zone_number, sel.utm_zone_letter)
-      selected_data.append((
-        float(lat_clicked),
-        float(lng_clicked),
-        sel.ID,                 # [2]: position ID
-        sel.deploymentID,       # [3]: deploymentID
-        float(sel.timestamp),   # [4]: timestamp UTC seconds
-        float(sel.easting),     # [5]: easting
-        float(sel.northing),    # [6]: northing
-        sel.utm_zone_number,    # [7]: utm zone number
-        float(sel.likelihood),  # [8]: likelihood
-        float(sel.activity),    # [9]: activity
-          (float(lat_clicked_point),    # [10][0]: db pt closest to click
-          float(lng_clicked_point)),     # [10][1]: db pt closest to click
-        time.strftime('%Y-%m-%d %H:%M:%S', # [11]: date string in Davis time
-          time.localtime(float(sel.timestamp-7*60*60))),
-        sel.utm_zone_letter     # utm zone letter
-      ))
-      #get index in the original filtered list, for the clicked point      
-      queried_data_IDs = [int(x[0]) for x in queried_data]
-      selected_index_large = queried_data_IDs.index(
-                                long(selected_data[0][2]))
-      '''
-
-      '''FIXME needs to be changed to be the index of the subset because it is passed to flot to highlight.'''
-
-                  # IF FLOT IS SELECTED:
-          # Populate selected_data list with data based on index
-          # FIXME could probably be changed to work the large list of data
-
-  ### Click Point on graph ######################
-  if flot_index and flot_dep and queried_data:
-    print "flot index", flot_index
-    #if graph_dep == None:
-    #graph_dep = deps[0].ID
-    graph_dep = flot_dep
-    #find the deployment of the selected point in flot
-
-    queried_objects_dep = queried_objects.filter(
-      deploymentID = graph_dep)
-    
-    print 'Point on map:', queried_objects_dep[flot_index].deploymentID
-    for i in range(len(queried_objects)): 
-      if queried_objects[i].ID == queried_objects_dep[flot_index].ID:
-        selected_index_large = i
-    
-#    queried_data_dep = [] 
-#    for i in queried_objects_dep:
-#      (lat, lon) = utm.to_latlon(float(i.easting), float(i.northing), 
-#          i.utm_zone_number, i.utm_zone_letter)
-#      date_string = time.strftime('%Y-%m-%d %H:%M:%S', 
-#          time.localtime(float(i.timestamp-7*60*60))) #FIXME
-#      queried_data_dep.append((i.ID, i.deploymentID, float(i.timestamp), 
-#          float(i.easting), float(i.northing), i.utm_zone_number, 
-#          float(i.likelihood), float(i.activity), (lat, lon), 
-#          i.utm_zone_letter, date_string))
-#
-#    print "graph_dep", graph_dep
-#    print "len data dep", len(queried_data_dep)
-#    selected_data.append((
-#        None,   # [0]: nothing clicked
-#        None,   # [1]: nothing clicked
-#        queried_data_dep[flot_index][0],   # [2]: ID
-#        queried_data_dep[flot_index][1],   # [3]: deploymentID
-#        float(queried_data_dep[flot_index][2]), # [4]: timestamp
-#        float(queried_data_dep[flot_index][3]), # [5]: easting
-#        float(queried_data_dep[flot_index][4]), # [6]: northing
-#        queried_data[flot_index][5], # [7]: utm zone number
-#        float(queried_data_dep[flot_index][6]), # [8]: likelihood
-#        float(queried_data_dep[flot_index][7]), # [9]: activity
-#        # [10]: tuple: [10][0]: lat, [10][1]: lon
-#        (float(queried_data_dep[flot_index][8][0]),
-#        float(queried_data_dep[flot_index][8][1])),
-#        # [11] Davis time string converted from timestamp UTC seconds
-#        time.strftime('%Y-%m-%d %H:%M:%S', 
-#          time.localtime(float(queried_data_dep[flot_index][2]-7*60*60))),
-#        # [12] utm zone letter
-#        queried_data_dep[flot_index][9]
-#      ))
-  
-  print "large", selected_index_large
-  print "small", selected_index
   
   context = {
             #public, deployment, project, etc.
@@ -448,24 +297,7 @@ def get_context(request, deps=[], req_deps=[]):
             # Deployment selected for graph
             'graph_dep': json.dumps(graph_dep),
             'graph_dep_django': graph_dep,
-
-            #if pos successfully clicked
-            'selected_message': selected_message, 
             
-            #map-clicked i in filtered pos_data
-            'selected_index': selected_index, 
-            
-            #clicked i in pos_data
-            'selected_index_large': json.dumps(selected_index_large),
-            'selected_index_large_django': selected_index_large,
-            
-            # index in large array of the clicked point in maps 
-            'map_pos_index': json.dumps(map_pos_index),
-            #index in dep array of the clicked point in maps
-            'map_dep_index': map_dep_index,
-            
-            #flot selected i in pos_data
-            'flot_index': json.dumps(flot_index), 
             #dep that's displayed in flot
             'flot_dep': json.dumps(flot_dep),
 
