@@ -29,7 +29,7 @@ def header_read(filename):
     header_str = afsk_file.read(read_len)
 
   afsk_header = struct.unpack(read_fmt, header_str)
-  return afsk_header
+  return (afsk_header, read_len)
 
 def header_create(rate, center_freq, mark_freq, space_freq):
   afsk_header = struct.pack(header_fmt,
@@ -40,22 +40,65 @@ def header_create(rate, center_freq, mark_freq, space_freq):
 
   return (afsk_header, header_len)
 
+class decode_string:
+
+  def __init__(self, start_sample, end_sample, bit_vector):
+    self.start_sample = start_sample
+    self.end_sample = end_sample
+    self.binary = self.binary_conversion(bit_vector)
+    (self.string, self.error) = self.string_conversion(bit_vector)
+
+  def binary_conversion(self, bit_vector):
+    index = 0
+    byte_index = 0
+    temp_byte = 0
+    integer_list = []
+    while index < len(bit_vector):
+      temp_byte += 2**byte_index*bit_vector[index]
+      byte_index += 1
+      if byte_index == 8:
+        integer_list.append(temp_byte)
+        byte_index = 0
+        temp_byte = 0
+      index += 1
+    if not byte_index == 0:
+      integer_list.append(temp_byte)
+    return bytearray(integer_list)
+
+  def string_conversion(self, bit_vector):
+    error_flag = False
+    data_str = ''
+    num_char = len(bit_vector)//10
+    for j in range(num_char):
+      if (bit_vector[j*10] == 0) and (bit_vector[j*10+9] == 1):
+        char_val = 0;
+        for k in range(8):
+          char_val += (2**k) * bit_vector[j*10+k+1];
+        data_str += chr(char_val)
+      else:
+        error_flag = True;
+        break
+
+    return (data_str, error_flag)
+
+
 class afsk:
 
   def __init__(self, filename=None):
 
     if filename:
-      header_data = header_read(filename)
+      (header_data, read_len) = header_read(filename)
       self.unix_time = long(header_data[0]) + int(header_data[1])*0.000001#may truncate fractions of seconds
       self.rate = float(header_data[2])
       self.center_freq = float(header_data[3])
       self.mark_freq = float(header_data[4])
       self.space_freq = float(header_data[5])
       with open(filename) as afsk_file:
-        afsk_file.seek(header_len)
+        afsk_file.seek(read_len)
         data = np.fromfile(afsk_file,dtype=np.float32)
       self.mark_data = data[::2]
       self.space_data = data[1::2]
+      #TODO get deploymentID from filename?
 
     else:
       self.unix_time = 0.0
@@ -69,10 +112,7 @@ class afsk:
 
   def decode(self):
 
-    self.start_index = []
-    self.stop_index = []
-    self.data_binary = []
-    self.data_string = []
+    self.decoded_list = []
 
     power_threashold = 0.74#TODO determine dynamically
     step_size = 32000/self.rate; #number of samples (at 32k) between measurement windows
@@ -128,21 +168,6 @@ class afsk:
       for j in range(num_char*10 - len(bit_vector)):
         bit_vector.append(1)
 
-      error_flag = False
-      data_str = ''
-      for j in range(num_char):
-        if (bit_vector[j*10] == 0) and (bit_vector[j*10+9] == 1):
-          char_val = 0;
-          for k in range(8):
-            char_val += (2**k) * bit_vector[j*10+k+1];
-          data_str += chr(char_val)
-        else:
-          error_flag = True;
-          print "ERROR:: sr: {0}, j: {1}, data string = {2}".format(sr,j,data_str)
-          break
-
-      if not error_flag:
-        print "sr: {0}, data string = {1}".format(sr, data_str)
-
+      self.decoded_list.append(decode_string(m_range[0], m_range[1], bit_vector))
       sr += 2
 
