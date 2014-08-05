@@ -22,17 +22,21 @@
     <script src="/static/flot/jquery.flot.resize.min.js"></script>
 
 <script>
-// Global variables
-  var highlightedPoly;
-  var selectedMarker;
-  var map;
-  var mapCenter;
-  var markers = [];
-  selectedMarkers = new Array();
+    // Global variables
+    var highlightedPoly;
+    var selectedMarker;
+    var map;
+    var mapCenter;
+    var markers = [];
+    markers_querydata = new Array();
+    selectedMarkers = new Array();
 
 function addSelectedPos(marker, map){
     /*Add a marker to a selected position point*/
             for (var i =0; i < selectedMarkers.length; i++) {
+                if(selectedMarkers[i].qraat_pos[1] != marker.qraat_pos[1]){
+                    loadFlot(markers_querydata, map, marker.qraat_pos[1]);
+                } //Deployment changed needs to load a new chart
                 if(selectedMarkers[i].selected)
                     selectedMarkers[i].selected.setMap(null);
                 else
@@ -56,7 +60,7 @@ function addSelectedPos(marker, map){
 
 }
 
-function loadFlot(markers, map){
+function loadFlot(markers, map, dep_id){
     //Loads flot graph
 
   //save flot clicked info (don't think this needs to be global)
@@ -73,11 +77,11 @@ function loadFlot(markers, map){
       // Position data for all requested deployments
       var pos_markers = markers; 
 
+      var graph_dep = dep_id;
       var graph_data = {{graph_data}};
       var label, min, max;
       var deps = {{deps_list}};
       var graph_data_index;
-      var flot_dep = {{flot_dep}};
 
       // graph_data_index specifies column in pos_data to display in Flot. 
       if (graph_data!=2) { // likelihood (default)
@@ -91,7 +95,7 @@ function loadFlot(markers, map){
       // Should never NOT be null. Set even if GET request has no form data. 
         var d1=[];
         for (var i=0; i < pos_markers.length; i++) {
-          if (pos_markers[i].qraat_pos[1] == {{graph_dep}}) {
+          if (pos_markers[i].qraat_pos[1] == graph_dep) {
             pos_markers[i].flot_index = i; 
             d1.push([pos_markers[i].qraat_pos[2]*1000-7*60*60*1000, pos_markers[i].qraat_pos[graph_data_index]]);
             d2.push([pos_markers[i].qraat_pos[2]*1000-7*60*60*1000, //timestamp
@@ -101,12 +105,12 @@ function loadFlot(markers, map){
           } 
         }
 
-      var data =[ { data: d1, label: "{{graph_dep}}", lines: {show:true} } ]
+      var data =[ { data: d1, label: graph_dep, lines: {show:true} } ]
       
       var color = ["#8383FF", "yellow", "green", "#B00000"]
 
       for (i=0; i < deps.length; i++) {
-        if ({{graph_dep}} == deps[i]) { var colorIndex = i; }
+        if (graph_dep == deps[i]) { var colorIndex = i; }
         //else { var colorIndex = 0; }
       }
       
@@ -137,7 +141,6 @@ function loadFlot(markers, map){
         clickedDateTime = item.dataIndex;
         
         addSelectedPos(d2[item.dataIndex][2], map);
-        document.getElementById('flot_dep').value = d2[item.dataIndex][3];
 
       });
 
@@ -403,7 +406,7 @@ function initialize(){
   } //end for loop for site locations
 
 // Display markers for the data points 
-  var markers_querydata = new Array();
+ 
   var infoWindows_querydata = new Array();    
   var position_data = {{pos_data|safe}};
   var display_type = {{display_type}};
@@ -511,7 +514,7 @@ function initialize(){
         infoWindows_querydata.push(infoWindow);
         markers_querydata.push(marker);
     } //end for loop for query data
-        loadFlot(markers_querydata, map);
+    loadFlot(markers_querydata, map, {{graph_dep}});
   } //end if statement for displaying query data as points (not lines)
 
 
@@ -769,7 +772,6 @@ google.maps.event.addDomListener(window, 'load', initialize);
 {% endfor %}
 </font>
 
-<input type="hidden" name="flot_dep" id="flot_dep">
 </form>
 
 <!-- <font size="1">date range: 2013-08-13  13:57:16 to 2014-06-16 14:28:12</font> -->

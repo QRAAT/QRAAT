@@ -298,9 +298,6 @@ def get_context(request, deps=[], req_deps=[]):
             'graph_dep': json.dumps(graph_dep),
             'graph_dep_django': graph_dep,
             
-            #dep that's displayed in flot
-            'flot_dep': json.dumps(flot_dep),
-
             #graph queried data as lines or points on map
             'display_type': json.dumps(display_type),
             'data_type': json.dumps(data_type), #position vs. track 
