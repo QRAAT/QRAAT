@@ -17,7 +17,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
-import struct
+import struct, re
+
+tag_regex = re.compile("([^/]*)_[0-9]*\.afsk$")
 
 header_fmt = "ffff"
 header_len = struct.calcsize(header_fmt)
@@ -45,7 +47,7 @@ class decode_string:
   def __init__(self, start_sample, end_sample, bit_vector):
     self.start_sample = start_sample
     self.end_sample = end_sample
-    self.binary = self.binary_conversion(bit_vector)
+    self.raw_hex_str = self.binary_conversion(bit_vector)
     (self.string, self.error) = self.string_conversion(bit_vector)
 
   def binary_conversion(self, bit_vector):
@@ -53,17 +55,21 @@ class decode_string:
     byte_index = 0
     temp_byte = 0
     integer_list = []
+    binary_str = ''
     while index < len(bit_vector):
       temp_byte += 2**byte_index*bit_vector[index]
       byte_index += 1
       if byte_index == 8:
-        integer_list.append(temp_byte)
+        binary_str += '{0:02x}'.format(temp_byte)
+        #integer_list.append(temp_byte)
         byte_index = 0
         temp_byte = 0
       index += 1
     if not byte_index == 0:
-      integer_list.append(temp_byte)
-    return bytearray(integer_list)
+      #integer_list.append(temp_byte)
+      binary_str += '{0:02x}'.format(temp_byte)
+    #return bytearray(integer_list)
+    return binary_str
 
   def string_conversion(self, bit_vector):
     error_flag = False
@@ -87,18 +93,23 @@ class afsk:
   def __init__(self, filename=None):
 
     if filename:
-      (header_data, read_len) = header_read(filename)
-      self.unix_time = long(header_data[0]) + int(header_data[1])*0.000001#may truncate fractions of seconds
-      self.rate = float(header_data[2])
-      self.center_freq = float(header_data[3])
-      self.mark_freq = float(header_data[4])
-      self.space_freq = float(header_data[5])
-      with open(filename) as afsk_file:
-        afsk_file.seek(read_len)
-        data = np.fromfile(afsk_file,dtype=np.float32)
-      self.mark_data = data[::2]
-      self.space_data = data[1::2]
-      #TODO get deploymentID from filename?
+      m = tag_regex.search(filename)
+      if m:
+        self.tag_name = m.groups()[0]
+        (header_data, read_len) = header_read(filename)
+        self.unix_time = long(header_data[0]) + int(header_data[1])*0.000001#may truncate fractions of seconds
+        self.rate = float(header_data[2])
+        self.center_freq = float(header_data[3])
+        self.mark_freq = float(header_data[4])
+        self.space_freq = float(header_data[5])
+        with open(filename) as afsk_file:
+          afsk_file.seek(read_len)
+          data = np.fromfile(afsk_file,dtype=np.float32)
+        self.mark_data = data[::2]
+        self.space_data = data[1::2]
+      else:
+        raise IOError("Couldn't read tagname from file or not an afsk file")
+
 
     else:
       self.unix_time = 0.0
@@ -114,7 +125,7 @@ class afsk:
 
     self.decoded_list = []
 
-    power_threashold = 0.74#TODO determine dynamically
+    
     step_size = 32000/self.rate; #number of samples (at 32k) between measurement windows
 
     one_single = 145.0/step_size;
@@ -123,6 +134,8 @@ class afsk:
     zero_len = 92.5/step_size;
 
     data_sum = self.mark_data + self.space_data
+
+    power_threashold = np.max(data_sum)/2.0 #0.74
 
     signal_indexes = np.where(data_sum > power_threashold)[0]
     signal_indexes = np.append(signal_indexes,self.mark_data.shape[0])
@@ -170,4 +183,14 @@ class afsk:
 
       self.decoded_list.append(decode_string(m_range[0], m_range[1], bit_vector))
       sr += 2
+
+  def write_to_db(self, db_con, siteID = 'NULL'):
+
+    if self.decoded_list:
+      cur = db_con.cursor()
+      for ds in self.decoded_list:
+        calc_start_time = self.unix_time + ds.start_sample/self.rate
+        calc_stop_time = self.unix_time + ds.end_sample/self.rate
+        cur.execute("INSERT INTO afsk (deploymentID, siteID, start_timestamp, stop_timestamp, message, binary_data, error) VALUES (%s, %s, %s, %s, x%s, %s, %s);", [self.tag_name, siteID, calc_start_time, calc_stop_time, ds.string, ds.raw_hex_str, ds.error])
+
 

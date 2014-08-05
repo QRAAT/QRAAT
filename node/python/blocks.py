@@ -274,18 +274,15 @@ class gps_afsk(gr.hier_block2):
                      gr.io_signature(num_ch, num_ch, gr.sizeof_gr_complex), # Input signature
                      gr.io_signature(0, 0, 0))     # Output signature
 
+
     #afsk
     self.afsk = afsk_demod(input_rate, afsk_output_rate, mark_freq, space_freq)
     afsk_actual_output_rate = self.afsk.output_rate
 
-    header_fmt="ffff"
-    afsk_header = struct.pack(header_fmt,
-          float(afsk_actual_output_rate),    #sampling rate (Hz)
-          float(center_freq),                #RF center frequency (Hz)
-          float(mark_freq),                  #mark frequency (Hz)
-          float(space_freq))                 #space frequency (Hz)
+    import qraat.afsk
+    (afsk_header, afsk_header_len) = qraat.afsk.write_header(afsk_actual_output_rate, center_freq, mark_freq, space_freq)
 
-    self.afsk_out = file_sink(gr.sizeof_float, dirname, txname, ".afsk", afsk_header, struct.calcsize(header_fmt))
+    self.afsk_out = file_sink(gr.sizeof_float, dirname, txname, ".afsk", afsk_header, afsk_header_len)
 
     self.connect((self, 0), self.afsk, self.afsk_out)
 
@@ -298,15 +295,10 @@ class gps_afsk(gr.hier_block2):
     for j in range(num_ch):
       self.connect((self, j), gr.stream_to_vector(gr.sizeof_gr_complex, cc_vlen), (self.cc,j))
 
-    header_fmt="iiffi"
-    cc_header = struct.pack(header_fmt, 
-          int(num_ch),                       #number of channels
-          int(cc_out_vlen),                  #number of floats per sample
-          float(cc_actual_output_rate),      #sampling rate
-          float(center_freq),                #RF center frequency
-          int(cc_vlen))                      #length of measurement in samples
+    import qraat.continuous_covariance
+    (cov_header, cov_header_len) = qraat.continuous_covariance.write_header(num_ch, cc_out_vlen, cc_actual_output_rate, center_freq, cc_vlen)
 
-    self.cc_out = file_sink(gr.sizeof_float*cc_out_vlen, dirname, txname, ".cov", cc_header, struct.calcsize(header_fmt))
+    self.cc_out = file_sink(gr.sizeof_float*cc_out_vlen, dirname, txname, ".cov", cc_header, cc_header_len)
 
     self.connect(self.cc, self.cc_out)
 
