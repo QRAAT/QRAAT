@@ -34,6 +34,13 @@ selectedMarkers = new Array();
 
 function addSelectedPos(marker, map){
     /*Add a marker to a selected position point*/
+	for (var i =0; i < selectedMarkers.length; i++) {
+		if(selectedMarkers[i].selected)
+			selectedMarkers[i].selected.setMap(null);
+		else
+			selectedMarkers[i].setMap(null);
+	}
+
 	marker.selected = new google.maps.Marker({
 		position: new google.maps.LatLng
 		(
@@ -47,25 +54,19 @@ function addSelectedPos(marker, map){
 
 	// Set on click infoWindow content for highlighted data marker
 	addInfoWindow(marker.selected, marker.qraat_pos, map);
-
-	for (var i =0; i < selectedMarkers.length; i++) {
-		if(selectedMarkers[i].selected)
-			selectedMarkers[i].selected.setMap(null);
-		else
-			selectedMarkers[i].setMap(null);
-	}
-	//Empty selected markers array
+	
+	//Empty selectedMarkers array
 	selectedMarkers = new Array();
 
 	selectedMarkers.push(marker);
 
 	// Deployment changed need to reload flot
 	if(marker.qraat_pos[1] != curr_dep){
-		var marker = reloadFlot(markers_querydata, map, marker);
+		reloadFlot(markers_querydata, map, marker);
 		curr_dep = marker.qraat_pos[1];
 	}
+	
 	selectFlotPoint(marker);
-
 }
 
 function getGraphData(markers, dep_id, sel_data){
@@ -85,10 +86,10 @@ function getGraphData(markers, dep_id, sel_data){
     //FIXME: bad smell hardcoded timestamp conversion
     for (var i=0; i < markers.length; i++) {
         if (markers[i].qraat_pos[1] == dep_id) {
-            var marker = markers[i];
-            marker.flot_index = i; 
-            data.graph.push([markers[i].qraat_pos[2]*1000-7*60*60*1000, markers[i].qraat_pos[graph_data_index]]);
-            data.markers.push(marker);
+            var flot_point = [markers[i].qraat_pos[2]*1000-7*60*60*1000, markers[i].qraat_pos[graph_data_index]];
+            markers[i].flot_point = flot_point; 
+            data.graph.push(flot_point);
+            data.markers.push(markers[i]);
             data.deployments.push(markers[i].qraat_pos[1]);
         } 
     }
@@ -97,15 +98,14 @@ function getGraphData(markers, dep_id, sel_data){
 
 function reloadFlot(markers, map, marker){
 	var dep_id = marker.qraat_pos[1];
-	plot.shutdown();
-	$("placeholder2").unbind("plotclick");
+	$("#placeholder2").data("plot").shutdown();
 	loadFlot(markers, map, dep_id);
 	//Set the marker 
-	for(var i=0; i<markers.length; i++){
+	/*for(var i=0; i<markers.length; i++){
 		if(marker.qraat_pos[0] == markers[i].qraat_pos[0]){
-			return markers[i];
+			marker.flot_index = markers[i].flot_index;
 		}
-	}
+	}*/
 }
 
 function loadFlot(pos_markers, map, dep_id){
@@ -121,7 +121,6 @@ function loadFlot(pos_markers, map, dep_id){
     $("#dep_id").text(dep_id);
 
     data = getGraphData(pos_markers, dep_id, sel_data);
-    console.log(data);
 
     var graph_data =[ { data: data.graph, label: graph_dep, lines: {show:true} } ];
 
@@ -140,8 +139,8 @@ function loadFlot(pos_markers, map, dep_id){
         selection: { mode: "xy" },
         colors: [ color[colorIndex] ]
     };
-
-    plot = $.plot("#placeholder2", graph_data, options);
+    
+    var plot = $.plot("#placeholder2", graph_data, options);
 
     // Select maker in map when clicked on flot
     $("#placeholder2").bind("plotclick", function (event, pos, item) {
@@ -160,8 +159,8 @@ function loadFlot(pos_markers, map, dep_id){
 }
 
 function selectFlotPoint(marker){
-    plot.unhighlight();
-    plot.highlight(0, marker.flot_index);
+    $("#placeholder2").data("plot").unhighlight();
+    $("#placeholder2").data("plot").highlight(0, marker.flot_point);
 }
 
 function addInfoWindow(marker, data, map){
