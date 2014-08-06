@@ -22,16 +22,15 @@
     <script src="/static/flot/jquery.flot.resize.min.js"></script>
 
 <script>
-    // Global variables
-    var highlightedPoly;
-    var selectedMarker;
-    var map;
-    var mapCenter;
-    var markers = [];
-	first_dep = {{graph_dep}};
-	curr_dep = first_dep;
-    markers_querydata = new Array();
-    selectedMarkers = new Array();
+// Global variables
+var highlightedPoly;
+var map;
+var mapCenter;
+var markers = [];
+first_dep = {{graph_dep}};
+curr_dep = first_dep;
+markers_querydata = new Array();
+selectedMarkers = new Array();
 
 function addSelectedPos(marker, map){
     /*Add a marker to a selected position point*/
@@ -69,6 +68,33 @@ function addSelectedPos(marker, map){
 
 }
 
+function getGraphData(markers, dep_id, sel_data){
+    
+    data = {}
+    data.graph = new Array();
+    data.markers = new Array();
+    data.deployments = new Array();
+
+    // graph_data_index specifies column in pos_data to display in Flot. 
+    if (sel_data ==2) { // activity 
+        graph_data_index = 7;
+    }
+    else{ // likelihood (default)
+        graph_data_index = 6; 
+    }
+    //FIXME: bad smell hardcoded timestamp conversion
+    for (var i=0; i < markers.length; i++) {
+        if (markers[i].qraat_pos[1] == dep_id) {
+            var marker = markers[i];
+            marker.flot_index = i; 
+            data.graph.push([markers[i].qraat_pos[2]*1000-7*60*60*1000, markers[i].qraat_pos[graph_data_index]]);
+            data.markers.push(marker);
+            data.deployments.push(markers[i].qraat_pos[1]);
+        } 
+    }
+    return data;
+}
+
 function reloadFlot(markers, map, marker){
 	var dep_id = marker.qraat_pos[1];
 	plot.shutdown();
@@ -85,54 +111,27 @@ function reloadFlot(markers, map, marker){
 function loadFlot(pos_markers, map, dep_id){
   //Loads flot graph
 
-  var flot_clicked_series;
-  var flot_clicked_datapoint;
-  // Data arrays
-  var d = new Array(); 
-  var d1 = new Array();
-  var d2 = new Array();
-      var graph_dep = dep_id;
-      var graph_data = {{graph_data}};
-      var label, min, max;
-      var deps = {{deps_list}};
-      var graph_data_index;
+    var flot_clicked_series;
+    var flot_clicked_datapoint;
+    var graph_dep = dep_id;
+    var sel_data = {{graph_data}};
+    var label, min, max;
+    var deps = {{deps_list}};
       
-      $("#dep_id").text(dep_id);
+    $("#dep_id").text(dep_id);
 
-      // graph_data_index specifies column in pos_data to display in Flot. 
-      if (graph_data ==2) { // activity 
-        graph_data_index = 7;
-	  }
-      else{ // likelihood (default)
-        graph_data_index = 6; 
-      }
+    data = getGraphData(pos_markers, dep_id, sel_data);
+    console.log(data);
 
-      //FIXME: bad smell hardcoded timestamp conversion
-      // Should never NOT be null. Set even if GET request has no form data. 
-        for (var i=0; i < pos_markers.length; i++) {
-          if (pos_markers[i].qraat_pos[1] == graph_dep) {
-            pos_markers[i].flot_index = i; 
-            d1.push([pos_markers[i].qraat_pos[2]*1000-7*60*60*1000, pos_markers[i].qraat_pos[graph_data_index]]);
-            d2.push([pos_markers[i].qraat_pos[2]*1000-7*60*60*1000, //timestamp
-                    pos_markers[i].qraat_pos[graph_data_index], //activity or likelihood
-                    pos_markers[i], // marker 
-                    pos_markers[i].qraat_pos[1]]); // deploymentID
-          } 
-		  else{
-		    pos_markers[i].flot_index = -1;	
-		  }
-        }
+    var graph_data =[ { data: data.graph, label: graph_dep, lines: {show:true} } ];
 
-      var data =[ { data: d1, label: graph_dep, lines: {show:true} } ]
-      
-      var color = ["#8383FF", "yellow", "green", "#B00000"]
+    var color = ["#8383FF", "yellow", "green", "#B00000"];
 
-      for (i=0; i < deps.length; i++) {
-        if (graph_dep == deps[i]) { var colorIndex = i; }
-        //else { var colorIndex = 0; }
-      }
-      
-      var options = {
+    for (i=0; i < deps.length; i++) {
+        if (graph_dep == deps[i]) { var colorIndex = i; };
+    }
+
+    var options = {
         legend: { show: false },
         series: { lines: { show: true }, points: { show: false } },
         grid: { hoverable: true, clickable: true },
@@ -140,24 +139,24 @@ function loadFlot(pos_markers, map, dep_id){
         highlightColor: 'red',
         selection: { mode: "xy" },
         colors: [ color[colorIndex] ]
-      };
+    };
 
-      plot = $.plot("#placeholder2", data, options);
+    plot = $.plot("#placeholder2", graph_data, options);
 
-      // Select maker in map when clicked on flot
-      $("#placeholder2").bind("plotclick", function (event, pos, item) {
+    // Select maker in map when clicked on flot
+    $("#placeholder2").bind("plotclick", function (event, pos, item) {
         if (item == undefined) return false;
-      //uncomment to have this show up after enablePosition2 in the html (perhaps clickdata2?) 
-      //$("#clickdata2").text("Index " + item.dataIndex +', Date/Time:'+item.datapoint[0]+', '+item.series.label + ': ' + item.datapoint[1]);
-        
+        //uncomment to have this show up after enablePosition2 in the html (perhaps clickdata2?) 
+        //$("#clickdata2").text("Index " + item.dataIndex +', Date/Time:'+item.datapoint[0]+', '+item.series.label + ': ' + item.datapoint[1]);
+
         //save clicked info in global variables
         flot_clicked_series = item.series;
         flot_clicked_datapoint = item.datapoint;
-        
-        clickedDateTime = item.dataIndex;
-        addSelectedPos(d2[item.dataIndex][2], map);
 
-      });
+        clickedDateTime = item.dataIndex;
+        addSelectedPos(data.markers[item.dataIndex], map);
+
+    });
 }
 
 function selectFlotPoint(marker){
