@@ -28,70 +28,69 @@
     var map;
     var mapCenter;
     var markers = [];
+	first_dep = {{graph_dep}};
+	curr_dep = first_dep;
     markers_querydata = new Array();
     selectedMarkers = new Array();
 
 function addSelectedPos(marker, map){
-	var aux_selected_markers = selectedMarkers;
     /*Add a marker to a selected position point*/
-            for (var i =0; i < aux_selected_markers.length; i++) {
-                if(selectedMarkers[i].selected)
-                    selectedMarkers[i].selected.setMap(null);
-                else
-                    selectedMarkers[i].setMap(null);
-				//TODO: Fix this
-                if(selectedMarkers[i].qraat_pos[1] != marker.qraat_pos[1]){
-                    reloadFlot(markers_querydata, map, marker);
-				} //Deployment changed needs to load a new chart
-            }
-            marker.selected = new google.maps.Marker({
-                position: new google.maps.LatLng
-                (
-                    marker.qraat_pos[8][0],
-                    marker.qraat_pos[8][1]
-                ),
-                map: map,
-                zIndex: google.maps.Marker.MAX_ZINDEX + 1
-                // zIndex sets marker on top of all other markers
-            });
+	marker.selected = new google.maps.Marker({
+		position: new google.maps.LatLng
+		(
+			marker.qraat_pos[8][0],
+			marker.qraat_pos[8][1]
+		),
+		map: map,
+		zIndex: google.maps.Marker.MAX_ZINDEX + 1
+		// zIndex sets marker on top of all other markers
+	});
 
-            addInfoWindow(marker.selected, marker.qraat_pos, map);
-            // Set on click infoWindow content for highlighted data marker
-            selectedMarkers.push(marker);
-            selectFlotPoint(marker);
+	// Set on click infoWindow content for highlighted data marker
+	addInfoWindow(marker.selected, marker.qraat_pos, map);
+
+	for (var i =0; i < selectedMarkers.length; i++) {
+		if(selectedMarkers[i].selected)
+			selectedMarkers[i].selected.setMap(null);
+		else
+			selectedMarkers[i].setMap(null);
+	}
+	//Empty selected markers array
+	selectedMarkers = new Array();
+
+	selectedMarkers.push(marker);
+
+	// Deployment changed need to reload flot
+	if(marker.qraat_pos[1] != curr_dep){
+		var marker = reloadFlot(markers_querydata, map, marker);
+		curr_dep = marker.qraat_pos[1];
+	}
+	selectFlotPoint(marker);
 
 }
 
 function reloadFlot(markers, map, marker){
 	var dep_id = marker.qraat_pos[1];
-	$("#placeholder2").unbind("plotclick");
+	plot.shutdown();
+	$("placeholder2").unbind("plotclick");
 	loadFlot(markers, map, dep_id);
 	//Set the marker 
 	for(var i=0; i<markers.length; i++){
 		if(marker.qraat_pos[0] == markers[i].qraat_pos[0]){
-			selectFlotPoint(markers[i]);
-			break;
+			return markers[i];
 		}
 	}
 }
 
-function loadFlot(markers, map, dep_id){
-    //Loads flot graph
+function loadFlot(pos_markers, map, dep_id){
+  //Loads flot graph
 
-  //save flot clicked info (don't think this needs to be global)
   var flot_clicked_series;
   var flot_clicked_datapoint;
-
-    $(function() {
-
-      // Data arrays
-      var d = [];
-      var d1 = [];
-      var d2 = [];
-
-      // Position data for all requested deployments
-      var pos_markers = markers; 
-
+  // Data arrays
+  var d = new Array(); 
+  var d1 = new Array();
+  var d2 = new Array();
       var graph_dep = dep_id;
       var graph_data = {{graph_data}};
       var label, min, max;
@@ -101,16 +100,15 @@ function loadFlot(markers, map, dep_id){
       $("#dep_id").text(dep_id);
 
       // graph_data_index specifies column in pos_data to display in Flot. 
-      if (graph_data!=2) { // likelihood (default)
-        graph_data_index = 6; 
-      }
-      else if (graph_data ==2) { // activity 
+      if (graph_data ==2) { // activity 
         graph_data_index = 7;
+	  }
+      else{ // likelihood (default)
+        graph_data_index = 6; 
       }
 
       //FIXME: bad smell hardcoded timestamp conversion
       // Should never NOT be null. Set even if GET request has no form data. 
-        var d1=[];
         for (var i=0; i < pos_markers.length; i++) {
           if (pos_markers[i].qraat_pos[1] == graph_dep) {
             pos_markers[i].flot_index = i; 
@@ -120,6 +118,9 @@ function loadFlot(markers, map, dep_id){
                     pos_markers[i], // marker 
                     pos_markers[i].qraat_pos[1]]); // deploymentID
           } 
+		  else{
+		    pos_markers[i].flot_index = -1;	
+		  }
         }
 
       var data =[ { data: d1, label: graph_dep, lines: {show:true} } ]
@@ -153,15 +154,10 @@ function loadFlot(markers, map, dep_id){
         flot_clicked_series = item.series;
         flot_clicked_datapoint = item.datapoint;
         
-        plot.unhighlight(); //unhighlights previous points
-        plot.highlight(item.series, item.datapoint);
         clickedDateTime = item.dataIndex;
-
         addSelectedPos(d2[item.dataIndex][2], map);
 
       });
-
-    }); //end the function for flot
 }
 
 function selectFlotPoint(marker){
@@ -475,8 +471,6 @@ function initialize(){
           disableAutoPan: true
           });
       
-    // submit clicked marker lat,lng to django server to find nearby pts
-    //TODO: Do not make a request to server
     marker.qraat_pos = position_data[i];
     google.maps.event.addListener(marker, 'click',
         function(){ 
@@ -531,7 +525,7 @@ function initialize(){
         infoWindows_querydata.push(infoWindow);
         markers_querydata.push(marker);
     } //end for loop for query data
-    loadFlot(markers_querydata, map, {{graph_dep}});
+    loadFlot(markers_querydata, map, curr_dep);
   } //end if statement for displaying query data as points (not lines)
 
 
