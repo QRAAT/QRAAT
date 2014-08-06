@@ -942,7 +942,6 @@ def score(ids):
 	# individual IDs to intervals. Ensures that all IDs associated with a given
 	# interval key have the same interval.
 	
-        # NOTE Got here
         interval_map = get_interval_map(out_of_order_ids, interval_chunked, id_to_interval)
 
 	key_neighborhood = compute_interval_neighborhood(interval_chunked.keys())
@@ -1717,7 +1716,7 @@ def get_cursor_value(handler, name):
 	rows = cur.execute(q, (name,))
 	if rows == 0:
 		# Default value
-		cur.execute('''INSERT INTO cursor (name, value) 
+		cur.execute('''INSERT INTO `cursor` (name, value) 
                                      VALUE ('estscore', 0)''')
 		return 0
 	elif rows == 1:

@@ -4,6 +4,11 @@
 # a given point. This is on a per transmitter per site basis; a 
 # useful extension to this work will be to coroborate points between
 # sites.
+  
+  # TODO something funky is going on. I expect the scores should be 
+  # close to the theoretical limit for the good windows. 
+
+  # TODO In production, the intervals should overlap. 
 
 import sys
 import qraat
@@ -41,8 +46,8 @@ def get_score_intervals(t_start, t_end):
 def get_interval_data(db_con, dep_id, site_id, interval):
   ''' Get pulse data for interval. 
   
-    Last columns are for the absolute and relative scores of the
-    record. (X[:,5] and X[:,6] resp.) Initially, there values are 0. 
+    Last columns are for the score and theoretically best score of the
+    record. (X[:,5], X[:,6] resp.) Initially, there values are 0. 
   ''' 
 
   cur = db_con.cursor()
@@ -180,19 +185,41 @@ def burst_filter(data, interval):
   return data[np.where(data[:,5] != BURST_BAD)]
 
 
-def time_filter(data, interval):
-  ''' Time filter. Set score absolute score and normalize. ''' 
+def time_filter(data, interval, thresh=None):
+  ''' Time filter. Set score absolute score and normalize. 
+    
+    `thresh` is either None or in [0 .. 1]. If `thresh` is not none,
+    it returns data with relative score of at least this value. 
+  ''' 
 
+  # Compute expected pulse interval. 
   pulse_interval = expected_pulse_interval(data)
+  pulse_error = int(SCORE_ERROR * TIMESTAMP_PRECISION)
   
+  # Best score theoretically possible for this interval. 
+  max_count = int(interval[1] - interval[0]) * TIMESTAMP_PRECISION / pulse_interval 
+  
+  # For each pulse, count the number of coroborating points, i.e., 
+  # points that are a pulse interval away within paramterized error.
+  (rows, _) = data.shape
+  for i in range(rows):
+    count = 0
+    for j in range(rows): 
+      offset = abs(data[i,2] - data[j,2]) % pulse_interval
+      if offset <= pulse_error or offset >= pulse_interval - pulse_error:
+        count += 1
+    data[i,5] = count - 1 # Counted myself.
+    data[i,6] = max_count
+
+  if thresh: 
+    return data[np.where(float(data[:,5]) / data[:,6] >= thresh)]
+  else:
+    return data
 
 
 
 
-
-
-
-
+# Testing, testing ... 
 
 if __name__ == '__main__': 
   db_con = qraat.util.get_db('writer')
@@ -206,3 +233,7 @@ if __name__ == '__main__':
     data = parametric_filter(data, tx_params)
     data = burst_filter(data, interval)
     time_filter(data, interval)
+    print "Time:", interval, "Count:", data.shape[0]
+    for i in range(data.shape[0]):
+      print data[i,0], round(data[i,2] / 1000.0, 2), data[i,5], data[i,6]
+    print 
