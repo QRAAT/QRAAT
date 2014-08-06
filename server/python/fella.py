@@ -18,12 +18,12 @@ BURST_BAD = -2
 
 # Some parameters. 
 BURST_INTERVAL = 10      # seconds
-BURST_THRESHOLD = 2 #20     # pulses/second FIXME
+BURST_THRESHOLD = 20     # pulses/second
 SCORE_INTERVAL = 60 * 5  # seconds
 SCORE_ERROR = 0.2        # seconds
 
-# Factor by which to multiply timestamps. 
-TIMESTAMP_PRECISION = 100
+# Factor by which to multiply timestamps.
+TIMESTAMP_PRECISION = 1000
                           
 
 
@@ -41,12 +41,12 @@ def get_score_intervals(t_start, t_end):
 def get_interval_data(db_con, dep_id, site_id, interval):
   ''' Get pulse data for interval. 
   
-    Last column is for the absolute score of the record.
-    Initially, this value is 0. 
+    Last columns are for the absolute and relative scores of the
+    record. (X[:,5] and X[:,6] resp.) Initially, there values are 0. 
   ''' 
 
   cur = db_con.cursor()
-  cur.execute('''SELECT ID, siteID, timestamp, band3, band10, 0
+  cur.execute('''SELECT ID, siteID, timestamp, band3, band10, 0, 0 
                    FROM est
                   WHERE deploymentID = %s
                     AND timestamp >= %s
@@ -84,7 +84,7 @@ def get_tx_params(db_con, dep_id):
   for (name, value) in cur.fetchall(): 
     if name == 'band3': 
       if value == '':
-        params['band3'] = 600 # sys.maxint  FIXME
+        params['band3'] = sys.maxint
       else: 
         params['band3'] = int(value)
     
@@ -100,6 +100,33 @@ def get_tx_params(db_con, dep_id):
   return params
 
 
+
+def expected_pulse_interval(data): 
+  ''' Compute expected pulse rate over data.
+  
+    Data is assumed to be sorted by timestamp and timestamps should be
+    multiplied by `TIMESTAMP_PRECISION`. (See `get_interval_data()`.)  
+  ''' 
+  
+  (rows, cols) = data.shape
+  
+  # Compute pairwise time differentials. 
+  diffs = []
+  for i in range(rows):
+    for j in range(i+1, rows): 
+      diffs.append(data[j,2] - data[i,2])
+
+  # Create a histogram. Bins are scaled by `SCORE_ERROR`. 
+  (hist, bins) = np.histogram(diffs, bins = (max(data[:,2]) - min(data[:,2]))
+                                        / (SCORE_ERROR * TIMESTAMP_PRECISION))
+  
+  i = np.argmax(hist)
+
+  #print "Expected pulse interval is %.2f seconds" % ((bins[i] + bins[i+1])
+  #                                            / (2 * TIMESTAMP_PRECISION))
+  
+  return int(bins[i] + bins[i+1]) / 2
+  
 
 def parametric_filter(data, tx_params): 
   ''' Parametric filter. Set score to `PARAM_BAD`.
@@ -130,16 +157,20 @@ def burst_filter(data, interval):
                               range = (interval[0] * TIMESTAMP_PRECISION, 
                                        interval[1] * TIMESTAMP_PRECISION),
                               bins = SCORE_INTERVAL / BURST_INTERVAL)
-
+  
+  # Find bins with bursts. 
   bad_intervals = []
-
   for i in range(len(hist)): 
     #print "%d pulses from %.2f to %.2f." % (hist[i], 
     #                float(bins[i]) / TIMESTAMP_PRECISION, 
     #                float(bins[i+1]) / TIMESTAMP_PRECISION)
     if (float(hist[i]) / BURST_INTERVAL) > BURST_THRESHOLD: 
       bad_intervals.append((bins[i], bins[i+1]))
+      # TODO If it were possible to carry around the row index when
+      # computing the histogram, we could mark signals within bad 
+      # bins here. 
 
+  # Mark signals within bad bins. 
   (rows, _) = data.shape
   for i in range(rows): 
     for (t0, t1) in bad_intervals:
@@ -147,6 +178,13 @@ def burst_filter(data, interval):
         data[i,5] = BURST_BAD
 
   return data[np.where(data[:,5] != BURST_BAD)]
+
+
+def time_filter(data, interval):
+  ''' Time filter. Set score absolute score and normalize. ''' 
+
+  pulse_interval = expected_pulse_interval(data)
+  
 
 
 
@@ -165,11 +203,6 @@ if __name__ == '__main__':
 
   for interval in get_score_intervals(t_start, t_end):
     data = get_interval_data(db_con, dep_id, site_id, interval)
-    print data.shape
     data = parametric_filter(data, tx_params)
-    print data.shape
     data = burst_filter(data, interval)
-    print data.shape
-    print 
-
-
+    time_filter(data, interval)
