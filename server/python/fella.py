@@ -1,30 +1,31 @@
-0# Time filter. This program attempts to remove false positives from 
+# Time filter. This program attempts to remove false positives from 
 # the pulse data based on the rate at which the transmitter emits 
 # pulses. Neighboring points are used to coraborate the validity of
 # a given point. This is on a per transmitter per site basis; a 
 # useful extension to this work will be to coroborate points between
-# sites.
-  
-# TODO In production, the intervals should overlap. 
-# TODO Better way to pick pulse interval? 
+# sites. 
+
+# TODO Adaptive threshold for relscore per window? 
 
 # NOTE It would be nice if np.where() would return a shallow
 #      copy. Then we could do 
 #       time_filter(burst_filter(parametric_filter(data, _), _), _)
 
-# NOTE Adaptive threshold value per window? 
+# NOTE The larger the score window, the more accurate we calculate 
+#      the expected pulse interval. 
 
 import sys
 import qraat
 import numpy as np
 import MySQLdb as mdb
 
-# Constants and parameters for per site/transmitter pulse filtering. 
+#### Constants and parameters for per site/transmitter pulse filtering. #######
 
 # Some parameters. 
 BURST_INTERVAL = 10      # seconds
 BURST_THRESHOLD = 20     # pulses/second
-SCORE_INTERVAL = 60 * 5  # seconds
+SCORE_INTERVAL = 60 * 10 # seconds
+SCORE_OVERLAP = 60       # seconds
 SCORE_ERROR = 0.03       # seconds
 
 # Factor by which to multiply timestamps. 
@@ -34,8 +35,9 @@ TIMESTAMP_PRECISION = 1000
 PARAM_BAD = -1
 BURST_BAD = -2 
 
-                          
 
+
+#### Handle pulse data. ####################################################### 
 
 def get_score_intervals(t_start, t_end): 
   ''' Return a list of scoring windows given arbitrary start and finish. '''  
@@ -71,6 +73,23 @@ def get_interval_data(db_con, dep_id, site_id, interval):
     data[-1][2] = int(data[-1][2] * TIMESTAMP_PRECISION)
   
   return np.array(data, dtype=np.int)
+
+
+def insert_data(db_con, data): 
+  ''' Insert scored data. ''' 
+  
+  (row, _) = data.shape; 
+  inserts = []; deletes = []
+  for i in range(row):
+    relscore = 0 if data[i,5] < 0 else float(data[i,5]) / data[i,6] 
+    inserts.append((data[i,0], data[i,5], round(relscore, 4)))
+    deletes.append(data[i,0])
+
+  # TODO Insert or update. 
+  cur = db_con.cursor()
+  cur.executemany('DELETE FROM estscore WHERE estID = %s', deletes)
+  cur.executemany('''INSERT INTO estscore (estID, absscore, relscore) 
+                     VALUES (%s, %s, %s)''', inserts)
 
 
 def get_tx_params(db_con, dep_id): 
@@ -111,6 +130,8 @@ def get_tx_params(db_con, dep_id):
 
 
 
+##### Per site/transmitter filters. ###########################################
+
 def expected_pulse_interval(data): 
   ''' Compute expected pulse rate over data.
   
@@ -134,7 +155,7 @@ def expected_pulse_interval(data):
   #print "Expected pulse interval is %.2f seconds" % ((bins[i] + bins[i+1])
   #                                             / (2 * TIMESTAMP_PRECISION))
   return int(bins[i] + bins[i+1]) / 2
-  
+
 
 def parametric_filter(data, tx_params): 
   ''' Parametric filter. Set score to `PARAM_BAD`.
@@ -225,7 +246,7 @@ def time_filter(data, interval, thresh=None):
 
 
 
-# Testing, testing ... 
+#### Testing, testing ... #####################################################
 
 if __name__ == '__main__': 
   db_con = qraat.util.get_db('writer')
@@ -233,6 +254,8 @@ if __name__ == '__main__':
   # Calibration data
   #dep_id = 51; site_id = 2; 
   #t_start, t_end = 1376427421, 1376434446
+  
+  # A walk through the woods 
   dep_id = 61; site_id = 3; 
   t_start, t_end = 1396725598, 1396732325
   
@@ -242,21 +265,29 @@ if __name__ == '__main__':
 
   for interval in get_score_intervals(t_start, t_end):
     data = get_interval_data(db_con, dep_id, site_id, interval)
-    if data.shape[0] < 2: 
-      print "skipping small chunk."
+    if data.shape[0] == 0: 
+      print "skipping empty chunk."
       continue
     
     parametric_filter(data, tx_params)
+
+    # Tbe only way to coroborate isolated points is with other sites. 
+    if data.shape[0] < 2: 
+      continue
+
     burst_filter(data, interval)
     filtered_data = time_filter(data, interval, 0.1)
+    insert_data(db_con, data)
 
-    print "Time:", interval, "Count:", data.shape[0]
-    print data.shape, filtered_data.shape
-    for i in range(data.shape[0]):
-      q = round(data[i,2] / 1000.0, 2)
-      print data[i,0], q, data[i,5], round(float(data[i,5]) / data[i,6], 2), round(q-p, 2)
-      p = q
-    print 
+    # Output ... 
+
+    #print "Time:", interval, "Count:", data.shape[0]
+    #print data.shape, filtered_data.shape
+    #for i in range(data.shape[0]):
+    #  q = round(data[i,2] / 1000.0, 2)
+    #  print data[i,0], q, data[i,5], round(float(data[i,5]) / data[i,6], 2), round(q-p, 2)
+    #  p = q
+    #print 
 
     #print data.shape, filtered_data.shape
     #for i in range(filtered_data.shape[0]):
