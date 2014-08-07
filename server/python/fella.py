@@ -5,10 +5,11 @@
 # useful extension to this work will be to coroborate points between
 # sites.
   
-  # TODO something funky is going on. I expect the scores should be 
-  # close to the theoretical limit for the good windows. 
+# TODO In production, the intervals should overlap. 
 
-  # TODO In production, the intervals should overlap. 
+# NOTE It would be nice if np.where() would return a shallow
+#      copy. Then we could do 
+#       time_filter(burst_filter(parametric_filter(data, _), _), _)
 
 import sys
 import qraat
@@ -17,18 +18,19 @@ import MySQLdb as mdb
 
 # Constants and parameters for per site/transmitter pulse filtering. 
 
-# Some constants. 
-PARAM_BAD = -1
-BURST_BAD = -2 
-
 # Some parameters. 
 BURST_INTERVAL = 10      # seconds
 BURST_THRESHOLD = 20     # pulses/second
 SCORE_INTERVAL = 60 * 5  # seconds
-SCORE_ERROR = 0.2        # seconds
+SCORE_ERROR = 0.03       # seconds
 
-# Factor by which to multiply timestamps.
+# Factor by which to multiply timestamps. 
 TIMESTAMP_PRECISION = 1000
+
+# Some constants. 
+PARAM_BAD = -1
+BURST_BAD = -2 
+
                           
 
 
@@ -128,7 +130,7 @@ def expected_pulse_interval(data):
   i = np.argmax(hist)
 
   #print "Expected pulse interval is %.2f seconds" % ((bins[i] + bins[i+1])
-  #                                            / (2 * TIMESTAMP_PRECISION))
+  #                                             / (2 * TIMESTAMP_PRECISION))
   
   return int(bins[i] + bins[i+1]) / 2
   
@@ -171,7 +173,7 @@ def burst_filter(data, interval):
     #                float(bins[i+1]) / TIMESTAMP_PRECISION)
     if (float(hist[i]) / BURST_INTERVAL) > BURST_THRESHOLD: 
       bad_intervals.append((bins[i], bins[i+1]))
-      # TODO If it were possible to carry around the row index when
+      # NOTE If it were possible to carry around the row index when
       # computing the histogram, we could mark signals within bad 
       # bins here. 
 
@@ -203,13 +205,15 @@ def time_filter(data, interval, thresh=None):
   # points that are a pulse interval away within paramterized error.
   (rows, _) = data.shape
   for i in range(rows):
+    data[i,6] = max_count
+    if data[i,6] < 0: # Skip if pulse already has been scored.
+      continue
     count = 0
     for j in range(rows): 
       offset = abs(data[i,2] - data[j,2]) % pulse_interval
       if offset <= pulse_error or offset >= pulse_interval - pulse_error:
         count += 1
     data[i,5] = count - 1 # Counted myself.
-    data[i,6] = max_count
 
   if thresh: 
     return data[np.where(float(data[:,5]) / data[:,6] >= thresh)]
@@ -230,10 +234,11 @@ if __name__ == '__main__':
 
   for interval in get_score_intervals(t_start, t_end):
     data = get_interval_data(db_con, dep_id, site_id, interval)
-    data = parametric_filter(data, tx_params)
-    data = burst_filter(data, interval)
+    parametric_filter(data, tx_params)
+    burst_filter(data, interval)
     time_filter(data, interval)
+
     print "Time:", interval, "Count:", data.shape[0]
     for i in range(data.shape[0]):
-      print data[i,0], round(data[i,2] / 1000.0, 2), data[i,5], data[i,6]
+      print data[i,0], round(data[i,2] / 1000.0, 2), data[i,5], round(float(data[i,5]) / data[i,6], 2)
     print 
