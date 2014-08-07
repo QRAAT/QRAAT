@@ -6,10 +6,13 @@
 # sites.
   
 # TODO In production, the intervals should overlap. 
+# TODO Better way to pick pulse interval? 
 
 # NOTE It would be nice if np.where() would return a shallow
 #      copy. Then we could do 
 #       time_filter(burst_filter(parametric_filter(data, _), _), _)
+
+# NOTE Adaptive threshold value per window? 
 
 import sys
 import qraat
@@ -128,10 +131,8 @@ def expected_pulse_interval(data):
                                         / (SCORE_ERROR * TIMESTAMP_PRECISION))
   
   i = np.argmax(hist)
-
   #print "Expected pulse interval is %.2f seconds" % ((bins[i] + bins[i+1])
   #                                             / (2 * TIMESTAMP_PRECISION))
-  
   return int(bins[i] + bins[i+1]) / 2
   
 
@@ -206,8 +207,9 @@ def time_filter(data, interval, thresh=None):
   (rows, _) = data.shape
   for i in range(rows):
     data[i,6] = max_count
-    if data[i,6] < 0: # Skip if pulse already has been scored.
+    if data[i,5] < 0: # Skip if pulse already has been scored.
       continue
+
     count = 0
     for j in range(rows): 
       offset = abs(data[i,2] - data[j,2]) % pulse_interval
@@ -247,16 +249,19 @@ if __name__ == '__main__':
     parametric_filter(data, tx_params)
     burst_filter(data, interval)
     filtered_data = time_filter(data, interval, 0.1)
- 
-    #print "Time:", interval, "Count:", data.shape[0]
-    #for i in range(data.shape[0]):
-    #  print data[i,0], round(data[i,2] / 1000.0, 2), data[i,5], round(float(data[i,5]) / data[i,6], 2)
-    #print 
 
+    print "Time:", interval, "Count:", data.shape[0]
     print data.shape, filtered_data.shape
-
-    for i in range(filtered_data.shape[0]):
-      q = round(filtered_data[i,2] / 1000.0, 2)
-      print count, q, round(q - p, 2)
+    for i in range(data.shape[0]):
+      q = round(data[i,2] / 1000.0, 2)
+      print data[i,0], q, data[i,5], round(float(data[i,5]) / data[i,6], 2), round(q-p, 2)
       p = q
-      count += 1
+    print 
+
+    #print data.shape, filtered_data.shape
+    #for i in range(filtered_data.shape[0]):
+    #  q = round(filtered_data[i,2] / 1000.0, 2)
+    #  print count, q, round(q - p, 2)
+    #  p = q
+    #  count += 1
+    #print 
