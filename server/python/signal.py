@@ -37,6 +37,39 @@ BURST_BAD = -2
 
 
 
+#### High level call. #########################################################
+
+def Filter(db_con, dep_id, site_id, t_start, t_end): 
+  ''' Score points per site and transmitter, insert into database. '''   
+
+  tx_params = get_tx_params(db_con, dep_id)
+
+  for interval in get_score_intervals(t_start, t_end):
+  
+    # Using overlapping windows in order to mitigate 
+    # score bias on points at the end of the windows. 
+    augmented_interval = (interval[0] - SCORE_OVERLAP, 
+                          interval[1] + SCORE_OVERLAP)
+
+    data = get_interval_data(db_con, dep_id, site_id, augmented_interval)
+    (rows, _) = data.shape
+
+    if rows == 0: # Skip empty chunks. 
+      continue
+    
+    parametric_filter(data, tx_params)
+
+    # Tbe only way to coroborate isolated points is with other sites. 
+    if rows > 1: 
+      burst_filter(data, augmented_interval)
+      time_filter(data, augmented_interval)
+    
+    # When inserting, exclude overlapping points. 
+    insert_data(db_con, data[np.where(
+                  interval[0] <= data[i,2] and data[i,2] < itnerval[1])])
+
+
+
 #### Handle pulse data. ####################################################### 
 
 def get_score_intervals(t_start, t_end): 
@@ -76,7 +109,7 @@ def get_interval_data(db_con, dep_id, site_id, interval):
 
 
 def insert_data(db_con, data): 
-  ''' Insert scored data. ''' 
+  ''' Insert scored data, updating existng records. ''' 
   
   (row, _) = data.shape; 
   inserts = []; deletes = []
@@ -242,7 +275,6 @@ def time_filter(data, interval, thresh=None):
     return data[np.where(data[:,5].astype(np.float) / data[:,6] >= thresh)]
   else:
     return data
-
 
 
 
