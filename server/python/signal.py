@@ -28,6 +28,9 @@ SCORE_INTERVAL = 60 * 10 # seconds
 SCORE_OVERLAP = 60       # seconds
 SCORE_ERROR = 0.03       # seconds
 
+# Log output. 
+VERBOSE = False
+
 # Factor by which to multiply timestamps. 
 TIMESTAMP_PRECISION = 1000
 
@@ -39,13 +42,25 @@ BURST_BAD = -2
 
 #### High level call. #########################################################
 
+def debug_output(msg): 
+  if VERBOSE: 
+    print "filter: signal: %s" % msg
+
+
 def Filter(db_con, dep_id, site_id, t_start, t_end): 
-  ''' Score points per site and transmitter, insert into database. '''   
-
-  tx_params = get_tx_params(db_con, dep_id)
-
-  for interval in get_score_intervals(t_start, t_end):
+  ''' Score points per site and transmitter, insert into database. 
   
+    Return the number of pulses that were scored. 
+  '''   
+
+  count = 0
+  tx_params = get_tx_params(db_con, dep_id)
+  debug_output("depID=%d parameters: band3=%s, band10=%s" 
+     % (dep_id, 'nil' if tx_params['band3'] == sys.maxint else tx_params['band3'],
+                'nil' if tx_params['band10'] == sys.maxint else tx_params['band10']))
+          
+  for interval in get_score_intervals(t_start, t_end):
+
     # Using overlapping windows in order to mitigate 
     # score bias on points at the end of the windows. 
     augmented_interval = (interval[0] - SCORE_OVERLAP, 
@@ -54,8 +69,12 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
     data = get_interval_data(db_con, dep_id, site_id, augmented_interval)
     (rows, _) = data.shape
 
-    if rows == 0: # Skip empty chunks. 
+    if rows == 0: # Skip empty chunks.
+      debut_output("skipping empty chunk")
       continue
+
+    debug_output("processing %.2f to %.2f (%d pulses)" % (interval[0], 
+                                                          interval[1], rows))
     
     parametric_filter(data, tx_params)
 
@@ -64,9 +83,12 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
       burst_filter(data, augmented_interval)
       time_filter(data, augmented_interval)
     
-    # When inserting, exclude overlapping points. 
-    insert_data(db_con, data[np.where(
-                  interval[0] <= data[i,2] and data[i,2] < itnerval[1])])
+    # When inserting, exclude overlapping points.
+    count += insert_data(db_con, 
+       data[(data[:,2] >= interval[0] * TIMESTAMP_PRECISION) & 
+            (data[:,2] <= interval[1] * TIMESTAMP_PRECISION)])
+  
+  return count
 
 
 
@@ -122,7 +144,8 @@ def insert_data(db_con, data):
   cur = db_con.cursor()
   cur.executemany('DELETE FROM estscore WHERE estID = %s', deletes)
   cur.executemany('''INSERT INTO estscore (estID, absscore, relscore) 
-                     VALUES (%s, %s, %s)''', inserts)
+                            VALUES (%s, %s, %s)''', inserts)
+  return len(inserts)
 
 
 def get_tx_params(db_con, dep_id): 
@@ -201,7 +224,7 @@ def parametric_filter(data, tx_params):
     if data[i,3] > tx_params['band3'] or data[i,4] > tx_params['band10']:
       data[i,5] = PARAM_BAD
 
-  return data[np.where(data[:,5] != PARAM_BAD)]
+  return data[data[:,5] != PARAM_BAD]
 
 
 def burst_filter(data, interval): 
@@ -239,7 +262,7 @@ def burst_filter(data, interval):
       if t0 <= data[i,2] and data[i,2] <= t1:
         data[i,5] = BURST_BAD
 
-  return data[np.where(data[:,5] != BURST_BAD)]
+  return data[data[:,5] != BURST_BAD]
 
 
 def time_filter(data, interval, thresh=None):
@@ -272,7 +295,7 @@ def time_filter(data, interval, thresh=None):
     data[i,5] = count - 1 # Counted myself.
 
   if thresh: 
-    return data[np.where(data[:,5].astype(np.float) / data[:,6] >= thresh)]
+    return data[data[:,5].astype(np.float) / data[:,6] >= thresh]
   else:
     return data
 
@@ -302,26 +325,21 @@ if __name__ == '__main__':
       continue
     
     parametric_filter(data, tx_params)
-
-    # Tbe only way to coroborate isolated points is with other sites. 
-    if data.shape[0] < 2: 
-      continue
-
     burst_filter(data, interval)
     filtered_data = time_filter(data, interval, 0.1)
+
     #insert_data(db_con, data)
 
     # Output ... 
 
-    #print "Time:", interval, "Count:", data.shape[0]
-    #print data.shape, filtered_data.shape
+    print "Time:", interval, "Count:", data.shape[0]
+    print data.shape, filtered_data.shape
     #for i in range(data.shape[0]):
     #  q = round(data[i,2] / 1000.0, 2)
     #  print data[i,0], q, data[i,5], round(float(data[i,5]) / data[i,6], 2), round(q-p, 2)
     #  p = q
     #print 
 
-    print data.shape, filtered_data.shape
     for i in range(filtered_data.shape[0]):
       q = round(filtered_data[i,2] / 1000.0, 2)
       print count, q, round(q - p, 2)
