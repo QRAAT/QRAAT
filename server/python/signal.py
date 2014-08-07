@@ -243,7 +243,7 @@ def burst_filter(data, interval):
 
 
 def time_filter(data, interval, thresh=None):
-  ''' Time filter. Set score absolute score and normalize. 
+  ''' Time filter. Calculate absolute score and normalize. 
     
     `thresh` is either None or in [0 .. 1]. If `thresh` is not none,
     it returns data with relative score of at least this value. 
@@ -284,12 +284,12 @@ if __name__ == '__main__':
   db_con = qraat.util.get_db('writer')
   
   # Calibration data
-  #dep_id = 51; site_id = 2; 
-  #t_start, t_end = 1376427421, 1376434446
+  dep_id = 51; site_id = 2; 
+  t_start, t_end = 1376427421, 1376434446
   
   # A walk through the woods 
-  dep_id = 61; site_id = 3; 
-  t_start, t_end = 1396725598, 1396732325
+  #dep_id = 61; site_id = 3; 
+  #t_start, t_end = 1396725598, 1396732325
   
   tx_params = get_tx_params(db_con, dep_id)
   count = 0
@@ -309,7 +309,7 @@ if __name__ == '__main__':
 
     burst_filter(data, interval)
     filtered_data = time_filter(data, interval, 0.1)
-    insert_data(db_con, data)
+    #insert_data(db_con, data)
 
     # Output ... 
 
@@ -321,10 +321,10 @@ if __name__ == '__main__':
     #  p = q
     #print 
 
-    #print data.shape, filtered_data.shape
-    #for i in range(filtered_data.shape[0]):
-    #  q = round(filtered_data[i,2] / 1000.0, 2)
-    #  print count, q, round(q - p, 2)
-    #  p = q
-    #  count += 1
-    #print 
+    print data.shape, filtered_data.shape
+    for i in range(filtered_data.shape[0]):
+      q = round(filtered_data[i,2] / 1000.0, 2)
+      print count, q, round(q - p, 2)
+      p = q
+      count += 1
+    print 
