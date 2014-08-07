@@ -466,10 +466,11 @@ function initialize(){
                 "<li><strong>Deployment ID: </strong>" + this.qraat_pos[1]  + "</li>" +
                 "<li><strong>Data point ID: </strong>" + this.qraat_pos[0]  + "</li>" +
                 "<li><strong>Lat, Lon: </strong>" + this.qraat_pos[8]    + "</li>" + 
-                "<li><strong>Easting, Northing, Zone: </strong>" + this.qraat_pos[1] + "</li>"  +
-                "<li><strong>Date & Time: </strong>" + this.qraat_pos[1]  + "</li>" +
-                "<li><strong>Position Likelihood: </strong>" + this.qraat_pos[1]  + "</li>" +
-                "<li><strong>Animal Activity: </strong>" + this.qraat_pos[1]  + "</li>" +
+                "<li><strong>Easting, Northing, Zone: </strong>" + [this.qraat_pos[3],
+                        this.qraat_pos[4], this.qraat_pos[5]] + "</li>"  +
+                "<li><strong>Date & Time: </strong>" + this.qraat_pos[10]  + "</li>" +
+                "<li><strong>Position Likelihood: </strong>" + this.qraat_pos[6].toFixed(6)  + "</li>" +
+                "<li><strong>Animal Activity: </strong>" + this.qraat_pos[7].toFixed(6)  + "</li>" +
                 "</ul>").appendTo(".mouse-over-info");
 
     }); // end mouseover event function
