@@ -75,7 +75,7 @@ for dep in dep_list:
     est_ids = qraat.srv.position.get_est_ids_timefilter(db_con, 
                                                     dep_id, 
                                                     time_range[0]-time_window, 
-                                                    time_range[1]+time_window, 0)
+                                                    time_range[1]+time_window, 0.1)
     
     sig = qraat.srv.position.signal(db_con, est_ids)
     

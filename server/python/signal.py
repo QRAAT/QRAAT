@@ -44,16 +44,17 @@ BURST_BAD = -2
 
 def debug_output(msg): 
   if VERBOSE: 
-    print "filter: signal: %s" % msg
+    print "signal: %s" % msg
 
 
 def Filter(db_con, dep_id, site_id, t_start, t_end): 
   ''' Score points per site and transmitter, insert into database. 
   
-    Return the number of pulses that were scored. 
+    Return the number of pulses that were scored and the last id
+    processed into the database.  
   '''   
 
-  count = 0
+  total = 0; max_id = 0
   tx_params = get_tx_params(db_con, dep_id)
   debug_output("depID=%d parameters: band3=%s, band10=%s" 
      % (dep_id, 'nil' if tx_params['band3'] == sys.maxint else tx_params['band3'],
@@ -67,28 +68,31 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
                           interval[1] + SCORE_OVERLAP)
 
     data = get_interval_data(db_con, dep_id, site_id, augmented_interval)
-    (rows, _) = data.shape
 
-    if rows == 0: # Skip empty chunks.
-      debut_output("skipping empty chunk")
+    if data.shape[0] == 0: # Skip empty chunks.
+      debug_output("skipping empty chunk")
       continue
 
     debug_output("processing %.2f to %.2f (%d pulses)" % (interval[0], 
-                                                          interval[1], rows))
+                                                          interval[1], 
+                                                          data.shape[0]))
     
     parametric_filter(data, tx_params)
 
     # Tbe only way to coroborate isolated points is with other sites. 
-    if rows > 1: 
+    if data.shape[0] > 1: 
       burst_filter(data, augmented_interval)
       time_filter(data, augmented_interval)
     
     # When inserting, exclude overlapping points.
-    count += insert_data(db_con, 
+    (count, id) = insert_data(db_con, 
        data[(data[:,2] >= interval[0] * TIMESTAMP_PRECISION) & 
             (data[:,2] <= interval[1] * TIMESTAMP_PRECISION)])
+
+    total += count
+    max_id = id if max_id < id else max_id
   
-  return count
+  return (total, max_id)
 
 
 
@@ -136,7 +140,7 @@ def insert_data(db_con, data):
   (row, _) = data.shape; 
   inserts = []; deletes = []
   for i in range(row):
-    relscore = 0 if data[i,5] < 0 else float(data[i,5]) / data[i,6] 
+    relscore = 0 if data[i,5] <= 0 else float(data[i,5]) / data[i,6] 
     inserts.append((data[i,0], data[i,5], round(relscore, 4)))
     deletes.append(data[i,0])
 
@@ -145,7 +149,9 @@ def insert_data(db_con, data):
   cur.executemany('DELETE FROM estscore WHERE estID = %s', deletes)
   cur.executemany('''INSERT INTO estscore (estID, absscore, relscore) 
                             VALUES (%s, %s, %s)''', inserts)
-  return len(inserts)
+
+  max_id = np.max(data[:,0]) if len(inserts) > 0 else 0
+  return (len(inserts), max_id)
 
 
 def get_tx_params(db_con, dep_id): 
@@ -303,7 +309,7 @@ def time_filter(data, interval, thresh=None):
 
 #### Testing, testing ... #####################################################
 
-if __name__ == '__main__': 
+def test1(): 
   db_con = qraat.util.get_db('writer')
   
   # Calibration data
@@ -346,3 +352,11 @@ if __name__ == '__main__':
       p = q
       count += 1
     print 
+
+def test2():
+  db_con = qraat.util.get_db('writer')
+  for interval in get_score_intervals(1376427421, 1376427421 + 23):
+    print interval
+
+if __name__ == '__main__': 
+  test2()
