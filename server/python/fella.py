@@ -216,7 +216,7 @@ def time_filter(data, interval, thresh=None):
     data[i,5] = count - 1 # Counted myself.
 
   if thresh: 
-    return data[np.where(float(data[:,5]) / data[:,6] >= thresh)]
+    return data[np.where(data[:,5].astype(np.float) / data[:,6] >= thresh)]
   else:
     return data
 
@@ -231,14 +231,14 @@ if __name__ == '__main__':
   t_start, t_end = 1376427421, 1376434446
 
   tx_params = get_tx_params(db_con, dep_id)
+  count = 0
 
   for interval in get_score_intervals(t_start, t_end):
     data = get_interval_data(db_con, dep_id, site_id, interval)
     parametric_filter(data, tx_params)
     burst_filter(data, interval)
-    time_filter(data, interval)
+    filtered_data = time_filter(data, interval, 0.05)
 
-    print "Time:", interval, "Count:", data.shape[0]
-    for i in range(data.shape[0]):
-      print data[i,0], round(data[i,2] / 1000.0, 2), data[i,5], round(float(data[i,5]) / data[i,6], 2)
-    print 
+    for i in range(filtered_data.shape[0]):
+      print count, round(filtered_data[i,2] / 1000.0, 2)
+      count += 1
