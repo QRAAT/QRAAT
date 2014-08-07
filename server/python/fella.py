@@ -1,4 +1,4 @@
-# Time filter. This program attempts to remove false positives from 
+0# Time filter. This program attempts to remove false positives from 
 # the pulse data based on the rate at which the transmitter emits 
 # pulses. Neighboring points are used to coraborate the validity of
 # a given point. This is on a per transmitter per site basis; a 
@@ -227,18 +227,36 @@ def time_filter(data, interval, thresh=None):
 
 if __name__ == '__main__': 
   db_con = qraat.util.get_db('writer')
-  dep_id = 51; site_id = 2; 
-  t_start, t_end = 1376427421, 1376434446
-
+  
+  # Calibration data
+  #dep_id = 51; site_id = 2; 
+  #t_start, t_end = 1376427421, 1376434446
+  dep_id = 61; site_id = 2; 
+  t_start, t_end = 1396725598, 1396732325
+  
   tx_params = get_tx_params(db_con, dep_id)
   count = 0
+  p = 0 
 
   for interval in get_score_intervals(t_start, t_end):
     data = get_interval_data(db_con, dep_id, site_id, interval)
+    if data.shape[0] < 2: 
+      print "skipping small chunk."
+      continue
+    
     parametric_filter(data, tx_params)
     burst_filter(data, interval)
-    filtered_data = time_filter(data, interval, 0.05)
+    filtered_data = time_filter(data, interval, 0.1)
+ 
+    #print "Time:", interval, "Count:", data.shape[0]
+    #for i in range(data.shape[0]):
+    #  print data[i,0], round(data[i,2] / 1000.0, 2), data[i,5], round(float(data[i,5]) / data[i,6], 2)
+    #print 
+
+    print data.shape, filtered_data.shape
 
     for i in range(filtered_data.shape[0]):
-      print count, round(filtered_data[i,2] / 1000.0, 2)
+      q = round(filtered_data[i,2] / 1000.0, 2)
+      print count, q, round(q - p, 2)
+      p = q
       count += 1
