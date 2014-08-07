@@ -56,7 +56,7 @@ def get_est_ids_timefilter(db_con, dep_id, t_start, t_end, thresh):
                   WHERE deploymentID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f
-                    AND relscore >= %f''' % (dep_id, t_start, t_end, thresh))
+                    AND relscore > %f''' % (dep_id, t_start, t_end, thresh))
   return [ int(row[0]) for row in cur.fetchall() ]
 
 def get_est_ids_bandfilter(db_con, dep_id, t_start, t_end):

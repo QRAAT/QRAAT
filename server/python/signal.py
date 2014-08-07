@@ -24,9 +24,9 @@ import MySQLdb as mdb
 # Some parameters. 
 BURST_INTERVAL = 10      # seconds
 BURST_THRESHOLD = 20     # pulses/second
-SCORE_INTERVAL = 60 * 10 # seconds
+SCORE_INTERVAL = 60 * 15 # seconds
 SCORE_OVERLAP = 60       # seconds
-SCORE_ERROR = 0.03       # seconds
+SCORE_ERROR = 0.02       # seconds
 
 # Log output. 
 VERBOSE = False
@@ -100,7 +100,8 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
 
 def get_score_intervals(t_start, t_end): 
   ''' Return a list of scoring windows given arbitrary start and finish. '''  
-  
+ 
+  t_start = int(t_start); t_end = int(t_end)
   intervals = range(t_start - (t_start % SCORE_INTERVAL), 
                     t_end + (t_end % SCORE_INTERVAL),
                     SCORE_INTERVAL)
@@ -300,7 +301,7 @@ def time_filter(data, interval, thresh=None):
         count += 1
     data[i,5] = count - 1 # Counted myself.
 
-  if thresh: 
+  if thresh:
     return data[data[:,5].astype(np.float) / data[:,6] >= thresh]
   else:
     return data
@@ -313,12 +314,12 @@ def test1():
   db_con = qraat.util.get_db('writer')
   
   # Calibration data
-  dep_id = 51; site_id = 2; 
-  t_start, t_end = 1376427421, 1376434446
+  #dep_id = 51; site_id = 2; 
+  #t_start, t_end = 1376427421, 1376434446
   
   # A walk through the woods 
-  #dep_id = 61; site_id = 3; 
-  #t_start, t_end = 1396725598, 1396732325
+  dep_id = 61; site_id = 3; 
+  t_start, t_end = 1396725598, 1396732325
   
   tx_params = get_tx_params(db_con, dep_id)
   count = 0
@@ -331,27 +332,31 @@ def test1():
       continue
     
     parametric_filter(data, tx_params)
-    burst_filter(data, interval)
-    filtered_data = time_filter(data, interval, 0.1)
 
-    #insert_data(db_con, data)
+    if data.shape[0] > 1: 
+      burst_filter(data, interval)
+      filtered_data = time_filter(data, interval, 0.1)
 
-    # Output ... 
+      #insert_data(db_con, data)
 
-    print "Time:", interval, "Count:", data.shape[0]
-    print data.shape, filtered_data.shape
-    #for i in range(data.shape[0]):
-    #  q = round(data[i,2] / 1000.0, 2)
-    #  print data[i,0], q, data[i,5], round(float(data[i,5]) / data[i,6], 2), round(q-p, 2)
-    #  p = q
-    #print 
+      # Output ... 
 
-    for i in range(filtered_data.shape[0]):
-      q = round(filtered_data[i,2] / 1000.0, 2)
-      print count, q, round(q - p, 2)
-      p = q
-      count += 1
-    print 
+      print "Time:", interval, "Count:", data.shape[0]
+      print data.shape, filtered_data.shape
+      
+      fella = filtered_data
+      if fella.shape[0] > 0: 
+        max_score = float(np.max(fella[:,5]))
+        for i in range(fella.shape[0]):
+          row = fella[i,:]
+          theoretical_score = float(row[6])
+          relscore = round(row[5] / theoretical_score, 3)
+          q = round(row[2] / 1000.0, 2)
+          print row[0], q, row[5], relscore, round(q-p, 2)
+          p = q
+        print 
+
+    else: print "too small."
 
 def test2():
   db_con = qraat.util.get_db('writer')
@@ -359,4 +364,4 @@ def test2():
     print interval
 
 if __name__ == '__main__': 
-  test2()
+  test1()

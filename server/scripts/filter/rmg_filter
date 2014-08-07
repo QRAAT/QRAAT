@@ -48,11 +48,11 @@ try:
   db_con = qraat.util.get_db('writer')
   qraat.srv.signal.VERBOSE = True
 
-  total = qraat.srv.signal.Filter(db_con,
-                                  options.dep_id, 
-                                  options.site_id,
-                                  options.t_start,
-                                  options.t_end)
+  (total, _) = qraat.srv.signal.Filter(db_con,
+                                       options.dep_id, 
+                                       options.site_id,
+                                       options.t_start,
+                                       options.t_end)
 
   print "filter: scored %d pulses." % total
   
