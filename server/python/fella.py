@@ -231,7 +231,7 @@ if __name__ == '__main__':
   # Calibration data
   #dep_id = 51; site_id = 2; 
   #t_start, t_end = 1376427421, 1376434446
-  dep_id = 61; site_id = 2; 
+  dep_id = 61; site_id = 3; 
   t_start, t_end = 1396725598, 1396732325
   
   tx_params = get_tx_params(db_con, dep_id)
