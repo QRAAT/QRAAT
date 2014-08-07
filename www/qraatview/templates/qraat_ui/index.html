@@ -1,26 +1,19 @@
+{% extends "qraat_site/base.html" %}
 <!-- File: qraat_ui/templates/index.html -->
-
-<!DOCTYPE html>
-<html>
-
-
-<head>
-
-    <title>QRAAT APP</title>
-    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+{% block script %}
     <link rel="stylesheet" type="text/css" href="/static/qraat_ui/css/style.css"/>
     <!-- Link google maps API with alisha's gmail key -->
     <script type="text/javascript" 
-      src="https://maps.googleapis.com/maps/api/js?key={% load google_maps_api %}&sensor=false">
+        src="https://maps.googleapis.com/maps/api/js?key={% load google_maps_api %}&sensor=false">
     </script>
-    <link href="/static/flot/example.css" rel="stylesheet" type="text/css">
-    <script src="/static/flot/jquery-1.11.1.min.js"></script>
+    <!-- <link href="/static/flot/example.css" rel="stylesheet" type="text/css"> -->
+    <script src="/static/flot/jquery.min.js"></script>
     <script src="/static/flot/jquery.flot.min.js"></script>
     <script src ="/static/flot/jquery.flot.time.min.js"></script>
     <script src ="/static/flot/jquery.flot.selection.min.js"></script>
     <script src="/static/flot/jquery.flot.threshold.min.js"></script>
     <script src="/static/flot/jquery.flot.resize.min.js"></script>
-
+    <script src="/static/qraat_ui/js/jquery-ui.min.js"></script>
 <script>
 // Global variables
 var highlightedPoly;
@@ -67,6 +60,7 @@ function addSelectedPos(marker, map){
 	}
 	
 	selectFlotPoint(marker);
+    map.setCenter(marker.getPosition());
 }
 
 function getGraphData(markers, dep_id, sel_data){
@@ -100,12 +94,6 @@ function reloadFlot(markers, map, marker){
 	var dep_id = marker.qraat_pos[1];
 	$("#placeholder2").data("plot").shutdown();
 	loadFlot(markers, map, dep_id);
-	//Set the marker 
-	/*for(var i=0; i<markers.length; i++){
-		if(marker.qraat_pos[0] == markers[i].qraat_pos[0]){
-			marker.flot_index = markers[i].flot_index;
-		}
-	}*/
 }
 
 function loadFlot(pos_markers, map, dep_id){
@@ -195,8 +183,6 @@ function hideFormFields() {
   if ({{view_type|safe}} == "deployment") {
     document.getElementById('id_deployment').style.display = 'none';
     document.querySelector("label[for='id_deployment_0']").style.display = "none";
-    document.getElementById('id_graph_dep').style.display = 'none';
-    document.querySelector("label[for='id_graph_dep']").style.display = "none";
   }
 }
 
@@ -360,11 +346,9 @@ function initialize(){
     } // end if site checked
   } // end looping through list of sites
 
-
   else {  // if sites are not checked, just push an empty list
     locations.push([]);
   }
-
 
 // SET MARKERS: 
   var marker, i;
@@ -478,42 +462,20 @@ function initialize(){
       
     // on mousing over markers for data points, open them to show lat/lng
     google.maps.event.addListener(marker, 'mouseover', function() {
-      
-      //Uncomment next line to show pop-up infowindows when mousing over marker data points
-      //infoWindows_querydata[this.infoWindowIndex].open(map, this);
+            $("<ul>" +
+                "<li><strong>Deployment ID: </strong>" + this.qraat_pos[1]  + "</li>" +
+                "<li><strong>Data point ID: </strong>" + this.qraat_pos[0]  + "</li>" +
+                "<li><strong>Lat, Lon: </strong>" + this.qraat_pos[8]    + "</li>" + 
+                "<li><strong>Easting, Northing, Zone: </strong>" + this.qraat_pos[1] + "</li>"  +
+                "<li><strong>Date & Time: </strong>" + this.qraat_pos[1]  + "</li>" +
+                "<li><strong>Position Likelihood: </strong>" + this.qraat_pos[1]  + "</li>" +
+                "<li><strong>Animal Activity: </strong>" + this.qraat_pos[1]  + "</li>" +
+                "</ul>").appendTo(".mouse-over-info");
 
-    //mouseover markers to show info in html sidebar
-    //TODO: Try to put pos date into marker obj
-    document.getElementById('selected_point_latlon').innerHTML = 
-      position_data[this.infoWindowIndex][8][0].toFixed(6) + ', ' +
-      position_data[this.infoWindowIndex][8][1].toFixed(6); 
-        // lat,lng of point in db
-    document.getElementById('selected_point_eastingnorthing').innerHTML = 
-      position_data[this.infoWindowIndex][3] + ', ' +   // easting 
-      position_data[this.infoWindowIndex][4] + ', ' +   // northing
-      position_data[this.infoWindowIndex][5] + ' ' +    // zone number
-      position_data[this.infoWindowIndex][9];          // zone letter
-    document.getElementById('selected_point_date').innerHTML = 
-      position_data[this.infoWindowIndex][10];// datestring timestamp
-    document.getElementById('selected_point_activity').innerHTML = 
-      position_data[this.infoWindowIndex][7].toFixed(6);  // activity
-    document.getElementById('selected_point_likelihood').innerHTML = 
-      position_data[this.infoWindowIndex][6].toFixed(6); // likelihood
-    document.getElementById('selected_point_positionID').innerHTML = 
-      position_data[this.infoWindowIndex][0];
-    document.getElementById('selected_point_deployment').innerHTML = 
-      position_data[this.infoWindowIndex][1];
     }); // end mouseover event function
 
     google.maps.event.addListener(marker, 'mouseout', function() {
-    document.getElementById('selected_point_latlon').innerHTML = "" 
-    document.getElementById('selected_point_eastingnorthing').innerHTML = "" 
-    document.getElementById('selected_point_date').innerHTML = ""
-    document.getElementById('selected_point_activity').innerHTML = "" 
-    document.getElementById('selected_point_likelihood').innerHTML = ""
-    document.getElementById('selected_point_positionID').innerHTML = ""
-    document.getElementById('selected_point_deployment').innerHTML = ""
-  
+        $(".mouse-over-info").empty();
     }); // end mouseout event function
 
     // close infowindows on mousing out of marker
@@ -525,8 +487,6 @@ function initialize(){
     } //end for loop for query data
     loadFlot(markers_querydata, map, curr_dep);
   } //end if statement for displaying query data as points (not lines)
-
-
 
 // DISPLAY MARKER / "HIGHLIGHT" SELECTED POINT (clicked in maps or in flot)
 
@@ -734,24 +694,15 @@ function initialize(){
 // Load google maps on browser window load
 google.maps.event.addDomListener(window, 'load', initialize);
 
-                            //FLOT GRAPH
-
 </script>
+{% endblock %}
 
-</head>
+{% block sidebar %}
 
-<body>
-
-
-<div id = "text" style="background-color: #E8E8E8; padding-right: 10px; margin-right: -10px;">
-
-<center>
-<div id="page_title"><a href='/'>QRAAT Home</a></div>
- <!--onclick='initialize(38.487828027, -122.149419006, 14);'-->
-<!-- <a href="index.html" target="export">Export view as .kml</a><br>-->
-</center>
-<br />
-
+<div id = "text">
+{% if project %}
+<a href={%url 'qraat:show-project' project.ID %}#deployments><h4>Project</h4></a>
+{% endif %}
 <div class="section_title">PREFERENCES
 <button onclick="submitForm()">Submit Form</button></div>
 <div id ="prefs">
@@ -765,14 +716,12 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <b>{{field.label_tag}}</b> {{field}}
 
 {% elif field.auto_id = "id_sites" %}
-<b>{{field.label_tag}}</b> {{field}}<br><br>
+<b>{{field.label_tag}}</b> {{field}}<br>
 <b><u>FILTER DATA BY:</u></b>
-<br><font size="1">Date/Time Format: YYYY-MM-DD HH:MM:SS (24hr)</font><br>
+<p><font size="1">Date/Time Format: YYYY-MM-DD HH:MM:SS (24hr)</font></p>
 
 {% elif field.auto_id = "id_activity_high" %}
-<b>{{field.label_tag}}</b> {{field}}<br><br>
-
-
+<b>{{field.label_tag}}</b> {{field}}<br>
 <b><u>GRAPH:</u></b><br>
 
 {% else %}
@@ -788,9 +737,6 @@ google.maps.event.addDomListener(window, 'load', initialize);
 
 <br>
 
-<script type="text/javascript">
-</script>
-
 <div class="section_title">MAP INFO</div>
 <div id="mouseover">
 <font size="2">
@@ -805,8 +751,8 @@ google.maps.event.addDomListener(window, 'load', initialize);
 
 {% endif %} <!-- endif for positions -->
 
-<b>Mouseover Lat, Lon: </b> <input type="text" class="current_info" id="latlong" style="width:150px; border:1px inset black;"></span>
-<!--<br><b>Clicked Lat, Lon: </b>--><input type="hidden" class="current_info" id="clicked_lat_lng" style="width:150px; border:1px inset black;"></span>
+<b>Mouseover Lat, Lon: </b> <input type="text" class="current_info" id="latlong"></span>
+<!--<br><b>Clicked Lat, Lon: </b>--><input type="hidden" class="current_info" id="clicked_lat_lng"></span>
 <br><b>Map Bounds: <font size="1"></b><span id="bounds"></span></font>
 <br><b>Map Center: </b><span id="current_center"></span>
 <br><b>Map Zoom: </b><span id="current_zoom"></span>
@@ -814,77 +760,42 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <br></font>
 </div>
 <br>
-
-<div class="section_title">DATA FOR MOUSED-OVER POSITION</div>
-
-<div id="clicked">
-<font size="2">
-{% if selected_message%}
- {% if flot_index == None %}
-<br><center><i>{{selected_message}}</i></center>
-  {% endif %}
-{% endif %}
-
-<b>Deployment ID: </b><span id="selected_point_deployment"></span>
-<br><b>Data Point ID: </b><span id="selected_point_positionID"></span>
-<br>
-<br><b>Lat, Lon: </b><span id="selected_point_latlon"></span>
-<br><b>Easting, Northing, Zone: </b><span id="selected_point_eastingnorthing"></span>
-<br>
-<br><b>Date & Time: </b><span id="selected_point_date"></span>
-<br><b>Position Likelihood: </b><span id="selected_point_likelihood"></span>
-<br><b>Animal Activity: </b><span id="selected_point_activity"></span>
-
-</font>
-</div> <!-- end clicked -->
 </div> <!-- end text -->
+<div class="mouse-over-info"></div>
 
-<!-- right side -->
-<div id="map-canvas"></div>
+{% endblock %}
 
-{% if positions %}
-<!-- FLOT CHART -->
-<div id="right_side">
-  <div id="content">
-  <center>
-  {% if graph_data == "1" or graph_data == "null" %}
-  <b><u>LIKELIHOOD vs. TIME</u></b>
-  <br>Deployment Shown = 
-  {% if graph_dep_django %}
-	<span id="dep_id"></span>
-  {% else %}
-  {{deps.0}}
-  {% endif %}
+{% block content %}
 
-  {% endif %}
+<div class="ui-content">
+    
+    <div class="row-3" id="map-canvas"></div>
 
-  {% if graph_data == "2" %}
-  <b><u>ACTIVITY vs. TIME</u></b>
-  <br>Deployment Shown = <span id="dep_id"></span> 
-  {% endif %}
+    {% if positions %}
+    <!-- FLOT CHART -->
+  <div class="row-3">
+      <center>
+      {% if graph_data == "1" or graph_data == "null" %}
+      <b><u>LIKELIHOOD vs. TIME</u></b>
+      <br>Deployment Shown = 
+      {% if graph_dep_django %}
+        <span id="dep_id"></span>
+      {% else %}
+      {{deps.0}}
+      {% endif %}
 
-<!--Uncomment next line to display index, time, and data from clicking the flot chart -->
-<!-- <span id ="enablePosition2">Clicked: </span> -->
-  <!-- <p><label><input id="enablePosition2" type="checkbox" checked="checked"></input>Clicked: </label>  -->
-  <span id="hoverdata2"></span>
-  <span id="clickdata2"></span>
-  <!-- <p><label><input id="enableTooltip2" type="checkbox" checked="checked"></input>Enable tooltip</label></p>  -->
-<br>
-<div id="right_side2">
-<!-- 2ND FLOT CHARTS -->
+      {% endif %}
 
-<div id="content2">
-  <!-- sets the width of the total container of both the main graph and the small overview graph -->
-  <div class="demo-container2" style="width:650px; height: 200px;">
-  <!-- sets the width of the main/large graph -->
-  <div id="placeholder2" class="demo-placeholder" style="float:left; width:650px; height: 200px;"></div>
-
-<!-- uncomment next line for small overview graph -->
+      {% if graph_data == "2" %}
+      <b><u>ACTIVITY vs. TIME</u></b>
+      <br>Deployment Shown = <span id="dep_id"></span> 
+      {% endif %}
+    <!-- uncomment next line for small overview graph -->
 <!--   <div id="overview" class="demo-placeholder" style="float: right; width: 100px; height: 125px;"></div> -->
- 
-  </div>
-</div> <!-- end div right_side2 -->
+    </center>
+    <div class="row-2" id="placeholder2"></div>
+    </div> 
+</div>
 
 {% endif %} <!-- end if positions (if there is query data) -->
-</body>
-</html>
+{% endblock %}

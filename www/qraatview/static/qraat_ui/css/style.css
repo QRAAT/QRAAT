@@ -1,55 +1,45 @@
-button { 
-  font: normal 12px "omnes-pro", Helvetica, Arial, sans-serif; 
-  }
+.sidebar{
+    width:35%;
+    margin-top: 0;
+}
+.content{
+    width: 65%;
+    padding-left: 4%;
+}
+.ui-content{
+    width: 100%;
+}
 
-html { height: 100% }
+.row-3{
+    width: 100%;
+    height: 300px;
+}
 
-body { 
-  height: 100%; margin: 0; padding: 0; 
-  font: normal 12px "omnes-pro", Helvetica, Arial, sans-serif; 
-  }
+.row-2{
+    width: 100%;
+    height: 200px;
+}
 
-#map-canvas { 
-  margin-top: 1cm; margin-right: 0.25cm; 
-  height: 60%; width: 63%; float: right; 
-  }
-
-#text {
-  width: 33%; height: 100%; float: left; 
-  font-size: 12px; margin: 1%;
-  }
-
-#page_title { font-size: 18px; font-weight:bold; }
-
-.section_title { font-size: 15px; font-weight:bold; text-align:center;}
-
-#prefs {
-  border-style:solid; border-width: 1px; 
-  height: 32%; overflow: scroll; padding: 5px; 
-  }
-
-#id_deployment {
-  list-style-type: none;
-  } /* removes the bullet points from the list of deps */
+#prefs{
+    border: solid;
+    border-width: 1px;
+}
 
 #mouseover {
-  border-style:solid; border-width: 1px; height: 15%; 
-  overflow: scroll; padding: 5px;
+  border-style:solid; border-width: 1px;
   }
 
 #clicked {
-  border-style:solid; border-width: 1px; height: 25%; 
-  overflow: scroll; padding: 5px;
+  border-style:solid; border-width: 1px;
   }
 
-#right_side { float: center; }
+.mouse-over-info > ul{
+    margin: 0;
+    font-size: x-small;
+    border: solid 1px;
+    list-style-type: none;
+}
 
-.current_info {
+#text, .current_info {
   font: normal 12px "omnes-pro", Helvetica, Arial, sans-serif;
   }
-
-#right_side2, #content2, .demo-placeholder2, .demo-placeholder { 
-  float: right;
-  }
-
-

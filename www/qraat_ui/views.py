@@ -5,6 +5,7 @@ from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import render, render_to_response, get_object_or_404
 from django.core.urlresolvers import reverse
 from django.db.models import Q, Max, Min
+from qraatview.views import get_nav_options
 import qraat, time, datetime, json, utm, math
 from pytz import utc, timezone
 from qraatview.models import Position, Track, Deployment, Site, Project
@@ -305,10 +306,6 @@ def get_context(request, deps=[], req_deps=[]):
   
   return context
 
-
-
-
-
 def index(request):
   ''' Compile a list of public deployments, make this available. 
       Don't initially display anything. ''' 
@@ -317,6 +314,8 @@ def index(request):
   #      ON deployment.projectID = project.ID 
   #   WHERE project.is_public = True ''' 
   
+  nav_options = get_nav_options(request)
+
   if request.GET.getlist('deployment') != None:
     req_deps = Deployment.objects.filter(ID__in=request.GET.getlist('deployment'))
   else: 
@@ -327,6 +326,7 @@ def index(request):
             is_public=True).values('ID'))
 
   context = get_context(request, deps, req_deps)
+  context["nav_options"] = nav_options
   return render(request, 'qraat_ui/index.html', context)
 
 def view_by_dep(request, project_id, dep_id):
@@ -359,6 +359,10 @@ def view_by_dep(request, project_id, dep_id):
     context = get_context(request, deps, deps)
   else:
     context = {}
+
+  nav_options = get_nav_options(request)
+  context["nav_options"] = nav_options
+  context["project"] = project
 
   return render(request, 'qraat_ui/index.html', context)
 
