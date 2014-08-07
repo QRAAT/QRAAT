@@ -6,11 +6,14 @@ import qraat, qraat.srv
 import numpy as np
 import os, commands, sys
 
+EST_SCORE_THRESHOLD = 0.01
+
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
 if int(output) > 1: 
   print >>sys.stderr, "position_auto: error: attempted reentry, exiting"
   sys.exit(1)
+
 
 db_con = qraat.util.get_db('writer')
 cursor = db_con.cursor()
@@ -75,7 +78,8 @@ for dep in dep_list:
     est_ids = qraat.srv.position.get_est_ids_timefilter(db_con, 
                                                     dep_id, 
                                                     time_range[0]-time_window, 
-                                                    time_range[1]+time_window, 0.1)
+                                                    time_range[1]+time_window, 
+                                                    EST_SCORE_THRESHOLD)
     
     sig = qraat.srv.position.signal(db_con, est_ids)
     
