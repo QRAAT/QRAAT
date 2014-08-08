@@ -55,7 +55,7 @@ try:
                   WHERE ID > %s''', (last_processed)) 
   
   qraat.srv.signal.VERBOSE = True
-  max_id = 0
+  max_id = last_processed
   
   for (dep_id, site_id) in cur.fetchall(): 
     print "filter_auto: depID=%d, siteID=%d" % (dep_id, site_id)
@@ -67,14 +67,17 @@ try:
                       AND siteID = %s''', (last_processed, dep_id, site_id,))
     (t_start, t_end) = cur.fetchone()
 
-    (total, id) = qraat.srv.signal.Filter(db_con, dep_id, site_id, t_start, t_end)
-    max_id = id if max_id < id else max_id
+    if (t_end - t_start) < qraat.srv.signal.SCORE_INTERVAL: 
+      print "filter_auto: skipping incomplete score interval." 
     
-    print "filter: scored %d pulses." % total
+    else: 
+      (total, id) = qraat.srv.signal.Filter(db_con, dep_id, site_id, t_start, t_end)
+      max_id = id if max_id < id else max_id
+      print "filter: scored %d pulses." % total
 
   cur.execute('UPDATE `cursor` SET value=%s WHERE name=\'estscore\'', 
                                                 (max_id,))
-  print "filter_auto: updated cursor to est.ID=%d." % last_processed
+  print "filter_auto: updated cursor to est.ID=%d." % max_id 
   
 
 except mdb.Error, e:
