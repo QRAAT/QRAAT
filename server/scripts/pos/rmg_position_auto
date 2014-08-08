@@ -84,8 +84,12 @@ for dep in dep_list:
       continue 
     
     bl = qraat.srv.position.position_estimator(sv, sig)
+    (utm_zone_letter, utm_zone_number) = bl.get_utm_zone()
+    
     (bearing, position)  = qraat.srv.position.calc_positions(sig, bl, 
-                                                         center, 
+                                                         center,
+                                                         utm_zone_letter,
+                                                         utm_zone_number,
                                                          time_window, 
                                                          time_delta,
                                                          dep_id)
