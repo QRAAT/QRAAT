@@ -24,7 +24,7 @@ import MySQLdb as mdb
 # Some parameters. 
 BURST_INTERVAL = 10      # seconds
 BURST_THRESHOLD = 20     # pulses/second
-SCORE_INTERVAL = 60 * 15 # seconds
+SCORE_INTERVAL = 60 * 10 # seconds
 SCORE_OVERLAP = 60       # seconds
 SCORE_ERROR = 0.02       # seconds
 
