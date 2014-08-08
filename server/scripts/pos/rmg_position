@@ -120,10 +120,13 @@ try:
 
     print "position: calculating bearing likelihoods (%d)." % len(sig) 
     bl = qraat.srv.position.position_estimator(sv, sig)
+    (utm_zone_letter, utm_zone_number) = bl.get_utm_zone()
 
     print "position: calculating positions."
     (bearing, position) = qraat.srv.position.calc_positions(sig, bl,
                                                         center,
+                                                        utm_zone_letter,
+                                                        utm_zone_number, 
                                                         options.t_window, 
                                                         options.t_delta, 
                                                         options.dep_id,
