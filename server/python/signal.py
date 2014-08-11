@@ -80,7 +80,7 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
     parametric_filter(data, tx_params)
 
     # Tbe only way to coroborate isolated points is with other sites. 
-    if data.shape[0] > 1: 
+    if data.shape[0] > 1 and data[data.shape[0]-1,2] - data[0,2] > 0: 
       burst_filter(data, augmented_interval)
       time_filter(data, augmented_interval)
     
