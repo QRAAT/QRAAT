@@ -6,7 +6,7 @@ import qraat, qraat.srv
 import numpy as np
 import os, commands, sys
 
-EST_SCORE_THRESHOLD = 0
+EST_SCORE_THRESHOLD = 0.15
 
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
