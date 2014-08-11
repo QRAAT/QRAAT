@@ -10,6 +10,10 @@
 # TODO Account for the percentage of time the system is listening
 #      for the transmitter. 
 
+# TODO Don't double count pulses that fall within the same error 
+#      window. To do this, throw pulses in a bucket data structure. 
+
+
 # NOTE It would be nice if np.where() would return a shallow
 #      copy. Then we could do 
 #       time_filter(burst_filter(parametric_filter(data, _), _), _)
@@ -122,7 +126,7 @@ def get_interval_data(db_con, dep_id, site_id, interval):
   ''' 
 
   cur = db_con.cursor()
-  cur.execute('''SELECT ID, siteID, timestamp, band3, band10, 0, 0 
+  cur.execute('''SELECT ID, siteID, timestamp, band3, band10, 0, 0, 0  
                    FROM est
                   WHERE deploymentID = %s
                     AND timestamp >= %s
@@ -148,15 +152,14 @@ def insert_data(db_con, data):
   (row, _) = data.shape; 
   inserts = []; deletes = []
   for i in range(row):
-    relscore = 0 if data[i,5] <= 0 else float(data[i,5]) / data[i,6] 
-    inserts.append((data[i,0], data[i,5], round(relscore, 4)))
+    inserts.append((data[i,0], data[i,5], data[i,6], data[i,7]))
     deletes.append(data[i,0])
 
   # TODO Insert or update. 
   cur = db_con.cursor()
   cur.executemany('DELETE FROM estscore WHERE estID = %s', deletes)
-  cur.executemany('''INSERT INTO estscore (estID, absscore, relscore) 
-                            VALUES (%s, %s, %s)''', inserts)
+  cur.executemany('''INSERT INTO estscore (estID, score, theoretical_score, max_score) 
+                            VALUES (%s, %s, %s, %s)''', inserts)
 
   max_id = np.max(data[:,0]) if len(inserts) > 0 else 0
   return (len(inserts), max_id)
@@ -311,7 +314,10 @@ def time_filter(data, thresh=None):
       offset = abs(data[i,2] - neighborhood[j,2]) % pulse_interval
       if offset <= pulse_error or offset >= pulse_interval - pulse_error:
         count += 1
+    
     data[i,5] = count - 1 # Counted myself.
+  
+  data[:,7] = np.max(data[:,5]) # Max count. 
 
   if thresh:
     return data[data[:,5].astype(np.float) / data[:,6] > thresh]
