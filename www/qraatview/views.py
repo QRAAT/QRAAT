@@ -12,6 +12,7 @@ from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
 from forms import EditTargetForm, EditTransmitterForm, EditLocationForm
 from forms import EditDeploymentForm, EditProjectForm
+import utils
 
 
 def not_allowed_page(request):
@@ -643,7 +644,10 @@ def edit_deployment(request, project_id, deployment_id):
         request=request,
         project_id=project_id,
         post_form=EditDeploymentForm(data=request.POST, instance=deployment),
-        get_form=EditDeploymentForm(instance=deployment),
+        get_form=EditDeploymentForm(
+            instance=deployment,
+            initial={'time_start':
+                     utils.timestamp_todate(deployment.time_start)}),
         template_path="qraat_site/edit-deployment.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:edit-deployment", args=(project_id, deployment_id)))
