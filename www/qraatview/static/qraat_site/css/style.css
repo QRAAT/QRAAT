@@ -67,8 +67,8 @@
 }
 
 .table-element{
-    padding: 8px;
-    line-height: 1.42857;
+    padding: 6px;
+    line-height: 1.22857;
     vertical-align: top;
     border-top: 1px solid #DDD;
 }
@@ -89,11 +89,11 @@
 
 .obj-list{
    display: block; 
-   background: None;
+   background: none;
 }
 
 .obj-element{
-    background: None;
+    background: none;
     display: block;
     padding-left: 2%;
 }
