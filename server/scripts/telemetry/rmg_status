@@ -29,7 +29,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 source rmg_env
-echo `date`
+echo Started at `date`
 echo
 echo rmg_schedule
 rmg_schedule $RMG_SERVER_SITELIST $RMG_SERVER_TXLIST
@@ -51,6 +51,6 @@ rmg_dbstats $RMG_SERVER_METADATA_DIR/authfile_readest
 echo
 echo rmg_plotstatus
 rmg_plotstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
-echo `date`
+echo Finished at `date`
 echo
 #END
