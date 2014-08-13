@@ -1,0 +1,136 @@
+#!/usr/bin/env python2
+# record_afsk
+# demodulates and records GPS AFSK signal from custom test transmitters
+# afsk output file: binary 32-bit floats with mark and space amplitude values interleaved
+#                   sampling rate hardcoded at 32000/40 = 800 Hz
+# cov output file: binary 32-bit floats with reduced covariance matrix
+#                   sampling rate hardcoded at 32000/160 = 200 Hz
+#
+# Copyright (C) 2014 Todd Borrowman
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+from gnuradio import gr
+from gnuradio.eng_option import eng_option
+from optparse import OptionParser
+import qraat.rmg
+import datetime, os
+import time
+
+# required FPGA that can do 4 rx channels.
+
+class record_broadband_graph():
+
+  def __init__(self,options):
+    
+    self.num_chan = 4
+    #self.pic_lo = 0
+
+    # setup USRP
+    self.tb = qraat.rmg.blocks.usrp_top_block(fpga_frequency = options.ddc_freq, decim_factor = options.decim, channels = self.num_chan)
+
+    self.directory = options.file_output_directory
+    self.tx_name = options.tx_name
+    self.tune_offset = 0
+    self.usb_rate = 256000
+    self.af_sample_rate = 32000 
+    fir_decim = long (self.usb_rate / self.af_sample_rate)
+
+    xlate_taps = gr.firdes.low_pass ( \
+      1.0, self.usb_rate, 15.6e3, 0.7e3, gr.firdes.WIN_HAMMING )
+
+    xlate = []
+    self.afsk = qraat.rmg.blocks.gps_afsk(self.num_chan, self.af_sample_rate, options.mark_freq, options.space_freq, self.directory, self.tx_name)
+    for j in range(self.num_chan):
+      xlate.append(gr.freq_xlating_fir_filter_ccf (fir_decim, xlate_taps, self.tune_offset, self.usb_rate ))
+      self.tb.connect((self.tb.u,j), xlate[j], (self.afsk,j))
+
+    # create pic_control
+    self.pic = qraat.rmg.pic_interface.pic_interface(options.serial_port)
+    if options.frequency < 215000000:
+      self.pic.tune(options.frequency + 70000000)
+    else:
+      self.pic.tune(options.frequency - 70000000)
+    self.pic.freq_check()
+
+  def start(self):
+
+    self.tb.start()
+    time.sleep(0.1)
+    self.afsk.enable()
+    print "Running"
+
+#sets gain on all receiver channels
+  def set_gain(self, gain):
+    for i in range(self.nchan):
+      self.tb.u.set_gain(gain,i)
+
+#sets usrp frequency of all receiver channels
+  def set_freq(self, target_freq):
+      ok = True
+      for j in range(self.nchan):
+          r = self.tb.u.set_center_freq(target_freq,j)
+          if not r:
+              ok = False
+              print "set_freq: failed to set subdev[%d] freq to %f" % (
+                  i, target_freq)
+      return ok
+
+  def pic_up(self):
+    self.pic.inc_freq()
+    self.pic.freq = self.pic.freq + 100000
+
+  def pic_down(self):
+    self.pic.dec_freq()
+    self.pic.freq = self.pic.freq - 100000
+
+if __name__ == '__main__':
+
+    # setup command line options
+    parser = OptionParser (option_class=eng_option)
+    parser.add_option("-c", "--ddc-freq", type="eng_float", default=-10.7e6,
+                      help="set Rx DDC frequency to FREQ", metavar="FREQ")
+    parser.add_option("-d", "--decim", type="int", default=250,
+                      help="USRP decimation")
+    parser.add_option("-f", "--file_output_directory", type="string", default="./output",
+                      help="parent directory for output files")
+    parser.add_option("-n", "--tx_name", type="string", default="test",
+                      help="transmitter name (file name prefix)")
+    parser.add_option("-p", "--serial_port", type="string", default="/dev/ttyUSB0", 
+                      help="serial port connected to RMG")
+    parser.add_option("-r", "--frequency", type="int", default=164500000,
+                      help="transmitter frequency in Hz")
+    parser.add_option("-t", "--time", type="int", default=0,
+                      help="recording time")
+    parser.add_option("-m", "--mark_freq", type="float", default=1200,
+                      help="audio frequency for a mark")
+    parser.add_option("-s", "--space_freq", type="float", default=1000,
+                      help="audio frequency for a space")
+    (options, args) = parser.parse_args()
+
+    if len(args) != 0:
+      parser.print_help()
+      raise SystemExit
+
+    g = record_broadband_graph(options)
+    g.start()
+    if options.time > 0:
+      print "Recording for {} seconds".format(options.time)
+      time.sleep(options.time)
+    else:
+      print "Press ctrl+c to stop recording"
+      while True:
+        time.sleep(10)
+        g.afsk.enable()
