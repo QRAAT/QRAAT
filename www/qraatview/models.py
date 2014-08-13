@@ -272,6 +272,7 @@ class TxMake(models.Model):
 
 class Tx(models.Model):
     class Meta:
+        verbose_name = "Transmitter"
         app_label = QRAAT_APP_LABEL
         db_table = "tx"
 
@@ -292,6 +293,23 @@ class Tx(models.Model):
     frequency = models.FloatField()
 
     is_hidden = models.BooleanField(default=False)
+
+    def verbose_name(self):
+        return self._meta.verbose_name
+
+    def hide(self):
+        objs_related = self.get_objs_related()
+
+        for obj in objs_related:
+            obj.hide()
+
+        self.is_hidden = True
+        self.save()
+
+    def get_objs_related(self):
+        objs_related = Deployment.objects.exclude(
+            is_hidden=True).filter(txID=self)
+        return objs_related
 
     def __unicode__(self):
         return u'%s %s' % (self.name, self.serial_no)
@@ -335,6 +353,7 @@ class TxMakeParameters(models.Model):
 
 class Target(models.Model):
     class Meta:
+        verbose_name = "Target"
         app_label = QRAAT_APP_LABEL
         db_table = "target"
 
@@ -350,6 +369,23 @@ class Target(models.Model):
         help_text="Project for which target was originally created")
 
     is_hidden = models.BooleanField(default=False)  # boolean default false
+
+    def verbose_name(self):
+        return self._meta.verbose_name
+
+    def hide(self):
+        objs_related = self.get_objs_related()
+
+        for obj in objs_related:
+            obj.hide()
+
+        self.is_hidden = True
+        self.save()
+
+    def get_objs_related(self):
+        objs_related = Deployment.objects.exclude(
+            is_hidden=True).filter(targetID=self)
+        return objs_related
 
     def __unicode__(self):
         return u'%s' % self.name
@@ -389,11 +425,30 @@ class Deployment(models.Model):
 
     is_hidden = models.BooleanField(default=False)
 
+    def get_objs_related(self):
+        return []
+
+    def hide(self):
+        related_objs = self.get_objs_related()
+        for obj in related_objs:
+            obj.hide()
+
+        self.is_hidden = True
+        # when a deployment is hidden it is unactive
+        self.is_active = False
+        self.save()
+
+    def verbose_name(self):
+        return self._meta.verbose_name
+
     def get_start(self):
         return timestamp_todate(self.time_start)
 
     def get_end(self):
         return timestamp_todate(self.time_end)
+
+    def __unicode__(self):
+        return u'%s active %s' % (self.name, self.is_active)
 
 
 class Track(models.Model):
@@ -427,6 +482,7 @@ class Track(models.Model):
 
 class Location(models.Model):
     class Meta:
+        verbose_name = "Location"
         app_label = QRAAT_APP_LABEL
         db_table = "location"
 
@@ -462,6 +518,22 @@ class Location(models.Model):
         decimal_places=2)  # decimal(7,2), default 0.00
 
     is_hidden = models.BooleanField(default=False)
+
+    def verbose_name(self):
+        return self._meta.verbose_name
+
+    def hide(self):
+        objs_related = self.get_objs_related()
+
+        for obj in objs_related:
+            obj.hide()
+
+        self.is_hidden = True
+        self.save()
+
+    def get_objs_related(self):
+        objs_related = []
+        return objs_related
 
     def __unicode__(self):
         return u'%s' % self.name

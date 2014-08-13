@@ -27,8 +27,9 @@ try:
 except ImportError: pass
 
 query_insert_pos = '''INSERT INTO position
-                       (deploymentID, timestamp, easting, northing, likelihood, activity)
-                      VALUES (%s, %s, %s, %s, %s, %s)''' 
+                       (deploymentID, timestamp, easting, northing, 
+                        utm_zone_number, utm_zone_letter, likelihood, activity)
+                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''' 
 
 query_insert_bearing = '''INSERT INTO bearing 
                            (deploymentID, siteID, timestamp, bearing, likelihood, activity)
@@ -111,7 +112,7 @@ class steering_vectors:
       cur.execute('''SELECT ID, Bearing,
                             sv1r, sv1i, sv2r, sv2i,
                             sv3r, sv3i, sv4r, sv4i
-                       FROM Steering_Vectors
+                       FROM steering_vectors
                       WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, cal_id))
       raw_data = cur.fetchall()
       prov_sv_ids = qraat.util.get_field(raw_data, 0)
@@ -133,6 +134,20 @@ class steering_vectors:
     (self.sites, self.bearings, self.steering_vectors, 
      self.prov_sv_ids, self.deps, self.sv_deps_by_site) = (sites, bearings, steering_vectors, 
                                                            prov_sv_ids, deps, sv_deps_by_site)
+
+
+  def get_utm_zone(self):
+    ''' Get utm zone letter and number for position estimation. 
+    
+      We expect all sites to have the same UTM zone. If this isn't 
+      true, throw an error. 
+    ''' 
+    (utm_zone_letter, utm_zone_number) = (self.sites[0].utm_zone_letter, 
+                                          self.sites[0].utm_zone_number)
+    for site in self.sites: 
+      if site.utm_zone_letter != utm_zone_letter or site.utm_zone_number != utm_zone_number: 
+        raise qraat.error.QraatError('UTM zone doesn\'t match for all sites; can\'t compute positions.')
+    return (utm_zone_letter, utm_zone_number)
 
 
 
@@ -249,6 +264,8 @@ class Position:
                                      timestamp, 
                                      easting,  # pos.imag
                                      northing, # pos.real
+                                     utm_zone_number,
+                                     utm_zone_letter,
                                      likelihood, 
                                      activity))
       pos_id = cur.lastrowid                               
@@ -341,6 +358,8 @@ class position_estimator:
 
     record_provenance_from_site_data = False
 
+    (self.utm_zone_letter, self.utm_zone_number) = sv.get_utm_zone()
+
     likelihoods = np.zeros((len(sig), 360))
     for i in range(len(sig)):
       try:
@@ -371,7 +390,9 @@ class position_estimator:
     else:
       self.likelihood_deps = [] 
   
-
+  def get_utm_zone(self):
+    ''' Get UTM zone letter and number. '''
+    return (self.utm_zone_letter, self.utm_zone_number)
 
   def __len__(self): 
     return self.likelihoods.shape[0]
@@ -509,7 +530,7 @@ def calc_windows(bl, t_window, t_delta):
 
 
 
-def calc_positions(signal, bl, center, t_window, t_delta, dep_id, verbose=False):
+def calc_positions(signal, bl, center, utm_zone_letter, utm_zone_number, t_window, t_delta, dep_id, verbose=False):
   ''' Calculate positions of a transmitter over a time interval. 
   
   '''
@@ -569,7 +590,8 @@ def calc_positions(signal, bl, center, t_window, t_delta, dep_id, verbose=False)
       if verbose: print
    
     if pos: # TODO utm
-      position.table.append((None, dep_id, t, pos.imag, pos.real, None, None, ll, pos_activity, pos_deps))
+      position.table.append((None, dep_id, t, pos.imag, pos.real, utm_zone_number,
+                                             utm_zone_letter, ll, pos_activity, pos_deps))
     
     for (site_id, (theta, ll, activity)) in theta.iteritems():
       bearing.table.append((None, dep_id, site_id, t, theta, ll, activity))

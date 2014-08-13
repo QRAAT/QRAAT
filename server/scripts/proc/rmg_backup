@@ -9,6 +9,9 @@
 # Call this script from cron:
 #	59 12 * * * rmg_backup
 #
+# This script uses rsync to copy form source/ to destination path. Note that
+# the source MUST have a trailing / to avoid spurious destination subdirectory
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -76,11 +79,11 @@ then
 fi
 
 # Backup $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_ARCHIVE_DIR
-BACKUP_ARCHIVE_FILELIST=/var/log/rmg/rmg_backup_archive_synclog
+BACKUP_ARCHIVE_FILELIST=/var/log/rmg/rmg_backup_archive_rsynclog
 echo Copying files from $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_ARCHIVE_DIR
 rm -f $BACKUP_ARCHIVE_FILELIST
+echo Logging to $BACKUP_ARCHIVE_FILELIST
 rsync -av --out-format='%n' $RMG_SERVER_ARCHIVE_DIR/  $RMG_BACKUP_ARCHIVE_DIR >$BACKUP_ARCHIVE_FILELIST
-# MUST have trailing / on the rsync source directory, to avoid spurious destination subdirectory
 if [ $? -ne 0 ]
 then
 	echo Error in rsync, bailing out
@@ -113,6 +116,7 @@ fi
 # Extract tables from the qraat database to $RMG_BACKUP_DIR/database
 echo Dumping database tables
 rmg_dbarchive $RMG_BACKUP_DIR/database
+# Make an explicit dump of the Archive_Log table, so that it contains a record of the other dump files
 rmg_dbarchive Archive_Log $RMG_BACKUP_DIR/database
 
 # Check for secondary backup
@@ -139,14 +143,43 @@ else
 			exit 1
 		fi
 	fi
-	echo Synchronizing $RMG_BACKUP_DRIVE and $RMG_BACKUP_DRIVE2
-	BACKUP_DRIVE_SYNCLOG=/var/log/rmg/rmg_backup_drive_synclog
-	rsync -av $RMG_BACKUP_DIR/ $RMG_BACKUP_DIR2 >$BACKUP_DRIVE_SYNCLOG
+	echo Copying files from $RMG_BACKUP_DRIVE to $RMG_BACKUP_DRIVE2
+	BACKUP_DRIVE_RSYNCLOG=/var/log/rmg/rmg_backup_drive_rsynclog
+	echo Logging to $BACKUP_DRIVE_RSYNCLOG
+	rsync -av $RMG_BACKUP_DIR/ $RMG_BACKUP_DIR2 >$BACKUP_DRIVE_RSYNCLOG
 	if [ $? -ne 0 ]
 	then
 		echo Error in rsync, bailing out
 	fi
 	df -l $RMG_BACKUP_DRIVE $RMG_BACKUP_DRIVE2
+fi
+
+# Sync frontend server
+if [ -z "$RMG_BACKUP_DRIVE2" ]
+then
+	echo RMG_BACKUP_DRIVE2 is not set, files not copied to frontend server
+	#TODO Try copying files from RMG_BACKUP_DRIVE instead
+else
+	echo Checking for backup drive: $RMG_BACKUP_DRIVE2
+	if [ ! -e $RMG_BACKUP_DRIVE2 ]
+	then
+		echo ERROR: backup drive $RMG_BACKUP_DRIVE2 not found
+		exit 1
+	fi
+	echo Checking for backup directory: $RMG_BACKUP_DIR2
+	if [ ! -e $RMG_BACKUP_DIR2 ]
+	then
+		echo ERROR: backup directory $RMG_BACKUP_DIR2 not found
+		exit 1
+	fi
+	echo Copying database files from $RMG_BACKUP_DIR2/database/ to $RMG_BACKUP_FRONTEND/database
+	BACKUP_FRONTEND_RSYNCLOG=/var/log/rmg/rmg_backup_frontend_rsynclog
+	echo Logging to $BACKUP_FRONTEND_RSYNCLOG
+	rsync -ravz $RMG_BACKUP_DIR2/database/ $RMG_BACKUP_FRONTEND/database >$BACKUP_FRONTEND_RSYNCLOG
+	if [ $? -ne 0 ]
+	then
+		echo Error in rsync, bailing out
+	fi
 fi
 
 echo Finished $0 at `date`

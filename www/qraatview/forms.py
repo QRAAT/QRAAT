@@ -49,12 +49,12 @@ class UserModelChoiceField(forms.ModelMultipleChoiceField):
         return obj.get_full_name()
 
 
-class EditProjectForm(ProjectForm):
+class OwnersEditProjectForm(ProjectForm):
     """Django's ModelForm to edit projects
        Extends ProjectForm"""
 
     def __init__(self, user=None, *args, **kwargs):
-        super(EditProjectForm, self).__init__(user, *args, **kwargs)
+        super(OwnersEditProjectForm, self).__init__(user, *args, **kwargs)
         project = super(ProjectForm, self).save(commit=False)
 
         # Set values for selection
@@ -117,6 +117,20 @@ class EditProjectForm(ProjectForm):
         return project
 
 
+class EditProjectForm(ProjectForm):
+    class Meta:
+        model = Project
+        fields = ("name", "description", "is_public")
+
+    def save(self, commit=True):
+        project = super(EditProjectForm, self).save(commit=False)
+
+        if commit is True:
+            project.save()
+
+        return project
+
+
 class AddManufacturerForm(forms.ModelForm):
     """Django's ModelForm to add tx_make"""
     class Meta:
@@ -146,7 +160,7 @@ class ProjectElementForm(forms.ModelForm):
 
 
 class AddLocationForm(ProjectElementForm):
-    """Django's ModelForm to create a location 
+    """Django's ModelForm to create a location
        extends ProjectElementForm"""
 
     class Meta:
@@ -155,7 +169,7 @@ class AddLocationForm(ProjectElementForm):
 
 
 class AddTargetForm(ProjectElementForm):
-    """Django's ModelForm to create a target 
+    """Django's ModelForm to create a target
        extends ProjectElementForm"""
 
     class Meta:
@@ -176,13 +190,14 @@ class AddDeploymentForm(ProjectElementForm):
 
     def set_project(self, project):
         super(AddDeploymentForm, self).set_project(project)
-        # constraint project's transmitters
-        self.fields["txID"].choices = [
-            (tx.ID, tx) for tx in project.get_transmitters()]
+        if project:
+            # constraint project's transmitters
+            self.fields["txID"].choices = [
+                (tx.ID, tx) for tx in project.get_transmitters()]
 
-        # constraint project's targets
-        self.fields["targetID"].choices = [
-            (target.ID, target) for target in project.get_targets()]
+            # constraint project's targets
+            self.fields["targetID"].choices = [
+                (target.ID, target) for target in project.get_targets()]
 
     def clean_txID(self):
         return Tx.objects.get(ID=self.cleaned_data.get("txID"))
@@ -209,9 +224,9 @@ class AddTransmitterForm(ProjectElementForm):
            in tx_parameters"""
 
         Tx = super(AddTransmitterForm, self).save(commit=False)
-        Tx.projectID = self.project
 
         if commit is True:
+            Tx.projectID = self.project
             Tx.save()
             Tx_make_parameters = TxMakeParameters.objects.filter(
                 tx_makeID=Tx.tx_makeID)
@@ -225,3 +240,38 @@ class AddTransmitterForm(ProjectElementForm):
                     units=parameter.units)
 
         return Tx
+
+
+class EditTransmitterForm(AddTransmitterForm):
+    class Meta:
+        model = Tx
+        exclude = ["projectID", "is_hidden",
+                   "serial_no", "tx_makeID", "frequency"]
+        labels = {"name": ("Transmitter name")}
+
+    def save(self, commit=True):
+        Tx = super(EditTransmitterForm, self).save(commit=False)
+
+        if commit is True:
+            Tx.save()
+
+
+class EditTargetForm(AddTargetForm):
+    class Meta:
+        model = Target
+        exclude = ["projectID", "is_hidden"]
+
+
+class EditLocationForm(AddLocationForm):
+    """Django's ModelForm to edit a location
+       extends AddLocationForm"""
+
+    class Meta:
+        model = Location
+        exclude = ["projectID", "is_hidden"]
+
+
+class EditDeploymentForm(ProjectElementForm):
+    class Meta:
+        model = Deployment
+        exclude = ["projectID", "is_hidden", "time_end", "targetID", "txID"]
