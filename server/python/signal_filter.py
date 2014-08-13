@@ -255,10 +255,10 @@ class Registry:
 
 		counts = self.get_matching_points(points, **kw)
 
-		with open('/home/qraat/counts.txt', 'a') as f:
-			f.write('----------------\n')
-			f.write('{}\n'.format(counts))
-			f.write('----------------\n')
+		#with open('/home/qraat/counts.txt', 'a') as f:
+		#	f.write('----------------\n')
+		#	f.write('{}\n'.format(counts))
+		#	f.write('----------------\n')
 
 		for point in points:
 			if point['ID'] not in counts.keys():
@@ -342,7 +342,7 @@ def filter_range(field_name, center, delta):
 
 def filter_values_over(field_name, threshold_dict):
 	def filter_func(point, points):
-		threshold = threshold_dict[point['txid']][field_name]
+		threshold = threshold_dict[point['deploymentID']][field_name]
 		#print 'Got filter threshold of {} for TXID {} (fieldname={})'.format(threshold, point['txid'], field_name)
 		if threshold is None:
 			return False
@@ -1219,7 +1219,7 @@ def time_chunk_ids(db_con, all_data, duration):
 		# k = (basetime, duration)
 		d, m = divmod(timestamp, duration)
 		base = d * duration
-		k = (base, duration, datum['siteid'], datum['txid'])
+		k = (base, duration, datum['siteID'], datum['deploymentID'])
 		# chunks[k].append(datum)
 		chunks[k].append(id)
 
@@ -1312,8 +1312,8 @@ def calculate_interval(db_con, ids):
 	assert len(intervals) == 1
 
 	# Writing out to log
-	with open('/home/qraat/interval_log.txt', 'a') as f:
-		f.write('interval: {} ({})\n'.format(intervals[0], len(ids)))
+	#with open('/home/qraat/interval_log.txt', 'a') as f:
+	#	f.write('interval: {} ({})\n'.format(intervals[0], len(ids)))
 
 	return intervals[0]
 
@@ -1380,7 +1380,7 @@ def read_est_records(db_con, ids, expanded=False, context=0):
 	if expanded:
 		print 'Performing timestamp query'
 		id_string = ', '.join([str(x) for x in ids])
-		q = 'SELECT min(timestamp), max(timestamp), siteid, txid FROM est WHERE ID IN ({});'.format(id_string)
+		q = 'SELECT min(timestamp), max(timestamp), siteID, deploymentID FROM est WHERE ID IN ({});'.format(id_string)
 		rows = cur.execute(q)
 		r = cur.fetchone()
 		r = tuple(r)
@@ -1390,7 +1390,7 @@ def read_est_records(db_con, ids, expanded=False, context=0):
 		print 'Done with that'
 		print 'Performing large est query'
 		cur = db_con.cursor()
-		q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp < %s and siteid = %s and txid = %s'.format(field_string)
+		q = 'SELECT {} FROM est WHERE timestamp >= %s and timestamp < %s and siteID = %s and deploymentID = %s'.format(field_string)
 		rows = cur.execute(q, (min, max, siteid, txid))
 	else:
 		print 'Querying IDs in particular'
