@@ -35,7 +35,7 @@ def header_read(filename):
 
 def header_create(rate, center_freq, mark_freq, space_freq):
   afsk_header = struct.pack(header_fmt,
-        float(afsk_actual_output_rate),    #sampling rate (Hz)
+        float(rate),    #sampling rate (Hz)
         float(center_freq),                #RF center frequency (Hz)
         float(mark_freq),                  #mark frequency (Hz)
         float(space_freq))                 #space frequency (Hz)

@@ -280,7 +280,7 @@ class gps_afsk(gr.hier_block2):
     afsk_actual_output_rate = self.afsk.output_rate
 
     import qraat.afsk
-    (afsk_header, afsk_header_len) = qraat.afsk.write_header(afsk_actual_output_rate, center_freq, mark_freq, space_freq)
+    (afsk_header, afsk_header_len) = qraat.afsk.header_create(afsk_actual_output_rate, center_freq, mark_freq, space_freq)
 
     self.afsk_out = file_sink(gr.sizeof_float, dirname, txname, ".afsk", afsk_header, afsk_header_len)
 
@@ -296,7 +296,7 @@ class gps_afsk(gr.hier_block2):
       self.connect((self, j), gr.stream_to_vector(gr.sizeof_gr_complex, cc_vlen), (self.cc,j))
 
     import qraat.continuous_covariance
-    (cov_header, cov_header_len) = qraat.continuous_covariance.write_header(num_ch, cc_out_vlen, cc_actual_output_rate, center_freq, cc_vlen)
+    (cc_header, cc_header_len) = qraat.continuous_covariance.header_create(num_ch, cc_out_vlen, cc_actual_output_rate, center_freq, cc_vlen)
 
     self.cc_out = file_sink(gr.sizeof_float*cc_out_vlen, dirname, txname, ".cov", cc_header, cc_header_len)
 
