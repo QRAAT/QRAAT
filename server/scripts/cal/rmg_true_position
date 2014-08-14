@@ -26,7 +26,7 @@
 import qraat
 import time, os, sys
 import numpy as np
-import MySQLdb as mdb
+#import MySQLdb as mdb
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -37,97 +37,77 @@ time indexed pulse per site for a calibration run. This program is part of
 QRAAT, an automated animal tracking system based on GNU Radio.   
 '''
 
-parser.add_option('--cal-id', type='int', metavar='INT',
-                  help="Calibration ID, the serial identifier in the database "
+parser.add_option('--dep-id', type='int', metavar='INT',
+                  help="Deployment ID, the serial identifier in the database "
                        "context identifying a calibration run.")
 
 (options, args) = parser.parse_args()
 
-if options.cal_id == None:
-  print >>sys.stderr, "true_position: erorr: need to provide a calibration ID via `--cal-id`."
+if options.dep_id == None:
+  print >>sys.stderr, "true_position: erorr: need to provide a deployment ID via `--dep-id`."
   sys.exit(1)
 
 # Get database credentials.
-try: 
-  db_config = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='writer')
+db_con = qraat.util.get_db('writer')
 
-except KeyError: 
-  print >>sys.stderr, "true_position: error: undefined environment variables. Try `source rmg_env.`" 
-  sys.exit(1) 
 
-except IOError, e: 
-  print >>sys.stderr, "true_position: error: missing DB credential file '%s'." % e.filename
+start = time.time()
+print "true_position: start time:", time.asctime(time.localtime(start))
+
+# Connect to the database. 
+cur = db_con.cursor()
+
+# Get GPS data for calibration run. 
+if not cur.execute("SELECT timestamp, easting, northing FROM gps_data WHERE deploymentID = %s", options.dep_id):
+  print >>sys.stderr, "true_position: error: no GPS data found for specified deployment."
   sys.exit(1)
 
-try:
-  start = time.time()
-  print "true_position: start time:", time.asctime(time.localtime(start))
-  
-  # Connect to the database. 
-  db_con = mdb.connect(db_config.host, 
-                       db_config.user,
-                       db_config.password,
-                       db_config.name)
+gps_data = np.array(cur.fetchall(), dtype=float)
+gps_timestamp = gps_data[:,0]
+gps_easting = gps_data[:,1]
+gps_northing = gps_data[:,2]
 
-  cur = db_con.cursor()
+# Get start and end times. 
+(t_start, t_end) = min(gps_data[:,0]), max(gps_data[:,0])
 
-  # Get GPS data for calibration run. 
-  cur.execute('''SELECT timestamp, easting, northing 
-                   FROM GPS_Calibration_Data
-                  WHERE cal_infoID = %d''' % options.cal_id)
+print "true_position: getting site data"
+cur.execute("SELECT ID, easting, northing from site")
+site_data = np.array(cur.fetchall(), dtype=float)
 
-  # gps_data[:,0] -- timestamp
-  # gps_data[:,1] -- easting
-  # gps_data[:,2] -- northing
-  gps_data = np.array(cur.fetchall(), dtype=float)
-  if gps_data.shape[0] == 0: 
-    print >>sys.stderr, "true_position: error: no GPS data found for specified cal run."
-    sys.exit(1)
+print "true_position: getting est data ..."
+cur.execute('''SELECT timestamp, ID, siteid 
+                   FROM est 
+                  WHERE deploymentID=%s 
+                    AND timestamp >= %s 
+                    AND timestamp <= %s''',(options.dep_id, t_start, t_end))
 
-  # Get start and end times. 
-  (t_start, t_end) = min(gps_data[:,0]), max(gps_data[:,0])
+est_data = np.array(cur.fetchall(), dtype=float)
+ct = est_data.shape[0]
+est_timestamp = est_data[:,0]
+est_ID = est_data[:,1]
+est_siteid = est_data[:,2]
+print "processing %d records." % ct
 
-  for site in qraat.csv.csv(db_con=db_con, db_table='sitelist'):
+if ct > 0: 
 
-    # TODO(?) import good pulse data from site - bw10<1000 - time, fdsp, fd*[r,i]
-    # NOTE This query is hefty. Selecting all the pulses over the time range of 
-    #  the calibration run (39,170 rows) took about a half hour. Inserting the 
-    #  same number of rows takes a matter of seconds. This leads me to believe
-    #  that if the est's were indexed by time and stored in a tree structure, 
-    #  this would go way faster. ~ Chris 10/18/2013
-    print "true_position: %s: getting data ..." % site.name,
-    cur.execute('''SELECT timestamp, ID 
-                     FROM est 
-                    WHERE siteid=%s 
-                      AND timestamp >= %s 
-                      AND timestamp <= %s''',(site.ID, t_start, t_end))
+  # calculate pulse position from time, linear interpolation 
+  est_easting = np.interp(est_timestamp, gps_timestamp, gps_easting)
+  est_northing = np.interp(est_timestamp, gps_timestamp, gps_northing)
 
-    est_data = np.array(cur.fetchall(), dtype=float)
-    ct = est_data.shape[0]
-    print "processing %d records." % ct
-   
-    if ct > 0: 
+  site_mask = np.where(est_siteid == site_data[:,0])
+  site_easting = site_data[site_mask,1]
+  site_northing = site_data[site_mask,2]
 
-      # calculate pulse position from time, linear interpolation 
-      est_easting = np.interp(est_data[:,0], gps_data[:,0], gps_data[:,1])
-      est_northing = np.interp(est_data[:,0], gps_data[:,0], gps_data[:,2])
+  # Calculate pulse bearing
+  est_bearing = np.arctan2(est_easting - site_easting, 
+                           est_northing - site_northing)*180/np.pi
 
-      # Calculate pulse bearing
-      est_bearing = np.arctan2(est_easting - float(site.easting), 
-                               est_northing - float(site.northing))*180/np.pi
+  # Insert into databse. 
+  cur.executemany('''INSERT INTO true_position 
+                            (estID, easting, northing, bearing) 
+                     VALUES (%s, %s, %s, %s)''', 
+         [ (est_ID[j], est_easting[j], 
+            est_northing[j], est_bearing[j]) for j in range(ct) ])
 
-      # Insert into databse. 
-      cur.executemany('''INSERT INTO True_Position 
-                                (estID, Cal_InfoID, easting, northing, bearing) 
-                         VALUES (%s, %s, %s, %s, %s)''', 
-             [ (est_data[j,1], options.cal_id, est_easting[j], 
-                est_northing[j], est_bearing[j]) for j in range(ct) ])
 
-  cur.execute("COMMIT")
-
-except mdb.Error, e:
-  print >>sys.stderr, "true_position: error: [%d] %s" % (e.args[0], e.args[1])
-  sys.exit(1)
-
-finally: 
-  print "true_position: finished in %.2f seconds." % (time.time() - start)
+print "true_position: finished in %.2f seconds." % (time.time() - start)
