@@ -5,7 +5,10 @@ from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import render, render_to_response, get_object_or_404
 from django.core.urlresolvers import reverse
 from django.db.models import Q, Max, Min
-from qraatview.views import get_nav_options
+from django.contrib.auth.decorators import login_required
+from qraatview.views import get_nav_options, not_allowed_page, can_view
+from qraatview.views import get_model_data, json_parse, get_model_type
+from qraatview.utils import DateTimeEncoder
 import qraat, time, datetime, json, utm, math
 from pytz import utc, timezone
 from qraatview.models import Position, Track, Deployment, Site, Project
@@ -370,6 +373,72 @@ def view_by_target(request, target_id):
   ''' Compile a list of deployments associated with `target_id`. ''' 
   return HttpResponse('Not implemneted yet. (targetID=%s)' % target_id)
 
+
 def view_by_tx(request, tx_id): 
   ''' Compile a list of deployments associated with `tx_id`. ''' 
   return HttpResponse('Not implemneted yet. (txID=%s)' % tx_id)
+
+
+@login_required(login_url="auth/login")
+def system_status(
+            request,
+            static_field="siteID",
+            obj="telemetry",
+            sel_fields=["intemp", "extemp", "voltage",
+                    "ping_power", "ping_computer", "site_status"]):
+
+    model_obj = get_model_type(obj)
+    obj_fields_keys = model_obj.objects.values(*sel_fields)[0].keys()
+    static_field_values = model_obj.objects.values_list(static_field, flat=True).distinct()
+
+    content = {}
+    content = dict(
+                nav_options=get_nav_options(request),
+                fields=json.dumps(request.GET.getlist("field")),
+                static_field_values=static_field_values,
+                obj_fields_keys=obj_fields_keys)
+
+    try:
+        data = get_model_data(request)
+    except Exception, e:
+        print e
+        content["data"] = json.dumps(None)
+    else:
+        content["data"] = json.dumps(json_parse(data), cls=DateTimeEncoder)
+
+    return render(request, "qraat_ui/system_status.html", content)
+
+
+@login_required(login_url="/auth/login")
+def generic_graph(
+                request,
+                objs=["telemetry", "position"],
+                excluded_fields=[
+                    "siteID", "datetime", "timezone",
+                    "utm_zone_number", "utm_zone_letter"],
+                template="qraat_ui/generic_graph.html"):
+
+    nav_options = get_nav_options(request)
+    content = {}
+    content = dict(
+            objs=objs,
+            nav_options=nav_options,
+            excluded_fields=json.dumps(excluded_fields),
+            selected_obj=json.dumps(request.GET.get("obj")),
+            offset=request.GET.get("offset"),
+            n_items=request.GET.get("n_items")
+            )
+    
+    fields = request.GET.getlist("field")
+    content["fields"] = json.dumps(fields)
+
+    try:
+        data = get_model_data(request) 
+    except Exception, e:
+        print e
+        content["data"] = json.dumps(None)
+    else:
+        content["data"] = json.dumps(json_parse(data), cls=DateTimeEncoder)
+
+    return render(
+        request, template, content)

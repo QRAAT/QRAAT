@@ -65,7 +65,7 @@ class Project(models.Model):
         app_label = QRAAT_APP_LABEL
         db_table = "project"
         permissions = COLLABORATOR_PERMISSIONS + VIEWER_PERMISSIONS
-
+    
     ID = models.AutoField(primary_key=True)
 
     ownerID = models.IntegerField(
@@ -537,3 +537,30 @@ class Location(models.Model):
 
     def __unicode__(self):
         return u'%s' % self.name
+
+
+class Telemetry(models.Model):
+    class Meta:
+        verbose_name = "Telemetry"
+        app_label = QRAAT_APP_LABEL
+        db_table = "telemetry"
+
+    ID = models.AutoField(primary_key=True)
+
+    siteID = models.ForeignKey(Site, db_column="siteID")
+
+    datetime = models.DateTimeField()
+
+    timezone = models.CharField(max_length=6)
+
+    intemp = models.DecimalField(max_digits=4, decimal_places=2)
+
+    extemp = models.DecimalField(max_digits=4, decimal_places=2)
+
+    voltage = models.DecimalField(max_digits=4, decimal_places=2)
+
+    ping_power = models.IntegerField(max_length=11)
+
+    ping_computer = models.IntegerField(max_length=11)
+
+    site_status = models.IntegerField(max_length=11)
