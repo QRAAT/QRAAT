@@ -185,12 +185,12 @@ class afsk:
       sr += 2
 
   def write_to_db(self, db_con, siteID = 'NULL'):
-
+    if not hasattr(self, 'decoded_list'):
+      self.decode()
     if self.decoded_list:
       cur = db_con.cursor()
       for ds in self.decoded_list:
         calc_start_time = self.unix_time + ds.start_sample/self.rate
         calc_stop_time = self.unix_time + ds.end_sample/self.rate
-        cur.execute("INSERT INTO afsk (deploymentID, siteID, start_timestamp, stop_timestamp, message, binary_data, error) VALUES (%s, %s, %s, %s, x%s, %s, %s);", [self.tag_name, siteID, calc_start_time, calc_stop_time, ds.string, ds.raw_hex_str, ds.error])
-
+        cur.execute("INSERT INTO afsk (deploymentID, siteID, start_timestamp, stop_timestamp, message, binary_data, error) VALUES (%s, %s, %s, %s, %s, x%s, %s);", [self.tag_name, siteID, calc_start_time, calc_stop_time, ds.string, ds.raw_hex_str, ds.error])
 
