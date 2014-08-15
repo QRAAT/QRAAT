@@ -135,7 +135,7 @@ class afsk:
 
     data_sum = self.mark_data + self.space_data
 
-    power_threashold = np.max(data_sum)/2.0 #0.74
+    power_threashold = np.max(data_sum)/2.0 #0.74 TODO
 
     signal_indexes = np.where(data_sum > power_threashold)[0]
     signal_indexes = np.append(signal_indexes,self.mark_data.shape[0])
