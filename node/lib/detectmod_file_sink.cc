@@ -108,7 +108,8 @@ void detectmod_file_sink::initialize_variables(
   memcpy(header_data, _header_data, header_len);
 
   d_fp = 0;
-  enable_detect = 0;
+  enable_record = 0;
+  staged_close = 0;
 
 }
 
@@ -132,7 +133,7 @@ detectmod_file_sink::work (int noutput_items,
 			       gr_vector_void_star &output_items)
 {
   int ch = input_items.size();
-  if (enable_detect > 0){
+  if (enable_record > 0){
     if (!d_fp) {
       gen_file_ptr();
     }
@@ -142,6 +143,7 @@ detectmod_file_sink::work (int noutput_items,
       }
     }
   }
+  if (staged_close > 0) close();
   return noutput_items;
 }
 
@@ -226,6 +228,7 @@ detectmod_file_sink::close()
     fclose((FILE *) d_fp);
     d_fp = 0;
   }
+  staged_close = 0;
   
 }
 
@@ -233,8 +236,8 @@ detectmod_file_sink::close()
 void detectmod_file_sink::enable()
 {
   //enable detector
-  close();
-  enable_detect = 1;
+  staged_close = 1;
+  enable_record = 1;
   return;
 }
 
@@ -252,13 +255,13 @@ void detectmod_file_sink::enable(const char *_directory,
                        _header_data,
                        _header_len);
   
-  enable_detect = 1;
+  enable_record = 1;
 }
 
 void detectmod_file_sink::disable()
 {
-  if (enable_detect > 0){
-    close();
+  if (enable_record > 0){
+    staged_close = 1;
   }
-  enable_detect = 0;
+  enable_record = 0;
 }

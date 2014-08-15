@@ -84,8 +84,11 @@ private:
   //! A file descriptor used for data output (pulses or continuous). 
   void	       *d_fp;
   
-  //! Enable detector flag.
-  char enable_detect;
+  //! Enable record flag.
+  char enable_record;
+
+  //! Close file once work function is finished flag.
+  char staged_close;
 
   /*!
    * \brief Generate file structure by time.
