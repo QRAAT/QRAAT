@@ -1,9 +1,12 @@
 from django import forms
+from django.forms import widgets
 from models import Project, TxMake
 from models import Tx, Target, Deployment, Location
 from models import TxMakeParameters, TxParameters
 from django.contrib.auth.models import User
 from django.contrib.admin.widgets import FilteredSelectMultiple
+from datetime import datetime
+import utils
 
 
 class ProjectForm(forms.ModelForm):
@@ -185,8 +188,14 @@ class AddDeploymentForm(ProjectElementForm):
         model = Deployment
         exclude = ["projectID", "is_hidden", "time_end"]
 
+    DATE_FORMAT = "%m/%d/%Y %H:%M:%S"
+
     txID = forms.ChoiceField()
     targetID = forms.ChoiceField()
+    time_start = forms.DateTimeField(
+        widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+        initial=datetime.now().strftime(DATE_FORMAT),
+        input_formats=[DATE_FORMAT, ])
 
     def set_project(self, project):
         super(AddDeploymentForm, self).set_project(project)
@@ -198,6 +207,18 @@ class AddDeploymentForm(ProjectElementForm):
             # constraint project's targets
             self.fields["targetID"].choices = [
                 (target.ID, target) for target in project.get_targets()]
+
+    def clean_time_start(self):
+        time_start = self.cleaned_data.get("time_start")
+
+        try:
+            timestamp = utils.date_totimestamp(time_start)
+        except:
+            raise forms.ValidationError(
+                "We couldn't parse the time_start given.\
+                        Check if the format is correct")
+        else:
+            return timestamp
 
     def clean_txID(self):
         return Tx.objects.get(ID=self.cleaned_data.get("txID"))
@@ -272,6 +293,30 @@ class EditLocationForm(AddLocationForm):
 
 
 class EditDeploymentForm(ProjectElementForm):
+    """Django's ModelForm to edit deployment.
+    This form doesn't extend AddDeploymentForm because we don't
+    want the set_project method that sets project's trasnmitters and
+    targets constraint.
+    """
+
     class Meta:
         model = Deployment
         exclude = ["projectID", "is_hidden", "time_end", "targetID", "txID"]
+
+    DATE_FORMAT = "%m/%d/%Y %H:%M:%S"
+
+    time_start = forms.DateTimeField(
+        widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+        input_formats=[DATE_FORMAT, ])
+
+    def clean_time_start(self):
+        time_start = self.cleaned_data.get("time_start")
+
+        try:
+            timestamp = utils.date_totimestamp(time_start)
+        except:
+            raise forms.ValidationError(
+                "We couldn't parse the time_start given.\
+                        Check if the format is correct")
+        else:
+            return timestamp

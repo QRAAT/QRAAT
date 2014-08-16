@@ -5,14 +5,22 @@
 # useful extension to this work will be to coroborate points between
 # sites. 
 
-# TODO Adaptive threshold for relscore per window? 
+# TODO Record pulse interval for score window in DB.  
+
+# TODO Account for the percentage of time the system is listening
+#      for the transmitter. 
+
+# TODO Don't double count pulses that fall within the same error 
+#      window. To do this, throw pulses in a bucket data structure. 
+
 
 # NOTE It would be nice if np.where() would return a shallow
 #      copy. Then we could do 
 #       time_filter(burst_filter(parametric_filter(data, _), _), _)
 
 # NOTE The larger the score window, the more accurate we calculate 
-#      the expected pulse interval. 
+#      the expected pulse interval.
+
 
 import sys
 import qraat
@@ -64,8 +72,8 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
 
     # Using overlapping windows in order to mitigate 
     # score bias on points at the end of the windows. 
-    augmented_interval = (interval[0] - SCORE_OVERLAP, 
-                          interval[1] + SCORE_OVERLAP)
+    augmented_interval = (interval[0] - (SCORE_NEIGHBORHOOD / 2), 
+                          interval[1] + (SCORE_NEIGHBORHOOD / 2))
 
     data = get_interval_data(db_con, dep_id, site_id, augmented_interval)
 
@@ -80,14 +88,14 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
     parametric_filter(data, tx_params)
 
     # Tbe only way to coroborate isolated points is with other sites. 
-    if data.shape[0] > 1: 
+    if data[data.shape[0]-1,2] - data[0,2] > 0: 
       burst_filter(data, augmented_interval)
-      time_filter(data, augmented_interval)
+      time_filter(data)
     
     # When inserting, exclude overlapping points.
     (count, id) = insert_data(db_con, 
-       data[(data[:,2] >= interval[0] * TIMESTAMP_PRECISION) & 
-            (data[:,2] <= interval[1] * TIMESTAMP_PRECISION)])
+       data[(data[:,2] >= (interval[0] * TIMESTAMP_PRECISION)) & 
+            (data[:,2] <= (interval[1] * TIMESTAMP_PRECISION))])
 
     total += count
     max_id = id if max_id < id else max_id
@@ -118,7 +126,7 @@ def get_interval_data(db_con, dep_id, site_id, interval):
   ''' 
 
   cur = db_con.cursor()
-  cur.execute('''SELECT ID, siteID, timestamp, band3, band10, 0, 0 
+  cur.execute('''SELECT ID, siteID, timestamp, band3, band10, 0, 0, 0  
                    FROM est
                   WHERE deploymentID = %s
                     AND timestamp >= %s
@@ -136,20 +144,22 @@ def get_interval_data(db_con, dep_id, site_id, interval):
 
 
 def insert_data(db_con, data): 
-  ''' Insert scored data, updating existng records. ''' 
+  ''' Insert scored data, updating existng records. 
+  
+    Return the number of inserted scores and the maximum estID. 
+  ''' 
   
   (row, _) = data.shape; 
   inserts = []; deletes = []
   for i in range(row):
-    relscore = 0 if data[i,5] <= 0 else float(data[i,5]) / data[i,6] 
-    inserts.append((data[i,0], data[i,5], round(relscore, 4)))
+    inserts.append((data[i,0], data[i,5], data[i,6], data[i,7]))
     deletes.append(data[i,0])
 
   # TODO Insert or update. 
   cur = db_con.cursor()
   cur.executemany('DELETE FROM estscore WHERE estID = %s', deletes)
-  cur.executemany('''INSERT INTO estscore (estID, absscore, relscore) 
-                            VALUES (%s, %s, %s)''', inserts)
+  cur.executemany('''INSERT INTO estscore (estID, score, theoretical_score, max_score) 
+                            VALUES (%s, %s, %s, %s)''', inserts)
 
   max_id = np.max(data[:,0]) if len(inserts) > 0 else 0
   return (len(inserts), max_id)
@@ -272,7 +282,7 @@ def burst_filter(data, interval):
   return data[data[:,5] != BURST_BAD]
 
 
-def time_filter(data, interval, thresh=None):
+def time_filter(data, thresh=None):
   ''' Time filter. Calculate absolute score and normalize. 
     
     `thresh` is either None or in [0 .. 1]. If `thresh` is not none,
@@ -282,27 +292,35 @@ def time_filter(data, interval, thresh=None):
   # Compute expected pulse interval. 
   pulse_interval = expected_pulse_interval(data)
   pulse_error = int(SCORE_ERROR * TIMESTAMP_PRECISION)
-  
+  delta = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION / 2 
+    
   # Best score theoretically possible for this interval. 
-  max_count = int(interval[1] - interval[0]) * TIMESTAMP_PRECISION / pulse_interval 
-  
+  theoretical_count = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION / pulse_interval
+
   # For each pulse, count the number of coroborating points, i.e., 
   # points that are a pulse interval away within paramterized error.
-  (rows, _) = data.shape
-  for i in range(rows):
-    data[i,6] = max_count
-    if data[i,5] < 0: # Skip if pulse already has been scored.
+  for i in range(data.shape[0]):
+    data[i,6] = theoretical_count
+    if data[i,5] < 0: # Skip if pulse didn't pass a previous filter. 
       continue
-
+    
+    # Compute neighborhood window. 
+    low = data[i,2] - delta
+    high = data[i,2] + delta
+    neighborhood = data[(low <= data[:,2]) & (data[:,2] <= high)] 
+    
     count = 0
-    for j in range(rows): 
-      offset = abs(data[i,2] - data[j,2]) % pulse_interval
+    for j in range(neighborhood.shape[0]): 
+      offset = abs(data[i,2] - neighborhood[j,2]) % pulse_interval
       if offset <= pulse_error or offset >= pulse_interval - pulse_error:
         count += 1
+    
     data[i,5] = count - 1 # Counted myself.
+  
+  data[:,7] = np.max(data[:,5]) # Max count. 
 
   if thresh:
-    return data[data[:,5].astype(np.float) / data[:,6] >= thresh]
+    return data[data[:,5].astype(np.float) / data[:,6] > thresh]
   else:
     return data
 
@@ -318,9 +336,13 @@ def test1():
   #t_start, t_end = 1376427421, 1376434446
   
   # A walk through the woods 
-  dep_id = 61; site_id = 3; 
-  t_start, t_end = 1396725598, 1396732325
+  #dep_id = 61; site_id = 3; 
+  #t_start, t_end = 1396725598, 1396732325
   
+  # A woodrat on Aug 8
+  dep_id = 102; site_id = 2; 
+  t_start, t_end = 1407448817.94, 1407466794.77
+
   tx_params = get_tx_params(db_con, dep_id)
   count = 0
   p = 0 
@@ -333,28 +355,28 @@ def test1():
     
     parametric_filter(data, tx_params)
 
-    if data.shape[0] > 1: 
+    if data.shape[0] > 1 and data[data.shape[0]-1,2] - data[0,2] > 0: 
       burst_filter(data, interval)
-      filtered_data = time_filter(data, interval, 0.1)
+      filtered_data = time_filter(data, 0.15)
 
       #insert_data(db_con, data)
 
       # Output ... 
-
-      print "Time:", interval, "Count:", data.shape[0]
-      print data.shape, filtered_data.shape
-      
-      fella = filtered_data
-      if fella.shape[0] > 0: 
-        max_score = float(np.max(fella[:,5]))
-        for i in range(fella.shape[0]):
-          row = fella[i,:]
-          theoretical_score = float(row[6])
-          relscore = round(row[5] / theoretical_score, 3)
-          q = round(row[2] / 1000.0, 2)
-          print row[0], q, row[5], relscore, round(q-p, 2)
-          p = q
-        print 
+        
+      if True: 
+        print "Time:", interval, "Count:", data.shape[0]
+        print data.shape, filtered_data.shape
+        fella = filtered_data
+        if fella.shape[0] > 0 and fella[fella.shape[0]-1,2] - fella[0,2] > 0: 
+          max_score = float(np.max(fella[:,5]))
+          for i in range(fella.shape[0]):
+            row = fella[i,:]
+            theoretical_score = float(row[6])
+            relscore = round(row[5] / theoretical_score, 3)
+            q = round(row[2] / 1000.0, 2)
+            print row[0], q, row[5], row[6], relscore, round(q-p, 2)
+            p = q
+          print 
 
     else: print "too small."
 
