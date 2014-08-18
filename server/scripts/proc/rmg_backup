@@ -83,7 +83,9 @@ BACKUP_ARCHIVE_FILELIST=/var/log/rmg/rmg_backup_archive_rsynclog
 echo Copying files from $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_ARCHIVE_DIR
 rm -f $BACKUP_ARCHIVE_FILELIST
 echo Logging to $BACKUP_ARCHIVE_FILELIST
+echo $0 starting primary backup `date`
 rsync -av --out-format='%n' $RMG_SERVER_ARCHIVE_DIR/  $RMG_BACKUP_ARCHIVE_DIR >$BACKUP_ARCHIVE_FILELIST
+echo $0 finished primary backup `date`
 if [ $? -ne 0 ]
 then
 	echo Error in rsync, bailing out
@@ -115,9 +117,11 @@ fi
 
 # Extract tables from the qraat database to $RMG_BACKUP_DIR/database
 echo Dumping database tables
+echo $0 starting database dump `date`
 rmg_dbarchive $RMG_BACKUP_DIR/database
 # Make an explicit dump of the Archive_Log table, so that it contains a record of the other dump files
 rmg_dbarchive Archive_Log $RMG_BACKUP_DIR/database
+echo $0 finished database dump `date`
 
 # Check for secondary backup
 if [ -z "$RMG_BACKUP_DRIVE2" ]
@@ -146,7 +150,9 @@ else
 	echo Copying files from $RMG_BACKUP_DRIVE to $RMG_BACKUP_DRIVE2
 	BACKUP_DRIVE_RSYNCLOG=/var/log/rmg/rmg_backup_drive_rsynclog
 	echo Logging to $BACKUP_DRIVE_RSYNCLOG
+	echo $0 starting secondary backup `date`
 	rsync -av $RMG_BACKUP_DIR/ $RMG_BACKUP_DIR2 >$BACKUP_DRIVE_RSYNCLOG
+	echo $0 finished secondary backup `date`
 	if [ $? -ne 0 ]
 	then
 		echo Error in rsync, bailing out
@@ -175,7 +181,9 @@ else
 	echo Copying database files from $RMG_BACKUP_DIR2/database/ to $RMG_BACKUP_FRONTEND/database
 	BACKUP_FRONTEND_RSYNCLOG=/var/log/rmg/rmg_backup_frontend_rsynclog
 	echo Logging to $BACKUP_FRONTEND_RSYNCLOG
+	echo $0 starting frontend backup `date`
 	rsync -ravz $RMG_BACKUP_DIR2/database/ $RMG_BACKUP_FRONTEND/database >$BACKUP_FRONTEND_RSYNCLOG
+	echo $0 finished frontend backup `date`
 	if [ $? -ne 0 ]
 	then
 		echo Error in rsync, bailing out
