@@ -32,7 +32,7 @@ db_con = mdb.connect(db_config.host,
 cur = db_con.cursor()
 
 #get site locations
-sites = qraat.csv.csv(db_con=db_con, db_table='sitelist')
+sites = qraat.csv.csv(db_con=db_con, db_table='site')
 print sites
 
 #get steering vector data

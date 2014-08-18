@@ -68,11 +68,11 @@ except mdb.Error, e:
   raise
 
 try:
-  cur.execute('SELECT name FROM sitelist')
+  cur.execute('SELECT name FROM site')
   db_sitelist = map(lambda row: row[0], cur.fetchall())
 except mdb.Error, e:
   print >>sys.stderr, "det_to_db: MySQLdb error: [%d] %s" % (e.args[0], e.args[1])
-  print >>sys.stderr, "det_to_db: Error while selecting sitelist names"
+  print >>sys.stderr, "det_to_db: Error while selecting site names"
   print "det_to_db: finished with error in %.2f seconds." % (time.time() - start)
   raise
   

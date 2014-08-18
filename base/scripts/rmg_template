@@ -47,7 +47,7 @@ try:
   cur.execute('SELECT count(*) FROM est')
   print "test: there are %d pulses in the database." % cur.fetchone()
 
-  sites = qraat.csv.csv(db_con=db_con, db_table='sitelist')
+  sites = qraat.csv.csv(db_con=db_con, db_table='site')
   print "template: here are the sites."
   print sites
 

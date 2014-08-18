@@ -35,7 +35,7 @@ use DBI ;
 my $Debug = 0 ;
 
 my $TableNameTelemetry = "telemetry" ;		# The name of the db table
-my $TableNameSitelist = "sitelist" ;		# The name of the db table
+my $TableNameSitelist = "site" ;		# The name of the db table
 
 sub usage()
 {

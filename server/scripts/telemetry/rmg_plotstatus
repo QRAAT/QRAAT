@@ -37,7 +37,7 @@ my $Debug = 0 ;					# Enable verbose output
 my $MovePlots = 1 ;				# Enable the moving of the plots to the WebPath
 
 my $TableNameTelemetry = "telemetry" ;		# Name of the database table that holds telemetry
-my $TableNameSitelist = "sitelist" ;		# Name of the database table that holds site list
+my $TableNameSitelist = "site" ;		# Name of the database table that holds site list
 #my $Interval = 2*86400 ;			# The plot interval, 2*1 day
 my $INTERVAL_DAY = 86400 ;			# The interval value for one day
 my $TmpPath = "/tmp" ;				# The path of a scratch directory

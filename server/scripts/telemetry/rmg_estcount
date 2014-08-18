@@ -31,7 +31,7 @@ use DBI ;
 my $Debug = 0 ;
 
 my $TableNameEstCount = "estcount" ;		# The name of the db table
-my $TableNameSitelist = "sitelist" ;		# The name of the db table
+my $TableNameSitelist = "site" ;		# The name of the db table
 my $ENV_NAME_RMG_SERVER_EST_DIR = "RMG_SERVER_EST_DIR" ;	# The name of the environment variable where the est directory is defined
 my $ENV_NAME_RMG_SITE_EST_DIR = "RMG_SITE_EST_DIR" ;	# The name of the environment variable where the est directory is defined
 
