@@ -76,7 +76,7 @@ parser.add_option('--t-chunk', type='float', metavar='SEC', default=60 * 60 * 4,
 parser.add_option('-v', '--verbose', action='store_true', default=False, 
                   help="Print the progression of the algorithm to the terminal.")
 
-parser.add_option('--thresh', type='float', metavar='[0 .. 1]', default=0, 
+parser.add_option('--thresh', type='float', metavar='[0 .. 1]', defaulti=None, 
                   help="Apply time filter to EST data wiht threshold value.")
 
 parser.add_option('--band', action='store_true', default=False, 
@@ -94,10 +94,10 @@ try:
   sv = qraat.srv.position.steering_vectors(db_con, options.cal_id)
   center = qraat.srv.position.get_center(db_con)
 
-  if options.thresh > 0: # FIXME apply time filter.
+  if options.thresh != None: 
     print "position: using time filter with threshold %f." % options.thresh
-    print >>sys.stderr, "position: warning: time filter not implemented."
-    get_est_ids = qraat.srv.position.get_est_ids
+    def get_est_ids(db_con, dep_id, t_start, t_end):
+      return qraat.srv.position.get_est_ids_timefilter(db_con, dep_id, t_start, t_end, options.thresh)
   elif options.band: 
     print "position: using band filter."
     get_est_ids = qraat.srv.position.get_est_ids_bandfilter

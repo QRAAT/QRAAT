@@ -302,7 +302,8 @@ class est (qraat.csv.csv):
 
     if row.txid is None: 
       if self.txid_index is None: 
-        cur.execute('SELECT id, name FROM txlist')
+        cur.execute('''SELECT deployment.ID, tx.name FROM tx 
+                         JOIN deployment ON deployment.txID = tx.ID''')
         self.txid_index = { name : id for (id, name) in cur.fetchall() }
       try:
         row.txid = self.txid_index[row.tagname]
@@ -311,7 +312,7 @@ class est (qraat.csv.csv):
 
     if row.siteid is None:
       if self.siteid_index is None: 
-        cur.execute('SELECT id, name FROM sitelist')
+        cur.execute('SELECT id, name FROM site')
         self.siteid_index = { name : id for (id, name) in cur.fetchall() }
       try:
         row.siteid = self.siteid_index[site]
