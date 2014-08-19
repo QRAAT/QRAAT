@@ -20,9 +20,10 @@ def date_totimestamp(date):
 
 
 class DateTimeEncoder(json.JSONEncoder):
+    """Adapter class that encodes a datetime object to json object"""
     def default(self, obj):
-        if hasattr(obj, 'isoformat'):
-            return obj.isoformat()
+        if isinstance(obj, datetime):
+            return date_totimestamp(obj)
         elif isinstance(obj, decimal.Decimal):
             return float(obj)
         elif isinstance(obj, ModelState):

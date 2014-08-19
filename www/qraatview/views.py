@@ -14,6 +14,7 @@ from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
 from forms import EditTargetForm, EditTransmitterForm, EditLocationForm
 from forms import EditDeploymentForm, EditProjectForm
+from datetime import datetime
 import json
 import utils
 
@@ -703,6 +704,45 @@ def get_distinct_data(data, distinct):
     return data.values(*distinct).distinct()
 
 
+def filter_datafor_field(data, filter_field):
+    for f in filter_field:
+        field, f_filter = f.split(",")
+
+        dict_filter = {}
+        dict_filter[field] = f_filter
+        data = data.filter(**dict_filter)
+
+    return data
+
+
+def filter_by_date(data, date_obj, start_date, end_date):
+    """Filter data for given date
+    params:
+        *data: queryset to be filtered
+        *date_obj: database table where the requested data is
+        *start_date: string start_date
+        *end_date: string end_date
+    #TODO: handles just database datetime columns,
+    should handle timestamp in future"""
+
+    start_date_filter = {}
+    end_date_filter = {}
+
+    start_date_filter[date_obj + "__gte"] = datetime.strptime(
+        start_date, "%m/%d/%Y %H:%M:%S")
+
+    if end_date.lower() == 'now':
+        end_date_filter[date_obj + "__lte"] = datetime.now()
+    else:
+        end_date_filter[date_obj + "__lte"] = datetime.strptime(
+            end_date, "%m/%d/%Y %H:%M:%S")
+
+    data = data.filter(**start_date_filter)
+    data = data.filter(**end_date_filter)
+
+    return data
+
+
 def render_data(request):
     '''Renders a JSON serialized data
        Only admins have access to this'''
@@ -734,6 +774,10 @@ def get_model_data(request):
     n_items = request.GET.get("n_items")
     offset = request.GET.get("offset")
     distinct = request.GET.getlist("distinct")
+    filter_field = request.GET.getlist("filter_field")
+    date_obj = request.GET.get("date")
+    start_date = request.GET.get("start_date")
+    end_date = request.GET.get("end_date")
 
     model = get_model_type(obj_type)
     data = model.objects.all()
@@ -746,6 +790,9 @@ def get_model_data(request):
             fields.append(u'ID')
         data = filter_databy_field(fields, data)
 
+    if filter_field:
+        data = filter_datafor_field(data, filter_field)
+
     if distinct:
         data = get_distinct_data(data, distinct)
 
@@ -754,6 +801,9 @@ def get_model_data(request):
 
     if n_items:
         data = get_subset(data, n_items)
+
+    if date_obj and start_date and end_date:
+        data = filter_by_date(data, date_obj, start_date, end_date)
 
     return data
 

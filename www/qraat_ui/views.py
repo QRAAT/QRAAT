@@ -1,5 +1,4 @@
 # File: qraat_ui/views.py
-
 from django.template import Context, loader, RequestContext
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import render, render_to_response, get_object_or_404
@@ -9,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from qraatview.views import get_nav_options, not_allowed_page, can_view
 from qraatview.views import get_model_data, json_parse, get_model_type
 from qraatview.utils import DateTimeEncoder
-import qraat, time, datetime, json, utm, math
+import qraat, time, datetime, json, utm, math, copy
 from pytz import utc, timezone
 from qraatview.models import Position, Track, Deployment, Site, Project
 from qraat_ui.forms import Form
@@ -387,16 +386,31 @@ def system_status(
             sel_fields=["intemp", "extemp", "voltage",
                     "ping_power", "ping_computer", "site_status"]):
 
+    if request.GET.get("start_date"):
+        start_date = request.GET.get("start_date")
+    else:
+        start_date = (datetime.datetime.now() -
+                datetime.timedelta(1)).strftime("%m/%d/%Y %H:%M:%S")
+
     model_obj = get_model_type(obj)
     obj_fields_keys = model_obj.objects.values(*sel_fields)[0].keys()
     static_field_values = model_obj.objects.values_list(static_field, flat=True).distinct()
+    fields = copy.copy(request.GET.getlist("field"))
+    
+    # Replaces field's name for selected field's value
+    sel_static_values = request.GET.getlist("filter_field")
+    for sel_values in sel_static_values:
+        key, value = sel_values.split(",")
+        fields[fields.index(key)] = sel_values 
 
     content = {}
     content = dict(
                 nav_options=get_nav_options(request),
-                fields=json.dumps(request.GET.getlist("field")),
+                fields=json.dumps(fields),
                 static_field_values=static_field_values,
-                obj_fields_keys=obj_fields_keys)
+                obj_fields_keys=obj_fields_keys,
+                start_date= start_date,
+                static_field=json.dumps(static_field))
 
     try:
         data = get_model_data(request)
@@ -412,7 +426,7 @@ def system_status(
 @login_required(login_url="/auth/login")
 def generic_graph(
                 request,
-                objs=["telemetry", "position"],
+                objs=["telemetry", "position", "deployment"],
                 excluded_fields=[
                     "siteID", "datetime", "timezone",
                     "utm_zone_number", "utm_zone_letter"],
