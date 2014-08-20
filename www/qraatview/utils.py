@@ -6,9 +6,14 @@ from datetime import datetime
 from django.db.models.base import ModelState
 
 
+def strfdate(date):
+    PATTERN = "%m/%d/%Y %H:%M:%S"
+    return date.strftime(PATTERN)
+
+
 def timestamp_todate(timestamp):
     return datetime.fromtimestamp(
-        int(timestamp)).strftime("%m/%d/%Y %H:%M:%S")
+        float(timestamp)).replace(tzinfo=tzlocal())
 
 
 def date_totimestamp(date):

@@ -17,9 +17,8 @@ from forms import EditDeploymentForm, EditProjectForm
 from django.utils import timezone
 from dateutil.tz import tzlocal
 from dateutil import parser
-from datetime import datetime, timedelta
-import json
-import utils
+from datetime import datetime
+import json, utils, decimal, pytz
 
 
 def not_allowed_page(request):
@@ -654,7 +653,8 @@ def edit_deployment(request, project_id, deployment_id):
         get_form=EditDeploymentForm(
             instance=deployment,
             initial={'time_start':
-                     utils.timestamp_todate(deployment.time_start)}),
+                     utils.strfdate(
+                         utils.timestamp_todate(deployment.time_start))}),
         template_path="qraat_site/edit-deployment.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:edit-deployment", args=(project_id, deployment_id)))
@@ -725,30 +725,46 @@ def filter_by_date(
         *data: queryset to be filtered
         *date_obj: database table where the requested data is
         *start_date: string start_date
-        *end_date: string end_date
-    #TODO: handles just database datetime columns,
-    should handle timestamp in future"""
+        *end_date: string end_date""" 
 
-    DATE_PATTERN = "%m/%d/%Y %H:%M:%S"
-    tz = tzlocal() 
+    if data:
+        obj = data[0][date_obj]
 
-    start_date_filter = {}
-    end_date_filter = {}
+        DATE_PATTERN = "%m/%d/%Y %H:%M:%S"
+        tz = tzlocal()
 
-    if not start_date:
-        start_date = (timezone.now() - timezone.timedelta(1)).strftime(DATE_PATTERN)
-    if not end_date:
-        end_date = "now"
+        start_date_filter = {}
+        end_date_filter = {}
 
-    start_date_filter[date_obj + "__gte"] = parser.parse(start_date).replace(tzinfo=tz)
+        # Apply default case, query from yesterday to now
+        if not start_date:
+            yesterday = timezone.now() - timezone.timedelta(1)
+            start_date = yesterday.strftime(DATE_PATTERN)
+        if not end_date:
+            end_date = "now"
 
-    if end_date.lower() == 'now':
-        end_date_filter[date_obj + "__lte"] = timezone.now()
-    else:
-        end_date_filter[date_obj + "__lte"] = parser.parse(end_date).replace(tzinfo=tz)
+        start_date = parser.parse(start_date).replace(tzinfo=tz)
 
-    data = data.filter(**start_date_filter)
-    data = data.filter(**end_date_filter)
+        if end_date.lower() == 'now':
+            end_date = timezone.now()
+        else:
+            end_date = parser.parse(end_date).replace(tzinfo=tz)
+
+        # handle different field instances: timestamp, datetime
+        if isinstance(obj, datetime):
+            start_date = start_date
+            end_date = end_date
+
+        elif isinstance(obj, decimal.Decimal):
+            start_date = utils.date_totimestamp(
+                start_date.astimezone(pytz.utc))
+            end_date = utils.date_totimestamp(end_date.astimezone(pytz.utc))
+
+        start_date_filter[date_obj + "__gte"] = start_date
+        end_date_filter[date_obj + "__lte"] = end_date
+
+        data = data.filter(**start_date_filter)
+        data = data.filter(**end_date_filter)
 
     return data
 

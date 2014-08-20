@@ -3,7 +3,7 @@
 from django.db import models
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import ObjectDoesNotExist
-from utils import timestamp_todate
+from utils import timestamp_todate, strfdate
 
 QRAAT_APP_LABEL = 'qraatview'
 COLLABORATOR_PERMISSIONS = (
@@ -442,10 +442,10 @@ class Deployment(models.Model):
         return self._meta.verbose_name
 
     def get_start(self):
-        return timestamp_todate(self.time_start)
+        return strfdate(timestamp_todate(self.time_start))
 
     def get_end(self):
-        return timestamp_todate(self.time_end)
+        return strfdate(timestamp_todate(self.time_end))
 
     def __unicode__(self):
         return u'%s active %s' % (self.name, self.is_active)
