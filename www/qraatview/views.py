@@ -14,7 +14,10 @@ from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
 from forms import EditTargetForm, EditTransmitterForm, EditLocationForm
 from forms import EditDeploymentForm, EditProjectForm
-from datetime import datetime
+from django.utils import timezone
+from dateutil.tz import tzlocal
+from dateutil import parser
+from datetime import datetime, timedelta
 import json
 import utils
 
@@ -715,7 +718,8 @@ def filter_datafor_field(data, filter_field):
     return data
 
 
-def filter_by_date(data, date_obj, start_date, end_date):
+def filter_by_date(
+        data, date_obj, start_date, end_date):
     """Filter data for given date
     params:
         *data: queryset to be filtered
@@ -725,17 +729,23 @@ def filter_by_date(data, date_obj, start_date, end_date):
     #TODO: handles just database datetime columns,
     should handle timestamp in future"""
 
+    DATE_PATTERN = "%m/%d/%Y %H:%M:%S"
+    tz = tzlocal() 
+
     start_date_filter = {}
     end_date_filter = {}
 
-    start_date_filter[date_obj + "__gte"] = datetime.strptime(
-        start_date, "%m/%d/%Y %H:%M:%S")
+    if not start_date:
+        start_date = (timezone.now() - timezone.timedelta(1)).strftime(DATE_PATTERN)
+    if not end_date:
+        end_date = "now"
+
+    start_date_filter[date_obj + "__gte"] = parser.parse(start_date).replace(tzinfo=tz)
 
     if end_date.lower() == 'now':
-        end_date_filter[date_obj + "__lte"] = datetime.now()
+        end_date_filter[date_obj + "__lte"] = timezone.now()
     else:
-        end_date_filter[date_obj + "__lte"] = datetime.strptime(
-            end_date, "%m/%d/%Y %H:%M:%S")
+        end_date_filter[date_obj + "__lte"] = parser.parse(end_date).replace(tzinfo=tz)
 
     data = data.filter(**start_date_filter)
     data = data.filter(**end_date_filter)
@@ -802,7 +812,7 @@ def get_model_data(request):
     if n_items:
         data = get_subset(data, n_items)
 
-    if date_obj and start_date and end_date:
+    if date_obj:
         data = filter_by_date(data, date_obj, start_date, end_date)
 
     return data

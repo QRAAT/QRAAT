@@ -10,12 +10,16 @@
     <script src="/static/flot/jquery.flot.min.js" type="text/javascript"></script>
     <script src="/static/flot/jquery.flot.time.min.js" type="text/javascript"></script>
     <script src="/static/qraat_site/js/jquery.datetimepicker.js" type="text/javascript"></script>
+    <script src="/static/qraat_ui/js/date.js" type="text/javascript"></script>
     <!--[if lte IE 8]><script language="javascript" type="text/javascript" src="excanvas.min.js"></script><![endif]-->
     <script type="text/javascript">
         $(document).ready(function(){
             $(".datetime").datetimepicker({
                                         format: "m/d/Y H:i:s"
                                         });
+
+            timezoneJS.timezone.zoneFileBasePath = '/static/tz';
+            timezoneJS.timezone.init();
 
             $("input, select").change(function(){
                 $("#graph_form").submit();    
@@ -30,9 +34,9 @@
             
             if(!data){
                $("#graph_form").submit();
+            }else{
+                plotGraph(data, fields, static_field);
             }
-
-            plotGraph(data, fields, static_field);
 
             //Set selected field on form
             if(fields){
@@ -54,7 +58,7 @@
             });
 
             request.done(function(data){
-                   plotGraph(data, fields, static_field); 
+                   plotGraph(JSON.parse(data), fields, static_field); 
             });
 
             var minute_interval = 2;
@@ -66,8 +70,9 @@
         function plotGraph(dataset, fields, static_field){
             var plotData = {};
             plotData.data = new Array();
+            console.log(dataset);
 
-            if(dataset){
+            if(dataset && dataset.length > 0){
                 for(var i=0; i<dataset.length; i++){
                     var set = new Array();
                     for(var key in dataset[i]){
@@ -83,12 +88,16 @@
                     }
                     plotData.data.push(set);
                 }
+                $("#nodata-alert").hide();
+            }else{
+                $("#nodata-alert").show();
             }
 
             var options = {series:{}, xaxis: {}};
             options.series.lines = {show: true};
             options.xaxis.mode = "time";
-            options.xaxis.timeformat = "date: %m/%d/%y time: %H:%M:%S";
+            options.xaxis.timeformat = "%m/%d/%y %H:%M:%S";
+            options.xaxis.timezone = "America/Los_Angeles";
             
 
             $.plot($("#placeholder"), [plotData.data] , options);
@@ -105,6 +114,13 @@
 
     <div class="container-fluid">
         <form id="graph_form" class="form-horizontal" method="get" role="form">
+
+            <div id="nodata-alert" class="row" style="display:none;"> 
+                <div class="alert alert-danger" role="alert"> 
+                    There is no data for this query
+                </div>
+            </div>
+
             <input id="obj-sel" type="hidden" name="obj" value="telemetry"></input>
 
             <div class="row">
