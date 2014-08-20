@@ -35,7 +35,7 @@ SECRET_KEY = base.key
 # SECURITY WARNING: don't run with debug turned on in production!
 # NOTE For testing purposes, this must be set to True in order 
 # to run 'python manage.py runserver'. 
-DEBUG = TEMPLATE_DEBUG = False
+DEBUG = TEMPLATE_DEBUG = True 
 
 TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
 
@@ -88,10 +88,16 @@ DATABASES = {
 		'USER': web_writer.user,
 		'PASSWORD': web_writer.password,
 	},
+	'qraat_ui': {
+		'ENGINE': 'django.db.backends.mysql',
+		'NAME': 'qraat',
+		'USER': web_reader.user,
+		'PASSWORD': web_reader.password,
+	},
 }
 
 DATABASE_ROUTERS = [ 'qraatview.router.DatabaseAppsRouter',]
-DATABASE_APPS_MAPPING = {'qraat_ui': 'qraat', 'qraatview': 'qraat' }	
+DATABASE_APPS_MAPPING = {'qraat_ui': 'qraat_ui', 'qraatview': 'qraat' }	
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/
