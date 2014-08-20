@@ -37,6 +37,26 @@ my $Debug = 0 ;
 my $TableNameTelemetry = "telemetry" ;		# The name of the db table
 my $TableNameSitelist = "site" ;		# The name of the db table
 
+#mysql> desc telemetry;
+#+---------------+--------------+------+-----+---------+----------------+
+#| Field         | Type         | Null | Key | Default | Extra          |
+#+---------------+--------------+------+-----+---------+----------------+
+#| ID            | bigint(20)   | NO   | PRI | NULL    | auto_increment |
+#| siteid        | bigint(20)   | NO   |     | NULL    |                |
+#| datetime      | datetime     | YES  |     | NULL    |                |
+#| timezone      | varchar(6)   | YES  |     | NULL    |                |
+#| intemp        | decimal(4,2) | YES  |     | NULL    |                |
+#| extemp        | decimal(4,2) | YES  |     | NULL    |                |
+#| voltage       | decimal(4,2) | YES  |     | NULL    |                |
+#| ping_power    | int(11)      | YES  |     | NULL    |                |
+#| ping_computer | int(11)      | YES  |     | NULL    |                |
+#| site_status   | int(11)      | YES  |     | NULL    |                |
+#| timestamp     | bigint(20)   | YES  |     | NULL    |                |
+#+---------------+--------------+------+-----+---------+----------------+
+#11 rows in set (0.00 sec)
+#
+#mysql> 
+
 sub usage()
 {
 	print "$0: path_to_sitelist authfile [debug]\n" ;
@@ -307,9 +327,11 @@ sub writetable($$$$)
 	}
 	my $site = $result ;
 	if( $Debug ) { print "debug: writetable: site code for site '$sitename' is $site\n" ; }
-	$query = "insert into $tablename values(DEFAULT" ;	# first column is ID, automatically allocated
-	$query .= ",'${site}'" ;				# next is the site ID value, from the above query
-	$query .= strftime ",'%Y-%m-%d %H:%M:%S','UTC'", gmtime();	# next the datetime and timezone
+	my $timestamp = time() ;
+	$query = "insert into $tablename (siteid,datetime,timezone,timestamp,intemp,extemp,voltage,ping_power,ping_computer,site_status) values(" ;
+	$query .= "'${site}'" ;				# next is the site ID value, from the above query
+	$query .= strftime ",'%Y-%m-%d %H:%M:%S','UTC'", gmtime($timestamp);	# next the datetime and timezone
+	$query .= ",'$timestamp'" ;
 	for my $value ( @$refdata )
 	{
 		if( not defined $value or $value eq "" )
