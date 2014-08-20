@@ -1,9 +1,9 @@
 .sidebar{
-    width:35%;
+    width:35% !important;
     margin-top: 0;
 }
 .content{
-    width: 65%;
+    width: 65% !important;
     padding-left: 4%;
 }
 .ui-content{

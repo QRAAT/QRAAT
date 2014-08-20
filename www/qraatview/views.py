@@ -1,10 +1,16 @@
-from django.db.models import Q
+import json
+import utils
+import decimal
+import pytz
+from django.db.models import Q, get_app, get_models
 from django.shortcuts import render, redirect
 from django.core.urlresolvers import reverse
 from django.core.context_processors import csrf
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponseBadRequest
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
+from django.core import serializers
 from models import Project, Tx, Location
 from models import Target, Deployment
 from forms import ProjectForm, OwnersEditProjectForm, AddTransmitterForm
@@ -12,11 +18,14 @@ from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
 from forms import EditTargetForm, EditTransmitterForm, EditLocationForm
 from forms import EditDeploymentForm, EditProjectForm
-import utils
+from django.utils import timezone
+from dateutil.tz import tzlocal
+from dateutil import parser
+from datetime import datetime
 
 
 def not_allowed_page(request):
-    return HttpResponse("Action not allowed")
+    return HttpResponseForbidden("Action not allowed")
 
 
 def get_query(obj_type):
@@ -36,12 +45,12 @@ def get_query(obj_type):
             query = lambda obj_id: Location.objects.get(ID=obj_id)
         elif(obj_type == "deployment"):
             query = lambda obj_id: Deployment.objects.get(ID=obj_id)
+        else:
+            raise ObjectDoesNotExist
+
     except ObjectDoesNotExist:
         raise ObjectDoesNotExist
     else:
-        if not query:
-            raise ObjectDoesNotExist
-
         return query
 
 
@@ -647,7 +656,8 @@ def edit_deployment(request, project_id, deployment_id):
         get_form=EditDeploymentForm(
             instance=deployment,
             initial={'time_start':
-                     utils.timestamp_todate(deployment.time_start)}),
+                     utils.strfdate(
+                         utils.timestamp_todate(deployment.time_start))}),
         template_path="qraat_site/edit-deployment.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:edit-deployment", args=(project_id, deployment_id)))
@@ -666,8 +676,189 @@ def get_nav_options(request):
                 {"url": "auth:users",
                  "name": "Users"},
                 {"url": "admin:index",
-                 "name": "Admin Pages"}]
+                 "name": "Admin Pages"},
+                {"url": "ui:system-status",
+                 "name": "System Status"}]
 
             for opt in super_user_opts:  # Add admin options
                 nav_options.append(opt)
     return nav_options
+
+
+def filter_databy_id(ids, data):
+    '''Filters data by given ids'''
+    return data.filter(ID__in=(ids))
+
+
+def filter_databy_field(fields, data):
+    '''Filters data by given fields'''
+
+    return data.values(*fields)
+
+
+def get_subset(data, n_items):
+    '''Returns a data subset of size `n_items`'''
+    return data[:n_items]
+
+
+def get_offset(data, offset):
+    '''Returns a data subset from offset to last item'''
+    return data[offset:]
+
+
+def get_distinct_data(data, distinct):
+    return data.values(*distinct).distinct()
+
+
+def filter_datafor_field(data, filter_field):
+    for f in filter_field:
+        field, f_filter = f.split(",")
+
+        dict_filter = {}
+        dict_filter[field] = f_filter
+        data = data.filter(**dict_filter)
+
+    return data
+
+
+def filter_by_date(
+        data, date_obj, start_date, end_date, duration):
+    """Filter data for given date
+    params:
+        *data: queryset to be filtered
+        *date_obj: database table where the requested data is
+        *start_date: string start_date
+        *end_date: string end_date"""
+
+    if data:
+        obj = data[0][date_obj]
+
+        DATE_PATTERN = "%m/%d/%Y %H:%M:%S"
+        tz = tzlocal()
+
+        start_date_filter = {}
+        end_date_filter = {}
+
+        # Apply default case, query from yesterday to now
+        if not start_date:
+            yesterday = timezone.now() - timezone.timedelta(1)
+            start_date = yesterday.strftime(DATE_PATTERN)
+        if not end_date:
+            end_date = "now"
+
+        start_date = parser.parse(start_date).replace(tzinfo=tz)
+
+        if end_date.lower() == 'now':
+            end_date = timezone.now()
+        else:
+            end_date = parser.parse(end_date).replace(tzinfo=tz)
+
+        # handle duration case
+        if duration:
+            start_date -= utils.get_timedelta(duration)
+
+        # handle different field instances: timestamp, datetime
+        if isinstance(obj, datetime):
+            start_date = start_date
+            end_date = end_date
+
+        elif isinstance(obj, decimal.Decimal):
+            start_date = utils.date_totimestamp(
+                start_date.astimezone(pytz.utc))
+            end_date = utils.date_totimestamp(end_date.astimezone(pytz.utc))
+
+        start_date_filter[date_obj + "__gte"] = start_date
+        end_date_filter[date_obj + "__lte"] = end_date
+
+        data = data.filter(**start_date_filter)
+        data = data.filter(**end_date_filter)
+
+    return data
+
+
+def render_data(request):
+    '''Renders a JSON serialized data
+       Only admins have access to this'''
+
+    user = request.user
+
+    try:
+        data = get_model_data(request)
+        data = json_parse(data)
+
+        if user.is_superuser:
+            return HttpResponse(
+                json.dumps(data, cls=utils.DateTimeEncoder),
+                content_type="application/json")
+        else:
+            return not_allowed_page(request)
+
+    except Exception, e:
+        print e
+        return HttpResponseBadRequest("Object not found")
+
+
+def get_model_data(request):
+    '''Returns Django's data selected by a get request'''
+
+    obj_type = request.GET.get("obj")
+    ids = request.GET.getlist("id")
+    fields = request.GET.getlist("field")
+    n_items = request.GET.get("n_items")
+    offset = request.GET.get("offset")
+    distinct = request.GET.getlist("distinct")
+    filter_field = request.GET.getlist("filter_field")
+    date_obj = request.GET.get("date")
+    start_date = request.GET.get("start_date")
+    end_date = request.GET.get("end_date")
+    duration = request.GET.get("duration")
+
+    model = get_model_type(obj_type)
+    data = model.objects.all()
+
+    if ids:
+        data = filter_databy_id(ids, data)
+
+    if fields:
+        if(ids):
+            fields.append(u'ID')
+        data = filter_databy_field(fields, data)
+
+    if filter_field:
+        data = filter_datafor_field(data, filter_field)
+
+    if distinct:
+        data = get_distinct_data(data, distinct)
+
+    if offset:
+        data = get_offset(data, offset)
+
+    if n_items:
+        data = get_subset(data, n_items)
+
+    if date_obj:
+        data = filter_by_date(data, date_obj, start_date, end_date, duration)
+
+    return data
+
+
+def json_parse(data):
+
+    if data is not None:
+        try:
+            return serializers.serialize("json", data)
+        except AttributeError:
+            return list(data)
+        except Exception, e:
+            raise e
+    else:
+        raise TypeError("Can't serialize a None type")
+
+
+def get_model_type(model_type):
+    app = get_app("qraatview")
+    if model_type is not None:
+        for model in get_models(app):
+            if model._meta.verbose_name.lower() == model_type.lower():
+                return model
+    return None

@@ -1,0 +1,15 @@
+{% block sidebar %}
+{% if user.is_authenticated %}
+<ol class="nav nav-pills nav-stacked">  
+    <li class="active">
+    <a href={% url 'ui:system-status' %}>System status</a>
+    </li>
+    <li>
+        <li class="side-bar-element">
+        <a href={% url 'ui:generic-graph' %}>Generic graph</a>
+        </li>
+    </li>
+</ol>
+
+{% endif %}
+{%endblock%}

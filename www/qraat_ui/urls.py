@@ -11,8 +11,7 @@ urlpatterns = patterns('qraat_ui.views',
         'view_by_dep', name='view_by_dep'),
     # url(r'^deployment/(?P<dep_id>\d+)/$', 'view_by_dep'),
     url(r'^target/(?P<target_id>\d+)/$', 'view_by_target'),
-    url(r'^transmitter/(?P<tx_id>\d+)/$', 'view_by_tx')
-)
-urlpatterns += patterns('',
-  url(r'^admin/', include(admin.site.urls)),
+    url(r'^transmitter/(?P<tx_id>\d+)/$', 'view_by_tx'),
+    url(r'^generic_graph', 'generic_graph', name='generic-graph'),
+    url(r'^system_status', 'system_status', name='system-status'),
 )

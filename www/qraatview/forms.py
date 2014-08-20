@@ -6,6 +6,7 @@ from models import TxMakeParameters, TxParameters
 from django.contrib.auth.models import User
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from datetime import datetime
+import pytz
 import utils
 
 
@@ -209,7 +210,7 @@ class AddDeploymentForm(ProjectElementForm):
                 (target.ID, target) for target in project.get_targets()]
 
     def clean_time_start(self):
-        time_start = self.cleaned_data.get("time_start")
+        time_start = self.cleaned_data.get("time_start").astimezone(pytz.utc)
 
         try:
             timestamp = utils.date_totimestamp(time_start)
@@ -310,7 +311,7 @@ class EditDeploymentForm(ProjectElementForm):
         input_formats=[DATE_FORMAT, ])
 
     def clean_time_start(self):
-        time_start = self.cleaned_data.get("time_start")
+        time_start = self.cleaned_data.get("time_start").astimezone(pytz.utc)
 
         try:
             timestamp = utils.date_totimestamp(time_start)
