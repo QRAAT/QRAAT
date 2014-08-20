@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect
-from django.http import HttpResponse, HttpResponseRedirect
-from django.contrib.auth import authenticate, login, logout
+from django.http import HttpResponse
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
-from qraat_auth.forms import UserForm, AccountChangeForm
+from qraat_auth.forms import AccountChangeForm
 from qraat_auth.forms import PasswordChangeForm
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
@@ -24,6 +24,9 @@ def user_logout(request):
 
 
 def user_login(request):
+
+    next = request.GET.get("next")
+
     if request.method == 'POST':
         login_form = AuthenticationForm(data=request.POST)
         if login_form.is_valid():
@@ -31,14 +34,18 @@ def user_login(request):
             if user is not None:
                 if user.is_active:
                     login(request, user)
-                    return redirect('/')
+                    if next != "None":
+                        return redirect(next)
+                    else:
+                        return redirect('/')
                 else:
                     return HttpResponse("Innactive user!")
     else:
         login_form = AuthenticationForm()
 
     return render(
-        request, 'qraat_auth/loginform.html', {'login_form': login_form})
+        request, 'qraat_auth/loginform.html', {'login_form': login_form,
+                                               'next': next})
 
 
 @login_required(login_url='/auth')
@@ -56,6 +63,7 @@ def show_users(request):
 
     return HttpResponse("Try a get!")
 
+
 @login_required(login_url='/auth')
 def user_logged_in(request):
     username = request.user.username
@@ -68,7 +76,7 @@ def user_account(request, user_id=None):
         user = User.objects.get(id=user_id)
     else:
         user = request.user
-    
+
     return render(
         request, 'qraat_auth/user-account.html', {'user': user})
 

@@ -42,7 +42,7 @@ class csv:
     Each row is a Row object, whose attributes correspond to the CSV 
     columns. This class's constructor accepts a file, e.g. 
     ``txist = csv('tx.list')``, or DB connector class and the name 
-    of a table, e.g. ``txlist = csv(db_con=db_con, table='txlist')``. 
+    of a table, e.g. ``txlist = csv(db_con=db_con, table='tx')``. 
 
   :param fn: Input file name or file descriptor. 
   :type fn: str, file
@@ -292,7 +292,7 @@ if __name__ == '__main__': # Testing, testing ...
   import MySQLdb as mdb
   try:
     db_con = mdb.connect('localhost', 'root', 'woodland', 'qraat')
-    txlist = csv(db_con=db_con, db_table='txlist')
+    txlist = csv(db_con=db_con, db_table='tx')
     txlist.write('fella')
 
   except mdb.Error, e:

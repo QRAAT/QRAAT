@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="form-container login-form">
- <form action={% url 'auth:login' %} method="post">
+    <form action="{% url 'auth:login' %}?next={{next}}" method="post">
     {% csrf_token %}
 	<!-- Displays form errors -->
 	{% if login_form.non_field_errors %}

@@ -27,7 +27,7 @@ try:
   db_con = qraat.util.get_db('writer')
   cur = db_con.cursor()
   
-  sites = qraat.csv.csv(db_con=db_con, db_table="sitelist")
+  sites = qraat.csv.csv(db_con=db_con, db_table="site")
   
   if options.base_dir == None:
     base_dir = os.environ.get('RMG_SERVER_EST_DIR')

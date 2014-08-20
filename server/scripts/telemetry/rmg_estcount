@@ -31,7 +31,7 @@ use DBI ;
 my $Debug = 0 ;
 
 my $TableNameEstCount = "estcount" ;		# The name of the db table
-my $TableNameSitelist = "sitelist" ;		# The name of the db table
+my $TableNameSitelist = "site" ;		# The name of the db table
 my $ENV_NAME_RMG_SERVER_EST_DIR = "RMG_SERVER_EST_DIR" ;	# The name of the environment variable where the est directory is defined
 my $ENV_NAME_RMG_SITE_EST_DIR = "RMG_SITE_EST_DIR" ;	# The name of the environment variable where the est directory is defined
 
@@ -92,7 +92,7 @@ sub main()
 		if( (not defined $sitename) or ($sitename eq "") ) { next ; }
 		my ( $server_est_count, $site_est_count ) = get_est_count($sitename) ;
 		print "$sitename: $server_est_count at server, $site_est_count at site\n" ;
-		writetable($dbh,$TableNameEstCount,$sitename,[$server_est_count,$site_est_count]) ;
+		writetable($dbh,$TableNameEstCount,$sitename,$server_est_count,$site_est_count) ;
 	}	
 	#
 	# Close database
@@ -176,9 +176,9 @@ sub opendatabase($)	# connects to the database and returns the database handle
 	return $dbh ;
 }
 
-sub writetable($$$$)
+sub writetable($$$$$)
 {
-	my ( $dbh, $tablename, $sitename, $refdata ) = @_ ;
+	my ( $dbh, $tablename, $sitename, $server_est_count, $site_est_count ) = @_ ;
 	# Get the site number from the sitename table
 	my $query = "select id from $TableNameSitelist where name='${sitename}' ;" ;
 	if( $Debug ) { print "debug: writetable: query=$query\n" ; }
@@ -190,19 +190,26 @@ sub writetable($$$$)
 	}
 	my $site = $result ;
 	if( $Debug ) { print "debug: writetable: site code for site '$sitename' is $site\n" ; }
-	$query = "insert into $tablename values(DEFAULT" ;	# first column is ID, automatically allocated
-	$query .= ",'${site}'" ;				# next is the site ID value, from the above query
-	$query .= strftime ",'%Y-%m-%d %H:%M:%S','UTC'", gmtime();	# next the datetime and timezone
-	for my $value ( @$refdata )
+	my $timestamp = time() ;
+	$query = "insert into $tablename (siteid,datetime,timezone,timestamp,server,site) values(" ;	# setup column names
+	$query .= "'${site}'" ;				# next is the site ID value, from the above query
+	$query .= strftime ",'%Y-%m-%d %H:%M:%S','UTC'", gmtime($timestamp);	# next, the datetime and timezone
+	$query .= ",'$timestamp'" ;				# and the unix time
+	if( (not defined $server_est_count) or ($server_est_count eq "") )
 	{
-		if( not defined $value or $value eq "" )
-		{
-			$query .= ",NULL" ;		# no quotes around the NULL
-		}
-		else
-		{
-			$query .= ",'${value}'" ;
-		}
+		$query .= ",NULL" ;
+	}
+	else
+	{
+		$query .= ",'$server_est_count'" ;
+	}
+	if( (not defined $site_est_count) or ($site_est_count eq "") )
+	{
+		$query .= ",NULL" ;
+	}
+	else
+	{
+		$query .= ",'$site_est_count'" ;
 	}
 	$query .= ") ;" ;
 	if( $Debug ) { print "debug: updatetable: query=$query\n" ; }
