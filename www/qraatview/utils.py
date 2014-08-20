@@ -2,7 +2,7 @@ import json
 import calendar
 import decimal
 from dateutil.tz import tzlocal
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.db.models.base import ModelState
 
 
@@ -23,6 +23,35 @@ def date_totimestamp(date):
         raise e
     else:
         return timestamp
+
+
+def get_timedelta(duration):
+    """Given a duration interval returns a timedelta object that represents
+    this duration"""
+
+    DAY, WEEK, MONTH, YEAR = 1, 7, 30, 365
+    duration_time = None
+
+    if isinstance(duration, str):
+        duration = duration.lower()
+
+    if duration == 'day':
+        duration_time = timedelta(days=DAY)
+
+    elif duration == 'week':
+        duration_time = timedelta(days=WEEK)
+
+    elif duration == 'month':
+        duration_time = timedelta(days=MONTH)
+
+    elif duration == 'year':
+        duration_time = timedelta(days=YEAR)
+
+    else:
+        if isinstance(duration, int):
+            duration_time = timedelta(days=duration)
+
+    return duration_time
 
 
 class DateTimeEncoder(json.JSONEncoder):

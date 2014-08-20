@@ -1,3 +1,7 @@
+import json
+import utils
+import decimal
+import pytz
 from django.db.models import Q, get_app, get_models
 from django.shortcuts import render, redirect
 from django.core.urlresolvers import reverse
@@ -18,7 +22,6 @@ from django.utils import timezone
 from dateutil.tz import tzlocal
 from dateutil import parser
 from datetime import datetime
-import json, utils, decimal, pytz
 
 
 def not_allowed_page(request):
@@ -674,7 +677,7 @@ def get_nav_options(request):
                  "name": "Users"},
                 {"url": "admin:index",
                  "name": "Admin Pages"},
-                {"url": "ui:generic-graph",
+                {"url": "ui:system-status",
                  "name": "System Status"}]
 
             for opt in super_user_opts:  # Add admin options
@@ -719,13 +722,13 @@ def filter_datafor_field(data, filter_field):
 
 
 def filter_by_date(
-        data, date_obj, start_date, end_date):
+        data, date_obj, start_date, end_date, duration):
     """Filter data for given date
     params:
         *data: queryset to be filtered
         *date_obj: database table where the requested data is
         *start_date: string start_date
-        *end_date: string end_date""" 
+        *end_date: string end_date"""
 
     if data:
         obj = data[0][date_obj]
@@ -749,6 +752,10 @@ def filter_by_date(
             end_date = timezone.now()
         else:
             end_date = parser.parse(end_date).replace(tzinfo=tz)
+
+        # handle duration case
+        if duration:
+            start_date -= utils.get_timedelta(duration)
 
         # handle different field instances: timestamp, datetime
         if isinstance(obj, datetime):
@@ -804,6 +811,7 @@ def get_model_data(request):
     date_obj = request.GET.get("date")
     start_date = request.GET.get("start_date")
     end_date = request.GET.get("end_date")
+    duration = request.GET.get("duration")
 
     model = get_model_type(obj_type)
     data = model.objects.all()
@@ -829,7 +837,7 @@ def get_model_data(request):
         data = get_subset(data, n_items)
 
     if date_obj:
-        data = filter_by_date(data, date_obj, start_date, end_date)
+        data = filter_by_date(data, date_obj, start_date, end_date, duration)
 
     return data
 

@@ -21,10 +21,6 @@
             timezoneJS.timezone.zoneFileBasePath = '/static/tz';
             timezoneJS.timezone.init();
 
-            $("input, select").change(function(){
-                $("#graph_form").submit();    
-            });
-
             var selected_obj = $("#obj-sel").val();
 
             var data = {{data|safe}};
@@ -44,33 +40,39 @@
                     $("#" + aux_fields[i]).val(fields[i]);
                 }
             }
+
+            $("select, input").change(function(){
+                updateGraph(fields, static_field);
+            });
+
+            var interval = 2;
         
             updateGraph(fields, static_field);
+            setInterval(function(){ updateGraph(fields, static_field)}, 1000 * 60 * interval );
 
         });
 
 
         function updateGraph(fields, static_field){
+            var url_state = "{% url 'ui:system-status' %}";
+            var form_data = $("#graph_form").serialize();
+            var state = url_state + '?' + form_data;
+            window.history.replaceState(null, null, state); 
+
             //Do not refresh page
             var request = $.ajax({
                     url: "{% url 'get-data' %}",
-                    data: $("#graph_form").serialize()
+                    data: form_data 
             });
 
             request.done(function(data){
-                   plotGraph(JSON.parse(data), fields, static_field); 
+                   plotGraph(data, fields, static_field); 
             });
-
-            var minute_interval = 2;
-
-            setTimeout(
-                    function(){ updateGraph(fields, static_field);  }, 1000 * 60 * minute_interval);
         }
 
         function plotGraph(dataset, fields, static_field){
             var plotData = {};
             plotData.data = new Array();
-            console.log(dataset);
 
             if(dataset && dataset.length > 0){
                 for(var i=0; i<dataset.length; i++){
@@ -161,8 +163,38 @@
             </div>
 
         <div class="row">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <div class="input-group-addon">
+                       Previous 
+                    </div>
+                    <div class="form-control">
+                            <label class="col-md-3">
+                                <input type="radio" name="duration" value="day"/>
+                                Day 
+                            </label>
+
+                            <label class="col-md-3">
+                                <input type="radio" name="duration" value="week"/>
+                                Week
+                            </label>
+                            <label class="col-md-3">
+                                <input type="radio" name="duration" value="month"/>
+                                Month
+                            </label>
+                            <label class="col-md-3">
+                                 <input type="radio" name="duration" value="year"/>
+                                 Year
+                            </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
             <div id="placeholder" class="col-md-8 margin-top-4" style="width:600px; height:300px;"></div>
         </div>
+
 
         <div class="row">
             <div class="col-md-4">
