@@ -1,5 +1,4 @@
 {% extends "qraat_ui/base.html" %}
-{% load staticfiles %}
 
 {% block extracss %}
     <link rel="stylesheet" type="text/css" href="/static/qraat_ui/css/status_pages.css"/>
@@ -19,8 +18,9 @@
                                         format: "m/d/Y H:i:s"
                                         });
 
-            timezoneJS.timezone.zoneFileBasePath = "{% static 'tz' %}";
-            timezoneJS.timezone.init();
+            var _tz = timezoneJS.timezone;
+            _tz.loadingScheme = _tz.loadingSchemes.MANUAL_LOAD;
+            _tz.loadZoneJSONData('/static/qraat_site/js/timezone.json', true);
 
             var selected_obj = $("#obj-sel").val();
 
