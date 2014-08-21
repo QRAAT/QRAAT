@@ -565,4 +565,4 @@ class Telemetry(models.Model):
 
     site_status = models.IntegerField(max_length=11)
 
-    timestamp = models.BigIntegerField(max_length=20)
+    timestamp = models.DecimalField(max_digits=16, decimal_places=6)
