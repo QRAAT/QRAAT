@@ -81,7 +81,7 @@
                     for(var key in dataset[i]){
                         if(dataset[i].hasOwnProperty(key) && key != static_field){ 
                             var value = dataset[i][key];
-                            if(key == "datetime"){
+                            if(key == "timestamp"){
                                 value *= 1000;
                                 set[0] = value;
                             }else{
