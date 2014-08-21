@@ -564,3 +564,5 @@ class Telemetry(models.Model):
     ping_computer = models.IntegerField(max_length=11)
 
     site_status = models.IntegerField(max_length=11)
+
+    timestamp = models.BigIntegerField(max_length=20)
