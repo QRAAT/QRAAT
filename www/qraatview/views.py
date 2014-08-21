@@ -1,6 +1,5 @@
 import json
 import utils
-import decimal
 import pytz
 from django.db.models import Q, get_app, get_models
 from django.shortcuts import render, redirect
@@ -11,6 +10,7 @@ from django.http import HttpResponseBadRequest
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from django.core import serializers
+from django.db.models.fields import DecimalField, DateTimeField
 from models import Project, Tx, Location
 from models import Target, Deployment
 from forms import ProjectForm, OwnersEditProjectForm, AddTransmitterForm
@@ -21,7 +21,6 @@ from forms import EditDeploymentForm, EditProjectForm
 from django.utils import timezone
 from dateutil.tz import tzlocal
 from dateutil import parser
-from datetime import datetime
 
 
 def not_allowed_page(request):
@@ -685,9 +684,11 @@ def get_nav_options(request):
     return nav_options
 
 
-def filter_databy_id(ids, data):
+def filter_databy_id(ids):
     '''Filters data by given ids'''
-    return data.filter(ID__in=(ids))
+    dict_filter = {}
+    dict_filter["ID__in"] = ids
+    return dict_filter
 
 
 def filter_databy_field(fields, data):
@@ -710,29 +711,29 @@ def get_distinct_data(data, distinct):
     return data.values(*distinct).distinct()
 
 
-def filter_datafor_field(data, filter_field):
+def filter_datafor_field(filter_field):
+    dict_filter = {}
     for f in filter_field:
         field, f_filter = f.split(",")
 
-        dict_filter = {}
         dict_filter[field] = f_filter
-        data = data.filter(**dict_filter)
 
-    return data
+    return dict_filter
 
 
 def filter_by_date(
-        data, date_obj, start_date, end_date, duration):
-    """Filter data for given date
+        model, date_obj, start_date, end_date, duration):
+    """Creates a django's filter for given date
     params:
         *data: queryset to be filtered
         *date_obj: database table where the requested data is
         *start_date: string start_date
         *end_date: string end_date"""
 
-    if data:
-        obj = data[0][date_obj]
+    dic_filter = {}
+    obj = utils.get_field_instance(model, date_obj)
 
+    if obj:
         DATE_PATTERN = "%m/%d/%Y %H:%M:%S"
         tz = tzlocal()
 
@@ -758,11 +759,11 @@ def filter_by_date(
             start_date -= utils.get_timedelta(duration)
 
         # handle different field instances: timestamp, datetime
-        if isinstance(obj, datetime):
+        if isinstance(obj, DateTimeField):
             start_date = start_date
             end_date = end_date
 
-        elif isinstance(obj, decimal.Decimal):
+        elif isinstance(obj, DecimalField):
             start_date = utils.date_totimestamp(
                 start_date.astimezone(pytz.utc))
             end_date = utils.date_totimestamp(end_date.astimezone(pytz.utc))
@@ -770,10 +771,10 @@ def filter_by_date(
         start_date_filter[date_obj + "__gte"] = start_date
         end_date_filter[date_obj + "__lte"] = end_date
 
-        data = data.filter(**start_date_filter)
-        data = data.filter(**end_date_filter)
+        dic_filter.update(start_date_filter)
+        dic_filter.update(end_date_filter)
 
-    return data
+    return dic_filter
 
 
 def render_data(request):
@@ -814,18 +815,26 @@ def get_model_data(request):
     duration = request.GET.get("duration")
 
     model = get_model_type(obj_type)
-    data = model.objects.all()
+    dict_filter = {}
+
+    if filter_field:
+        dict_filter.update(filter_datafor_field(filter_field))
+
+    if date_obj:
+        dict_filter.update(
+            filter_by_date(model, date_obj, start_date, end_date, duration))
 
     if ids:
-        data = filter_databy_id(ids, data)
+        dict_filter.update(filter_databy_id(ids))
 
+    # select data
+    data = model.objects.filter(**dict_filter)
+
+    # strip data
     if fields:
         if(ids):
             fields.append(u'ID')
         data = filter_databy_field(fields, data)
-
-    if filter_field:
-        data = filter_datafor_field(data, filter_field)
 
     if distinct:
         data = get_distinct_data(data, distinct)
@@ -835,9 +844,6 @@ def get_model_data(request):
 
     if n_items:
         data = get_subset(data, n_items)
-
-    if date_obj:
-        data = filter_by_date(data, date_obj, start_date, end_date, duration)
 
     return data
 

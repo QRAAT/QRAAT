@@ -53,6 +53,11 @@ def get_timedelta(duration):
 
     return duration_time
 
+def get_field_instance(model, field_name):
+    for field in model._meta.fields:
+        if field_name == field.verbose_name:
+            return field
+
 
 class DateTimeEncoder(json.JSONEncoder):
     """Adapter class that encodes a datetime object to json object"""
