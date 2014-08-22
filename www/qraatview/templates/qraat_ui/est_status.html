@@ -65,7 +65,7 @@
 
 
         function updateGraph(fields, static_field){
-            var url_state = "{% url 'ui:system-status' %}";
+            var url_state = "{% url 'ui:est-status' %}";
             var form_data = $("#graph_form").serialize();
             var state = url_state + '?' + form_data;
             window.history.replaceState(null, null, state); 
@@ -107,7 +107,8 @@
             }
 
             var options = {series:{}, xaxis: {}};
-            options.series.lines = {show: true};
+            options.series.lines = {show: false};
+            options.series.points = {show: true};
             options.xaxis.mode = "time";
             options.xaxis.timeformat = "%m/%d/%y %H:%M:%S";
             options.xaxis.timezone = "America/Los_Angeles";
@@ -122,7 +123,7 @@
 
 {% block content %}
    <div class="row">
-        <h4>System status</h4>
+        <h4>Est status</h4>
    </div>
 
     <div class="container-fluid">
@@ -134,7 +135,7 @@
                 </div>
             </div>
 
-            <input id="obj-sel" type="hidden" name="obj" value="telemetry"></input>
+            <input id="obj-sel" type="hidden" name="obj" value="est"></input>
 
             <div class="row">
                 <div class="col-md-4">
@@ -150,12 +151,12 @@
 
             <div id="axis" class="row">
                 <div class='col-md-offset-0 col-md-4'>
-                        <input type="hidden" name="field" value="siteID"></input>
+                        <input type="hidden" name="field" value="deploymentID"></input>
                         <div class='input-group'>
-                            <div class='input-group-addon'>Site</div>
+                            <div class='input-group-addon'>Deployment</div>
                             <select id='site_list' class='form-control' name='filter_field'>
                                 {% for value in static_field_values %}
-                                    <option value="siteID,{{value}}">{{value}} </option>
+                                    <option value="deploymentID,{{value}}">{{value}} </option>
                                 {% endfor %}
                             </select>
                         </div>

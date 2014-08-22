@@ -1,0 +1,7 @@
+.centered{
+    position: relative;
+    top: 50%;
+    left: 50%;
+    margin-top: -16px;
+    margin-left: -16px;
+}

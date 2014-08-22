@@ -14,4 +14,5 @@ urlpatterns = patterns('qraat_ui.views',
     url(r'^transmitter/(?P<tx_id>\d+)/$', 'view_by_tx'),
     url(r'^generic_graph', 'generic_graph', name='generic-graph'),
     url(r'^system_status', 'system_status', name='system-status'),
+    url(r'^est_status', 'est_status', name='est-status'),
 )
