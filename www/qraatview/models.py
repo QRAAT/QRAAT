@@ -65,7 +65,7 @@ class Project(models.Model):
         app_label = QRAAT_APP_LABEL
         db_table = "project"
         permissions = COLLABORATOR_PERMISSIONS + VIEWER_PERMISSIONS
-    
+
     ID = models.AutoField(primary_key=True)
 
     ownerID = models.IntegerField(
@@ -566,3 +566,89 @@ class Telemetry(models.Model):
     site_status = models.IntegerField(max_length=11)
 
     timestamp = models.DecimalField(max_digits=16, decimal_places=6)
+
+
+class Est(models.Model):
+    class Meta:
+        verbose_name = "Est"
+        app_label = QRAAT_APP_LABEL
+        db_table = "est"
+
+    ID = models.AutoField(primary_key=True)
+
+    siteID = models.ForeignKey(Site, db_column="siteID")
+
+    timestamp = models.DecimalField(max_digits=16, decimal_places=6)
+
+    frequency = models.IntegerField(max_length=11)
+
+    center = models.IntegerField(max_length=11)
+
+    fdsp = models.FloatField()
+
+    fd1r = models.FloatField()
+    fd1i = models.FloatField()
+    fd2r = models.FloatField()
+    fd2i = models.FloatField()
+    fd3r = models.FloatField()
+    fd3i = models.FloatField()
+    fd4r = models.FloatField()
+    fd4i = models.FloatField()
+
+    band3 = models.SmallIntegerField(max_length=6)
+
+    band10 = models.SmallIntegerField(max_length=6)
+
+    edsp = models.FloatField()
+
+    ed1r = models.FloatField()
+    ed1i = models.FloatField()
+    ed2r = models.FloatField()
+    ed2i = models.FloatField()
+    ed3r = models.FloatField()
+    ed3i = models.FloatField()
+    ed4r = models.FloatField()
+    ed4i = models.FloatField()
+
+    ec = models.FloatField()
+
+    tnp = models.FloatField()
+
+    nc11r = models.FloatField()
+    nc11i = models.FloatField()
+    nc12r = models.FloatField()
+    nc12i = models.FloatField()
+    nc13r = models.FloatField()
+    nc13i = models.FloatField()
+    nc14r = models.FloatField()
+    nc14r = models.FloatField()
+    nc21r = models.FloatField()
+    nc21i = models.FloatField()
+    nc22r = models.FloatField()
+    nc22i = models.FloatField()
+    nc23r = models.FloatField()
+    nc23i = models.FloatField()
+    nc24r = models.FloatField()
+    nc24i = models.FloatField()
+    nc31r = models.FloatField()
+    nc31i = models.FloatField()
+    nc32r = models.FloatField()
+    nc32i = models.FloatField()
+    nc33r = models.FloatField()
+    nc33i = models.FloatField()
+    nc34r = models.FloatField()
+    nc34i = models.FloatField()
+    nc41r = models.FloatField()
+    nc41i = models.FloatField()
+    nc42r = models.FloatField()
+    nc42i = models.FloatField()
+    nc43r = models.FloatField()
+    nc43i = models.FloatField()
+    nc44r = models.FloatField()
+    nc44i = models.FloatField()
+
+    fdsnr = models.FloatField()
+
+    edsnr = models.FloatField()
+
+    deploymentID = models.ForeignKey(Deployment, db_column="deploymentID")

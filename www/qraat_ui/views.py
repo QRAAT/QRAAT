@@ -423,6 +423,51 @@ def system_status(
     return render(request, "qraat_ui/system_status.html", content)
 
 
+@login_required(login_url="auth/login")
+def est_status(
+            request,
+            static_field="deploymentID",
+            obj="est",
+            sel_fields=["fdsp", "edsp", "frequency",
+                    "fdsnr", "edsnr"]):
+
+    if request.GET.get("start_date"):
+        start_date = request.GET.get("start_date")
+    else:
+        start_date = (datetime.datetime.now() -
+                datetime.timedelta(1)).strftime("%m/%d/%Y %H:%M:%S")
+
+    model_obj = get_model_type(obj)
+    obj_fields_keys = model_obj.objects.values(*sel_fields)[0].keys()
+    static_field_values = model_obj.objects.values_list(static_field, flat=True).distinct()
+    fields = copy.copy(request.GET.getlist("field"))
+    
+    # Replaces field's name for selected field's value
+    sel_static_values = request.GET.getlist("filter_field")
+    for sel_values in sel_static_values:
+        key, value = sel_values.split(",")
+        fields[fields.index(key)] = sel_values 
+
+    content = {}
+    content = dict(
+                nav_options=get_nav_options(request),
+                fields=json.dumps(fields),
+                static_field_values=static_field_values,
+                obj_fields_keys=obj_fields_keys,
+                start_date= start_date,
+                static_field=json.dumps(static_field))
+
+    try:
+        data = get_model_data(request)
+    except Exception, e:
+        print e
+        content["data"] = json.dumps(None)
+    else:
+        content["data"] = json.dumps(json_parse(data), cls=DateTimeEncoder)
+
+    return render(request, "qraat_ui/est_status.html", content)
+
+
 @login_required(login_url="/auth/login")
 def generic_graph(
                 request,
