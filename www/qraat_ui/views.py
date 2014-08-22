@@ -383,8 +383,8 @@ def system_status(
             request,
             static_field="siteID",
             obj="telemetry",
-            sel_fields=["intemp", "extemp", "voltage",
-                    "ping_power", "ping_computer", "site_status"]):
+            excluded_fields=["ID", "siteID", "timestamp",
+                "datetime", "timezone"]):
 
     if request.GET.get("start_date"):
         start_date = request.GET.get("start_date")
@@ -393,7 +393,8 @@ def system_status(
                 datetime.timedelta(1)).strftime("%m/%d/%Y %H:%M:%S")
 
     model_obj = get_model_type(obj)
-    obj_fields_keys = model_obj.objects.values(*sel_fields)[0].keys()
+    obj_fields_keys = [field.name for field in model_obj._meta.fields
+        if field.name not in excluded_fields]
     static_field_values = model_obj.objects.values_list(static_field, flat=True).distinct()
     fields = copy.copy(request.GET.getlist("field"))
     
@@ -428,8 +429,8 @@ def est_status(
             request,
             static_field="deploymentID",
             obj="est",
-            sel_fields=["fdsp", "edsp", "frequency",
-                    "fdsnr", "edsnr"]):
+            excluded_fields=["ID", "deploymentID", "siteID",
+                "timestamp"]):
 
     if request.GET.get("start_date"):
         start_date = request.GET.get("start_date")
@@ -438,7 +439,8 @@ def est_status(
                 datetime.timedelta(1)).strftime("%m/%d/%Y %H:%M:%S")
 
     model_obj = get_model_type(obj)
-    obj_fields_keys = model_obj.objects.values(*sel_fields)[0].keys()
+    obj_fields_keys = [field.name for field in model_obj._meta.fields
+        if field.name not in excluded_fields]
     static_field_values = model_obj.objects.values_list(static_field, flat=True).distinct()
     fields = copy.copy(request.GET.getlist("field"))
     
