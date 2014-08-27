@@ -1,7 +1,7 @@
 import json
 import utils
-import pytz
-from django.db.models import Q, get_app, get_models
+import rest_api
+from django.db.models import Q
 from django.shortcuts import render, redirect
 from django.core.urlresolvers import reverse
 from django.core.context_processors import csrf
@@ -9,8 +9,6 @@ from django.http import HttpResponse, HttpResponseForbidden
 from django.http import HttpResponseBadRequest
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
-from django.core import serializers
-from django.db.models.fields import DecimalField, DateTimeField
 from models import Project, Tx, Location
 from models import Target, Deployment
 from forms import ProjectForm, OwnersEditProjectForm, AddTransmitterForm
@@ -18,18 +16,30 @@ from forms import AddManufacturerForm, AddTargetForm
 from forms import AddDeploymentForm, AddLocationForm
 from forms import EditTargetForm, EditTransmitterForm, EditLocationForm
 from forms import EditDeploymentForm, EditProjectForm
-from django.utils import timezone
-from dateutil.tz import tzlocal
-from dateutil import parser
 
 
 def not_allowed_page(request):
+    """This view renders a page for forbidden action
+    with HTTP 403 status and a message"""
+
     return HttpResponseForbidden("Action not allowed")
 
 
 def get_query(obj_type):
-    """ Receives an object type and return it's specific
-    query"""
+    """ This function selects a query based in a model verbose name
+
+    :param obj_type: Object's verbose name
+    :type obj_type: str.
+    :returns:  func -- A function to query a model by id
+
+    .. note::
+
+       .. code-block:: python
+
+          #Example of usage:
+          query = get_query("transmitters")
+          transmitter_10 = query(10)
+    """
 
     query = None
     obj_type = obj_type.lower()
@@ -56,23 +66,34 @@ def get_query(obj_type):
 def get_objs_by_type(obj_type, obj_ids):
     """Receives an object type and a list of ids and return a list of
     Objects based in it's type i.e transmitter, location, target, or
-    deployment"""
+    deployment
 
-    try:
-        query = get_query(obj_type)
-        #  maps items selected on the form in a list of objects
-        objs = map(query, obj_ids)
-    except Exception, e:
-        raise e
+    :param obj_type: Model's verbose name
+    :type obj_type: str.
+    :returns:  list -- list of models for each given id
+    :raises: ObjectDoesNotExist
+    """
 
-    else:
-        return objs
+    query = get_query(obj_type)
+
+    #  maps items selected on the form in a list of objects
+    objs = map(query, obj_ids)
+
+    return objs
 
 
 def can_delete(project, user):
     """A user can delete content in a project if the user is the project owner or
     if the user is in the collaborators group and the group has permission
-    to delete content on the project"""
+    to delete content on the project
+
+    :param project: qraatview.models Project instance.
+    :type project: models.Project.
+    :param user: Django auth user instance.
+    :type user: User.
+    :returns:  bool -- returns if a user has permission \
+            to delete something in a project
+    """
 
     # With has_perm we can have different permissions for group
     return project.is_owner(user) or\
@@ -83,7 +104,14 @@ def can_delete(project, user):
 def can_change(project, user):
     """A user can change content in a project if the user is the project owner or
     if the user is in the collaborators group and the group has permission
-    to change content on the project"""
+    to change content in the project
+
+    :param project: qraatview.models Project instance.
+    :type project: models.Project.
+    :param user: Django auth user instance.
+    :type user: User.
+    :returns:  bool -- returns if a user has permission \
+            to change something in a project"""
 
     return project.is_owner(user) or\
         (project.is_collaborator(user)
@@ -93,7 +121,14 @@ def can_change(project, user):
 def can_view(project, user):
     """Users can view content in a project if the project is public,
     or the user is the project owner, or the user is a project collaborator
-    or the user is a project viewer"""
+    or the user is a project viewer
+
+    :param project: qraatview.models Project instance.
+    :type project: models.Project
+    :param user: Django auth user instance.
+    :type user: User.
+    :returns:  bool -- returns if a user has permission to view \
+            something in a project"""
 
     return project.is_public\
         or project.is_owner(user)\
@@ -102,6 +137,14 @@ def can_view(project, user):
 
 
 def index(request):
+    """This view renders the system's first page.
+    This page has a nav bar and users projects
+
+    :param request: Django's http request object
+    :type request: HttpRequest.
+    :returns:  HttpResponse -- Rendered http response object
+    """
+
     nav_options = get_nav_options(request)
     user = request.user
 
@@ -118,6 +161,14 @@ def index(request):
 
 
 def get_project(project_id):
+    """Function for intern use that queries a project by id
+
+    :param project_id: A valid project id
+    :type project_id: int.
+
+    :returns:  Project -- A Project Model instance
+    """
+
     try:
         project = Project.objects.get(ID=project_id)
     except ObjectDoesNotExist:
@@ -127,6 +178,23 @@ def get_project(project_id):
 
 
 def show_transmitter(request, project_id, transmitter_id):
+    """
+    This view renders transmitter's information
+
+    :param request:  Django's request obj.
+    :type request: HttpRequest.
+    :param project_id:  Id for transmitter's project.
+    :type project_id: int.
+    :param transmitter_id:  Transmitter's id.
+    :type transmitter_id: int.
+    :returns:  HttpResponse -- Serialized http response with \
+            transmitter's information.
+
+    .. note::
+
+       #TODO: Implement a nice view with a map in qraat_ui.
+    """
+
     user = request.user
     project = get_project(project_id)
 
@@ -141,6 +209,19 @@ def show_transmitter(request, project_id, transmitter_id):
 
 
 def show_deployment(request, project_id, deployment_id):
+    """
+    This view renders deployment's information
+
+    :param request:  Django's request obj.
+    :type request: HttpRequest.
+    :param project_id:  Id for deployment's project.
+    :type project_id: int.
+    :param transmitter_id:  Deployment's id.
+    :type deployment_id: int.
+    :returns:  HttpResponse -- Http response with rendered \
+            deployment's information placed in qraat_ui.views.view_by_dep
+    """
+
     user = request.user
     project = get_project(project_id)
 
@@ -153,6 +234,22 @@ def show_deployment(request, project_id, deployment_id):
 
 
 def show_target(request, project_id, target_id):
+    """
+    This view renders target's information
+
+    :param request:  Django's request obj.
+    :type request: HttpRequest.
+    :param project_id:  Id for target's project.
+    :type project_id: int.
+    :param target_id:  Target's id.
+    :type target_id: int.
+    :returns:  HttpResponse -- Serialized http response with \
+            target's information.
+
+    .. note::
+
+       #TODO: Implement a nice view with a map in qraat_ui.
+    """
 
     user = request.user
     project = get_project(project_id)
@@ -166,6 +263,23 @@ def show_target(request, project_id, target_id):
 
 
 def show_location(request, project_id, location_id):
+    """
+    This view renders location's information
+
+    :param request:  Django's request obj.
+    :type request: HttpRequest.
+    :param project_id:  Id for location's project.
+    :type project_id: int.
+    :param location_id:  Location's id.
+    :type location_id: int.
+    :returns:  HttpResponse -- Serialized http response with \
+            location's information.
+
+    .. note::
+
+       #TODO: Implement a nice view with a map in qraat_ui.
+    """
+
     user = request.user
     project = get_project(project_id)
 
@@ -181,6 +295,16 @@ def show_location(request, project_id, location_id):
 
 @login_required(login_url='/auth/login')
 def projects(request):
+    """This view renders a page with projects.
+    For a user projects are displayed as public projects,
+    projects the user owns, projects the user can collaborate,
+    and projects the user can visualize.
+
+    :param request: Django's http request object
+    :type request: HttpRequest.
+    :returns:  HttpResponse -- Rendered http response object
+    """
+
     user = request.user
 
     user_projects = Project.objects.filter(
@@ -215,6 +339,25 @@ def projects(request):
 def render_project_form(
         request, project_id, post_form,
         get_form, template_path, success_url):
+    """This is a main view called by other views that aim to render forms for
+    Transmitters, Locations, Targets, and Deployments
+
+    :param request: Django's http request object
+    :type request: HttpRequest.
+    :param project_id: Project's id to check user permissions
+    :type project_id: str.
+    :param post_form: Form to render when receives a post request
+    :type post_form: ProjectForm.
+    :param get_form: Form to render when receives a get request
+    :type get_form: ProjectForm.
+    :param template_path: The path of the template that will be rendered
+    :type template_path: str.
+    :param success_url: Url to redirect in case of success
+    :type success_url: str.
+    :returns:  HttpResponse -- Http response obj with a rendered page that \
+            contains a form to add or edit Transmitters, \
+            Locations, Targets, or Deployments
+    """
 
     user = request.user
     project = get_project(project_id)
@@ -684,108 +827,15 @@ def get_nav_options(request):
     return nav_options
 
 
-def filter_databy_id(ids):
-    '''Filters data by given ids'''
-    dict_filter = {}
-    dict_filter["ID__in"] = ids
-    return dict_filter
-
-
-def filter_databy_field(fields, data):
-    '''Filters data by given fields'''
-
-    return data.values(*fields)
-
-
-def get_subset(data, n_items):
-    '''Returns a data subset of size `n_items`'''
-    return data[:n_items]
-
-
-def get_offset(data, offset):
-    '''Returns a data subset from offset to last item'''
-    return data[offset:]
-
-
-def get_distinct_data(data, distinct):
-    return data.values(*distinct).distinct()
-
-
-def filter_datafor_field(filter_field):
-    dict_filter = {}
-    for f in filter_field:
-        field, f_filter = f.split(",")
-
-        dict_filter[field] = f_filter
-
-    return dict_filter
-
-
-def filter_by_date(
-        model, date_obj, start_date, end_date, duration):
-    """Creates a django's filter for given date
-    params:
-        *data: queryset to be filtered
-        *date_obj: database table where the requested data is
-        *start_date: string start_date
-        *end_date: string end_date"""
-
-    dic_filter = {}
-    obj = utils.get_field_instance(model, date_obj)
-
-    if obj:
-        DATE_PATTERN = "%m/%d/%Y %H:%M:%S"
-        tz = tzlocal()
-
-        start_date_filter = {}
-        end_date_filter = {}
-
-        # Apply default case, query from yesterday to now
-        if not start_date:
-            yesterday = timezone.now() - timezone.timedelta(1)
-            start_date = yesterday.strftime(DATE_PATTERN)
-        if not end_date:
-            end_date = "now"
-
-        start_date = parser.parse(start_date).replace(tzinfo=tz)
-
-        if end_date.lower() == 'now':
-            end_date = timezone.now()
-        else:
-            end_date = parser.parse(end_date).replace(tzinfo=tz)
-
-        # handle duration case
-        if duration:
-            start_date -= utils.get_timedelta(duration)
-
-        # handle different field instances: timestamp, datetime
-        if isinstance(obj, DateTimeField):
-            start_date = start_date
-            end_date = end_date
-
-        elif isinstance(obj, DecimalField):
-            start_date = utils.date_totimestamp(
-                start_date.astimezone(pytz.utc))
-            end_date = utils.date_totimestamp(end_date.astimezone(pytz.utc))
-
-        start_date_filter[date_obj + "__gte"] = start_date
-        end_date_filter[date_obj + "__lte"] = end_date
-
-        dic_filter.update(start_date_filter)
-        dic_filter.update(end_date_filter)
-
-    return dic_filter
-
-
 def render_data(request):
-    '''Renders a JSON serialized data
-       Only admins have access to this'''
+    """Renders a JSON serialized data
+       By now only admins have access to this"""
 
     user = request.user
 
     try:
-        data = get_model_data(request)
-        data = json_parse(data)
+        data = rest_api.get_model_data(request)
+        data = rest_api.json_parse(data)
 
         if user.is_superuser:
             return HttpResponse(
@@ -797,74 +847,3 @@ def render_data(request):
     except Exception, e:
         print e
         return HttpResponseBadRequest("Object not found")
-
-
-def get_model_data(request):
-    '''Returns Django's data selected by a get request'''
-
-    obj_type = request.GET.get("obj")
-    ids = request.GET.getlist("id")
-    fields = request.GET.getlist("field")
-    n_items = request.GET.get("n_items")
-    offset = request.GET.get("offset")
-    distinct = request.GET.getlist("distinct")
-    filter_field = request.GET.getlist("filter_field")
-    date_obj = request.GET.get("date")
-    start_date = request.GET.get("start_date")
-    end_date = request.GET.get("end_date")
-    duration = request.GET.get("duration")
-
-    model = get_model_type(obj_type)
-    dict_filter = {}
-
-    if filter_field:
-        dict_filter.update(filter_datafor_field(filter_field))
-
-    if date_obj:
-        dict_filter.update(
-            filter_by_date(model, date_obj, start_date, end_date, duration))
-
-    if ids:
-        dict_filter.update(filter_databy_id(ids))
-
-    # select data
-    data = model.objects.filter(**dict_filter)
-
-    # strip data
-    if fields:
-        if(ids):
-            fields.append(u'ID')
-        data = filter_databy_field(fields, data)
-
-    if distinct:
-        data = get_distinct_data(data, distinct)
-
-    if offset:
-        data = get_offset(data, offset)
-
-    if n_items:
-        data = get_subset(data, n_items)
-
-    return data
-
-
-def json_parse(data):
-
-    if data is not None:
-        try:
-            return serializers.serialize("json", data)
-        except AttributeError:
-            return list(data)
-        except Exception, e:
-            raise e
-    else:
-        raise TypeError("Can't serialize a None type")
-
-
-def get_model_type(model_type):
-    app = get_app("qraatview")
-    if model_type is not None:
-        for model in get_models(app):
-            if model._meta.verbose_name.lower() == model_type.lower():
-                return model
-    return None

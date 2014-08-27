@@ -6,8 +6,8 @@ from django.core.urlresolvers import reverse
 from django.db.models import Q, Max, Min
 from django.contrib.auth.decorators import login_required
 from qraatview.views import get_nav_options, not_allowed_page, can_view
-from qraatview.views import get_model_data, json_parse, get_model_type
 from qraatview.utils import DateTimeEncoder
+import qraatview.rest_api as rest_api
 import qraat, time, datetime, json, utm, math, copy
 from pytz import utc, timezone
 from qraatview.models import Position, Track, Deployment, Site, Project
@@ -392,7 +392,7 @@ def system_status(
         start_date = (datetime.datetime.now() -
                 datetime.timedelta(1)).strftime("%m/%d/%Y %H:%M:%S")
 
-    model_obj = get_model_type(obj)
+    model_obj = rest_api.get_model_type(obj)
     obj_fields_keys = [field.name for field in model_obj._meta.fields
         if field.name not in excluded_fields]
     static_field_values = model_obj.objects.values_list(static_field, flat=True).distinct()
@@ -414,12 +414,12 @@ def system_status(
                 static_field=json.dumps(static_field))
 
     try:
-        data = get_model_data(request)
+        data = rest_api.get_model_data(request)
     except Exception, e:
         print e
         content["data"] = json.dumps(None)
     else:
-        content["data"] = json.dumps(json_parse(data), cls=DateTimeEncoder)
+        content["data"] = json.dumps(rest_api.json_parse(data), cls=DateTimeEncoder)
 
     return render(request, "qraat_ui/system_status.html", content)
 
@@ -438,7 +438,7 @@ def est_status(
         start_date = (datetime.datetime.now() -
                 datetime.timedelta(1)).strftime("%m/%d/%Y %H:%M:%S")
 
-    model_obj = get_model_type(obj)
+    model_obj = rest_api.get_model_type(obj)
     obj_fields_keys = [field.name for field in model_obj._meta.fields
         if field.name not in excluded_fields]
     static_field_values = model_obj.objects.values_list(static_field, flat=True).distinct()
@@ -460,12 +460,12 @@ def est_status(
                 static_field=json.dumps(static_field))
 
     try:
-        data = get_model_data(request)
+        data = rest_api.get_model_data(request)
     except Exception, e:
         print e
         content["data"] = json.dumps(None)
     else:
-        content["data"] = json.dumps(json_parse(data), cls=DateTimeEncoder)
+        content["data"] = json.dumps(rest_api.json_parse(data), cls=DateTimeEncoder)
 
     return render(request, "qraat_ui/est_status.html", content)
 
@@ -473,7 +473,7 @@ def est_status(
 @login_required(login_url="/auth/login")
 def generic_graph(
                 request,
-                objs=["telemetry", "position", "deployment"],
+                objs=["telemetry", "position", "deployment", "est"],
                 excluded_fields=[
                     "siteID", "datetime", "timezone",
                     "utm_zone_number", "utm_zone_letter"],
@@ -494,12 +494,12 @@ def generic_graph(
     content["fields"] = json.dumps(fields)
 
     try:
-        data = get_model_data(request) 
+        data = rest_api.get_model_data(request) 
     except Exception, e:
         print e
         content["data"] = json.dumps(None)
     else:
-        content["data"] = json.dumps(json_parse(data), cls=DateTimeEncoder)
+        content["data"] = json.dumps(rest_api.json_parse(data), cls=DateTimeEncoder)
 
     return render(
         request, template, content)
