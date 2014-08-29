@@ -1,4 +1,5 @@
-# from hello.models import Position
+"""This module contains Form objects for Django's admin pages"""
+
 from django.contrib import admin
 from models import Track, Tx, TxMake, Deployment
 from models import Site, Location, Project
