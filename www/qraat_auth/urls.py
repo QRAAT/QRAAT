@@ -4,7 +4,6 @@ from qraat_auth import views
 urlpatterns = patterns('qraat_auth.views',
     url(r'^$', 'index'),
     url(r'^login/$', 'user_login', name='login'),
-    url(r'^login/logged-in/$', 'user_logged_in'),
     url(r'^users/$', 'show_users', name="users"),
     url(r'^users/user-account/(?P<user_id>\d+)/$', 'user_account', name="user-account-id"),
     url(r'user-account/$', 'user_account', name="user-account"),
