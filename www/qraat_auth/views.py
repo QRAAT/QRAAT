@@ -1,3 +1,8 @@
+"""This is the views module for qraat_auth
+
+This module contains all views for users account changing, login, etc.
+"""
+
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.contrib.auth import login, logout
@@ -11,12 +16,17 @@ from django.contrib.auth.models import User
 
 
 def index(request):
+    """Auth index, it checks for logged in users and redirects to a
+    login page if necessary."""
+
     if not request.user.is_authenticated():
         return redirect('login/?next=%s' % request.path)
     return redirect('/')
 
 
 def user_logout(request):
+    """This view handles the user logout."""
+
     if request.user.is_authenticated():
         logout(request)
 
@@ -24,6 +34,9 @@ def user_logout(request):
 
 
 def user_login(request):
+    """This view handles user login.
+    It has a next parameter in case of redirecting a
+    user to a requested page"""
 
     next = request.GET.get("next")
 
@@ -50,6 +63,9 @@ def user_login(request):
 
 @login_required(login_url='/auth')
 def show_users(request):
+    """This view shows a list of registered users in the system.
+    It is for admin use only"""
+
     user = request.user
     if request.method == 'GET':
 
@@ -65,13 +81,9 @@ def show_users(request):
 
 
 @login_required(login_url='/auth')
-def user_logged_in(request):
-    username = request.user.username
-    return render(request, 'qraat_auth/loggedin.html', {'username': username})
-
-
-@login_required(login_url='/auth')
 def user_account(request, user_id=None):
+    """This view displays user account information"""
+
     if request.user.is_superuser and user_id:
         user = User.objects.get(id=user_id)
     else:
@@ -83,6 +95,8 @@ def user_account(request, user_id=None):
 
 @login_required(login_url='/auth')
 def edit_account(request):
+    """This view is the entry for a form to edit user's information."""
+
     user = request.user
     form = AccountChangeForm(instance=user)
 
@@ -99,6 +113,8 @@ def edit_account(request):
 
 @login_required(login_url='/auth')
 def change_password(request):
+    """This view is the entry for users to change their password"""
+
     user = request.user
     form = PasswordChangeForm(instance=user)
 
