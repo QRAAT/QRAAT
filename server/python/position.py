@@ -20,67 +20,17 @@
 import qraat
 import numpy as np
 import time, os, sys
-import random
+import utm
 
-try:
-  import MySQLdb as mdb
-except ImportError: pass
-
-query_insert_pos = '''INSERT INTO position
-                       (deploymentID, timestamp, easting, northing, 
-                        utm_zone_number, utm_zone_letter, likelihood, activity)
-                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''' 
-
-query_insert_bearing = '''INSERT INTO bearing 
-                           (deploymentID, siteID, timestamp, bearing, likelihood, activity)
-                          VALUES (%s, %s, %s, %s, %s, %s)''' 
+num_ch = 4
 
 def get_center(db_con):
   cur = db_con.cursor()
-  cur.execute('''SELECT northing, easting 
+  cur.execute('''SELECT northing, easting, utm_zone_number, utm_zone_letter 
                    FROM qraat.location
                   WHERE name = 'center' ''')
   (n, e) = cur.fetchone()
-  return np.complex(n, e)
-
-
-# Get est's from the database, applying a filter. Return a set of
-# estID's which are fed to the class signal. 
-# TODO Curry these?  
-# TODO Grab band filte rfalues from tx_pulse.  
-
-def get_est_ids_timefilter(db_con, dep_id, t_start, t_end, thresh):
-  cur = db_con.cursor()
-  cur.execute('''SELECT ID 
-                   FROM est
-                   JOIN estscore ON est.ID = estscore.estID
-                  WHERE deploymentID=%d
-                    AND timestamp >= %f 
-                    AND timestamp <= %f
-                    AND (score / theoretical_score) > %f''' % (
-                                      dep_id, t_start, t_end, thresh))
-  return [ int(row[0]) for row in cur.fetchall() ]
-
-def get_est_ids_bandfilter(db_con, dep_id, t_start, t_end):
-  cur = db_con.cursor()
-  cur.execute('''SELECT ID 
-                   FROM est
-                  WHERE deploymentID=%d
-                    AND timestamp >= %f 
-                    AND timestamp <= %f 
-                    AND band3 < 150 
-                    AND band10 < 900''' % (dep_id, t_start, t_end))
-  return [ int(row[0]) for row in cur.fetchall() ]
-
-def get_est_ids(db_con, dep_id, t_start, t_end):
-  cur = db_con.cursor()
-  cur.execute('''SELECT ID 
-                   FROM est
-                  WHERE deploymentID=%d
-                    AND timestamp >= %f 
-                    AND timestamp <= %f''' % (dep_id, t_start, t_end))
-  return [ int(row[0]) for row in cur.fetchall() ]
-
+  return np.complex(n, e), utm_zone_number, utm_zone_letter
 
 class steering_vectors:
   ''' Encapsulate steering vectors. 
@@ -95,18 +45,15 @@ class steering_vectors:
   ''' 
   
   def __init__(self, db_con, cal_id):
-    deps = []
 
     # Get site locations.
-    sites = qraat.csv.csv(db_con=db_con, db_table='site')
-    sv_deps_by_site = {}
-
-    for row in sites:
-      deps.append(('site', row.ID))
+    self.sites = qraat.csv.csv(db_con=db_con, db_table='site')
 
     # Get steering vector data.
-    steering_vectors = {} # site.ID -> sv
-    bearings = {}         # site.ID -> bearing
+    self.steering_vectors = {} # site.ID -> sv
+    self.bearings = {}         # site.ID -> bearing
+    self.svID = {}
+    self.calID = {}
     to_be_removed = []
     cur = db_con.cursor()
     for site in sites:
@@ -116,26 +63,20 @@ class steering_vectors:
                        FROM steering_vectors
                       WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, cal_id))
       raw_data = cur.fetchall()
-      prov_sv_ids = qraat.util.get_field(raw_data, 0)
-      data_no_ids = qraat.util.remove_field(raw_data, 0)
-      sv_data = np.array(data_no_ids,dtype=float)
+      sv_data = np.array(raw_data,dtype=float)
       if sv_data.shape[0] > 0:
-        steering_vectors[site.ID] = np.array(sv_data[:,1::2] + np.complex(0,1) * sv_data[:,2::2])
-        sv_deps_by_site[site.ID] = prov_sv_ids
-        bearings[site.ID] = np.array(sv_data[:,0])
+        self.steering_vectors[site.ID] = np.array(sv_data[:,2::2] + np.complex(0,1) * sv_data[:,3::2])
+        self.bearings[site.ID] = np.array(sv_data[:,1])
+        self.svID[site.ID] = np.array(sv_data[:,0], dtype=int)
+        self.calID[site.ID] = cal_id
       else:
         to_be_removed.append(site)
     while len(to_be_removed) > 0:
-      sites.table.remove(to_be_removed.pop())
+      self.sites.table.remove(to_be_removed.pop())
 
     # Format site locations as np.complex's.
-    for site in sites:
+    for site in self.sites:
       setattr(site, 'pos', np.complex(site.northing, site.easting))
-
-    (self.sites, self.bearings, self.steering_vectors, 
-     self.prov_sv_ids, self.deps, self.sv_deps_by_site) = (sites, bearings, steering_vectors, 
-                                                           prov_sv_ids, deps, sv_deps_by_site)
-
 
   def get_utm_zone(self):
     ''' Get utm zone letter and number for position estimation. 
@@ -151,87 +92,292 @@ class steering_vectors:
     return (utm_zone_letter, utm_zone_number)
 
 
+class per_site_data:
 
-class signal:
-  ''' Encapsulate pulse signal data. 
-  
-    I'm evaluating what functionality I want from the est object so 
-    that the data is more chewable in bearing and position calculation.
-    My thinking now is that this could replace est entirely and be 
-    the interface between det's, DB, and file. For now, it will serve
-    useful for exploring. 
-  ''' 
+  def __init__(self):
+    self.num_est = 0
+    self.num_bearing = 0
+    self.estID = np.zeros((self.num_est,),dtype = int)
+    self.timestamp = np.zeros((self.num_est,),dtype = float)
+    self.power = np.zeros((self.num_est,),dtype = float)
+    self.signal_vector = np.zeros((self.num_est,num_ch),dtype = int)
+    self.site_position = np.complex(0,0)
+    self.bearing = np.zeros((self.num_bearing,),dtype = float)
+    self.bearing_likelihood = np.zeros((self.num_est, self.num_bearing), dtype=float)
+    self.bearingID = 0
+    self.calID = 0
 
-  #: Number of channels. 
-  N = 4
+  def time_filter(self, t_start, t_stop):
+    mask = (self.timestamp < t_stop) * (self.timestamp > t_start)
+    new_data = per_site_data()
+    new_data.num_est = np.sum(mask)
+    new_data.num_bearing = data.num_bearing
+    new_data.site_position = data.site_position
+    new_data.bearing = data.bearing
+    new_data.estID = data.estID[mask]
+    new_data.timestamp = data.timestamp[mask]
+    new_data.signal_vector = data.signal_vector[mask, :]
+    new_data.power = data.power[mask]
+    new_data.bearing_likelihood = data.bearing_likelihood[mask,:]
+    return new_data
 
-  def __init__(self, db_con, est_ids): 
+  def activity(self):
+    a = None
+    if self.num_est > 0:
+      a = np.std(self.power) / np.mean(self.power)
+    return a
 
-    if len(est_ids) == 0:
-      self.id = self.site_id = self.dep_id = self.timestamp = np.array([])
-      self.edsp = self.ed = self.nc = np.array([])
-      self.signal_ct = 0
+  def bearing_estimate(self):
+    bearing_likelihood = np.sum(self.bearing_likelihood, 0)
+    max_index = np.argmax(bearing_likelihood)
+    theta_hat = self.bearing[max_index]
+    norm_max_likelihood = bearing_likelihood[max_index] / float(self.num_est)
+    return theta_hat, norm_max_likelihood
 
-    else: 
-      # Store eigenvalue decomposition vectors and noise covariance
-      # matrices in NumPy arrays. 
-      
-      cur = db_con.cursor()
-      cur.execute('''SELECT ID, siteID, deploymentID, timestamp, edsp, 
+class estimator:
+
+  def __init__(self, deploymentID, t_start, t_stop, t_window, t_delta):
+
+    self.deploymentID = deploymentID
+    self.t_start = t_start
+    self.t_stop = t_stop
+    self.t_window = t_window
+    self.t_delta = t_delta
+    self.num_est = 0
+    self.per_site = dict()
+    self.max_estID = 0
+
+
+  def get_est_data(self, db_con, score_threshold):
+    cur = db_con.cursor()
+    self.num_est = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
                             ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
-                            nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
-                            nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
-                            nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
-                            nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i
-                       FROM est
-                      WHERE ID in (%s)''' % ','.join(map(lambda(x) : str(x), est_ids)))
+                   FROM est
+                   JOIN estscore ON est.ID = estscore.estID
+                  WHERE deploymentID={0:d}
+                    AND timestamp >= {1:f} 
+                    AND timestamp <= {2:f}
+                    AND (score / theoretical_score) > {3:f}'''.format(
+                         self.deploymentID, self.t_start-self.t_window,
+                         self.t_end+self.t_window, score_threshold))
+    if self.num_est:
+      raw_db = cur.fetchall()
+      raw_data = np.array(raw_db, dtype=float)
+      estID = raw_data[:,0]
+      self.max_estID = np.max(estID)
+      siteID = raw_data[:,1]
+      timestamp = raw_data[:,2]
+      power = raw_data[:,3]
+      signal_vector = np.zeros((raw_data.shape[0],num_ch),dtype=np.complex)
+      for j in range(num_ch):
+        signal_vector[:,j] = raw_data[:,2*j+4] + np.complex(0,-1)*raw_data[:,2*j+5]
+      for site in set(siteID):
+        temp_data = per_site_data()
+        temp_data.estID = estID[siteID == site]
+        temp_data.timestamp = timestamp[siteID == site]
+        temp_data.power = power[siteID == site]
+        temp_data.signal_vector = signal_vector[siteID == site]
+        temp_data.num_est = np.sum(siteID == site)
+        self.per_site[site] = temp_data
+        
+    return self.num_est
+
+
+  def get_bearing_likelihood(self, sv):
+
+    for site, data in self.per_site.iteritems():
+      # Bartlet's estimator.
+      V = data.signal_vector #records X channels
+      try:
+        G = sv.steering_vectors[site] #bearings X channels
+        data.bearing = sv.bearings[site]
+        data.calID = sv.calID[site]
+      except KeyError:
+        #no steering vectors or bearings for site
+        data.num_bearing = 0
+        data.bearing = np.zeros((0,),dtype=float)
+        data.bearing_likelihood = np.zeros((V.shape[0], 0), dtype = float)
+        continue
+      left_half = np.dot(V, np.conj(np.transpose(G))) #records X bearings
+      data.bearing_likelihood = np.real(left_half * np.conj(left_half)) #records X bearings
+      data.num_bearing = data.bearing.shape[0]
+      data.site_position = sv.sites.get('ID', site).pos#!!!!!!!!check this!!!!!!!!!!!
+
+  def time_filter(self, t_start, t_stop):
+    filtered_dict = dict()
+    total_est = 0
+    if t_stop > self.t_start and t_start < self.t_stop:
+      for site, data in self.per_site.iteritems():
+        new_data = data.time_filter(t_start, t_stop)
+        if new_data.num_est > 0:
+          total_est += new_data.num_est        
+          filtered_dict[site] = new_data
+    new_estimator = estimator(self.deploymentID, t_start, t_stop, 0, 0)
+    new_estimator.num_est = total_est
+    new_estimator.per_site = filtered_dict
+    return new_estimator
+
+  def windowed(self):
+    time_step = np.floor(self.t_start / float(self.t_delta))
+    while self.t_stop > (time_step - self.t_window / 2.0): 
+      yield self.time_filter(time_step*self.t_delta - self.t_window / 2.0,
+                             time_step*self.t_delta + self.t_window / 2.0)
+      time_step += 1
+
+
+  def insert_bearings(self, db_con):
+    timestamp = (self.t_start + self.t_stop) / 2.0
+    cur = db_con.cursor()
+    for site, data in self.per_site.iteritems():
+      if data.num_bearing > 0 and data.num_est > 0:
+        theta_hat, norm_max_likelihood = data.bearing_estimate()
+        activity = data.activity()
+        cur.execute('''INSERT INTO bearing 
+                   (deploymentID, siteID, timestamp, bearing, likelihood, activity)
+                   VALUES (%s, %s, %s, %s, %s, %s)''',
+                   (self.deploymentID, site, timestamp,
+                    theta_hat, norm_max_likelihood, activity))
+        data.bearingID = cur.lastrowid
+        handle_provenance_insertion(cur, {'est':tuple(data.estID), 'calibration_information':tuple(data.calID)}, {'bearing':tuple(data.bearingID)})
     
-      raw = np.array(cur.fetchall(), dtype=float)
 
-      # Metadata. 
-      (self.id, 
-       self.site_id, 
-       self.dep_id) = (np.array(raw[:,i], dtype=int) for i in range(0,3))
-      self.timestamp = raw[:,3]
-      raw = raw[:,4:]
+                    
+  def get_position_likelihood(self, positions):
+    likelihoods = np.zeros(positions.shape, dtype=float)
+    for site, data in self.per_site.iteritems():
+      bearing_to_positions = np.angle(positions - data.site_position) * 180 / np.pi
+      sum_bearing_likelihoods = np.sum(data.bearing_likelihood,0) #normalize?
+      likelihoods += np.interp(bearing_to_positions,
+                               np.hstack((self.bearing-360, self.bearing)),
+                               np.hstack((sum_bearing_likelihoods, sum_bearing_likelihoods)))
+    return likelihoods
 
-      # Signal power. 
-      self.edsp = raw[:,0]
-      raw = raw[:,1:]
+  def get_canidate_positions(self, center, scale, half_span=15):
+    grid = np.zeros((half_span*2+1, half_span*2+1),np.complex)
+    for e in range(-half_span,half_span+1):
+      for n in range(-half_span,half_span+1):
+        grid[e + half_span, n + half_span] = center + np.complex(n * scale, e * scale)
+    return grid
 
-      # Signal vector, N x 1.
-      self.ed = raw[:,0:8:2] + np.complex(0,-1) * raw[:,1:8:2]
-      raw = raw[:,8:]
+  def position_estimate(self, center_position):
+    scale = 100
+    p_hat = center_position
+    while scale > 1:
+      positions = get_canidate_positions(p_hat, scale)
+      likelihoods = get_position_likelihood(positions)
+      max_index = np.argmax(likelihoods)
+      p_hat = positions.flat(max_index)
+      max_likelihood = likelihoods.flat(max_index)
+      scale /= 10
+    return p_hat, max_likelihood
 
-      # Noise covariance matrix, N x N. 
-      self.nc = raw[:,0::2] + np.complex(0,-1) * raw[:,1::2]
-      self.nc = self.nc.reshape(raw.shape[0], self.N, self.N)
+  def insert_positions(self, db_con, center=None):
+    if center is None:
+      (center_position, utm_number, utm_letter) = get_center(db_con)
+    else:
+      (center_position, utm_number, utm_letter) = center
+    timestamp = (self.t_start + self.t_stop) / 2.0
+    position_hat, likelihood = self.position_estimate(center_position)
+    site_activities = [ s.activity() for s in self.per_site.itervalues() ]
+    lat, lon = utm.to_latlon(position_hat.imag, position_hat.real, utm_zone_number, utm_zone_letter)
+    cur = db_con.cursor()
+    cur.execute('''INSERT INTO position
+                       (deploymentID, timestamp, easting, northing, 
+                        utm_zone_number, utm_zone_letter, likelihood, 
+                        activity, latitude, longitude)
+                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+                   (self.deploymentID, timestamp, position_hat.imag, position_hat.real,
+                    utm_zone_number, utm_zone_letter, likelihood,
+                    np.mean(site_activities)), lat, lon)
+    self.positionID = cur.lastrowid
+    bearingID = [ data.bearingID for data in self.per_site.itervalues() ]
+    handle_provenance_insertion(cur, {'bearing':bearingID}, {'position':tuple(self.positionID)})
 
-      self.signal_ct = self.id.shape[0]
 
-  def __len__(self): 
-    return self.signal_ct
+def handle_provenance_insertion(cur, depends_on, obj):
+  ''' Insert provenance data into database ''' 
+  query = 'insert into provenance (obj_table, obj_id, dep_table, dep_id) values (%s, %s, %s, %s);'
+  prov_args = []
+  for dep_k in depends_on.keys():
+    for dep_v in depends_on[dep_k]:
+      for obj_k in obj.keys():
+        for obj_v in obj[obj_k]:
+          args = (obj_k, obj_v, dep_k, dep_v)
+          prov_args.append(args)
+  cur.executemany(query, prov_args) 
 
-  def activity_per_site(self, index_list):
-    ''' Return activity metric per site. 
 
-       The activity metric we use is the standard deviation the signal
-       power (edsp). 
-    
-     :returns: Mapping of siteID to a float.
-     :rtype: dict
-    '''
-    activity = {}
-    for index in index_list:
-      if not activity.get(self.site_id[index]):
-        activity[self.site_id[index]] = [self.edsp[index]]
-      else: 
-        activity[self.site_id[index]].append(self.edsp[index])
+##############################################
+# below this line is depricated, I think -Todd
+##############################################
 
-    for (site_id, x) in activity.iteritems():
-      activity[site_id] = np.std(x) / np.mean(x)
-    
-    return activity
+
+
+
+
+
+
+
+
+
+
+
+
+import random
+
+# Get est's from the database, applying a filter. Return a set of
+# estID's which are fed to the class signal. 
+
+def get_est_ids_timefilter(db_con, dep_id, t_start, t_end, thresh):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID, siteID, deploymentID, timestamp, edsp, 
+                            ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
+                   FROM est
+                   JOIN estscore ON est.ID = estscore.estID
+                  WHERE deploymentID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f
+                    AND (score / theoretical_score) > %f''' % (
+                                      dep_id, t_start, t_end, thresh))
+  raw_db = cur.fetchall()
+  estID = [ int(row[0]) for row in raw_db ]
+  signal_dict = get_signal_dict(raw_db, dep_id) 
+  return estID, signal_dict
+
+def get_est_ids_bandfilter(db_con, dep_id, t_start, t_end, band3 = 150, band10 = 900):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID, siteID, timestamp, edsp, 
+                            ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
+                   FROM est
+                  WHERE deploymentID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f 
+                    AND band3 < %f 
+                    AND band10 < %f''' % (dep_id, t_start, t_end, band3, band10))
+  raw_db = cur.fetchall()
+  estID = [ int(row[0]) for row in raw_db ]
+  signal_dict = get_signal_dict(raw_db, dep_id) 
+  return estID, signal_dict
+
+def get_est_ids(db_con, dep_id, t_start, t_end):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID, siteID, timestamp, edsp, 
+                            ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
+                   FROM est
+                  WHERE deploymentID=%d
+                    AND timestamp >= %f 
+                    AND timestamp <= %f''' % (dep_id, t_start, t_end))
+  raw_db = cur.fetchall()
+  estID = [ int(row[0]) for row in raw_db ]
+  signal_dict = get_signal_dict(raw_db, dep_id) 
+  return estID, signal_dict
+
+
+
+
+
+
+
 
 
 
@@ -260,7 +406,7 @@ class Position:
     cur = db_con.cursor()
     for (id, dep_id, timestamp, easting, northing, 
          utm_zone_number, utm_zone_letter, likelihood, 
-         activity, pos_deps) in self.table: 
+         activity, pos_dependancies) in self.table: 
       cur.execute(query_insert_pos, (dep_id, 
                                      timestamp, 
                                      easting,  # pos.imag
@@ -270,7 +416,7 @@ class Position:
                                      likelihood, 
                                      activity))
       pos_id = cur.lastrowid                               
-      handle_provenance_insertion(cur, pos_deps, {'position':(pos_id,)})
+      handle_provenance_insertion(cur, pos_dependancies, {'position':(pos_id,)})
 
   def export_kml(self, name, dep_id):
 
@@ -365,7 +511,7 @@ class position_estimator:
     for i in range(len(sig)):
       try:
         G      = sv.steering_vectors[self.site_id[i]]
-        G_deps = sv.sv_deps_by_site[self.site_id[i]]
+        G_dependancies = sv.sv_dependancies_by_site[self.site_id[i]]
       except KeyError:
         print >>sys.stderr, "position: error: no steering vectors for site ID=%d" % self.site_id[i]
         sys.exit(1)
@@ -377,19 +523,19 @@ class position_estimator:
       left_half = np.dot(V, np.conj(np.transpose(G)))
       bearing_likelihood = (left_half * np.conj(left_half)).real
 
-      bearing_likelihood_deps = [('Steering_Vectors', x) for x in G_deps]
-      bearing_likelihood_deps.append(('est', V_dep))
+      bearing_likelihood_dependancies = [('Steering_Vectors', x) for x in G_dependancies]
+      bearing_likelihood_dependancies.append(('est', V_dep))
 
-      likelihood_deps = {}
+      likelihood_dependancies = {}
       for j, theta in enumerate(sv.bearings[self.site_id[i]]):
         likelihoods[i, theta] = bearing_likelihood[0, j]
-        likelihood_deps[i, theta] = bearing_likelihood_deps
+        likelihood_dependancies[i, theta] = bearing_likelihood_dependancies
 
     self.likelihoods = likelihoods
     if record_provenance_from_site_data:
-      self.likelihood_deps = likelihood_deps
+      self.likelihood_dependancies = likelihood_dependancies
     else:
-      self.likelihood_deps = [] 
+      self.likelihood_dependancies = [] 
   
   def get_utm_zone(self):
     ''' Get UTM zone letter and number. '''
@@ -445,8 +591,7 @@ class position_estimator:
       for n in range(-half_span,half_span+1):
         grid[e + half_span, n + half_span] = center + np.complex(n * scale, e * scale)
 
-    #: The third dimension of the search space: bearings from each
-    #: candidate point to each receiver site.
+    #: Bearings from receiver sites to each candidate point.
     site_bearings = {}
     for site in self.sites:
       site_bearings[site.ID] = np.angle(grid - site.pos) * 180 / np.pi
@@ -475,22 +620,6 @@ class position_estimator:
                                    round(random.uniform(j_neg, j_pos), 2))
     
     return self.position_estimator(ll_per_site, j_center, scale, half_span) 
-
-
-
-class mle_position_estimator (position_estimator): 
-  ''' Calculate bearing distribution with the minimum likelihood estimator. ''' 
-
-  def __init__(self, sv, sig): 
-    self.sites   = sv.sites
-    self.id      = sig.id
-    self.site_id = sig.site_id
-    self.time    = sig.timestamp
-
-    record_provenance_from_site_data = False
-
-    self.likelihoods = np.zeros((len(sig), 360)) # TODO 
-    self.likelihood_deps = []                    # TODO 
 
 
 
@@ -546,7 +675,7 @@ def calc_positions(signal, bl, center, utm_zone_letter, utm_zone_number, t_windo
 
   for (t, index_list) in calc_windows(bl, t_window, t_delta): 
    
-    pos = ll = pos_deps = pos_activity = None
+    pos = ll = pos_dependancies = pos_activity = None
 
     # Calculate activiy. (siteID -> activity.) 
     activity = signal.activity_per_site(index_list)
@@ -583,16 +712,16 @@ def calc_positions(signal, bl, center, utm_zone_letter, utm_zone_number, t_windo
         scale /= 10
 
       # Determine components of est that contribute to the computed position.
-      pos_deps = []
+      pos_dependancies = []
       for est_index in index_list:
-        pos_deps.append(bl.id[est_index])
-      pos_deps = {'est': tuple(pos_deps)}
+        pos_dependancies.append(bl.id[est_index])
+      pos_dependancies = {'est': tuple(pos_dependancies)}
 
       if verbose: print
    
     if pos: # TODO utm
       position.table.append((None, dep_id, t, pos.imag, pos.real, utm_zone_number,
-                                             utm_zone_letter, ll, pos_activity, pos_deps))
+                                             utm_zone_letter, ll, pos_activity, pos_dependancies))
     
     for (site_id, (theta, ll, activity)) in theta.iteritems():
       bearing.table.append((None, dep_id, site_id, t, theta, ll, activity))
@@ -600,117 +729,3 @@ def calc_positions(signal, bl, center, utm_zone_letter, utm_zone_number, t_windo
   return (bearing, position)
 
 
-
-
-
-
-
-
-def compress(s):
-  ''' What's this for? *TODO* ''' 
-  strings = []
-  ss = sorted(s, reverse=True)
-
-  last_num = None
-  sequence_start = None
-
-  while len(ss) != 0:
-    i = ss.pop()
-    if last_num is None:
-      # the start
-      sequence_start = i
-    elif last_num + 1 == i:
-      # still in sequence
-      pass
-    else:
-      # sequence over
-      if sequence_start == last_num:
-        strings.append(str(sequence_start))
-      else:
-        strings.append('%d-%d' % (sequence_start, last_num))
-      sequence_start = i
-    last_num = i
-
-  # add last
-  if sequence_start == last_num:
-    strings.append(str(sequence_start))
-  else:
-    strings.append('%d-%d' % (sequence_start, last_num))
-
-  return ','.join(strings)
-
-
-def handle_provenance_insertion(cur, depends_on, obj):
-  ''' *TODO* add doc string ''' 
-  query = 'insert into provenance (obj_table, obj_id, dep_table, dep_id) values (%s, %s, %s, %s);'
-  prov_args = []
-  for dep_k in depends_on.keys():
-    for dep_v in depends_on[dep_k]:
-      for obj_k in obj.keys():
-        for obj_v in obj[obj_k]:
-          args = (obj_k, obj_v, dep_k, dep_v)
-          prov_args.append(args)
-  cur.executemany(query, prov_args) 
-
-
-class halfplane: 
-  ''' A two-dimensional linear inequality. 
-
-    Compute the slope and y-intercept of the line defined by point ``p`` 
-    and bearing ``theta``. Format of ``p`` is np.complex(real=northing, 
-    imag=easting). Also, ``pos`` is set to True if the vector theta goes 
-    in a positive direction along the x-axis. 
-  ''' 
-  
-  #: The types of plane constrains:
-  #: greater than, less than, greater than
-  #: or equal to, less than or equal to. 
-  plane_t = qraat.util.enum('GT', 'LT', 'GE', 'LE')
-  plane_string = { plane_t.GT : '>', 
-                   plane_t.LT : '<', 
-                   plane_t.GE : '>=', 
-                   plane_t.LE : '<=' }
-
-  def __init__ (self, p, theta):
-
-    self.x_p = p.imag
-    self.y_p = p.real
-    self.m = np.tan(np.pi * theta / 180) 
-    self.plane = None
-
-    if (0 <= theta and theta <= 90) or (270 <= theta and theta <= 360):
-      self.pos = True
-    else: self.pos = False 
-
-    if (0 <= theta and theta <= 180):
-      self.y_pos = True
-    else: self.y_pos = False
-
-  def __repr__ (self): 
-    s = 'y %s %.02f(x - %.02f) + %.02f' % (self.plane_string[self.plane], 
-                                           self.m, self.x_p, self.y_p)
-    return '%-37s' % s
-
-  def __call__ (self, x): 
-    return self.m * (x - self.x_p) + self.y_p
-
-  def inverse(self, y): 
-    return ((y - self.y_p) + (self.m * self.x_p)) / self.m
-
-  @classmethod
-  def from_bearings(cls, p, theta_i, theta_j):
-    Ti = cls(p, theta_i)
-    Tj = cls(p, theta_j) 
-    if Ti.pos:
-      Ti.plane = cls.plane_t.GT
-      if not Tj.pos:
-        Tj.plane = cls.plane_t.GT 
-      else: Tj.plane = cls.plane_t.LT
-    else:
-      Ti.plane = cls.plane_t.LT
-      if Tj.pos:
-        Tj.plane = cls.plane_t.LT
-      else: Tj.plane = cls.plane_t.GT
-    return (Ti, Tj)    
-
-  

@@ -3,7 +3,7 @@
 # Calculate the position of a target transmitter over a given
 # time range. The function position_estimation() represents 
 # our first iteration of this algorithm. This program 
-# is part of QRAAT, an utomated animal tracking system 
+# is part of QRAAT, an automated animal tracking system 
 # based on GNU Radio. 
 #
 # Copyright (C) 2013 Todd Borrowman, Christopher Patton
