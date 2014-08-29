@@ -9,6 +9,7 @@ from django.http import HttpResponse, HttpResponseForbidden
 from django.http import HttpResponseBadRequest
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
+from django.template import Context
 from models import Project, Tx, Location
 from models import Target, Deployment
 from forms import ProjectForm, OwnersEditProjectForm, AddTransmitterForm
@@ -687,19 +688,19 @@ def manage_targets(request, project_id):
 def manage_locations(request, project_id):
 
     project = get_project(project_id)
-    content = {}
-    content["nav_options"] = get_nav_options(request)
-    content["project"] = project
-    content["objects"] = project.get_locations()
-    content["obj_type"] = "location"
-    content["foreign_fields"] = []
-    content["excluded_fields"] = ["projectID", "ID", "is_hidden"]
+    context = Context() 
+    context["nav_options"] = get_nav_options(request)
+    context["project"] = project
+    context["objects"] = project.get_locations()
+    context["obj_type"] = "location"
+    context["foreign_fields"] = []
+    context["excluded_fields"] = ["projectID", "ID", "is_hidden"]
 
     return render_manage_page(
         request,
         project,
         "qraat_site/manage_locations.html",
-        content)
+        context)
 
 
 @login_required(login_url="/auth/login")
