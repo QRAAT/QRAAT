@@ -29,7 +29,7 @@ def get_center(db_con):
   cur.execute('''SELECT northing, easting, utm_zone_number, utm_zone_letter 
                    FROM qraat.location
                   WHERE name = 'center' ''')
-  (n, e) = cur.fetchone()
+  (n, e, utm_zone_number, utm_zone_letter) = cur.fetchone()
   return np.complex(n, e), utm_zone_number, utm_zone_letter
 
 class steering_vectors:
@@ -56,7 +56,7 @@ class steering_vectors:
     self.calID = {}
     to_be_removed = []
     cur = db_con.cursor()
-    for site in sites:
+    for site in self.sites:
       cur.execute('''SELECT ID, Bearing,
                             sv1r, sv1i, sv2r, sv2i,
                             sv3r, sv3i, sv4r, sv4i
@@ -111,14 +111,14 @@ class per_site_data:
     mask = (self.timestamp < t_stop) * (self.timestamp > t_start)
     new_data = per_site_data()
     new_data.num_est = np.sum(mask)
-    new_data.num_bearing = data.num_bearing
-    new_data.site_position = data.site_position
-    new_data.bearing = data.bearing
-    new_data.estID = data.estID[mask]
-    new_data.timestamp = data.timestamp[mask]
-    new_data.signal_vector = data.signal_vector[mask, :]
-    new_data.power = data.power[mask]
-    new_data.bearing_likelihood = data.bearing_likelihood[mask,:]
+    new_data.num_bearing = self.num_bearing
+    new_data.site_position = self.site_position
+    new_data.bearing = self.bearing
+    new_data.estID = self.estID[mask]
+    new_data.timestamp = self.timestamp[mask]
+    new_data.signal_vector = self.signal_vector[mask, :]
+    new_data.power = self.power[mask]
+    new_data.bearing_likelihood = self.bearing_likelihood[mask,:]
     return new_data
 
   def activity(self):
@@ -151,7 +151,7 @@ class estimator:
   def get_est_data(self, db_con, score_threshold):
     cur = db_con.cursor()
     self.num_est = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
-                            ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
+                            ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i 
                    FROM est
                    JOIN estscore ON est.ID = estscore.estID
                   WHERE deploymentID={0:d}
@@ -159,7 +159,7 @@ class estimator:
                     AND timestamp <= {2:f}
                     AND (score / theoretical_score) > {3:f}'''.format(
                          self.deploymentID, self.t_start-self.t_window,
-                         self.t_end+self.t_window, score_threshold))
+                         self.t_stop+self.t_window, score_threshold))
     if self.num_est:
       raw_db = cur.fetchall()
       raw_data = np.array(raw_db, dtype=float)
@@ -201,7 +201,7 @@ class estimator:
       left_half = np.dot(V, np.conj(np.transpose(G))) #records X bearings
       data.bearing_likelihood = np.real(left_half * np.conj(left_half)) #records X bearings
       data.num_bearing = data.bearing.shape[0]
-      data.site_position = sv.sites.get('ID', site).pos#!!!!!!!!check this!!!!!!!!!!!
+      data.site_position = sv.sites.get(ID=site).pos
 
   def time_filter(self, t_start, t_stop):
     filtered_dict = dict()
@@ -218,11 +218,12 @@ class estimator:
     return new_estimator
 
   def windowed(self):
-    time_step = np.floor(self.t_start / float(self.t_delta))
-    while self.t_stop > (time_step - self.t_window / 2.0): 
-      yield self.time_filter(time_step*self.t_delta - self.t_window / 2.0,
-                             time_step*self.t_delta + self.t_window / 2.0)
-      time_step += 1
+    half_window = self.t_window / 2.0
+    time_center = np.ceil((self.t_start - half_window) / float(self.t_delta)) * self.t_delta
+    while self.t_stop > (time_center - half_window): 
+      yield self.time_filter(time_center - half_window,
+                             time_center + half_window)
+      time_center += self.t_delta
 
 
   def insert_bearings(self, db_con):
@@ -272,26 +273,27 @@ class estimator:
     return p_hat, max_likelihood
 
   def insert_positions(self, db_con, center=None):
-    if center is None:
-      (center_position, utm_number, utm_letter) = get_center(db_con)
-    else:
-      (center_position, utm_number, utm_letter) = center
-    timestamp = (self.t_start + self.t_stop) / 2.0
-    position_hat, likelihood = self.position_estimate(center_position)
-    site_activities = [ s.activity() for s in self.per_site.itervalues() ]
-    lat, lon = utm.to_latlon(position_hat.imag, position_hat.real, utm_zone_number, utm_zone_letter)
-    cur = db_con.cursor()
-    cur.execute('''INSERT INTO position
-                       (deploymentID, timestamp, easting, northing, 
-                        utm_zone_number, utm_zone_letter, likelihood, 
-                        activity, latitude, longitude)
-                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
-                   (self.deploymentID, timestamp, position_hat.imag, position_hat.real,
-                    utm_zone_number, utm_zone_letter, likelihood,
-                    np.mean(site_activities)), lat, lon)
-    self.positionID = cur.lastrowid
-    bearingID = [ data.bearingID for data in self.per_site.itervalues() ]
-    handle_provenance_insertion(cur, {'bearing':bearingID}, {'position':tuple(self.positionID)})
+    if len(self.per_site) > 1:
+      if center is None:
+        (center_position, utm_number, utm_letter) = get_center(db_con)
+      else:
+        (center_position, utm_number, utm_letter) = center
+      timestamp = (self.t_start + self.t_stop) / 2.0
+      position_hat, likelihood = self.position_estimate(center_position)
+      site_activities = [ s.activity() for s in self.per_site.itervalues() ]
+      lat, lon = utm.to_latlon(position_hat.imag, position_hat.real, utm_zone_number, utm_zone_letter)
+      cur = db_con.cursor()
+      cur.execute('''INSERT INTO position
+                         (deploymentID, timestamp, easting, northing, 
+                          utm_zone_number, utm_zone_letter, likelihood, 
+                          activity, latitude, longitude)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+                     (self.deploymentID, timestamp, position_hat.imag, position_hat.real,
+                      utm_zone_number, utm_zone_letter, likelihood,
+                      np.mean(site_activities)), lat, lon)
+      self.positionID = cur.lastrowid
+      bearingID = [ data.bearingID for data in self.per_site.itervalues() ]
+      handle_provenance_insertion(cur, {'bearing':bearingID}, {'position':tuple(self.positionID)})
 
 
 def handle_provenance_insertion(cur, depends_on, obj):
