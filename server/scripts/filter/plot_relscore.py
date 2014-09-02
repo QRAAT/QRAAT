@@ -39,8 +39,9 @@ parser.description = '''This does nothing.'''
 
 (options, args) = parser.parse_args()
 
-t_start = 1396725598.00 
-t_end   = 1396732325.77
+t_start = 1409554800.0 + (3600 * 4)  # 1 Sep 00:00
+t_end   = 1409554800.0 + (3600 * 12) # 2 Sep 00:00
+
 
 try: 
   start = time.time()
@@ -56,18 +57,17 @@ try:
 
   for (dep_id, site_id) in cur.fetchall():
     cur.execute('''SELECT (score / (theoretical_score + 1))
-                     FROM est, estscore
+                     FROM est JOIN estscore ON est.ID = estscore.estID
                     WHERE deploymentID = %d
-                      AND timestamp >= %f
-                      AND timestamp <= %f
                       AND siteID = %d 
-                      AND estID = est.ID''' % (dep_id, t_start, t_end, site_id)) 
+                      AND timestamp >= %f
+                      AND timestamp <= %f''' % (dep_id, site_id, t_start, t_end)) 
 
     X = []
     for x in cur.fetchall(): 
       X.append(float(x[0]))
     
-    if len(X) > 2:
+    if len(X) > 10:
       print "plot_relscore: plotting (depID=%d, siteID=%d)" % (dep_id, site_id)
 
       fig = plt.figure(figsize=(5,4))
