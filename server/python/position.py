@@ -21,6 +21,7 @@ import qraat
 import numpy as np
 import time, os, sys
 import utm
+from scipy.interpolate import interp1d #spline interpolation
 
 num_ch = 4
 
@@ -104,6 +105,7 @@ class per_site_data:
     self.site_position = np.complex(0,0)
     self.bearing = np.zeros((self.num_bearing,),dtype = float)
     self.bearing_likelihood = np.zeros((self.num_est, self.num_bearing), dtype=float)
+    self.bearing_likelihood_function = lambda : None
     self.bearingID = 0
     self.calID = 0
 
@@ -121,7 +123,12 @@ class per_site_data:
     new_data.bearing_likelihood = self.bearing_likelihood[mask,:]
     return new_data
 
-  def activity(self):
+  def formulate_bearing_llh(self):
+    if self.num_est > 0:
+      sum_bearing_likelihoods = np.sum(self.bearing_likelihood,0) #normalize?
+      self.bearing_likelihood_function = interp1d(np.hstack((self.bearing[-5::5]-360, self.bearing[::5],self.bearing[:5:5]+360)), np.hstack((sum_bearing_likelihoods[-5::5], sum_bearing_likelihoods[::5], sum_bearing_likelihoods[:5:5])), kind='cubic')
+
+  def get_activity(self):
     a = None
     if self.num_est > 0:
       a = np.std(self.power) / np.mean(self.power)
@@ -202,7 +209,7 @@ class estimator:
       data.bearing_likelihood = np.real(left_half * np.conj(left_half)) #records X bearings
       data.num_bearing = data.bearing.shape[0]
       data.site_position = sv.sites.get(ID=site).pos
-
+      
   def time_filter(self, t_start, t_stop):
     filtered_dict = dict()
     total_est = 0
@@ -232,7 +239,7 @@ class estimator:
     for site, data in self.per_site.iteritems():
       if data.num_bearing > 0 and data.num_est > 0:
         theta_hat, norm_max_likelihood = data.bearing_estimate()
-        activity = data.activity()
+        activity = data.get_activity()
         cur.execute('''INSERT INTO bearing 
                    (deploymentID, siteID, timestamp, bearing, likelihood, activity)
                    VALUES (%s, %s, %s, %s, %s, %s)''',
@@ -247,10 +254,8 @@ class estimator:
     likelihoods = np.zeros(positions.shape, dtype=float)
     for site, data in self.per_site.iteritems():
       bearing_to_positions = np.angle(positions - data.site_position) * 180 / np.pi
-      sum_bearing_likelihoods = np.sum(data.bearing_likelihood,0) #normalize?
-      likelihoods += np.interp(bearing_to_positions,
-                               np.hstack((self.bearing-360, self.bearing)),
-                               np.hstack((sum_bearing_likelihoods, sum_bearing_likelihoods)))
+      bearing_to_positions[bearing_to_positions < 0] += 360
+      likelihoods += data.bearing_likelihood_function(bearing_to_positions)
     return likelihoods
 
   def get_canidate_positions(self, center, scale, half_span=15):
@@ -261,16 +266,21 @@ class estimator:
     return grid
 
   def position_estimate(self, center_position):
+    for data in self.per_site.itervalues():
+      data.formulate_bearing_llh()
     scale = 100
     p_hat = center_position
-    while scale > 1:
-      positions = get_canidate_positions(p_hat, scale)
-      likelihoods = get_position_likelihood(positions)
+    while scale >= 1:
+      positions = self.get_canidate_positions(p_hat, scale)
+      likelihoods = self.get_position_likelihood(positions)
       max_index = np.argmax(likelihoods)
-      p_hat = positions.flat(max_index)
-      max_likelihood = likelihoods.flat(max_index)
+      p_hat = positions.flat[max_index]
+      max_likelihood = likelihoods.flat[max_index]
       scale /= 10
     return p_hat, max_likelihood
+
+  def get_activity(self):
+    return np.mean([ s.get_activity() for s in self.per_site.itervalues() ])
 
   def insert_positions(self, db_con, center=None):
     if len(self.per_site) > 1:
@@ -280,7 +290,7 @@ class estimator:
         (center_position, utm_number, utm_letter) = center
       timestamp = (self.t_start + self.t_stop) / 2.0
       position_hat, likelihood = self.position_estimate(center_position)
-      site_activities = [ s.activity() for s in self.per_site.itervalues() ]
+      activity = self.get_activity()
       lat, lon = utm.to_latlon(position_hat.imag, position_hat.real, utm_zone_number, utm_zone_letter)
       cur = db_con.cursor()
       cur.execute('''INSERT INTO position
@@ -290,7 +300,7 @@ class estimator:
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
                      (self.deploymentID, timestamp, position_hat.imag, position_hat.real,
                       utm_zone_number, utm_zone_letter, likelihood,
-                      np.mean(site_activities)), lat, lon)
+                      activity, lat, lon))
       self.positionID = cur.lastrowid
       bearingID = [ data.bearingID for data in self.per_site.itervalues() ]
       handle_provenance_insertion(cur, {'bearing':bearingID}, {'position':tuple(self.positionID)})
