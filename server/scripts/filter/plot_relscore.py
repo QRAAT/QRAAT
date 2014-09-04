@@ -39,9 +39,8 @@ parser.description = '''This does nothing.'''
 
 (options, args) = parser.parse_args()
 
-t_start = 1409554800.0 + (3600 * 4)  # 1 Sep 00:00
-t_end   = 1409554800.0 + (3600 * 12) # 2 Sep 00:00
-
+t_start = 1407448800.186593 
+t_end   = 1407466794.772133 
 
 try: 
   start = time.time()

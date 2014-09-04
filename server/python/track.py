@@ -50,22 +50,15 @@ try:
   import utm, xml
 except ImportError: pass
 
-# TODO change tx_id to dep_id 
-def get_pos_ids(db_con, tx_id, t_start, t_end): 
+def get_pos_ids(db_con, dep_id, t_start, t_end): 
   cur = db_con.cursor()
   cur.execute('''SELECT ID 
                    FROM position
                   WHERE deploymentID=%d
                     AND timestamp >= %f 
-                    AND timestamp <= %f''' % (tx_id, t_start, t_end))
+                    AND timestamp <= %f''' % (dep_id, t_start, t_end))
   return [ int(row[0]) for row in cur.fetchall() ]
 
-def get_dep_by_id(db_con, track_id):
-  cur = db_con.cursor()
-  cur.execute('''SELECT deploymentID 
-                   FROM track
-                  WHERE ID=%d''' % track_id)
-  return cur.fetchone()[0]
 
 # 
 # A few families of max speed given time interval functions. 
@@ -93,13 +86,14 @@ def maxspeed_const(m):
 # Run tracker. 
 #
 
-def calc_tracks(db_con, pos, track_id, C=1):
+def calc_tracks(db_con, pos, dep_id, C=1):
   cur = db_con.cursor()
-  cur.execute('''SELECT ID, deploymentID, max_speed_family, 
+  cur.execute('''SELECT target.ID, max_speed_family, 
                         speed_burst, speed_sustained, speed_limit
-                   FROM track
-                  WHERE ID = %d''' % track_id)
-  (_, dep_id, family, burst, sustained, limit) = cur.fetchone()
+                   FROM target 
+                   JOIN deployment ON target.ID = deployment.targetID
+                  WHERE deployment.ID = %d''' % dep_id)
+  (_, family, burst, sustained, limit) = cur.fetchone()
   if family == 'const':
     M = maxspeed_const(limit)
   elif family == 'exp': 
@@ -107,7 +101,7 @@ def calc_tracks(db_con, pos, track_id, C=1):
   elif family == 'linear':
     M = maxspeed_linear((BURST_INTERVAL, burst), (SUSTAINED_INTERVAL, sustained), limit)
   
-  return Track.calc(db_con, pos, track_id, M, C) 
+  return Track.calc(db_con, pos, dep_id, M, C) 
 
 
 
@@ -224,21 +218,20 @@ class Track:
   window_length = 250  
   overlap_length = 25 
 
-  def __init__(self, db_con=None, track_id=None, t_start=None, t_end=None): 
-    self.track_id = track_id
+  def __init__(self, db_con=None, dep_id=None, t_start=None, t_end=None): 
+    self.dep_id = dep_id
     self.table = []
     if db_con:
       cur = db_con.cursor()
       
-      # TODO optimize. 
-      cur.execute('''SELECT positionID, track.deploymentID, track_pos.timestamp, easting, northing, 
-                            utm_zone_number, utm_zone_letter, likelihood,
-                            activity
-                       FROM track, track_pos, position
-                      WHERE trackID = %d
-                        AND positionID = position.ID
+      # TODO needs testing!
+      cur.execute('''SELECT positionID, position..deploymentID, track_pos.timestamp, easting, northing, 
+                            utm_zone_number, utm_zone_letter, likelihood, activity
+                       FROM position
+                       JOIN track_pos ON track_pos.positionID = position.ID
+                      WHERE deploymentID = %d
                         AND track_pos.timestamp >= %f AND track_pos.timestamp <= %f 
-                      ORDER BY timestamp ASC''' % (track_id, t_start, t_end))
+                      ORDER BY timestamp ASC''' % (dep_id, t_start, t_end))
       
       for row in cur.fetchall():
         self.table.append((row[0], row[1], float(row[2]), float(row[3]), float(row[4]), 
@@ -246,9 +239,9 @@ class Track:
         
 
   @classmethod
-  def calc(cls, db_con, pos, track_id, M, C, optimal=False):
+  def calc(cls, db_con, pos, dep_id, M, C, optimal=False):
     track = cls()
-    track.track_id = track_id
+    track.dep_id = dep_id
     
     # Get positions. 
     track.pos = pos
@@ -274,8 +267,8 @@ class Track:
                            AND timestamp <= %f''' % (self.table[0][2], self.table[-1][2])) 
     for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
          utm_zone_letter, likelihood, activity) in self.table:
-      cur.execute('''INSERT INTO track_pos (positionID, trackID, timestamp)
-                          VALUES (%d, %d, %d)''' % (pos_id, self.track_id, t))
+      cur.execute('''INSERT INTO track_pos (positionID, deploymentID, timestamp)
+                          VALUES (%d, %d, %d)''' % (pos_id, self.dep_id, t))
 
   def _calc_tracks_windowed(self, M, C):
     ''' Calculate tracks over overlapping windows of positions. 
