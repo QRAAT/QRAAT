@@ -313,7 +313,7 @@ class estimator:
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                      (self.deploymentID, timestamp, position_hat.imag, position_hat.real,
                       utm_number, utm_letter, likelihood,
-                      activity, lat, lon))
+                      activity, round(lat,6), round(lon,6)))
       self.positionID = cur.lastrowid
       bearingID = [ data.bearingID for data in self.per_site.itervalues() ]
       handle_provenance_insertion(cur, {'bearing':bearingID}, {'position':(self.positionID,)})
