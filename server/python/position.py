@@ -21,7 +21,8 @@ import qraat
 import numpy as np
 import time, os, sys
 import utm
-from scipy.interpolate import interp1d #spline interpolation
+#from scipy.interpolate import interp1d #spline interpolation
+import scipy.interpolate
 
 num_ch = 4
 
@@ -62,7 +63,8 @@ class steering_vectors:
                             sv1r, sv1i, sv2r, sv2i,
                             sv3r, sv3i, sv4r, sv4i
                        FROM steering_vectors
-                      WHERE SiteID=%d and Cal_InfoID=%d''' % (site.ID, cal_id))
+                      WHERE SiteID=%s and Cal_InfoID=%s
+                   ORDER BY Bearing''', (site.ID, cal_id))
       raw_data = cur.fetchall()
       sv_data = np.array(raw_data,dtype=float)
       if sv_data.shape[0] > 0:
@@ -126,7 +128,19 @@ class per_site_data:
   def formulate_bearing_llh(self):
     if self.num_est > 0:
       sum_bearing_likelihoods = np.sum(self.bearing_likelihood,0) #normalize?
-      self.bearing_likelihood_function = interp1d(np.hstack((self.bearing[-5::5]-360, self.bearing[::5],self.bearing[:5:5]+360)), np.hstack((sum_bearing_likelihoods[-5::5], sum_bearing_likelihoods[::5], sum_bearing_likelihoods[:5:5])), kind='cubic')
+      upper_half = np.where(self.bearing < 180)#returns tuple with len()=dimensionality
+      last_index = upper_half[0][-1] + 1
+      lower_half = np.where(self.bearing >= 180)
+      first_index = lower_half[0][0] - 1
+      bearing_domain = np.hstack((self.bearing[[first_index]]-360,
+                                  self.bearing[lower_half]-360,
+                                  self.bearing[upper_half],
+                                  self.bearing[[last_index]]))
+      likelihood_range = np.hstack((sum_bearing_likelihoods[[first_index]],
+                                    sum_bearing_likelihoods[lower_half],
+                                    sum_bearing_likelihoods[upper_half],
+                                    sum_bearing_likelihoods[[last_index]]))
+      self.bearing_likelihood_function = scipy.interpolate.InterpolatedUnivariateSpline(bearing_domain,likelihood_range)
 
   def get_activity(self):
     a = None
@@ -246,16 +260,15 @@ class estimator:
                    (self.deploymentID, site, timestamp,
                     theta_hat, norm_max_likelihood, activity))
         data.bearingID = cur.lastrowid
-        handle_provenance_insertion(cur, {'est':tuple(data.estID), 'calibration_information':tuple(data.calID)}, {'bearing':tuple(data.bearingID)})
+        handle_provenance_insertion(cur, {'est':tuple(data.estID), 'calibration_information':(data.calID,)}, {'bearing':(data.bearingID,)})
     
-
                     
   def get_position_likelihood(self, positions):
     likelihoods = np.zeros(positions.shape, dtype=float)
     for site, data in self.per_site.iteritems():
       bearing_to_positions = np.angle(positions - data.site_position) * 180 / np.pi
-      bearing_to_positions[bearing_to_positions < 0] += 360
-      likelihoods += data.bearing_likelihood_function(bearing_to_positions)
+      #likelihoods += data.bearing_likelihood_function(bearing_to_positions)
+      likelihoods += data.bearing_likelihood_function(bearing_to_positions.flat).reshape(bearing_to_positions.shape)
     return likelihoods
 
   def get_canidate_positions(self, center, scale, half_span=15):
@@ -291,19 +304,19 @@ class estimator:
       timestamp = (self.t_start + self.t_stop) / 2.0
       position_hat, likelihood = self.position_estimate(center_position)
       activity = self.get_activity()
-      lat, lon = utm.to_latlon(position_hat.imag, position_hat.real, utm_zone_number, utm_zone_letter)
+      lat, lon = utm.to_latlon(position_hat.imag, position_hat.real, utm_number, utm_letter)
       cur = db_con.cursor()
       cur.execute('''INSERT INTO position
                          (deploymentID, timestamp, easting, northing, 
                           utm_zone_number, utm_zone_letter, likelihood, 
                           activity, latitude, longitude)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                      (self.deploymentID, timestamp, position_hat.imag, position_hat.real,
-                      utm_zone_number, utm_zone_letter, likelihood,
+                      utm_number, utm_letter, likelihood,
                       activity, lat, lon))
       self.positionID = cur.lastrowid
       bearingID = [ data.bearingID for data in self.per_site.itervalues() ]
-      handle_provenance_insertion(cur, {'bearing':bearingID}, {'position':tuple(self.positionID)})
+      handle_provenance_insertion(cur, {'bearing':bearingID}, {'position':(self.positionID,)})
 
 
 def handle_provenance_insertion(cur, depends_on, obj):
