@@ -35,7 +35,7 @@ SECRET_KEY = base.key
 # SECURITY WARNING: don't run with debug turned on in production!
 # NOTE For testing purposes, this must be set to True in order 
 # to run 'python manage.py runserver'. 
-DEBUG = TEMPLATE_DEBUG = True 
+DEBUG = TEMPLATE_DEBUG = False 
 
 TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
 
