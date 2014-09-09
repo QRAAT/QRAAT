@@ -4,9 +4,7 @@
 
 import qraat, qraat.srv
 import numpy as np
-import os, commands, sys
-
-EST_SCORE_THRESHOLD = 0.15
+import os, commands, sys, time
 
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
@@ -14,9 +12,13 @@ if int(output) > 1:
   print >>sys.stderr, "position_auto: error: attempted reentry, exiting"
   sys.exit(1)
 
+runtime_start = time.time()
+print "position_auto: start time: {}".format(runtime_start)
 
 db_con = qraat.util.get_db('writer')#will throw missing environment error here
 cursor = db_con.cursor()
+
+EST_SCORE_THRESHOLD = float(os.environ["RMG_POS_EST_THRESHOLD"])
 
 # Get id of last processed record (last record scored). 
 cursor.execute("SELECT value FROM qraat.cursor WHERE name='position'")
@@ -32,7 +34,8 @@ print "Last EST record processed: {}".format(last_processed)
 cursor.execute('''SELECT DISTINCT deploymentID 
                     FROM est JOIN estscore 
                       ON est.ID = estscore.estID
-                   WHERE ID > %s;''', (last_processed,))
+                   WHERE ID > %s
+                     AND (score/theoretical_score) > %s;''', (last_processed,EST_SCORE_THRESHOLD))
 deployment_list = cursor.fetchall()
 print "{} transmitters found in new records".format(len(deployment_list))
 print deployment_list
@@ -94,3 +97,8 @@ for deployment in deployment_list:
 #store id of last processed record
 if max_id > last_processed:
   cursor.execute("UPDATE qraat.cursor SET value=%s WHERE name='position'", (max_id,))
+  print "updating cursor position to {}".format(max_id)
+else:
+  print "no new records processed (max_id={0})".format(max_id)
+
+print "position_auto: finished in {0:.2f} seconds.".format(time.time() - runtime_start)

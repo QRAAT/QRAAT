@@ -75,7 +75,7 @@ parser.add_option('--t-chunk', type='float', metavar='SEC', default=60 * 60 * 4,
 parser.add_option('-v', '--verbose', action='store_true', default=False, 
                   help="Print the progression of the algorithm to the terminal.")
 
-parser.add_option('--thresh', type='float', metavar='[0 .. 1]', defaulti=0.15, 
+parser.add_option('--thresh', type='float', metavar='[0 .. 1]', default=0.15, 
                   help="Apply time filter to EST data wiht threshold value.")
 
 (options, args) = parser.parse_args()
@@ -90,13 +90,18 @@ print "position: fetching site data."
 sv = qraat.srv.position.steering_vectors(db_con, options.cal_id)
 center = qraat.srv.position.get_center(db_con)
 
-chunks = range(int(options.t_start), int(options.t_end), int(options.t_chunk))
+chunks = []
+ts = options.t_start
+while (options.t_end - ts > options.t_chunk):
+  chunks.append((ts, ts+options.t_chunk))
+  ts += options.t_chunk
+chunks.append((ts, options.t_end))
 
 for i in range(len(chunks)):
 
   print "position: fetching chunk %d of %d." % (i+1, len(chunks)) 
 
-  estimator = qraat.srv.position.estimator(options.dep_id,  chunks[i], chunks[i] + options.t_chunk, options.t_window, options.t_delta)
+  estimator = qraat.srv.position.estimator(options.dep_id,  chunks[i][0], chunks[i][1], options.t_window, options.t_delta)
   num_est = estimator.get_est_data(db_con, options.thresh)
   if num_est > 0:
     estimator.get_bearing_likelihood(sv)
