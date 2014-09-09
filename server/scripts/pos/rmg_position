@@ -22,8 +22,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import qraat, qraat.srv
-import time, os, sys, commands
-import MySQLdb as mdb
+import time, sys, commands
 from optparse import OptionParser
 
 # Check for running instances of this program. 
@@ -53,9 +52,9 @@ parser.add_option('--dep-id', type='int', metavar='INT', default=51,
                   help="Serial ID of the target and transmitter in the database "
                        "context.")
 
-parser.add_option('--t-delta', type='float', metavar='SEC', default=1.0,
+parser.add_option('--t-delta', type='float', metavar='SEC', default=15.0,
                   help="Time step for each position calculation. (Default "
-                       "is 1.0 seconds.) ")
+                       "is 15.0 seconds.) ")
 
 parser.add_option('--t-window', type='float', metavar='SEC', default=30.0,
                   help="Time window to use for the position likelihood "
@@ -76,73 +75,39 @@ parser.add_option('--t-chunk', type='float', metavar='SEC', default=60 * 60 * 4,
 parser.add_option('-v', '--verbose', action='store_true', default=False, 
                   help="Print the progression of the algorithm to the terminal.")
 
-parser.add_option('--thresh', type='float', metavar='[0 .. 1]', defaulti=None, 
+parser.add_option('--thresh', type='float', metavar='[0 .. 1]', defaulti=0.15, 
                   help="Apply time filter to EST data wiht threshold value.")
-
-parser.add_option('--band', action='store_true', default=False, 
-                  help="Apply band filter to EST data.")
 
 (options, args) = parser.parse_args()
 
-try: 
-  start = time.time()
-  print "position: start time:", time.asctime(time.localtime(start))
+ 
+start = time.time()
+print "position: start time:", time.asctime(time.localtime(start))
 
-  db_con = qraat.util.get_db('writer')
+db_con = qraat.util.get_db('writer')
   
-  print "position: fetching site data." 
-  sv = qraat.srv.position.steering_vectors(db_con, options.cal_id)
-  center = qraat.srv.position.get_center(db_con)
+print "position: fetching site data." 
+sv = qraat.srv.position.steering_vectors(db_con, options.cal_id)
+center = qraat.srv.position.get_center(db_con)
 
-  if options.thresh != None: 
-    print "position: using time filter with threshold %f." % options.thresh
-    def get_est_ids(db_con, dep_id, t_start, t_end):
-      return qraat.srv.position.get_est_ids_timefilter(db_con, dep_id, t_start, t_end, options.thresh)
-  elif options.band: 
-    print "position: using band filter."
-    get_est_ids = qraat.srv.position.get_est_ids_bandfilter
-  else: 
-    print "position: no signal filter."
-    get_est_ids = qraat.srv.position.get_est_ids
+chunks = range(int(options.t_start), int(options.t_end), int(options.t_chunk))
 
-  chunks = range(int(options.t_start), int(options.t_end), int(options.t_chunk))
+for i in range(len(chunks)):
 
-  for i in range(len(chunks)):
+  print "position: fetching chunk %d of %d." % (i+1, len(chunks)) 
 
-    print "position: fetching chunk %d of %d." % (i+1, len(chunks)) 
-    
-    est_ids = get_est_ids(db_con, options.dep_id, chunks[i], chunks[i] + options.t_chunk)
-    sig = qraat.srv.position.signal(db_con, est_ids)
+  estimator = qraat.srv.position.estimator(options.dep_id,  chunks[i], chunks[i] + options.t_chunk, options.t_window, options.t_delta)
+  num_est = estimator.get_est_data(db_con, options.thresh)
+  if num_est > 0:
+    estimator.get_bearing_likelihood(sv)
+    for new_estimator in estimator.windowed():
+      print "position: calculating bearings"
+      new_estimator.insert_bearings(db_con)
+      print "position: calculating positions"
+      new_estimator.insert_positions(db_con, center)
+  else:
+    print "Skipping empty chunk"
+    continue 
+  
 
-    if len(sig) == 0:
-      print "position: skipping empty chunk."
-      continue
-
-    print "position: calculating bearing likelihoods (%d)." % len(sig) 
-    bl = qraat.srv.position.position_estimator(sv, sig)
-    (utm_zone_letter, utm_zone_number) = bl.get_utm_zone()
-
-    print "position: calculating positions."
-    (bearing, position) = qraat.srv.position.calc_positions(sig, bl,
-                                                        center,
-                                                        utm_zone_letter,
-                                                        utm_zone_number, 
-                                                        options.t_window, 
-                                                        options.t_delta, 
-                                                        options.dep_id,
-                                                        options.verbose) 
-
-    print "position: inserting positions (%d)." % (len(position))
-    position.insert_db(db_con)
-    print "position: inserting bearings (%d)." % (len(bearing))
-    bearing.insert_db(db_con)
-
-except mdb.Error, e:
-  print >>sys.stderr, "position: error: [%d] %s" % (e.args[0], e.args[1])
-  sys.exit(1)
-
-except qraat.error.QraatError, e:
-  print >>sys.stderr, "position: error: %s." % e
-
-finally: 
-  print "position: finished in %.2f seconds." % (time.time() - start)
+print "position: finished in {0:.2f} seconds.".format(time.time() - start)
