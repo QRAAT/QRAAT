@@ -1,5 +1,4 @@
 #!/usr/bin/python
-# TODO add timers for logging (e.g. see serv/proc/rmg_det_to_db) 
 # TODO clean up output, as well as error handling in position.py.  
 
 import qraat, qraat.srv
@@ -13,7 +12,7 @@ if int(output) > 1:
   sys.exit(1)
 
 runtime_start = time.time()
-print "position_auto: start time: {}".format(time.asctime(time.localtime(runtime_start)))))))))))
+print "position_auto: start time: {}".format(time.asctime(time.localtime(runtime_start)))
 
 db_con = qraat.util.get_db('writer')#will throw missing environment error here
 cursor = db_con.cursor()
