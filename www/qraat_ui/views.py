@@ -183,14 +183,15 @@ def get_context(request, deps=[], req_deps=[]):
                           )
 
       for q in queried_objects:
-        (lat, lon) = utm.to_latlon(float(q.easting), float(q.northing), 
-          q.utm_zone_number, q.utm_zone_letter)
+        #(lat, lon) = utm.to_latlon(float(q.easting), float(q.northing), 
+        #  q.utm_zone_number, q.utm_zone_letter)
         date_string = time.strftime('%Y-%m-%d %H:%M:%S', 
                 time.localtime(float(q.timestamp-7*60*60))) #FIXME: Hardcode timestamp conversion 
 
         queried_data.append((q.ID, q.deploymentID, float(q.timestamp), 
           float(q.easting), float(q.northing), q.utm_zone_number, 
-          float(q.likelihood), float(q.activity), (lat, lon), 
+          float(q.likelihood), float(q.activity), 
+          (float(q.latitude), float(q.longitude)), 
           q.utm_zone_letter, date_string))
 
       # Note: To pass strings to js using json, use |safe in template.
@@ -257,16 +258,17 @@ def get_context(request, deps=[], req_deps=[]):
         raise Exception("Somethign is wrong.")
      
       for row in queried_objects:
-        (lat, lon) = utm.to_latlon(float(row.easting), 
-            float(row.northing), row.utm_zone_number,
-            row.utm_zone_letter)
+        #(lat, lon) = utm.to_latlon(float(row.easting), 
+        #    float(row.northing), row.utm_zone_number,
+        #    row.utm_zone_letter)
         date_string = time.strftime('%Y-%m-%d %H:%M:%S', #FIXME
             time.localtime(float(row.timestamp-7*60*60)))
 
         queried_data.append((row.ID, row.deploymentID,
           float(row.timestamp), float(row.easting), 
           float(row.northing), row.utm_zone_number, 
-          float(row.likelihood), float(row.activity), (lat, lon), 
+          float(row.likelihood), float(row.activity), 
+          (float(row.latitude), float(row.longitude)), 
           row.utm_zone_letter, date_string))
        
      
