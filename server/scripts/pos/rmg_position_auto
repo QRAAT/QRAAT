@@ -1,12 +1,9 @@
 #!/usr/bin/python
-# TODO add timers for logging (e.g. see serv/proc/rmg_det_to_db) 
 # TODO clean up output, as well as error handling in position.py.  
 
 import qraat, qraat.srv
 import numpy as np
-import os, commands, sys
-
-EST_SCORE_THRESHOLD = 0.15
+import os, commands, sys, time
 
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
@@ -14,16 +11,20 @@ if int(output) > 1:
   print >>sys.stderr, "position_auto: error: attempted reentry, exiting"
   sys.exit(1)
 
+runtime_start = time.time()
+print "position_auto: start time: {}".format(time.asctime(time.localtime(runtime_start)))
 
-db_con = qraat.util.get_db('writer')
+db_con = qraat.util.get_db('writer')#will throw missing environment error here
 cursor = db_con.cursor()
+
+EST_SCORE_THRESHOLD = float(os.environ["RMG_POS_EST_THRESHOLD"])
 
 # Get id of last processed record (last record scored). 
 cursor.execute("SELECT value FROM qraat.cursor WHERE name='position'")
 last_processed = cursor.fetchone()
 if last_processed == None:
-  cursor.execute("INSERT INTO qraat.cursor (name, value) VALUE ('position', 0)")
-  last_processed = 0
+  print >>sys.stderr,  "position_auto: error: No cursor found for position"
+  sys.exit(1)
 else: 
   last_processed = last_processed[0]
 print "Last EST record processed: {}".format(last_processed)
@@ -32,32 +33,35 @@ print "Last EST record processed: {}".format(last_processed)
 cursor.execute('''SELECT DISTINCT deploymentID 
                     FROM est JOIN estscore 
                       ON est.ID = estscore.estID
-                   WHERE ID > %s;''', (last_processed,))
-dep_list = cursor.fetchall()
-print "{} transmitters found in new records".format(len(dep_list))
-print dep_list
-if len(dep_list) > 0:
+                   WHERE ID > %s
+                     AND (score/theoretical_score) > %s;''', (last_processed,EST_SCORE_THRESHOLD))
+deployment_list = cursor.fetchall()
+print "{} transmitters found in new records".format(len(deployment_list))
+print deployment_list
+if len(deployment_list) > 0:
   cal_id = int(os.environ['RMG_POS_CAL_ID'])
   sv = qraat.srv.position.steering_vectors(db_con, cal_id)
+  sv.get_utm_zone #checks sites are in same zone, throws error if not
   center = qraat.srv.position.get_center(db_con)
 
 time_window = float(os.environ['RMG_POS_TIME_WINDOW'])
 time_delta = float(os.environ['RMG_POS_TIME_STEP'])
 max_id = last_processed
-for dep in dep_list:
-  dep_id = dep[0]
-  print "Processing transmitter: {}".format(dep_id)
+for deployment in deployment_list:
+  deployment_id = deployment[0]
+  print "Processing transmitter: {}".format(deployment_id)
   #get times of to-be-processed records
   cursor.execute('''SELECT ID, timestamp 
                       FROM est JOIN estscore
                         ON est.ID = estscore.estID
                      WHERE ID > %s AND deploymentID = %s 
-                     ORDER BY timestamp ASC;''', (last_processed,dep_id))
+                     ORDER BY timestamp ASC;''', (last_processed,deployment_id))
   times = np.array(cursor.fetchall(),dtype=float)
   print "Found {} records".format(times.shape[0])
   print "Calculating time range"
   #determine time range needed to be processed
-  #TODO source rmg_env
+  #time_ranges is a list of tuples determining the start and stop of a time_range
+  #a time_range is a block of contiguous time_windows over which there is a signal
   time_ranges = []
   if times.shape[0] > 0:
     temp_range = [times[0,1], times[0,1]]
@@ -74,36 +78,26 @@ for dep in dep_list:
  #process time ranges
   for time_range in time_ranges:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
-    
-    est_ids = qraat.srv.position.get_est_ids_timefilter(db_con, 
-                                                    dep_id, 
-                                                    time_range[0]-time_window, 
-                                                    time_range[1]+time_window, 
-                                                    EST_SCORE_THRESHOLD)
-    
-    sig = qraat.srv.position.signal(db_con, est_ids)
-    
-    if len(sig) == 0: 
+    estimator = qraat.srv.position.estimator(deployment_id, time_range[0], time_range[1], time_window, time_delta)
+    num_est = estimator.get_est_data(db_con, EST_SCORE_THRESHOLD)
+    if num_est > 0:
+      estimator.get_bearing_likelihood(sv)
+      for new_estimator in estimator.windowed():
+        new_estimator.insert_bearings(db_con)
+        new_estimator.insert_positions(db_con, center)
+    else:
       print "Skipping empty chunk"
       continue 
-    
-    bl = qraat.srv.position.position_estimator(sv, sig)
-    (utm_zone_letter, utm_zone_number) = bl.get_utm_zone()
-    
-    (bearing, position)  = qraat.srv.position.calc_positions(sig, bl, 
-                                                         center,
-                                                         utm_zone_letter,
-                                                         utm_zone_number,
-                                                         time_window, 
-                                                         time_delta,
-                                                         dep_id)
-    bearing.insert_db(db_con)
-    position.insert_db(db_con)
 
-  temp_max_id = np.max(times[:,0])
+  temp_max_id = estimator.max_estID
   if temp_max_id > max_id:
     max_id = temp_max_id
 
 #store id of last processed record
 if max_id > last_processed:
   cursor.execute("UPDATE qraat.cursor SET value=%s WHERE name='position'", (max_id,))
+  print "updating cursor position to {}".format(max_id)
+else:
+  print "no new records processed (max_id={0})".format(max_id)
+
+print "position_auto: finished in {0:.2f} seconds.".format(time.time() - runtime_start)
