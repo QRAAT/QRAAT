@@ -46,7 +46,7 @@ try:
   # Get a list of depIDs with new positions and their earliest timestamp. 
   cur.execute('''SELECT DISTINCT deploymentID 
                    FROM qraat.position 
-                  WHERE ID >= %s''', (last_processed))
+                  WHERE ID > %s''', (last_processed))
 
   rows = map(lambda(row) : int(row[0]), cur.fetchall())
   print "track_auto: new data for", rows
@@ -57,7 +57,7 @@ try:
     cur.execute('''SELECT min(timestamp), max(timestamp) 
                      FROM qraat.position 
                     WHERE deploymentID=%d
-                      AND ID >= %d''' % (dep_id, last_processed))
+                      AND ID > %d''' % (dep_id, last_processed))
     
     (t_start, t_end) = map(lambda(t) : float(t), (cur.fetchone()))
     print "track_auto: deploymentID=%d, [%.2f, %.2f]" % (dep_id, t_start, t_end)
