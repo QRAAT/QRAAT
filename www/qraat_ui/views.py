@@ -14,6 +14,8 @@ from qraatview.models import Position, Track, Deployment, Site, Project
 from qraat_ui.forms import Form
 from decimal import Decimal
 
+import qraat
+
 def get_context(request, deps=[], req_deps=[]):
   
   if 'sites' in request.GET:
@@ -233,10 +235,27 @@ def get_context(request, deps=[], req_deps=[]):
       args = Q()
       for each_args in args_deps:
         args = args | each_args
-   
+  
       # Query data. 
-      queried_objects = Position.objects.filter(*(args,), **kwargs)
-      
+      if int(data_type) == 1: 
+        queried_objects = Position.objects.filter(*(args,), **kwargs)
+      elif int(data_type) == 2: 
+        queried_objects = Position.objects.raw(
+           '''SELECT * FROM position
+                JOIN track_pos ON track_pos.positionID = position.ID
+               WHERE position.deploymentID = %s
+                 AND position.timestamp >= %s AND position.timestamp <= %s
+                 AND likelihood >= %s AND likelihood <= %s
+                 AND activity >= %s AND activity <= %s
+               ORDER BY position.timestamp''', (req_deps[0].ID, 
+            qraat.util.datetime_to_timestamp(datetime_from),
+            qraat.util.datetime_to_timestamp(datetime_to),
+            likelihood_low, likelihood_high, 
+            activity_low, activity_high, ))
+
+      else: 
+        raise Exception("Somethign is wrong.")
+     
       for row in queried_objects:
         (lat, lon) = utm.to_latlon(float(row.easting), 
             float(row.northing), row.utm_zone_number,
@@ -260,10 +279,6 @@ def get_context(request, deps=[], req_deps=[]):
                           likelihood__lte = likelihood_high,
                           activity__gte = activity_low,
                           activity__lte = activity_high) '''
-  
-  ## Clicking Point on map ################################
-  # FIXME This should be done in Javascript? 
-  # Get clicked lat, lon from js event --> html form & convert to UTM
   
   context = {
             #public, deployment, project, etc.
@@ -355,7 +370,9 @@ def view_by_dep(request, project_id, dep_id):
 
   else:
     deps = project.get_deployments().filter(ID=dep_id)
-    
+   
+  # FIXME Super inefficient. Clean up get_context() to return 
+  # an empty context if there's no data. 
   positions = Position.objects.filter(deploymentID__in=deps.values("ID") )
   if len(positions) >0:
     context = get_context(request, deps, deps)

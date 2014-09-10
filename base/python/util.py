@@ -23,6 +23,7 @@ except ImportError: pass
 import os, sys
 from csv import csv
 import error
+import time, datetime
 
 def remove_field(l, i):
   ''' Provenance function. *TODO* '''  
@@ -61,4 +62,10 @@ def get_db(view):
   except IOError, e:
     raise error.QraatError("missing DB credential file '%s'" % e.filename)
 
-  
+
+def datetime_to_timestamp(string): 
+  return time.mktime(datetime.datetime.strptime(
+          string, '%Y-%m-%d %H:%M:%S').timetuple())
+
+def timestamp_to_datetime(t): 
+  return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(t)) 
