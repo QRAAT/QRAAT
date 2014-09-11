@@ -10,7 +10,7 @@ from qraatview.utils import DateTimeEncoder
 import qraatview.rest_api as rest_api
 import qraat, time, datetime, json, utm, math, copy
 from pytz import utc, timezone
-from qraatview.models import Position, Track, Deployment, Site, Project
+from qraatview.models import Position, Deployment, Site, Project
 from qraat_ui.forms import Form
 from decimal import Decimal
 

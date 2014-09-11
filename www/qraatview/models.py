@@ -613,35 +613,6 @@ class Deployment(models.Model):
         return u'%s active %s' % (self.name, self.is_active)
 
 
-class Track(models.Model):
-    class Meta:
-        app_label = QRAAT_APP_LABEL
-        db_table = "track"
-
-    SPEED_CHOICES = (('exp', 'exp'), ('linear', 'linear'), ('const', 'const'))
-
-    ID = models.AutoField(primary_key=True)
-
-    deploymentID = models.ForeignKey(
-        Deployment, db_column="deploymentID")
-
-    projectID = models.ForeignKey(Project, db_column="projectID")
-
-    max_speed_family = models.CharField(
-        max_length=6, choices=SPEED_CHOICES)  # enum('exp','linear','const')
-
-    speed_burst = models.FloatField()
-
-    speed_sustained = models.FloatField()
-
-    speed_limit = models.FloatField()
-
-    is_hidden = models.BooleanField(default=False)
-
-    def __unicode__(self):
-        return u'%s' % self.ID
-
-
 class Location(models.Model):
     """**Location Model Object**.
     This is the Django's model representation for a location in QRAAT's

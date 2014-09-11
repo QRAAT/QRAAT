@@ -1,7 +1,7 @@
 """This module contains Form objects for Django's admin pages"""
 
 from django.contrib import admin
-from models import Track, Tx, TxMake, Deployment
+from models import Tx, TxMake, Deployment
 from models import Site, Location, Project
 from models import AuthProjectCollaborator, AuthProjectViewer
 from models import TxParameters, TxMakeParameters
@@ -135,19 +135,6 @@ class DeploymentAdmin(admin.ModelAdmin):
         return obj.projectID.name
 
 
-class TrackAdmin(admin.ModelAdmin):
-    list_display = ('ID', 'Deployment_id', 'max_speed_family',
-                    'speed_burst', 'speed_sustained',
-                    'speed_limit', 'is_hidden')
-
-    list_filter = ('max_speed_family', 'is_hidden')
-
-    ordering = ('-is_hidden', 'ID')
-
-    def Deployment_id(self, obj):
-        return obj.deploymentID.ID
-
-
 admin.site.register(Location, LocationAdmin)
 admin.site.register(Site, SiteAdmin)
 admin.site.register(Tx, TransmitterAdmin)
@@ -158,4 +145,3 @@ admin.site.register(Deployment, DeploymentAdmin)
 admin.site.register(Project, ProjectAdmin)
 admin.site.register(AuthProjectViewer, AuthProjectViewerAdmin)
 admin.site.register(AuthProjectCollaborator, AuthProjectCollaboratorAdmin)
-admin.site.register(Track, TrackAdmin)
