@@ -1,4 +1,11 @@
 # File: qraat_ui/views.py
+#
+# TODO Clean up get_context(). The way it's written necessitates a redundant 
+#      query in the calling functions, e.g. get_by_dep() and download_by_dep(). 
+# 
+# TODO Cache last query (result of get_context()) for download.  
+#
+
 from django.template import Context, loader, RequestContext
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import render, render_to_response, get_object_or_404
@@ -14,7 +21,10 @@ from qraatview.models import Position, Deployment, Site, Project
 from qraat_ui.forms import Form
 from decimal import Decimal
 
+import csv
 import qraat
+
+
 
 def get_context(request, deps=[], req_deps=[]):
   
@@ -386,6 +396,51 @@ def view_by_dep(request, project_id, dep_id):
   context["project"] = project
 
   return render(request, 'qraat_ui/index.html', context)
+
+
+def download_by_dep(request, project_id, dep_id): 
+  try:
+    project = Project.objects.get(ID=project_id)
+  except ObjectDoesNotExist:
+    return HttpResponse("We didn't find this project") 
+  
+  if not project.is_public:
+    if request.user.is_authenticated():
+      user = request.user
+      if project.is_owner(user)\
+           or (user.has_perm("can_view")
+               and (project.is_collaborator(user)
+                    or project.is_viewer(user))):
+
+        deps = project.get_deployments().filter(ID=dep_id)
+      else:
+        return HttpResponse("You're not allowed to view this.")
+    
+    else:
+      return HttpResponse("You're not allowed to visualize this")
+
+  else:
+    deps = project.get_deployments().filter(ID=dep_id)
+  
+  # FIXME Super inefficient. Clean up get_context() to return 
+  # an empty context if there's no data. 
+  positions = Position.objects.filter(deploymentID__in=deps.values("ID") )
+  if len(positions) >0:
+    context = get_context(request, deps, deps)
+  else:
+    context = {}
+
+  response = HttpResponse(content_type='text/csv')
+  response['Content-Disposition'] = 'attachement; filename="position_dep%s.csv"' % dep_id
+
+  writer = csv.writer(response)
+  writer.writerow(['ID', 'deploymentID', 'timestamp', 'easting', 'northing', 'zone', 
+                   'datetime', 'latitude', 'longitude', 'likelihood', 'activity'])
+  for row in json.loads(context['pos_data']):
+    writer.writerow([ row[0], row[1], row[2], row[3], row[4], str(row[5]) + row[9], 
+                      row[10], row[8][0], row[8][1], row[6], row[7] ])
+  return response
+  
 
 def view_by_target(request, target_id): 
   ''' Compile a list of deployments associated with `target_id`. ''' 
