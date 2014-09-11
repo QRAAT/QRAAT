@@ -496,6 +496,7 @@ class Target(models.Model):
     :param ID: ID
     :param name: Target's name
     :param description: target's description
+    :param max_speed_family: Type of max speed function: exp, linear, or cons.
     :param projectID: Foreign key for project
     :param is_hidden: target's deletion status"""
 
@@ -510,6 +511,15 @@ class Target(models.Model):
     name = models.CharField(max_length=50)
 
     description = models.TextField()  # text
+
+    max_speed_family = models.CharField(max_length=5,
+                                        choices=(('exp', 'Exponential'),
+                                                 ('linear', 'Piecewise linear'),
+                                                 ('const', 'Constant')))
+
+    speed_burst     = models.FloatField()
+    speed_sustained = models.FloatField()
+    speed_limit     = models.FloatField()
 
     projectID = models.ForeignKey(
         Project, db_column="projectID",
