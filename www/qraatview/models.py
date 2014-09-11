@@ -512,7 +512,7 @@ class Target(models.Model):
 
     description = models.TextField()  # text
 
-    max_speed_family = models.CharField(max_length=5,
+    max_speed_family = models.CharField(max_length=16,
                                         choices=(('exp', 'Exponential'),
                                                  ('linear', 'Piecewise linear'),
                                                  ('const', 'Constant')))
