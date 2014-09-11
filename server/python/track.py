@@ -42,7 +42,7 @@ import numpy as np
 import time, os, sys
 import random
 
-BURST_INTERVAL = 30        # 30 seconds
+BURST_INTERVAL = 60        # 1 minute
 SUSTAINED_INTERVAL = 1800  # 30 minutes
 
 try:
