@@ -5,6 +5,7 @@
 # 
 # TODO Cache last query (result of get_context()) for download.  
 #
+# TODO Post handler for "Submit Form"? 
 
 from django.template import Context, loader, RequestContext
 from django.http import HttpResponse, HttpResponseRedirect, Http404
@@ -399,6 +400,8 @@ def view_by_dep(request, project_id, dep_id):
 
 
 def download_by_dep(request, project_id, dep_id): 
+  print request
+  
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
