@@ -496,6 +496,7 @@ class Target(models.Model):
     :param ID: ID
     :param name: Target's name
     :param description: target's description
+    :param max_speed_family: Type of max speed function: exp, linear, or cons.
     :param projectID: Foreign key for project
     :param is_hidden: target's deletion status"""
 
@@ -510,6 +511,15 @@ class Target(models.Model):
     name = models.CharField(max_length=50)
 
     description = models.TextField()  # text
+
+    max_speed_family = models.CharField(max_length=16,
+                                        choices=(('exp', 'Exponential'),
+                                                 ('linear', 'Piecewise linear'),
+                                                 ('const', 'Constant')))
+
+    speed_burst     = models.FloatField()
+    speed_sustained = models.FloatField()
+    speed_limit     = models.FloatField()
 
     projectID = models.ForeignKey(
         Project, db_column="projectID",
@@ -611,35 +621,6 @@ class Deployment(models.Model):
 
     def __unicode__(self):
         return u'%s active %s' % (self.name, self.is_active)
-
-
-class Track(models.Model):
-    class Meta:
-        app_label = QRAAT_APP_LABEL
-        db_table = "track"
-
-    SPEED_CHOICES = (('exp', 'exp'), ('linear', 'linear'), ('const', 'const'))
-
-    ID = models.AutoField(primary_key=True)
-
-    deploymentID = models.ForeignKey(
-        Deployment, db_column="deploymentID")
-
-    projectID = models.ForeignKey(Project, db_column="projectID")
-
-    max_speed_family = models.CharField(
-        max_length=6, choices=SPEED_CHOICES)  # enum('exp','linear','const')
-
-    speed_burst = models.FloatField()
-
-    speed_sustained = models.FloatField()
-
-    speed_limit = models.FloatField()
-
-    is_hidden = models.BooleanField(default=False)
-
-    def __unicode__(self):
-        return u'%s' % self.ID
 
 
 class Location(models.Model):

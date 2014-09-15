@@ -1,4 +1,12 @@
 # File: qraat_ui/views.py
+#
+# TODO Clean up get_context(). The way it's written necessitates a redundant 
+#      query in the calling functions, e.g. get_by_dep() and download_by_dep(). 
+# 
+# TODO Cache last query (result of get_context()) for download.  
+#
+# TODO Post handler for "Submit Form"? 
+
 from django.template import Context, loader, RequestContext
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import render, render_to_response, get_object_or_404
@@ -10,9 +18,14 @@ from qraatview.utils import DateTimeEncoder
 import qraatview.rest_api as rest_api
 import qraat, time, datetime, json, utm, math, copy
 from pytz import utc, timezone
-from qraatview.models import Position, Track, Deployment, Site, Project
+from qraatview.models import Position, Deployment, Site, Project
 from qraat_ui.forms import Form
 from decimal import Decimal
+
+import csv
+import qraat
+
+
 
 def get_context(request, deps=[], req_deps=[]):
   
@@ -132,66 +145,73 @@ def get_context(request, deps=[], req_deps=[]):
       form. '''
       print "-------when deployment page first loads"
 
-      dep_query = Position.objects.filter(deploymentID = req_deps[0].ID) 
+      #dep_query = Position.objects.filter(deploymentID__in = map(lambda(row) : row.ID, req_deps)) 
+      dep_query = Position.objects.filter(deploymentID = req_deps[0].ID)
       ''' Query db for min/max value for selected deployment.
         Used to automatically populate html form intial values. '''
       
-      # Select the last day of data for deployment. 
-      datetime_to_initial = float( dep_query.aggregate(Max('timestamp'))
-                                    ['timestamp__max'] )
-      datetime_to_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
-                  time.localtime(float(datetime_to_initial-7*60*60)))
-    
-      datetime_from_min_initial = float( dep_query.aggregate(
-                              Min('timestamp'))['timestamp__min'] )
-      datetime_from_day_initial = float(datetime_to_initial - 86400.00) 
-        # minus 24 hrs
-      if datetime_from_day_initial < datetime_from_min_initial:
-        datetime_from_initial = datetime_from_min_initial
-      else:
-        datetime_from_initial = datetime_from_day_initial
-      datetime_from_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
-                  time.localtime(float(datetime_from_initial-7*60*60)))
-
-      likelihood_low_initial = dep_query.aggregate(Min('likelihood'))['likelihood__min']
-      likelihood_high_initial = dep_query.aggregate(Max('likelihood'))['likelihood__max']
-
-      activity_low_initial = dep_query.aggregate(Min('activity'))['activity__min']
-      activity_high_initial = dep_query.aggregate(Max('activity'))['activity__max']
-  
-      index_form.fields['datetime_from'].initial = datetime_from_str_initial
-      index_form.fields['datetime_to'].initial = datetime_to_str_initial
-      index_form.fields['likelihood_low'].initial = likelihood_low_initial
-      index_form.fields['likelihood_high'].initial = likelihood_high_initial
-      index_form.fields['activity_low'].initial = activity_low_initial
-      index_form.fields['activity_high'].initial = activity_high_initial
- 
-      ''' FIXME: For blank form value(s), default them to min/max values of that dep. Notify the user that this happened. '''
-      
-      # Query data. 
       queried_data=[]
-      queried_objects = Position.objects.filter(
-                          deploymentID = req_deps[0].ID,
-                          timestamp__gte = datetime_from_initial,
-                          timestamp__lte = datetime_to_initial,
-                          likelihood__gte = likelihood_low_initial,
-                          likelihood__lte = likelihood_high_initial,
-                          activity__gte = activity_low_initial,
-                          activity__lte = activity_high_initial
-                          )
+      
+      if len(dep_query) == 0: 
+        print "No positions, returning empty context."
+      
+      else: # Set default form vlaues, populate queried_data. 
+        # Select the last day of data for deployment. 
+        datetime_to_initial = float( dep_query.aggregate(Max('timestamp'))
+                                      ['timestamp__max'] )
+        datetime_to_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
+                    time.localtime(float(datetime_to_initial-7*60*60)))
+      
+        datetime_from_min_initial = float( dep_query.aggregate(
+                                Min('timestamp'))['timestamp__min'] )
+        datetime_from_day_initial = float(datetime_to_initial - 86400.00) 
+          # minus 24 hrs
+        if datetime_from_day_initial < datetime_from_min_initial:
+          datetime_from_initial = datetime_from_min_initial
+        else:
+          datetime_from_initial = datetime_from_day_initial
+        datetime_from_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
+                    time.localtime(float(datetime_from_initial-7*60*60)))
 
-      for q in queried_objects:
-        (lat, lon) = utm.to_latlon(float(q.easting), float(q.northing), 
-          q.utm_zone_number, q.utm_zone_letter)
-        date_string = time.strftime('%Y-%m-%d %H:%M:%S', 
-                time.localtime(float(q.timestamp-7*60*60))) #FIXME: Hardcode timestamp conversion 
+        likelihood_low_initial = dep_query.aggregate(Min('likelihood'))['likelihood__min']
+        likelihood_high_initial = dep_query.aggregate(Max('likelihood'))['likelihood__max']
 
-        queried_data.append((q.ID, q.deploymentID, float(q.timestamp), 
-          float(q.easting), float(q.northing), q.utm_zone_number, 
-          float(q.likelihood), float(q.activity), (lat, lon), 
-          q.utm_zone_letter, date_string))
+        activity_low_initial = dep_query.aggregate(Min('activity'))['activity__min']
+        activity_high_initial = dep_query.aggregate(Max('activity'))['activity__max']
+    
+        index_form.fields['datetime_from'].initial = datetime_from_str_initial
+        index_form.fields['datetime_to'].initial = datetime_to_str_initial
+        index_form.fields['likelihood_low'].initial = likelihood_low_initial
+        index_form.fields['likelihood_high'].initial = likelihood_high_initial
+        index_form.fields['activity_low'].initial = activity_low_initial
+        index_form.fields['activity_high'].initial = activity_high_initial
+   
+        ''' FIXME: For blank form value(s), default them to min/max values of that dep. Notify the user that this happened. '''
+        
+        # Query data. 
+        queried_objects = Position.objects.filter(
+                            deploymentID = req_deps[0].ID,
+                            timestamp__gte = datetime_from_initial,
+                            timestamp__lte = datetime_to_initial,
+                            likelihood__gte = likelihood_low_initial,
+                            likelihood__lte = likelihood_high_initial,
+                            activity__gte = activity_low_initial,
+                            activity__lte = activity_high_initial
+                            )
 
-      # Note: To pass strings to js using json, use |safe in template.
+        for q in queried_objects:
+          #(lat, lon) = utm.to_latlon(float(q.easting), float(q.northing), 
+          #  q.utm_zone_number, q.utm_zone_letter)
+          date_string = time.strftime('%Y-%m-%d %H:%M:%S', 
+                  time.localtime(float(q.timestamp-7*60*60))) #FIXME: Hardcode timestamp conversion 
+
+          queried_data.append((q.ID, q.deploymentID, float(q.timestamp), 
+            float(q.easting), float(q.northing), q.utm_zone_number, 
+            float(q.likelihood), float(q.activity), 
+            (float(q.latitude), float(q.longitude)), 
+            q.utm_zone_letter, date_string))
+
+        # Note: To pass strings to js using json, use |safe in template.
     
     else: 
       ''' If any GET data from html form has been entered '''
@@ -233,21 +253,39 @@ def get_context(request, deps=[], req_deps=[]):
       args = Q()
       for each_args in args_deps:
         args = args | each_args
-   
+  
       # Query data. 
-      queried_objects = Position.objects.filter(*(args,), **kwargs)
-      
+      if int(data_type) == 1: 
+        queried_objects = Position.objects.filter(*(args,), **kwargs)
+      elif int(data_type) == 2: 
+        queried_objects = Position.objects.raw(
+           '''SELECT * FROM position
+                JOIN track_pos ON track_pos.positionID = position.ID
+               WHERE position.deploymentID = %s
+                 AND position.timestamp >= %s AND position.timestamp <= %s
+                 AND likelihood >= %s AND likelihood <= %s
+                 AND activity >= %s AND activity <= %s
+               ORDER BY position.timestamp''', (req_deps[0].ID, 
+            qraat.util.datetime_to_timestamp(datetime_from),
+            qraat.util.datetime_to_timestamp(datetime_to),
+            likelihood_low, likelihood_high, 
+            activity_low, activity_high, ))
+
+      else: 
+        raise Exception("Somethign is wrong.")
+     
       for row in queried_objects:
-        (lat, lon) = utm.to_latlon(float(row.easting), 
-            float(row.northing), row.utm_zone_number,
-            row.utm_zone_letter)
+        #(lat, lon) = utm.to_latlon(float(row.easting), 
+        #    float(row.northing), row.utm_zone_number,
+        #    row.utm_zone_letter)
         date_string = time.strftime('%Y-%m-%d %H:%M:%S', #FIXME
             time.localtime(float(row.timestamp-7*60*60)))
 
         queried_data.append((row.ID, row.deploymentID,
           float(row.timestamp), float(row.easting), 
           float(row.northing), row.utm_zone_number, 
-          float(row.likelihood), float(row.activity), (lat, lon), 
+          float(row.likelihood), float(row.activity), 
+          (float(row.latitude), float(row.longitude)), 
           row.utm_zone_letter, date_string))
        
      
@@ -260,10 +298,6 @@ def get_context(request, deps=[], req_deps=[]):
                           likelihood__lte = likelihood_high,
                           activity__gte = activity_low,
                           activity__lte = activity_high) '''
-  
-  ## Clicking Point on map ################################
-  # FIXME This should be done in Javascript? 
-  # Get clicked lat, lon from js event --> html form & convert to UTM
   
   context = {
             #public, deployment, project, etc.
@@ -355,18 +389,55 @@ def view_by_dep(request, project_id, dep_id):
 
   else:
     deps = project.get_deployments().filter(ID=dep_id)
-    
-  positions = Position.objects.filter(deploymentID__in=deps.values("ID") )
-  if len(positions) >0:
-    context = get_context(request, deps, deps)
-  else:
-    context = {}
+   
+  context = get_context(request, deps, deps)
 
   nav_options = get_nav_options(request)
   context["nav_options"] = nav_options
   context["project"] = project
 
   return render(request, 'qraat_ui/index.html', context)
+
+
+def download_by_dep(request, project_id, dep_id): 
+  print request
+  
+  try:
+    project = Project.objects.get(ID=project_id)
+  except ObjectDoesNotExist:
+    return HttpResponse("We didn't find this project") 
+  
+  if not project.is_public:
+    if request.user.is_authenticated():
+      user = request.user
+      if project.is_owner(user)\
+           or (user.has_perm("can_view")
+               and (project.is_collaborator(user)
+                    or project.is_viewer(user))):
+
+        deps = project.get_deployments().filter(ID=dep_id)
+      else:
+        return HttpResponse("You're not allowed to view this.")
+    
+    else:
+      return HttpResponse("You're not allowed to visualize this")
+
+  else:
+    deps = project.get_deployments().filter(ID=dep_id)
+  
+  context = get_context(request, deps, deps)
+
+  response = HttpResponse(content_type='text/csv')
+  response['Content-Disposition'] = 'attachement; filename="position_dep%s.csv"' % dep_id
+
+  writer = csv.writer(response)
+  writer.writerow(['ID', 'deploymentID', 'timestamp', 'easting', 'northing', 'zone', 
+                   'datetime', 'latitude', 'longitude', 'likelihood', 'activity'])
+  for row in json.loads(context['pos_data']):
+    writer.writerow([ row[0], row[1], row[2], row[3], row[4], str(row[5]) + row[9], 
+                      row[10], row[8][0], row[8][1], row[6], row[7] ])
+  return response
+  
 
 def view_by_target(request, target_id): 
   ''' Compile a list of deployments associated with `target_id`. ''' 

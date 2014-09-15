@@ -193,7 +193,7 @@ function server_install {
   my_echo "--------------------------------"
   my_echo "--- in $(pwd)"
   my_echo "--- make"
-  make >>$LOG 2>&1
+  sudo make >>$LOG 2>&1
   if [ ! $? = 0 ]; then
     echo
     echo "error: make: exited with error status. Check out log file for details."
@@ -251,7 +251,7 @@ function base_install {
   my_echo "--------------------------------"
   my_echo "--- in $(pwd)"
   my_echo "--- make"
-  make >>$LOG 2>&1
+  sudo make >>$LOG 2>&1
   if [ ! $? = 0 ]; then
     echo
     echo "error: make: exited with error status. Check out log file for details."
