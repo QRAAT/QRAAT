@@ -92,7 +92,7 @@ def calc_tracks(db_con, pos, dep_id, C=1):
                         speed_burst, speed_sustained, speed_limit
                    FROM target 
                    JOIN deployment ON target.ID = deployment.targetID
-                  WHERE deployment.ID = %d''' % dep_id)
+                  WHERE deployment.ID = %s''', (dep_id,))
   (_, family, burst, sustained, limit) = cur.fetchone()
   if family == 'const':
     M = maxspeed_const(limit)
@@ -101,7 +101,7 @@ def calc_tracks(db_con, pos, dep_id, C=1):
   elif family == 'linear':
     M = maxspeed_linear((BURST_INTERVAL, burst), (SUSTAINED_INTERVAL, sustained), limit)
   
-  return Track.calc(db_con, pos, dep_id, M, C) 
+  return Track.calc(db_con, pos, dep_id, M, C, optimal=False) 
 
 
 
@@ -215,8 +215,8 @@ class Track:
 
   '''
 
-  window_length = 250  
-  overlap_length = 25 
+  window_length = 250 
+  overlap_length = 10
 
   def __init__(self, db_con=None, dep_id=None, t_start=None, t_end=None): 
     self.dep_id = dep_id
@@ -224,7 +224,6 @@ class Track:
     if db_con:
       cur = db_con.cursor()
       
-      # TODO needs testing!
       cur.execute('''SELECT positionID, position..deploymentID, track_pos.timestamp, easting, northing, 
                             utm_zone_number, utm_zone_letter, likelihood, activity
                        FROM position
@@ -263,8 +262,9 @@ class Track:
     # Overwrite existing tracks for time window. 
     cur = db_con.cursor()
     cur.execute('''DELETE fROM qraat.track_pos 
-                         WHERE timestamp >= %f 
-                           AND timestamp <= %f''' % (self.table[0][2], self.table[-1][2])) 
+                         WHERE timestamp >= %s 
+                           AND timestamp <= %s
+                           AND deploymentID = %s''', (self.table[0][2], self.table[-1][2], self.dep_id)) 
     for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
          utm_zone_letter, likelihood, activity) in self.table:
       cur.execute('''INSERT INTO track_pos (positionID, deploymentID, timestamp)
@@ -321,7 +321,7 @@ class Track:
       the solution is optimal for the time window.
     ''' 
     roots = self.graph(self.pos, M)
-    self.track = map(lambda(row) : row[:3], self.critical_path(self.toposort(roots), C))
+    self.track = self.critical_path(self.toposort(roots), C)
   
   def __getiter__(self): 
     return self.table
