@@ -260,15 +260,16 @@ class Track:
  
   def insert_db(self, db_con):
     # Overwrite existing tracks for time window. 
-    cur = db_con.cursor()
-    cur.execute('''DELETE fROM qraat.track_pos 
-                         WHERE timestamp >= %s 
-                           AND timestamp <= %s
-                           AND deploymentID = %s''', (self.table[0][2], self.table[-1][2], self.dep_id)) 
-    for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
-         utm_zone_letter, likelihood, activity) in self.table:
-      cur.execute('''INSERT INTO track_pos (positionID, deploymentID, timestamp)
-                          VALUES (%d, %d, %d)''' % (pos_id, self.dep_id, t))
+    if len(self.table) > 0: 
+      cur = db_con.cursor()
+      cur.execute('''DELETE fROM qraat.track_pos 
+                           WHERE timestamp >= %s 
+                             AND timestamp <= %s
+                             AND deploymentID = %s''', (self.table[0][2], self.table[-1][2], self.dep_id)) 
+      for (pos_id, dep_id, t, easting, northing, utm_zone_number, 
+           utm_zone_letter, likelihood, activity) in self.table:
+        cur.execute('''INSERT INTO track_pos (positionID, deploymentID, timestamp)
+                            VALUES (%d, %d, %d)''' % (pos_id, self.dep_id, t))
 
   def _calc_tracks_windowed(self, M, C):
     ''' Calculate tracks over overlapping windows of positions. 
