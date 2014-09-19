@@ -40,12 +40,11 @@ try:
   db_con = qraat.util.get_db('writer')
 
   cur = db_con.cursor()
-  cur.execute('SELECT value FROM `cursor` WHERE name=\'estscore\'')
+  cur.execute('SELECT value FROM processing_cursor WHERE name=\'estscore\'')
   last_processed = cur.fetchone()
   if last_processed == None:
-    last_processed = 0
-    cur.execute('INSERT INTO `cursor` (name, value) VALUE (%s, %s)', 
-                                                       ('estscore', 0,))
+    print >>sys.stderr,  "filter_auto: error: No cursor found for estscore"
+    sys.exit(1)
   else: (last_processed,) = last_processed
   print "filter_auto: cursor at est.ID=%d" % last_processed
 
@@ -82,7 +81,7 @@ try:
       max_id = id if max_id < id else max_id
       print "filter: scored %d pulses." % total
 
-    cur.execute('UPDATE `cursor` SET value=%s WHERE name=\'estscore\'', (max_id,))
+    cur.execute('UPDATE processing_cursor SET value=%s WHERE name=\'estscore\'', (max_id,))
     print "filter_auto: updated cursor to est.ID=%d." % max_id 
 
 

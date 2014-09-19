@@ -20,7 +20,7 @@ cursor = db_con.cursor()
 EST_SCORE_THRESHOLD = float(os.environ["RMG_POS_EST_THRESHOLD"])
 
 # Get id of last processed record (last record scored). 
-cursor.execute("SELECT value FROM qraat.cursor WHERE name='position'")
+cursor.execute("SELECT value FROM qraat.processing_cursor WHERE name='position'")
 last_processed = cursor.fetchone()
 if last_processed == None:
   print >>sys.stderr,  "position_auto: error: No cursor found for position"
@@ -95,7 +95,7 @@ for deployment in deployment_list:
 
 #store id of last processed record
 if max_id > last_processed:
-  cursor.execute("UPDATE qraat.cursor SET value=%s WHERE name='position'", (max_id,))
+  cursor.execute("UPDATE qraat.processing_cursor SET value=%s WHERE name='position'", (max_id,))
   print "updating cursor position to {}".format(max_id)
 else:
   print "no new records processed (max_id={0})".format(max_id)
