@@ -47,14 +47,17 @@ try:
     sys.exit(1)
   else: (last_processed,) = last_processed
   print "filter_auto: cursor at est.ID=%d" % last_processed
+  
+  cur.execute('SELECT max(timestamp) from est WHERE ID > %s''', (last_processed,))
+  t_end_max = cur.fetchone()[0]
 
   # Get a set of (dep_id, site_id) pairs for which there is new data. 
   cur.execute('''SELECT DISTINCT deploymentID, siteID 
                    FROM est 
-                  WHERE ID > %s''', (last_processed)) 
+                  WHERE ID > %s''', (last_processed,)) 
   
   qraat.srv.signal.VERBOSE = True
-  
+
   bad = False; chunks = []
   for (dep_id, site_id) in cur.fetchall(): 
     cur.execute('''SELECT min(timestamp), max(timestamp) 
@@ -64,7 +67,7 @@ try:
                       AND siteID = %s''', (last_processed, dep_id, site_id,))
     (t_start, t_end) = cur.fetchone()
 
-    if (t_end - t_start) < qraat.srv.signal.SCORE_INTERVAL: 
+    if (t_end_max - t_start) < qraat.srv.signal.SCORE_INTERVAL: 
       print "filter_auto: incomplete score interval (depID=%d, siteID=%d)" % (dep_id, site_id)
       bad = True
 
