@@ -67,9 +67,6 @@ try:
     pos = qraat.srv.position.Position(db_con, pos_ids)
     print len(pos)
   
-    if len(pos) < 2:  
-      continue 
-
     print "track_auto: deploymentID=%d: calculating ..." % dep_id,
     track = qraat.srv.track.calc_tracks(db_con, pos, dep_id, C=-5)
     print len(track)
