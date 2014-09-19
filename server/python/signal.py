@@ -32,8 +32,8 @@ import MySQLdb as mdb
 # Some parameters. 
 BURST_INTERVAL = 10         # seconds
 BURST_THRESHOLD = 20        # pulses/second
-SCORE_INTERVAL = 60 * 15    # seconds
-SCORE_NEIGHBORHOOD = 30     # seconds
+SCORE_INTERVAL = 60 * 3     # seconds
+SCORE_NEIGHBORHOOD = 20     # seconds
 SCORE_ERROR = 0.02          # seconds
 
 # Log output. 
@@ -68,6 +68,8 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
      % (dep_id, 'nil' if tx_params['band3'] == sys.maxint else tx_params['band3'],
                 'nil' if tx_params['band10'] == sys.maxint else tx_params['band10']))
           
+  interval_data = [] # Keep track of pulse rate of each window. 
+
   for interval in get_score_intervals(t_start, t_end):
 
     # Using overlapping windows in order to mitigate 
@@ -100,11 +102,12 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
        data[(data[:,2] >= (interval[0] * TIMESTAMP_PRECISION)) & 
             (data[:,2] <= (interval[1] * TIMESTAMP_PRECISION))])
 
-    update_interval(db_con, dep_id, site_id, 
-                    interval[0], float(pulse_interval) / TIMESTAMP_PRECISION)
+    interval_data.append((interval[0], float(pulse_interval) / TIMESTAMP_PRECISION))
 
     total += count
     max_id = id if max_id < id else max_id
+  
+  update_intervals(db_con, dep_id, site_id, interval_data)
   
   return (total, max_id)
 
@@ -170,17 +173,26 @@ def update_data(db_con, data):
   return (len(inserts), max_id)
 
 
-def update_interval(db_con, dep_id, site_id, t, pulse_rate):
+def update_intervals(db_con, dep_id, site_id, intervals):
   ''' Insert interval data for (dep, site). ''' 
   
-  cur = db_con.cursor() 
-  cur.execute('''INSERT INTO estinterval (deploymentID, siteID, timestamp, 
-                                          duration, pulse_rate)
-                  VALUE (%s, %s, %s, %s, %s) 
-                     ON DUPLICATE KEY UPDATE duration = %s, pulse_rate = %s''',
-                (dep_id, site_id, t, 
-                 SCORE_INTERVAL, pulse_rate, 
-                 SCORE_INTERVAL, pulse_rate))
+  if len(intervals) > 0: 
+
+    cur = db_con.cursor()
+    cur.execute('''DELETE FROM estinterval 
+                    WHERE timestamp >= %s 
+                      AND timestamp <= %s
+                      AND deploymentID = %s
+                      AND siteID = %s''', 
+              (intervals[0][0], intervals[-1][0], dep_id, site_id))
+
+    inserts = []
+    for (t, pulse_rate) in intervals:
+      inserts.append((dep_id, site_id, t, SCORE_INTERVAL, pulse_rate))
+      
+    cur.executemany('''INSERT INTO estinterval (deploymentID, siteID, timestamp, 
+                                                duration, pulse_rate)
+                             VALUE (%s, %s, %s, %s, %s)''', inserts)
 
 
 
