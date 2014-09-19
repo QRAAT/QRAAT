@@ -36,11 +36,11 @@ try:
 
   # Get positionID of last processed position.  
   cur = db_con.cursor()
-  cur.execute('SELECT value FROM qraat.cursor WHERE name=\'track_pos\'')
+  cur.execute('SELECT value FROM qraat.processing_cursor WHERE name=\'track_pos\'')
   last_processed = cur.fetchone()
   if last_processed is None: 
-    last_processed = 0
-    cur.execute('INSERT INTO qraat.cursor (name, value) VALUE (\'track_pos\', 0)')
+    print >>sys.stderr,  "track_auto: error: No cursor found for track_pos"
+    sys.exit(1)
   else: last_processed = int(last_processed[0])
 
   # Get a list of depIDs with new positions and their earliest timestamp. 
@@ -79,7 +79,7 @@ try:
 
   if max_processed > last_processed: 
     print "track_auto: updating cursor to positionID=%d." % max_processed
-    cur.execute('''UPDATE qraat.cursor 
+    cur.execute('''UPDATE qraat.processing_cursor 
                       SET value=%d 
                     WHERE name="track_pos" ''' % max_processed)  
   
