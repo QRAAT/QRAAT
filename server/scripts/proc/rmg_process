@@ -29,7 +29,7 @@ name=`basename $0`
 count=`pgrep -c $name`
 if [ "$count" -gt "1" ]
 then
-	echo $name already running, bye!
+	echo $name already running, `date`
 	exit 1
 fi
 
