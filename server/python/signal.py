@@ -90,12 +90,18 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
     # Tbe only way to coroborate isolated points is with other sites. 
     if data[data.shape[0]-1,2] - data[0,2] > 0: 
       burst_filter(data, augmented_interval)
-      time_filter(data)
+      pulse_interval = expected_pulse_interval(data)
+      time_filter(data, pulse_interval)
+
+    else: pulse_interval = None
     
     # When inserting, exclude overlapping points.
-    (count, id) = insert_data(db_con, 
+    (count, id) = update_data(db_con, 
        data[(data[:,2] >= (interval[0] * TIMESTAMP_PRECISION)) & 
             (data[:,2] <= (interval[1] * TIMESTAMP_PRECISION))])
+
+    update_interval(db_con, dep_id, site_id, 
+                    interval[0], float(pulse_interval) / TIMESTAMP_PRECISION)
 
     total += count
     max_id = id if max_id < id else max_id
@@ -143,7 +149,7 @@ def get_interval_data(db_con, dep_id, site_id, interval):
   return np.array(data, dtype=np.int)
 
 
-def insert_data(db_con, data): 
+def update_data(db_con, data): 
   ''' Insert scored data, updating existng records. 
   
     Return the number of inserted scores and the maximum estID. 
@@ -155,7 +161,6 @@ def insert_data(db_con, data):
     inserts.append((data[i,0], data[i,5], data[i,6], data[i,7]))
     deletes.append(data[i,0])
 
-  # TODO Insert or update. 
   cur = db_con.cursor()
   cur.executemany('DELETE FROM estscore WHERE estID = %s', deletes)
   cur.executemany('''INSERT INTO estscore (estID, score, theoretical_score, max_score) 
@@ -163,6 +168,20 @@ def insert_data(db_con, data):
 
   max_id = np.max(data[:,0]) if len(inserts) > 0 else 0
   return (len(inserts), max_id)
+
+
+def update_interval(db_con, dep_id, site_id, t, pulse_rate):
+  ''' Insert interval data for (dep, site). ''' 
+  
+  cur = db_con.cursor() 
+  cur.execute('''INSERT INTO estinterval (deploymentID, siteID, timestamp, 
+                                          duration, pulse_rate)
+                  VALUE (%s, %s, %s, %s, %s) 
+                     ON DUPLICATE KEY UPDATE duration = %s, pulse_rate = %s''',
+                (dep_id, site_id, t, 
+                 SCORE_INTERVAL, pulse_rate, 
+                 SCORE_INTERVAL, pulse_rate))
+
 
 
 def get_tx_params(db_con, dep_id): 
@@ -282,15 +301,13 @@ def burst_filter(data, interval):
   return data[data[:,5] != BURST_BAD]
 
 
-def time_filter(data, thresh=None):
+def time_filter(data, pulse_interval, thresh=None):
   ''' Time filter. Calculate absolute score and normalize. 
     
     `thresh` is either None or in [0 .. 1]. If `thresh` is not none,
     it returns data with relative score of at least this value. 
   ''' 
 
-  # Compute expected pulse interval. 
-  pulse_interval = expected_pulse_interval(data)
   pulse_error = int(SCORE_ERROR * TIMESTAMP_PRECISION)
   delta = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION / 2 
     
@@ -359,7 +376,7 @@ def test1():
       burst_filter(data, interval)
       filtered_data = time_filter(data, 0.15)
 
-      #insert_data(db_con, data)
+      #update_data(db_con, data)
 
       # Output ... 
         
