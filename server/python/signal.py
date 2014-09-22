@@ -86,19 +86,15 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
                                                           data.shape[0]))
     
     parametric_filter(data, tx_params)
+      
+    if data.shape[0] >= BURST_THRESHOLD: 
+      burst_filter(data, augmented_interval)
 
     # Tbe only way to coroborate isolated points is with other sites. 
-    #if data[data.shape[0]-1,2] - data[0,2] > 0: 
-    
     if data.shape[0] > 2:
-      try: 
-        burst_filter(data, augmented_interval)
-        pulse_interval = expected_pulse_interval(data)
-        time_filter(data, pulse_interval)
-        pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
-      except ValueError: 
-        print "----------> ValueError! %d" %  data.shape[0]
-        pulse_interval = None
+      pulse_interval = expected_pulse_interval(data)
+      time_filter(data, pulse_interval)
+      pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
 
     else: pulse_interval = None
     

@@ -50,14 +50,14 @@ try:
     (last_processed,) = last_processed
     print "filter_auto: processing_cursor at est.ID=%d" % last_processed
   
-  cur.execute('SELECT UNIX_TIMESTAMP(NOW())'); (now,) = cur.fetchone(); 
+  cur.execute('SELECT UNIX_TIMESTAMP(NOW())')
+  (now,) = cur.fetchone(); 
   now = now - (now % qraat.srv.signal.SCORE_INTERVAL)
   now += qraat.srv.signal.SCORE_NEIGHBORHOOD / 2
 
   # Get a set of (dep_id, site_id) pairs for which there is new data, 
   # excluding the latest incomplete chunk. 
-  cur.execute('''SELECT DISTINCT deploymentID, 
-                                 siteID
+  cur.execute('''SELECT DISTINCT deploymentID, siteID
                    FROM est 
                   WHERE ID > %s 
                     AND timestamp < %s''', (last_processed, now)) 
