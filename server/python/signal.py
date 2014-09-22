@@ -5,8 +5,6 @@
 # useful extension to this work will be to coroborate points between
 # sites. 
 
-# TODO Record pulse interval for score window in DB.  
-
 # TODO Account for the percentage of time the system is listening
 #      for the transmitter. 
 
