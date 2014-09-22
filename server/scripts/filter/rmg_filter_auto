@@ -40,26 +40,26 @@ try:
   db_con = qraat.util.get_db('writer')
 
   cur = db_con.cursor()
-  cur.execute('SELECT value FROM processing_cursor WHERE name=\'estscore\'')
+  cur.execute('SELECT value FROM `processing_cursor` WHERE name=\'estscore\'')
   last_processed = cur.fetchone()
   if last_processed == None:
-    print >>sys.stderr,  "filter_auto: error: No cursor found for estscore"
-    sys.exit(1)
+    last_processed = 0
+    cur.execute('INSERT INTO `processing_cursor` (name, value) VALUE (%s, %s)', 
+                                                       ('estscore', 0,))
   else: (last_processed,) = last_processed
-  print "filter_auto: cursor at est.ID=%d" % last_processed
-  
-  cur.execute('SELECT max(timestamp) from est WHERE ID > %s''', (last_processed,))
-  t_end_max = cur.fetchone()[0]
+  print "filter_auto: processing_cursor at est.ID=%d" % last_processed
 
   # Get a set of (dep_id, site_id) pairs for which there is new data. 
   cur.execute('''SELECT DISTINCT deploymentID, siteID 
                    FROM est 
-                  WHERE ID > %s''', (last_processed,)) 
+                  WHERE ID > %s''', (last_processed)) 
   
   qraat.srv.signal.VERBOSE = True
-
-  bad = False; chunks = []
+  max_id = last_processed
+  
   for (dep_id, site_id) in cur.fetchall(): 
+    print "filter_auto: depID=%d, siteID=%d" % (dep_id, site_id)
+    
     cur.execute('''SELECT min(timestamp), max(timestamp) 
                      FROM qraat.est
                     WHERE ID > %s 
@@ -67,26 +67,18 @@ try:
                       AND siteID = %s''', (last_processed, dep_id, site_id,))
     (t_start, t_end) = cur.fetchone()
 
-    if (t_end_max - t_start) < qraat.srv.signal.SCORE_INTERVAL: 
-      print "filter_auto: incomplete score interval (depID=%d, siteID=%d)" % (dep_id, site_id)
-      bad = True
-
-    else: chunks.append((dep_id, site_id, t_start, t_end))
-  
-  if bad: 
-    print "filter_auto: skipping processing until all intervals are caught up." 
-
-  else: 
-    max_id = last_processed
-    for (dep_id, site_id, t_start, t_end) in chunks: 
-      print "filter_auto: depID=%d, siteID=%d" % (dep_id, site_id)
+    if (t_end - t_start) < qraat.srv.signal.SCORE_INTERVAL: 
+      print "filter_auto: skipping incomplete score interval." 
+    
+    else: 
       (total, id) = qraat.srv.signal.Filter(db_con, dep_id, site_id, t_start, t_end)
       max_id = id if max_id < id else max_id
       print "filter: scored %d pulses." % total
 
-    cur.execute('UPDATE processing_cursor SET value=%s WHERE name=\'estscore\'', (max_id,))
-    print "filter_auto: updated cursor to est.ID=%d." % max_id 
-
+  cur.execute('UPDATE `processing_cursor` SET value=%s WHERE name=\'estscore\'', 
+                                                (max_id,))
+  print "filter_auto: updated processing_cursor to est.ID=%d." % max_id 
+  
 
 except mdb.Error, e:
   print >>sys.stderr, "filter_auto: error: [%d] %s" % (e.args[0], e.args[1])

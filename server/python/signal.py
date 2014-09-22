@@ -90,10 +90,17 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
     parametric_filter(data, tx_params)
 
     # Tbe only way to coroborate isolated points is with other sites. 
-    if data[data.shape[0]-1,2] - data[0,2] > 0: 
-      burst_filter(data, augmented_interval)
-      pulse_interval = expected_pulse_interval(data)
-      time_filter(data, pulse_interval)
+    #if data[data.shape[0]-1,2] - data[0,2] > 0: 
+    
+    if data.shape[0] > 2:
+      try: 
+        burst_filter(data, augmented_interval)
+        pulse_interval = expected_pulse_interval(data)
+        time_filter(data, pulse_interval)
+        pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
+      except ValueError: 
+        print "----------> ValueError! %d" %  data.shape[0]
+        pulse_interval = None
 
     else: pulse_interval = None
     
@@ -102,7 +109,7 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
        data[(data[:,2] >= (interval[0] * TIMESTAMP_PRECISION)) & 
             (data[:,2] <= (interval[1] * TIMESTAMP_PRECISION))])
 
-    interval_data.append((interval[0], float(pulse_interval) / TIMESTAMP_PRECISION))
+    interval_data.append((interval[0], pulse_interval))
 
     total += count
     max_id = id if max_id < id else max_id
