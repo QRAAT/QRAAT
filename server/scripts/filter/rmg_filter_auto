@@ -57,9 +57,7 @@ try:
   # Get a set of (dep_id, site_id) pairs for which there is new data, 
   # excluding the latest incomplete chunk. 
   cur.execute('''SELECT DISTINCT deploymentID, 
-                                 siteID, 
-                                 min(timestamp), 
-                                 max(timestamp)
+                                 siteID
                    FROM est 
                   WHERE ID > %s 
                     AND timestamp < %s''', (last_processed, now)) 
@@ -67,8 +65,15 @@ try:
   qraat.srv.signal.VERBOSE = True
   max_id = last_processed
   
-  for (dep_id, site_id, t_start, t_end) in cur.fetchall(): 
-    
+  for (dep_id, site_id) in cur.fetchall(): 
+    cur.execute('''SELECT min(timestamp), max(timestamp)
+                     FROM est 
+                    WHERE ID > %s 
+                      AND timestamp < %s
+                      AND deploymentID = %s
+                      AND siteID = %s''', (last_processed, now, dep_id, site_id)) 
+    (t_start, t_end) = cur.fetchone() 
+
     if dep_id is not None: 
       print "filter_auto: depID=%d, siteID=%d" % (dep_id, site_id)
       (total, id) = qraat.srv.signal.Filter(db_con, dep_id, site_id, t_start, t_end)
