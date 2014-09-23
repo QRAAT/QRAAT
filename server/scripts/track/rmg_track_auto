@@ -66,7 +66,7 @@ try:
     pos_ids = qraat.srv.track.get_pos_ids(db_con, dep_id, t_start, t_end)
     pos = qraat.srv.position.Position(db_con, pos_ids)
     print len(pos)
-  
+
     print "track_auto: deploymentID=%d: calculating ..." % dep_id,
     track = qraat.srv.track.calc_tracks(db_con, pos, dep_id, C=-5)
     print len(track)

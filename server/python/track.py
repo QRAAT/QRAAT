@@ -44,11 +44,16 @@ import random
 
 BURST_INTERVAL = 60        # 1 minute
 SUSTAINED_INTERVAL = 1800  # 30 minutes
+ 
+WINDOW_LENGTH = 250 
+OVERLAP_LENGTH = 25
 
 try:
   import MySQLdb as mdb
   import utm, xml
 except ImportError: pass
+
+
 
 def get_pos_ids(db_con, dep_id, t_start, t_end): 
   cur = db_con.cursor()
@@ -57,8 +62,23 @@ def get_pos_ids(db_con, dep_id, t_start, t_end):
                   WHERE deploymentID=%d
                     AND timestamp >= %f 
                     AND timestamp <= %f''' % (dep_id, t_start, t_end))
-  return [ int(row[0]) for row in cur.fetchall() ]
+     
+  pos_ids = [ int(row[0]) for row in cur.fetchall() ]
 
+  # Process at least `OVERLAP_LENGTH` number of pos_ids. 
+  if len(pos_ids) < OVERLAP_LENGTH:
+
+    cur.execute('''SELECT ID 
+                     FROM position
+                    WHERE deploymentID=%d
+                    ORDER BY timestamp DESC
+                    LIMIT %s''' % (dep_id, OVERLAP_LENGTH))
+  
+    pos_ids = [ int(row[0]) for row in cur.fetchall() ]
+  
+  return pos_ids
+    
+    
 
 # 
 # A few families of max speed given time interval functions. 
@@ -215,9 +235,6 @@ class Track:
 
   '''
 
-  window_length = 250 
-  overlap_length = 10
-
   def __init__(self, db_con=None, dep_id=None, t_start=None, t_end=None): 
     self.dep_id = dep_id
     self.table = []
@@ -280,7 +297,7 @@ class Track:
     '''
     pos_dict = {}
     self.track = []
-    i = 0; j = self.window_length 
+    i = 0; j = WINDOW_LENGTH 
 
     while i < len(self.pos):
       
@@ -288,7 +305,7 @@ class Track:
       while self.pos[i-1][2] == t:
         i -= 1
 
-      j =  min(len(self.pos) - 1, i + self.window_length)
+      j =  min(len(self.pos) - 1, i + WINDOW_LENGTH)
       
       t = self.pos[j][2]
       while self.pos[j-1][2] == t:
@@ -302,7 +319,7 @@ class Track:
           pos_dict[node.t] = set()
         pos_dict[node.t].add(node)
 
-      i += self.window_length - self.overlap_length
+      i += WINDOW_LENGTH - OVERLAP_LENGTH
 
     # When there are many possibilities for a timestep, choose the
     # position with higher likelihood. (NOTE that it may be better 
