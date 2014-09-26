@@ -5,9 +5,6 @@
 # useful extension to this work will be to coroborate points between
 # sites. 
 
-# TODO Account for the percentage of time the system is listening
-#      for the transmitter. 
-
 # TODO Don't double count pulses that fall within the same error 
 #      window. To do this, throw pulses in a bucket data structure. 
 
@@ -18,6 +15,11 @@
 
 # NOTE The larger the score window, the more accurate we calculate 
 #      the expected pulse interval.
+
+# NOTE We don't yet account for the percentage of time the system is 
+#      listening for the transmitter. This should be encorpoerated 
+#      into the theoretical score over the pulse's neighborhood. 
+
 
 
 import sys
@@ -76,7 +78,7 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
                           interval[1] + (SCORE_NEIGHBORHOOD / 2))
 
     data = get_interval_data(db_con, dep_id, site_id, augmented_interval)
-
+  
     if data.shape[0] == 0: # Skip empty chunks.
       debug_output("skipping empty chunk")
       continue
@@ -103,10 +105,10 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
     # When inserting, exclude overlapping points.
     (count, id) = update_data(db_con, 
        data[(data[:,2] >= (interval[0] * TIMESTAMP_PRECISION)) & 
-            (data[:,2] <= (interval[1] * TIMESTAMP_PRECISION))])
+            (data[:,2] <  (interval[1] * TIMESTAMP_PRECISION))])
 
     interval_data.append((interval[0], pulse_interval))
-
+  
     total += count
     max_id = id if max_id < id else max_id
   

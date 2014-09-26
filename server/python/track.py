@@ -45,8 +45,8 @@ import random
 BURST_INTERVAL = 60        # 1 minute
 SUSTAINED_INTERVAL = 1800  # 30 minutes
  
-WINDOW_LENGTH = 250 
-OVERLAP_LENGTH = 25
+WINDOW_LENGTH = 500 
+OVERLAP_LENGTH = 50
 
 try:
   import MySQLdb as mdb
@@ -66,13 +66,13 @@ def get_pos_ids(db_con, dep_id, t_start, t_end):
   pos_ids = [ int(row[0]) for row in cur.fetchall() ]
 
   # Process at least `OVERLAP_LENGTH` number of pos_ids. 
-  if len(pos_ids) < OVERLAP_LENGTH:
+  if len(pos_ids) < WINDOW_LENGTH:
 
     cur.execute('''SELECT ID 
                      FROM position
                     WHERE deploymentID=%d
                     ORDER BY timestamp DESC
-                    LIMIT %s''' % (dep_id, OVERLAP_LENGTH))
+                    LIMIT %s''' % (dep_id, WINDOW_LENGTH))
   
     pos_ids = [ int(row[0]) for row in cur.fetchall() ]
   
