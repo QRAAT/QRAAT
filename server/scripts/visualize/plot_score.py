@@ -30,6 +30,9 @@ cursor = db.cursor()
 num_records = cursor.execute("select timestamp, edsp, fdsp, edsnr, fdsnr, ec, tnp, center, siteID, score, theoretical_score from est left join estscore on est.ID = estscore.estID where deploymentID=%s and timestamp > %s and timestamp < %s", (deploymentID, start_time, stop_time))
 data = np.array(cursor.fetchall(),dtype = float)
 
+num_intervals = cursor.execute("select timestamp, pulse_rate, duration, siteID from estinterval where deploymentID = %s and timestamp > %s and timestamp < %s", (deploymentID, start_time, stop_time))
+interval_data = np.array(cursor.fetchall(),dtype = float)
+
 db.close()
 
 print "deploymentID: {0}\ntimestamps: {1} - {2}, {3} - {4}".format(deploymentID, start_time, stop_time, time.strftime("%x %X",time.localtime(start_time)), time.strftime("%x %X",time.localtime(stop_time)))
@@ -39,6 +42,7 @@ print "{} records with theoretical_score == 0".format(np.sum(data[:,10] == 0))
 print "{} records scored < 0".format(np.sum(data[:,9] < 0))
 print "{} records scored == 0".format(np.sum(data[:,9] == 0))
 print "{} records scored > 0".format(np.sum(data[:,9] > 0))
+print "{} intervals found in estinterval table".format(num_intervals)
 
 site_set = set(data[:,8])
 for siteID in site_set:
@@ -78,6 +82,14 @@ for siteID in site_set:
   fig.set_size_inches(16,12)
   pp.savefig("{0}/depID{1:d}_site{2:.0f}_score.png".format(plot_dir,deploymentID,siteID))
   pp.clf()
-
+  intmask = (interval_data[:,3] == siteID)
+  pp.plot(interval_data[intmask,0], interval_data[intmask,1],'.')
+  pp.xlabel("Time (seconds)")
+  pp.ylabel("Pulse Interval (seconds)")
+  pp.title("Time vs. Interval, deploymentID={0:d}, siteID={1:.0f}, {2:d}<timestamp<{3:d}".format(deploymentID,siteID,start_time,stop_time))
+  fig = pp.gcf()
+  fig.set_size_inches(16,12)
+  pp.savefig("{0}/depID{1:d}_site{2:.0f}_interval.png".format(plot_dir,deploymentID,siteID))
+  pp.clf()
 
 
