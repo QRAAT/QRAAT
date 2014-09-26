@@ -93,8 +93,10 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
     # Tbe only way to coroborate isolated points is with other sites. 
     if data.shape[0] > 2:
       pulse_interval = expected_pulse_interval(data)
-      time_filter(data, pulse_interval)
-      pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
+      if pulse_interval > 0:
+        time_filter(data, pulse_interval)
+        pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
+      else: pulse_interval = None 
 
     else: pulse_interval = None
     
@@ -245,12 +247,15 @@ def expected_pulse_interval(data):
   ''' 
   
   (rows, cols) = data.shape
-  
+  max_interval_length = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION
+
   # Compute pairwise time differentials. 
   diffs = []
   for i in range(rows):
     for j in range(i+1, rows): 
-      diffs.append(data[j,2] - data[i,2])
+      diff = data[j,2] - data[i,2]
+      if diff < max_interval_length: 
+        diffs.append(diff)
 
   # Create a histogram. Bins are scaled by `SCORE_ERROR`. 
   (hist, bins) = np.histogram(diffs, bins = (max(data[:,2]) - min(data[:,2]))
