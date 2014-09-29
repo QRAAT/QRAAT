@@ -5,6 +5,8 @@
 # useful extension to this work will be to coroborate points between
 # sites. 
 
+# TODO Change estinterval.pulse_rate to pulse_interval. 
+
 # TODO Don't double count pulses that fall within the same error 
 #      window. To do this, throw pulses in a bucket data structure. 
 
@@ -29,15 +31,20 @@ import MySQLdb as mdb
 
 #### Constants and parameters for per site/transmitter pulse filtering. #######
 
-# Some parameters. 
+# Burst filter parameters. 
 BURST_INTERVAL = 10         # seconds
 BURST_THRESHOLD = 20        # pulses/second
+
+# Time filter paramters. 
 SCORE_INTERVAL = 60 * 3     # seconds
 SCORE_NEIGHBORHOOD = 20     # seconds
 SCORE_ERROR = 0.02          # seconds
 
-# Log output. 
-VERBOSE = False
+# Minumum percentage of transmitter's nominal pulse interval that the expected
+# pulse_interval is allowed to drift. Tiny pulse intervals frequently result 
+# from particularly noisy, but it may not be enough to trigger the burst 
+# filter.
+MIN_DRIFT_PERCENTAGE = 0.33
 
 # Factor by which to multiply timestamps. 
 TIMESTAMP_PRECISION = 1000
@@ -45,6 +52,9 @@ TIMESTAMP_PRECISION = 1000
 # Some constants. 
 PARAM_BAD = -1
 BURST_BAD = -2 
+
+# Log output. 
+VERBOSE = False
 
 
 
@@ -64,9 +74,10 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
 
   total = 0; max_id = 0
   tx_params = get_tx_params(db_con, dep_id)
-  debug_output("depID=%d parameters: band3=%s, band10=%s" 
+  debug_output("depID=%d parameters: band3=%s, band10=%s, pulse_rate=%s" 
      % (dep_id, 'nil' if tx_params['band3'] == sys.maxint else tx_params['band3'],
-                'nil' if tx_params['band10'] == sys.maxint else tx_params['band10']))
+                'nil' if tx_params['band10'] == sys.maxint else tx_params['band10'], 
+                tx_params['pulse_rate']))
           
   interval_data = [] # Keep track of pulse rate of each window. 
 
@@ -94,7 +105,7 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
 
     # Tbe only way to coroborate isolated points is with other sites. 
     if data.shape[0] > 2:
-      pulse_interval = expected_pulse_interval(data)
+      pulse_interval = expected_pulse_interval(data, tx_params['pulse_rate'])
       if pulse_interval > 0:
         time_filter(data, pulse_interval)
         pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
@@ -232,6 +243,9 @@ def get_tx_params(db_con, dep_id):
       else: 
         params['band10'] = int(value)
 
+    elif name == 'pulse_rate': 
+      params[name] = float(value)
+
     else: 
       params[name] = value
 
@@ -241,22 +255,25 @@ def get_tx_params(db_con, dep_id):
 
 ##### Per site/transmitter filters. ###########################################
 
-def expected_pulse_interval(data): 
+def expected_pulse_interval(data, pulse_rate): 
   ''' Compute expected pulse rate over data.
   
     Data is assumed to be sorted by timestamp and timestamps should be
     multiplied by `TIMESTAMP_PRECISION`. (See `get_interval_data()`.)  
+
+    :param pulse_rate: Transmitter's nominal pulse rate in pulses / minute. 
   ''' 
   
   (rows, cols) = data.shape
-  max_interval_length = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION
+  max_interval = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION
+  min_interval = ((60 * MIN_DRIFT_PERCENTAGE) / pulse_rate) * TIMESTAMP_PRECISION
 
   # Compute pairwise time differentials. 
   diffs = []
   for i in range(rows):
     for j in range(i+1, rows): 
       diff = data[j,2] - data[i,2]
-      if diff < max_interval_length: 
+      if min_interval < diff and diff < max_interval: 
         diffs.append(diff)
 
   # Create a histogram. Bins are scaled by `SCORE_ERROR`. 
@@ -264,8 +281,6 @@ def expected_pulse_interval(data):
                                         / (SCORE_ERROR * TIMESTAMP_PRECISION))
   
   i = np.argmax(hist)
-  #print "Expected pulse interval is %.2f seconds" % ((bins[i] + bins[i+1])
-  #                                             / (2 * TIMESTAMP_PRECISION))
   return int(bins[i] + bins[i+1]) / 2
 
 
