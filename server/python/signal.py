@@ -135,12 +135,10 @@ def get_score_intervals(t_start, t_end):
   ''' Return a list of scoring windows given arbitrary start and finish. '''  
  
   t_start = int(t_start); t_end = int(t_end)
-  intervals = range(t_start - (t_start % SCORE_INTERVAL), 
-                    t_end + (t_end % SCORE_INTERVAL),
-                    SCORE_INTERVAL)
-                    
-  for i in range(1,len(intervals)): 
-    yield (intervals[i-1], intervals[i])
+  for i in range(t_start - (t_start % SCORE_INTERVAL), 
+                 t_end   + (t_end   % SCORE_INTERVAL),
+                 SCORE_INTERVAL):
+    yield (i, i + SCORE_INTERVAL)
 
 
 def get_interval_data(db_con, dep_id, site_id, interval):
@@ -217,8 +215,8 @@ def get_tx_params(db_con, dep_id):
     
     `band3` and `band10` are expected to be among the tramsitter's 
     paramters and converted to integers. If they're unspecified (NULL), 
-    they are given `sys.maxint`. All other paramters are treated as 
-    strings.
+    they are given `sys.maxint`. `pulse_ratae` is interpreted as a float
+    pulses / minute. All other paramters are treated as strings.
   ''' 
 
   cur = db_con.cursor()
@@ -295,7 +293,7 @@ def parametric_filter(data, tx_params):
     if data[i,3] > tx_params['band3'] or data[i,4] > tx_params['band10']:
       data[i,5] = PARAM_BAD
 
-  return data[data[:,5] != PARAM_BAD]
+  #return data[data[:,5] != PARAM_BAD]
 
 
 def burst_filter(data, interval): 
@@ -333,7 +331,7 @@ def burst_filter(data, interval):
       if t0 <= data[i,2] and data[i,2] <= t1:
         data[i,5] = BURST_BAD
 
-  return data[data[:,5] != BURST_BAD]
+  #return data[data[:,5] != BURST_BAD]
 
 
 def time_filter(data, pulse_interval, thresh=None):
@@ -371,10 +369,10 @@ def time_filter(data, pulse_interval, thresh=None):
   
   data[:,7] = np.max(data[:,5]) # Max count. 
 
-  if thresh:
-    return data[data[:,5].astype(np.float) / data[:,6] > thresh]
-  else:
-    return data
+  #if thresh:
+  #  return data[data[:,5].astype(np.float) / data[:,6] > thresh]
+  #else:
+  #  return data
 
 
 
