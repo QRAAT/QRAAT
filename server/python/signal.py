@@ -38,7 +38,11 @@ BURST_THRESHOLD = 20        # pulses/second
 # Time filter paramters. 
 SCORE_INTERVAL = 60 * 3     # seconds
 SCORE_NEIGHBORHOOD = 20     # seconds
-SCORE_ERROR = 0.02          # seconds
+
+# Score error for pulse corroboration, as a function of the variation over 
+# the interval. (Second moment of the mode pulse interval). This relationship
+# was deduced emperically. 
+SCORE_ERROR = lambda(x) : (0.009 * x) + 0.02
 
 # Minumum percentage of transmitter's nominal pulse interval that the expected
 # pulse_interval is allowed to drift. Tiny pulse intervals frequently result 
@@ -52,6 +56,8 @@ MIN_DRIFT_PERCENTAGE = 0.33
 
 # Factor by which to multiply timestamps. 
 TIMESTAMP_PRECISION = 1000
+
+BIN_WIDTH = 0.02 
 
 # Some constants. 
 PARAM_BAD = -1
@@ -111,7 +117,7 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
     if data.shape[0] > 2:
       (pulse_interval, pulse_variation) = expected_pulse_interval(data, tx_params['pulse_rate'])
       if pulse_interval > 0:
-        time_filter(data, pulse_interval)
+        time_filter(data, pulse_interval, pulse_variation)
         pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
       else: pulse_interval = pulse_variation = None 
 
@@ -269,7 +275,7 @@ def expected_pulse_interval(data, pulse_rate):
   (rows, cols) = data.shape
   max_interval = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION
   min_interval = ((60 * MIN_DRIFT_PERCENTAGE) / pulse_rate) * TIMESTAMP_PRECISION
-  bin_width = SCORE_ERROR * TIMESTAMP_PRECISION
+  bin_width = BIN_WIDTH * TIMESTAMP_PRECISION
 
   # Compute pairwise time differentials. 
   diffs = []
@@ -279,7 +285,7 @@ def expected_pulse_interval(data, pulse_rate):
       if min_interval < diff and diff < max_interval: 
         diffs.append(diff)
 
-  # Create a histogram. Bins are scaled by `SCORE_ERROR`. 
+  # Create a histogram. Bins are scaled by `BIN_WIDTH`. 
   (hist, bins) = np.histogram(diffs, bins = (max(data[:,2]) - min(data[:,2])) / bin_width)
   
   # Mode pulse interval = expected pulse interval. 
@@ -287,13 +293,14 @@ def expected_pulse_interval(data, pulse_rate):
   mode = int(bins[i] + bins[i+1]) / 2
 
   # Second moment of mode. 
-  m = float(mode) / TIMESTAMP_PRECISION
   second_moment = 0
-  for j in range(hist.shape[0]-1): 
-    x = float(bins[j] + bins[j+1]) / (2 * TIMESTAMP_PRECISION)
-    f = float(hist[j]) / hist[i] 
-    second_moment += SCORE_ERROR * f * (x - m) ** 2 
-  
+  if mode > 0:
+    m = float(mode) / TIMESTAMP_PRECISION
+    for j in range(hist.shape[0]-1): 
+      x = float(bins[j] + bins[j+1]) / (2 * TIMESTAMP_PRECISION)
+      f = float(hist[j]) / hist[i] 
+      second_moment += BIN_WIDTH * f * (x - m) ** 2 
+
   return (mode, second_moment)
 
 
@@ -349,14 +356,14 @@ def burst_filter(data, interval):
   #return data[data[:,5] != BURST_BAD]
 
 
-def time_filter(data, pulse_interval, thresh=None):
+def time_filter(data, pulse_interval, pulse_variation, thresh=None):
   ''' Time filter. Calculate absolute score and normalize. 
     
     `thresh` is either None or in [0 .. 1]. If `thresh` is not none,
     it returns data with relative score of at least this value. 
   ''' 
 
-  pulse_error = int(SCORE_ERROR * TIMESTAMP_PRECISION)
+  pulse_error = int(SCORE_ERROR(pulse_variation) * TIMESTAMP_PRECISION)
   delta = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION / 2 
     
   # Best score theoretically possible for this interval. 
