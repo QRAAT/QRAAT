@@ -44,6 +44,8 @@ SCORE_ERROR = 0.02          # seconds
 # pulse_interval is allowed to drift. Tiny pulse intervals frequently result 
 # from particularly noisy, but it may not be enough to trigger the burst 
 # filter.
+# 
+#  FIXME This is a bit of a cludge to filter noisy intervals. 
 MIN_DRIFT_PERCENTAGE = 0.33
 
 # Factor by which to multiply timestamps. 
