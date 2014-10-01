@@ -89,6 +89,7 @@ for siteID in site_set:
   pp.xlabel("Time (seconds)")
   pp.ylabel("Pulse Interval (seconds)")
   pp.title("Time vs. Interval, deploymentID={0:d}, siteID={1:.0f}, {2:d}<timestamp<{3:d}".format(deploymentID,siteID,start_time,stop_time))
+  pp.legend(["Pulse interval (mode)", "Variation (second moment)"])
   fig = pp.gcf()
   fig.set_size_inches(16,12)
   pp.savefig("{0}/depID{1:d}_site{2:.0f}_interval.png".format(plot_dir,deploymentID,siteID))
