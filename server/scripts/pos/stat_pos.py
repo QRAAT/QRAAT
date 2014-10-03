@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # stat_pos.py - Calculate velocity and acceleration of raw positions. 
 #
 # Copyright (C) 2013 Christopher Patton

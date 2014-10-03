@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_true_position
 # Interpolate GPS and pulse data for a calibration run and calculate 
 # a bearing for each time indexed pulse per site. Inputs from 

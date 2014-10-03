@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_filter
 # Template for writing scripts. This program is part of QRAAT, 
 # an automated animal tracking system based on GNU Radio. 

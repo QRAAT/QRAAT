@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_position
 # Calculate the position of a target transmitter over a given
 # time range. The function position_estimation() represents 

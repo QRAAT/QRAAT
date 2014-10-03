@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # 4channel_spectrum_server 
 # Modified version of 4channel_spectrum that allows visualisation of the 
 # RMG over a network. The server side is physically connected to the RMG. 

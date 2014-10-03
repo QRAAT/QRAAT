@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # TODO clean up output, as well as error handling in position.py.  
 
 import qraat.srv

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # plot_search_space.py. This script is part of QRAAT, an automated 
 # animal tracking system based on GNU Radio. 
 #
