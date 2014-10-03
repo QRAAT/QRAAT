@@ -16,9 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-try: 
-  import MySQLdb as mdb
-except ImportError: pass
+import MySQLdb as mdb
 
 import os, sys
 from csv import csv
@@ -32,16 +30,6 @@ def remove_field(l, i):
 def get_field(l, i):
   ''' Provenance function. *TODO* '''  
   return tuple([x[i] for x in l])
-
-
-def enum(*sequential, **named):
-  """ 
-    Create an enumerated type as a Python class. For example, see
-  """
-  enums = dict(zip(sequential, range(len(sequential))), **named)
-  Enum = type('Enum', (), enums)
-  return Enum
-
 
 def get_db(view):
   ''' Get database credentials. ''' 

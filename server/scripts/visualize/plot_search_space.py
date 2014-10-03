@@ -32,7 +32,7 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import MySQLdb as mdb
 import numpy as np
 import time, os, sys
-import qraat, qraat.srv
+import qraat.srv
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -170,7 +170,7 @@ def plot_search_space(pos_likelihood, i, j, center, scale, half_span=15):
 
 
 
-db_con = qraat.util.get_db('reader')
+db_con = qraat.srv.util.get_db('reader')
 
 print "plot_search_space: fetching site data."
 sv = qraat.srv.position.steering_vectors(db_con, options.cal_id)
@@ -196,7 +196,7 @@ print "plot_search_space: plotting."
 
 try: 
 
-  for (t, index_list) in qraat.position.calc_windows(bl, t_window, t_delta):
+  for (t, index_list) in qraat.srv.position.calc_windows(bl, t_window, t_delta):
 
     (i, j) = (index_list[0], index_list[-1])
 

@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import qraat
+import qraat, qraat.srv
 import time, os, sys, commands
 import MySQLdb as mdb
 import matplotlib as mpl
@@ -46,7 +46,7 @@ try:
   start = time.time()
   print "plot_relscore: start time:", time.asctime(time.localtime(start))
 
-  db_con = qraat.util.get_db('reader')
+  db_con = qraat.srv.util.get_db('reader')
   cur = db_con.cursor()
 
   cur.execute('''SELECT DISTINCT deploymentID, siteID 

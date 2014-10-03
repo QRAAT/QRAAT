@@ -44,7 +44,7 @@ try:
   start = time.time()
   print "stat_pos: start time:", time.asctime(time.localtime(start))
 
-  db_con = qraat.util.get_db('reader')
+  db_con = qraat.srv.util.get_db('reader')
   
   try: 
     t_start = time.mktime(time.strptime(options.t_start, "%Y-%m-%d"))

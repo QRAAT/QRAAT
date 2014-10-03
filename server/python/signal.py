@@ -25,9 +25,7 @@
 
 
 import sys
-import qraat
 import numpy as np
-import MySQLdb as mdb
 
 #### Constants and parameters for per site/transmitter pulse filtering. #######
 
@@ -377,63 +375,66 @@ def time_filter(data, pulse_interval, thresh=None):
 
 
 #### Testing, testing ... #####################################################
+if __name__ == '__main__':
+  import qraat
 
-def test1(): 
-  db_con = qraat.util.get_db('writer')
-  
-  # Calibration data
-  #dep_id = 51; site_id = 2; 
-  #t_start, t_end = 1376427421, 1376434446
-  
-  # A walk through the woods 
-  #dep_id = 61; site_id = 3; 
-  #t_start, t_end = 1396725598, 1396732325
-  
-  # A woodrat on Aug 8
-  dep_id = 102; site_id = 2; 
-  t_start, t_end = 1407448817.94, 1407466794.77
-
-  tx_params = get_tx_params(db_con, dep_id)
-  count = 0
-  p = 0 
-
-  for interval in get_score_intervals(t_start, t_end):
-    data = get_interval_data(db_con, dep_id, site_id, interval)
-    if data.shape[0] == 0: 
-      print "skipping empty chunk."
-      continue
+  def test1(): 
+    db_con = qraat.util.get_db('writer')
     
-    parametric_filter(data, tx_params)
+    # Calibration data
+    #dep_id = 51; site_id = 2; 
+    #t_start, t_end = 1376427421, 1376434446
+    
+    # A walk through the woods 
+    #dep_id = 61; site_id = 3; 
+    #t_start, t_end = 1396725598, 1396732325
+    
+    # A woodrat on Aug 8
+    dep_id = 102; site_id = 2; 
+    t_start, t_end = 1407448817.94, 1407466794.77
 
-    if data.shape[0] > 1 and data[data.shape[0]-1,2] - data[0,2] > 0: 
-      burst_filter(data, interval)
-      filtered_data = time_filter(data, 0.15)
+    tx_params = get_tx_params(db_con, dep_id)
+    count = 0
+    p = 0 
 
-      #update_data(db_con, data)
+    for interval in get_score_intervals(t_start, t_end):
+      data = get_interval_data(db_con, dep_id, site_id, interval)
+      if data.shape[0] == 0: 
+        print "skipping empty chunk."
+        continue
+      
+      parametric_filter(data, tx_params)
 
-      # Output ... 
-        
-      if True: 
-        print "Time:", interval, "Count:", data.shape[0]
-        print data.shape, filtered_data.shape
-        fella = filtered_data
-        if fella.shape[0] > 0 and fella[fella.shape[0]-1,2] - fella[0,2] > 0: 
-          max_score = float(np.max(fella[:,5]))
-          for i in range(fella.shape[0]):
-            row = fella[i,:]
-            theoretical_score = float(row[6])
-            relscore = round(row[5] / theoretical_score, 3)
-            q = round(row[2] / 1000.0, 2)
-            print row[0], q, row[5], row[6], relscore, round(q-p, 2)
-            p = q
-          print 
+      if data.shape[0] > 1 and data[data.shape[0]-1,2] - data[0,2] > 0: 
+        burst_filter(data, interval)
+        filtered_data = time_filter(data, 0.15)
 
-    else: print "too small."
+        #update_data(db_con, data)
 
-def test2():
-  db_con = qraat.util.get_db('writer')
-  for interval in get_score_intervals(1376427421, 1376427421 + 23):
-    print interval
+        # Output ... 
+          
+        if True: 
+          print "Time:", interval, "Count:", data.shape[0]
+          print data.shape, filtered_data.shape
+          fella = filtered_data
+          if fella.shape[0] > 0 and fella[fella.shape[0]-1,2] - fella[0,2] > 0: 
+            max_score = float(np.max(fella[:,5]))
+            for i in range(fella.shape[0]):
+              row = fella[i,:]
+              theoretical_score = float(row[6])
+              relscore = round(row[5] / theoretical_score, 3)
+              q = round(row[2] / 1000.0, 2)
+              print row[0], q, row[5], row[6], relscore, round(q-p, 2)
+              p = q
+            print 
 
-if __name__ == '__main__': 
+      else: print "too small."
+
+  def test2():
+    db_con = qraat.util.get_db('writer')
+    for interval in get_score_intervals(1376427421, 1376427421 + 23):
+      print interval
+
+ 
   test1()
+#end main()

@@ -23,7 +23,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import qraat
+import qraat.srv
 import time, os, sys
 import numpy as np
 #import MySQLdb as mdb
@@ -48,7 +48,7 @@ if options.dep_id == None:
   sys.exit(1)
 
 # Get database credentials.
-db_con = qraat.util.get_db('writer')
+db_con = qraat.srv.util.get_db('writer')
 
 
 start = time.time()

@@ -1,4 +1,4 @@
-# tracks.py - Calculate a highly likely track for a transmitter from
+# track.py - Calculate a highly likely track for a transmitter from
 # estimated positions. 
 #
 # Copyright (C) 2014 Christopher Patton
@@ -47,11 +47,6 @@ SUSTAINED_INTERVAL = 1800  # 30 minutes
  
 WINDOW_LENGTH = 500 
 OVERLAP_LENGTH = 50
-
-try:
-  import MySQLdb as mdb
-  import utm, xml
-except ImportError: pass
 
 
 
@@ -533,7 +528,12 @@ class Track:
     # Perhaps what we want is not a gx:track, but something fucnctionally 
     # similar.
 
-    # TODO Add northing, easting to output. 
+    # TODO Add northing, easting to output.
+    try:
+      import utm
+    except ImportError:
+      print "function export_kml() requires \"utm\" library, please install"
+      raise
 
     fd = open('%s_track.kml' % name, 'w')
     fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')

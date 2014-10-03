@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import qraat
+import qraat.srv
 import utm
 import time, os, sys
 #import MySQLdb as mdb
@@ -58,7 +58,7 @@ start = time.time()
 print "insert_gps: start time:", time.asctime(time.localtime(start))
 
 # Connect to database. 
-db_con = qraat.util.get_db('writer')
+db_con = qraat.srv.util.get_db('writer')
 
 
 
