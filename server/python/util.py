@@ -19,8 +19,7 @@
 import MySQLdb as mdb
 
 import os, sys
-from csv import csv
-import error
+import qraat
 import time, datetime
 
 def remove_field(l, i):
@@ -35,7 +34,7 @@ def get_db(view):
   ''' Get database credentials. ''' 
 
   try:
-    db_config = csv(os.environ['RMG_SERVER_DB_AUTH']).get(view=view)
+    db_config = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view=view)
     
     # Connect to the database.
     db_con = mdb.connect(db_config.host,
@@ -45,10 +44,10 @@ def get_db(view):
     return db_con
 
   except KeyError:
-    raise error.QraatError("undefined environment variables. Try `source rmg_env`")
+    raise qraat.error.QraatError("undefined environment variables. Try `source rmg_env`")
 
   except IOError, e:
-    raise error.QraatError("missing DB credential file '%s'" % e.filename)
+    raise qraat.error.QraatError("missing DB credential file '%s'" % e.filename)
 
 
 def datetime_to_timestamp(string): 
