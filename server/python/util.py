@@ -35,19 +35,17 @@ def get_db(view):
 
   try:
     db_config = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view=view)
-    
-    # Connect to the database.
-    db_con = mdb.connect(db_config.host,
-                         db_config.user,
-                         db_config.password,
-                         db_config.name)
-    return db_con
-
   except KeyError:
     raise qraat.error.QraatError("undefined environment variables. Try `source rmg_env`")
-
   except IOError, e:
     raise qraat.error.QraatError("missing DB credential file '%s'" % e.filename)
+    
+  # Connect to the database.
+  db_con = mdb.connect(db_config.host,
+                       db_config.user,
+                       db_config.password,
+                       db_config.name)
+  return db_con
 
 
 def datetime_to_timestamp(string): 
