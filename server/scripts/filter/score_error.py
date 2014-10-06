@@ -8,7 +8,10 @@
 # points of an eigenvalue decomposition signal power within a certain
 # range, and false positives are outside of the range. The test data 
 # is from September 2014 for depID=105 and siteID=8. Note that this 
-# isn't generalizable. 
+# isn't generalizable.
+#
+# Run the filter script at least once so that we have the estinterval
+# stuff calculated. 
 
 import qraat, qraat.srv
 import MySQLdb as mdb
@@ -18,8 +21,12 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as pp
 import os, sys, time
 
-dep_id = 105
+dep_id  = 105
 site_id = 8
+t_start = 1410721127
+t_end   = 1410807696
+
+EST_SCORE_THRESHOLD = float(os.environ["RMG_POS_EST_THRESHOLD"]) # greater than
 
 try: 
   start = time.time()
@@ -28,30 +35,23 @@ try:
   db_con = qraat.srv.util.get_db('writer')
   cur = db_con.cursor()
  
-  # Time window. 
-  cur.execute('''SELECT min(timestamp), max(timestamp)
-                   FROM est
-                  WHERE deploymentID = %s 
-                    AND siteID = %s''', (dep_id, site_id))
-  (t_start, t_end) = cur.fetchone()
-
   # Interval statistics. 
-  cur.execute('''SELECT timestamp, duration, pulse_interval, pulse_variation
+  cur.execute('''SELECT timestamp, pulse_interval, pulse_variation
                    FROM estinterval
                   WHERE deploymentID = %s 
                     AND siteID = %s
                     AND timestamp >= %s
-                    AND timestamp + duration <= %s
+                    AND timestamp <= %s
                   ORDER BY timestamp''', (dep_id, site_id, t_start, t_end))
 
-  intervals = []
+  intervals = list(cur.fetchall())
 
-  points = []  # (id, timestamp, power) 
+  # Partition good/bad points. 
+  points = []  # (id, t, power) 
   good = {}    # id -> {True, False}
-  for (T, duration, pulse_interval, pulse_variation) in cur.fetchall(): 
-    
-    intervals.append((T, pulse_interval, pulse_variation))
 
+  for i in range(len(intervals)-1):
+    
     # Signal power for pulses in window. 
     cur.execute('''SELECT id, timestamp, edsp
                      FROM est
@@ -59,7 +59,8 @@ try:
                       AND siteID = %s
                       AND timestamp >= %s
                       AND timestamp < %s
-                    ORDER BY timestamp''', (dep_id, site_id, T, float(T) + duration))
+                    ORDER BY timestamp''', (
+          dep_id, site_id, intervals[i][0], intervals[i+1][0]))
     
     interval_points = []
     for (id, t, edsp) in cur.fetchall():
@@ -73,7 +74,7 @@ try:
       else:                              good[row[0]] = False
 
     points += interval_points 
-  
+ 
   # Plot good vs bad points for sanity. 
   good_points = []; bad_points = []
   for (id, t, power) in points:
@@ -94,11 +95,47 @@ try:
   fig.set_size_inches(16,12)
   pp.savefig('good_points.png')
   pp.clf()
+
+  # Create a grid of (false positive, false_negative)'s. The x-axis is pulse interval 
+  # variation and the y-axis is pulse error. 
+  scores = [] # (x, y, (false_pos, false_neg))
+  score_error_step = 0.01
+  variation_step = 0.04
+  for score_error in np.arange(0, 0.1, score_error_step): 
     
+    # Run signal filter.
+    qraat.srv.signal.SCORE_ERROR = lambda(x) : score_error
+    print "score_error = %.2f" % qraat.srv.signal.SCORE_ERROR(0)
+    (total, _) = qraat.srv.signal.Filter(db_con, dep_id, site_id, t_start, t_end)
+
+    # Count the number of false positives and false negatives in each variation range. 
+    false_pos = false_neg = 0
+    for variation in np.arange(0, 6, variation_step): 
+
+      for i in range(len(intervals)-1): 
+        
+        if variation <= intervals[i][2] and intervals[i][2] < variation + variation_step:
+            
+          cur.execute('''SELECT estID, score, theoretical_score
+                           FROM estscore JOIN est ON est.ID = estscore.estID
+                          WHERE deploymentID = %s 
+                            AND siteID = %s
+                            AND timestamp >= %s
+                            AND timestamp < %s''', (
+                  dep_id, site_id, intervals[i][0], intervals[i+1][0]))
   
+          for (id, score, theoretical_score) in cur.fetchall(): 
+            rel_score = float(score) / theoretical_score
+            
+            if good[id] and rel_score > EST_SCORE_THRESHOLD:        pass # Ok 
+            elif not good[id] and rel_score <= EST_SCORE_THRESHOLD: pass # Ok
+            elif not good[id] and rel_score > EST_SCORE_THRESHOLD:  false_pos += 1 # False positive
+            elif good[id] and rel_score <= EST_SCORE_THRESHOLD:     false_neg += 1 # False negative
 
-
-
+      scores.append((variation, score_error, (false_pos, false_neg)))
+      
+  print scores
+  
 
 except mdb.Error, e:
   print >>sys.stderr, "score_error: error: [%d] %s" % (e.args[0], e.args[1])
