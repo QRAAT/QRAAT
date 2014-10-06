@@ -20,6 +20,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as pp
 import os, sys, time
+import pickle
 
 dep_id  = 105
 site_id = 8
@@ -30,7 +31,7 @@ EST_SCORE_THRESHOLD = float(os.environ["RMG_POS_EST_THRESHOLD"]) # greater than
 
 try: 
   start = time.time()
-  print "score_error: start time:", time.asctime(time.localtime(start))
+  print >>sys.stderr, "score_error: start time:", time.asctime(time.localtime(start))
 
   db_con = qraat.srv.util.get_db('writer')
   cur = db_con.cursor()
@@ -99,13 +100,13 @@ try:
   # Create a grid of (false positive, false_negative)'s. The x-axis is pulse interval 
   # variation and the y-axis is pulse error. 
   scores = [] # (x, y, (false_pos, false_neg))
-  score_error_step = 0.01
+  score_error_step = 0.005
   variation_step = 0.04
-  for score_error in np.arange(0, 0.1, score_error_step): 
+  for score_error in np.arange(0, 0.2, score_error_step): 
     
     # Run signal filter.
     qraat.srv.signal.SCORE_ERROR = lambda(x) : score_error
-    print "score_error = %.2f" % qraat.srv.signal.SCORE_ERROR(0)
+    print >>sys.stderr, "score_error = %.3f" % qraat.srv.signal.SCORE_ERROR(0)
     (total, _) = qraat.srv.signal.Filter(db_con, dep_id, site_id, t_start, t_end)
 
     # Count the number of false positives and false negatives in each variation range. 
@@ -134,7 +135,7 @@ try:
 
       scores.append((variation, score_error, (false_pos, false_neg)))
       
-  print scores
+  pickle.dump(scores, open('result', 'w')) # Dump result
   
 
 except mdb.Error, e:
@@ -145,4 +146,4 @@ except qraat.error.QraatError, e:
   print >>sys.stderr, "score_error: error: %s." % e
 
 finally: 
-  print "score_error: finished in %.2f seconds." % (time.time() - start)
+  print >>sys.stderr, "score_error: finished in %.2f seconds." % (time.time() - start)
