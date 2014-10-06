@@ -30,7 +30,7 @@ cursor = db.cursor()
 num_records = cursor.execute("select timestamp, edsp, fdsp, edsnr, fdsnr, ec, tnp, center, siteID, score, theoretical_score from est left join estscore on est.ID = estscore.estID where deploymentID=%s and timestamp > %s and timestamp < %s", (deploymentID, start_time, stop_time))
 data = np.array(cursor.fetchall(),dtype = float)
 
-num_intervals = cursor.execute("select timestamp, pulse_rate, duration, siteID, A from estinterval where deploymentID = %s and timestamp > %s and timestamp < %s", (deploymentID, start_time, stop_time))
+num_intervals = cursor.execute("select timestamp, pulse_interval, duration, siteID, pulse_variation from estinterval where deploymentID = %s and timestamp > %s and timestamp < %s", (deploymentID, start_time, stop_time))
 interval_data = np.array(cursor.fetchall(),dtype = float)
 
 db.close()
