@@ -4,7 +4,7 @@
 # types. 
 
 
-import qraat
+import qraat, qraat.srv
 import MySQLdb as mdb
 import argparse
 
@@ -19,7 +19,7 @@ args = parser.parse_args()
 
 default_type = 'pulse'
 
-db_con = qraat.util.get_db('reader')
+db_con = qraat.srv.util.get_db('reader')
 
 cur = db_con.cursor()
 

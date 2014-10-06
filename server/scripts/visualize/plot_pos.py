@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import qraat
+import qraat, qraat.srv
 import matplotlib.pyplot as pp
 import matplotlib.image as mpimg
 import numpy as np
@@ -43,7 +43,7 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000,
 
 overlay = True
 
-db_con = qraat.util.get_db('reader')
+db_con = qraat.srv.util.get_db('reader')
 
 cur = db_con.cursor()
   

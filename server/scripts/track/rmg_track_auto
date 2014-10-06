@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_track_auto_auto
 # 
 # Copyright (C) 2014 Christopher Patton
@@ -32,7 +32,7 @@ try:
   start = time.time()
   print "track_auto: start time:", time.asctime(time.localtime(start))
 
-  db_con = qraat.util.get_db('writer')
+  db_con = qraat.srv.util.get_db('writer')
 
   # Get positionID of last processed position.  
   cur = db_con.cursor()

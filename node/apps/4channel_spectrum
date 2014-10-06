@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # 4channel_spectrum
 # Visualization software for the Rapi Multichannel Goniometer. 
 # Originally developed at UIC-ECE. This file is part of QRAAT, an 

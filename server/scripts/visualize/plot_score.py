@@ -6,7 +6,7 @@ import argparse
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as pp
-import qraat.util
+import qraat.srv.util
 import os
 
 parser = argparse.ArgumentParser()
@@ -24,7 +24,7 @@ deploymentID = args.deploymentID
 if not os.path.isdir(plot_dir):
   print "directory, {0}, not found; creating directory".format(plot_dir)
   os.makedirs(plot_dir)
-db = qraat.util.get_db('reader')
+db = qraat.srv.util.get_db('reader')
 cursor = db.cursor()
 
 num_records = cursor.execute("select timestamp, edsp, fdsp, edsnr, fdsnr, ec, tnp, center, siteID, score, theoretical_score from est left join estscore on est.ID = estscore.estID where deploymentID=%s and timestamp > %s and timestamp < %s", (deploymentID, start_time, stop_time))

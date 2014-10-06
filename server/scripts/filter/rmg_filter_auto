@@ -37,7 +37,7 @@ try:
   start = time.time()
   print "filter_auto: start time:", time.asctime(time.localtime(start))
   
-  db_con = qraat.util.get_db('writer')
+  db_con = qraat.srv.util.get_db('writer')
 
   cur = db_con.cursor()
   cur.execute('SELECT value FROM `processing_cursor` WHERE name=\'estscore\'')

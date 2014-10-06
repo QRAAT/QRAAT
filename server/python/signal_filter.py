@@ -42,7 +42,7 @@ import math
 import traceback
 
 import MySQLdb as mdb
-import qraat 
+import qraat.srv
 
 # Error tolerance for subsequent corroborating pulses. Part of the time 
 # filter. If interval is calculated for a point less than this, the time 
@@ -120,7 +120,7 @@ class Registry:
 
 		if self.txlist is None:
                   tx_dict = {}
-		  db_con = qraat.util.get_db('reader')
+		  db_con = qraat.srv.util.get_db('reader')
 		  cur = db_con.cursor()
 
                   # Transmitters in active deployments
@@ -436,7 +436,7 @@ class ChangeHandler:
 		assert self.mode in VALID_MODES
 		if self.mode == 'db':
 			self.buffer = []
-			self.obj = qraat.util.get_db('writer')
+			self.obj = qraat.srv.util.get_db('writer')
 		elif self.mode == 'fileinc':
 			self.obj = obj # A filename is this case
 			self.current_index = 1
@@ -820,7 +820,7 @@ def score(ids):
 	reasoning = defaultdict(list)
 	debug_print('Initial call to score {} ID(s)'.format(len(ids)))
 	change_handler = init_change_handler()
-	db_con = qraat.util.get_db('writer')
+	db_con = qraat.srv.util.get_db('writer')
 
 	parametrically_poor = set()
 

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_det_to_db
 # Batch process det files into the datbase. This script is part of the 
 # QRAAT system. 

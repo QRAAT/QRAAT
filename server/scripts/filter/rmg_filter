@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_filter
 # Template for writing scripts. This program is part of QRAAT, 
 # an automated animal tracking system based on GNU Radio. 
@@ -45,7 +45,7 @@ try:
   start = time.time()
   print "filter: start time:", time.asctime(time.localtime(start))
 
-  db_con = qraat.util.get_db('writer')
+  db_con = qraat.srv.util.get_db('writer')
   qraat.srv.signal.VERBOSE = True
 
   (total, _) = qraat.srv.signal.Filter(db_con,

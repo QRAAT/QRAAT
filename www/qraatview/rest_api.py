@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """RESTFul api that handles http request and mounts a Django's QuerySet.
 
 This module is the core of a RESTFul api, it can serialize data,

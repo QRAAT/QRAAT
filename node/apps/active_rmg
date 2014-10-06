@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # active_rmg 
 # Visualization of activity data. This simple program collects output
 # from the running RMG module and displays statistical infomration

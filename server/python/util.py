@@ -16,13 +16,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-try: 
-  import MySQLdb as mdb
-except ImportError: pass
+import MySQLdb as mdb
 
 import os, sys
-from csv import csv
-import error
+import qraat
 import time, datetime
 
 def remove_field(l, i):
@@ -33,34 +30,22 @@ def get_field(l, i):
   ''' Provenance function. *TODO* '''  
   return tuple([x[i] for x in l])
 
-
-def enum(*sequential, **named):
-  """ 
-    Create an enumerated type as a Python class. For example, see
-  """
-  enums = dict(zip(sequential, range(len(sequential))), **named)
-  Enum = type('Enum', (), enums)
-  return Enum
-
-
 def get_db(view):
   ''' Get database credentials. ''' 
 
   try:
-    db_config = csv(os.environ['RMG_SERVER_DB_AUTH']).get(view=view)
-    
-    # Connect to the database.
-    db_con = mdb.connect(db_config.host,
-                         db_config.user,
-                         db_config.password,
-                         db_config.name)
-    return db_con
-
+    db_config = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view=view)
   except KeyError:
-    raise error.QraatError("undefined environment variables. Try `source rmg_env`")
-
+    raise qraat.error.QraatError("undefined environment variables. Try `source rmg_env`")
   except IOError, e:
-    raise error.QraatError("missing DB credential file '%s'" % e.filename)
+    raise qraat.error.QraatError("missing DB credential file '%s'" % e.filename)
+    
+  # Connect to the database.
+  db_con = mdb.connect(db_config.host,
+                       db_config.user,
+                       db_config.password,
+                       db_config.name)
+  return db_con
 
 
 def datetime_to_timestamp(string): 
