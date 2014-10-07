@@ -27,7 +27,9 @@ site_id = 8
 t_start = 1410721127
 t_end   = 1410807696
 
-EST_SCORE_THRESHOLD = float(os.environ["RMG_POS_EST_THRESHOLD"]) # greater than
+EST_SCORE_THRESHOLD = float(sys.argv[1]) # float(os.environ["RMG_POS_EST_THRESHOLD"]) 
+                                         # greater than
+print "Score threshold:",  EST_SCORE_THRESHOLD
 
 try: 
   start = time.time()
@@ -99,11 +101,17 @@ try:
 
   # Create a grid of (false positive, false_negative)'s. The x-axis is pulse interval 
   # variation and the y-axis is pulse error. 
-  scores = [] # (x, y, (false_pos, false_neg))
+  
   score_error_step = 0.005
   variation_step = 0.04
-  for score_error in np.arange(0, 0.2, score_error_step): 
+  Y = np.arange(0, 0.2, score_error_step)
+  X = np.arange(0, 6, variation_step)
+  pos = []; neg = []; 
+
+  for score_error in Y: 
     
+    pos.append([]); neg.append([])
+
     # Run signal filter.
     qraat.srv.signal.SCORE_ERROR = lambda(x) : score_error
     print >>sys.stderr, "score_error = %.3f" % qraat.srv.signal.SCORE_ERROR(0)
@@ -111,7 +119,7 @@ try:
 
     # Count the number of false positives and false negatives in each variation range. 
     false_pos = false_neg = 0
-    for variation in np.arange(0, 6, variation_step): 
+    for variation in X: 
 
       for i in range(len(intervals)-1): 
         
@@ -133,9 +141,10 @@ try:
             elif not good[id] and rel_score > EST_SCORE_THRESHOLD:  false_pos += 1 # False positive
             elif good[id] and rel_score <= EST_SCORE_THRESHOLD:     false_neg += 1 # False negative
 
-      scores.append((variation, score_error, (false_pos, false_neg)))
+      pos[-1].append(false_pos); neg[-1].append(false_neg)
       
-  pickle.dump(scores, open('result', 'w')) # Dump result
+  pickle.dump((X, Y, np.transpose(pos), np.transpose(neg)), 
+                 open('result%0.1f' % EST_SCORE_THRESHOLD, 'w')) # Dump result
   
 
 except mdb.Error, e:
