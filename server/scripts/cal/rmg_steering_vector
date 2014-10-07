@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_steering_vector
 # Calculate the steering vectors for a certain site and 
 # calibration run. Inputs a cal run (join on True_Position
@@ -82,7 +82,7 @@ try:
                        db_config.name)
   cur = db_con.cursor()
 
-  cur.execute('SELECT name FROM sitelist WHERE id = %d' % options.site_id)
+  cur.execute('SELECT name FROM site WHERE ID = %d' % options.site_id)
   site_name = cur.fetchone()
   if site_name == None:
     print >>sys.stderr, 'steering_vector: error: no entry for '\

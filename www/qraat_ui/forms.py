@@ -1,11 +1,11 @@
 # qraat_ui/forms.py
 
 from django import forms
-from qraat_ui.models import Site, Deployment, Position
+from qraatview.models import Site, Deployment, Position
 from django.shortcuts import render, redirect
 
 # Select position or track data.
-DATA_CHOICES = [('1', 'Position')]
+DATA_CHOICES = [('1', 'Raw positions'), ('2', 'Track')]
 #DATA_CHOICES = [('1', 'Position'), ('2', 'Track')]
 
 # Display data points as lines or as marker points.

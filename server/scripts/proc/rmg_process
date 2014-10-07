@@ -29,7 +29,7 @@ name=`basename $0`
 count=`pgrep -c $name`
 if [ "$count" -gt "1" ]
 then
-	echo $name already running, bye!
+	echo $name already running, `date`
 	exit 1
 fi
 
@@ -41,12 +41,12 @@ echo det_to_db
 rmg_det_to_db
 #remove empty directories
 find $RMG_SERVER_DET_DIR -mindepth 1 -depth -type d -empty -delete
+echo
+echo filter_auto
+rmg_filter_auto
 echo 
 echo position_auto
 rmg_position_auto
-#echo
-#echo rmg_filterest
-#rmg_filterest
 echo
 echo track_auto
 rmg_track_auto

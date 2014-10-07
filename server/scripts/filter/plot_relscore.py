@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_plot_relscore
 # Template for writing scripts. This program is part of QRAAT, 
 # an automated animal tracking system based on GNU Radio. 
@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import qraat
+import qraat, qraat.srv
 import time, os, sys, commands
 import MySQLdb as mdb
 import matplotlib as mpl
@@ -39,50 +39,53 @@ parser.description = '''This does nothing.'''
 
 (options, args) = parser.parse_args()
 
-t_start = 1396335600 # 4/1/14
-t_end   = 1398841200 # 4/30/14
+t_start = 1407448800.186593 
+t_end   = 1407466794.772133 
 
 try: 
   start = time.time()
   print "plot_relscore: start time:", time.asctime(time.localtime(start))
 
-  db_con = qraat.util.get_db('reader')
+  db_con = qraat.srv.util.get_db('reader')
   cur = db_con.cursor()
 
-  for line in sys.stdin.readlines():
-    (tx_id, site_id) = line.strip().split(' ')
-    tx_id = int(tx_id)
-    site_id = int(site_id)
+  cur.execute('''SELECT DISTINCT deploymentID, siteID 
+                   FROM est JOIN estscore ON est.ID = estscore.estID
+                  WHERE timestamp >= %s 
+                    AND timestamp <= %s''', (t_start, t_end))
 
-    cur.execute('''SELECT relscore 
-                     FROM est, estscore
-                    WHERE txID = %d
-                      AND timestamp >= %f
-                      AND timestamp <= %f
+  for (dep_id, site_id) in cur.fetchall():
+    cur.execute('''SELECT (score / (theoretical_score + 1))
+                     FROM est JOIN estscore ON est.ID = estscore.estID
+                    WHERE deploymentID = %d
                       AND siteID = %d 
-                      AND estID = est.ID''' % (tx_id, t_start, t_end, site_id)) 
+                      AND timestamp >= %f
+                      AND timestamp <= %f''' % (dep_id, site_id, t_start, t_end)) 
 
-    X = map(lambda(x) : float(x[0]), cur.fetchall())
-    if len(X) > 100:
-      print "plot_relscore: plotting (txID=%d, siteID=%d)" % (tx_id, site_id)
+    X = []
+    for x in cur.fetchall(): 
+      X.append(float(x[0]))
+    
+    if len(X) > 10:
+      print "plot_relscore: plotting (depID=%d, siteID=%d)" % (dep_id, site_id)
 
       fig = plt.figure(figsize=(5,4))
       ax = fig.add_subplot(111)
 
-      N = 50
+      N = 20
       # the histogram of the data
       n, bins, patches = ax.hist(X, N, facecolor='grey', alpha=0.75)
       bincenters = 0.5*(bins[1:]+bins[:-1])
       ax.set_xlabel('Score')
       ax.set_ylabel('Frequency')
       ax.set_xlim(min(X), max(X))
-      ax.set_ylim(0, 100000) # FIXME
+      #ax.set_ylim(0, 100000) # FIXME
       ax.grid(False)
 
-      plt.savefig("tx%d_site%d.png" % (tx_id, site_id))
+      plt.savefig("dep%d_site%d.png" % (dep_id, site_id))
       
     else:
-      print "plot_relscore: skipping empty set (txID=%d, siteID=%d)" % (tx_id, site_id)
+      print "plot_relscore: skipping empty set (depID=%d, siteID=%d)" % (dep_id, site_id)
 
   
 

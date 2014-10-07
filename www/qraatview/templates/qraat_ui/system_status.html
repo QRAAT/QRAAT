@@ -1,0 +1,227 @@
+{% extends "qraat_ui/base.html" %}
+
+{% block extracss %}
+    <link rel="stylesheet" type="text/css" href="/static/qraat_ui/css/status_pages.css"/>
+    <link rel="stylesheet" type="text/css" href="/static/qraat_site/css/jquery.datetimepicker.css"/>
+    <link href="/static/qraat_ui/css/ui-spinner.css" rel="stylesheet" />
+{% endblock %}
+
+{% block extrascript %}
+    <script src="/static/flot/jquery.min.js" type="text/javascript"></script>
+    <script src="/static/flot/jquery.flot.min.js" type="text/javascript"></script>
+    <script src="/static/flot/jquery.flot.time.min.js" type="text/javascript"></script>
+    <script src="/static/qraat_site/js/jquery.datetimepicker.js" type="text/javascript"></script>
+    <script src="/static/qraat_ui/js/ui-spinner.js" type="text/javascript"></script>
+    <script src="/static/qraat_ui/js/date.js" type="text/javascript"></script>
+    <!--[if lte IE 8]><script language="javascript" type="text/javascript" src="excanvas.min.js"></script><![endif]-->
+    <script type="text/javascript">
+        $(document).ready(function(){
+
+
+            $(document).ajaxStart(function(){
+                $("#placeholder").spinner();
+            }).ajaxStop(function(){
+                $("#spinner").empty();
+            });
+
+            $(".datetime").datetimepicker({
+                                        format: "m/d/Y H:i:s"
+                                        });
+
+            var _tz = timezoneJS.timezone;
+            _tz.loadingScheme = _tz.loadingSchemes.MANUAL_LOAD;
+            _tz.loadZoneJSONData('/static/qraat_site/js/timezone.json', true);
+
+            var selected_obj = $("#obj-sel").val();
+
+            var data = {{data|safe}};
+            var fields = {{fields|safe}};
+            var aux_fields = ['site_list', 'axis_y'];
+            var static_field = {{static_field|safe}};
+            
+            if(!data){
+               $("#graph_form").submit();
+            }else{
+                plotGraph(data, fields, static_field);
+            }
+
+            //Set selected field on form
+            if(fields){
+                for(var i=0; i<aux_fields.length; i++){
+                    $("#" + aux_fields[i]).val(fields[i]);
+                }
+            }
+
+            $("select, input").change(function(){
+                updateGraph(fields, static_field);
+            });
+
+            var interval = 2;
+        
+            updateGraph(fields, static_field);
+            setInterval(function(){ updateGraph(fields, static_field)}, 1000 * 60 * interval );
+
+        });
+
+
+        function updateGraph(fields, static_field){
+            var url_state = "{% url 'ui:system-status' %}";
+            var form_data = $("#graph_form").serialize();
+            var state = url_state + '?' + form_data;
+            window.history.replaceState(null, null, state); 
+
+            //Do not refresh page
+            var request = $.ajax({
+                    url: "{% url 'get-data' %}",
+                    data: form_data 
+            });
+
+            request.done(function(data){
+                   plotGraph(data, fields, static_field); 
+            });
+        }
+
+        function plotGraph(dataset, fields, static_field){
+            var plotData = {};
+            plotData.data = new Array();
+
+            if(dataset && dataset.length > 0){
+                for(var i=0; i<dataset.length; i++){
+                    var set = new Array();
+                    for(var key in dataset[i]){
+                        if(dataset[i].hasOwnProperty(key) && key != static_field){ 
+                            var value = dataset[i][key];
+                            if(key == "timestamp"){
+                                value *= 1000;
+                                set[0] = value;
+                            }else{
+                                set[1] = value;
+                            }
+                        }
+                    }
+                    plotData.data.push(set);
+                }
+                $("#nodata-alert").hide();
+            }else{
+                $("#nodata-alert").show();
+            }
+
+            var options = {series:{}, xaxis: {}};
+            options.series.lines = {show: true};
+            options.xaxis.mode = "time";
+            options.xaxis.timeformat = "%m/%d/%y %H:%M:%S";
+            options.xaxis.timezone = "America/Los_Angeles";
+            
+
+            $.plot($("#placeholder"), [plotData.data] , options);
+        }
+    </script>
+{% endblock %}
+
+{% block sidebar %} {% include "qraat_ui/status_sidebar.html" %} {% endblock %}
+
+{% block content %}
+   <div class="row">
+        <h4>System status</h4>
+   </div>
+
+    <div class="container-fluid">
+        <form id="graph_form" class="form-horizontal" method="get" role="form">
+
+            <div id="nodata-alert" class="row" style="display:none;"> 
+                <div class="alert alert-danger" role="alert"> 
+                    There is no data for this query
+                </div>
+            </div>
+
+            <input id="obj-sel" type="hidden" name="obj" value="telemetry"></input>
+
+            <div class="row">
+                <div class="col-md-4">
+                   <h5>
+                      Controls 
+                   </h5>
+                </div>
+                <div class="col-md-4">
+                    <button type="submmit" class="btn btn-primary btn-sm">Plot</button>
+                </div>
+            </div>
+
+
+            <div id="axis" class="row">
+                <div class='col-md-offset-0 col-md-4'>
+                        <input type="hidden" name="field" value="siteID"></input>
+                        <div class='input-group'>
+                            <div class='input-group-addon'>Site</div>
+                            <select id='site_list' class='form-control' name='filter_field'>
+                                {% for value in static_field_values %}
+                                    <option value="siteID,{{value}}">{{value}} </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                </div>
+
+                <div class='col-md-4'>
+                    <div class='input-group'>
+                        <div class='input-group-addon'>Axis Y</div>
+                        <select id='axis_y' class='form-control' name='field'>
+                            {% for key in obj_fields_keys %}
+                                <option value={{key}}> {{key}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>    
+            </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <div class="input-group-addon">
+                       Previous 
+                    </div>
+                    <div class="form-control">
+                            <label class="col-md-3">
+                                <input type="radio" name="duration" value="day"/>
+                                Day 
+                            </label>
+
+                            <label class="col-md-3">
+                                <input type="radio" name="duration" value="week"/>
+                                Week
+                            </label>
+                            <label class="col-md-3">
+                                <input type="radio" name="duration" value="month"/>
+                                Month
+                            </label>
+                            <label class="col-md-3">
+                                 <input type="radio" name="duration" value="year"/>
+                                 Year
+                            </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div id="placeholder" class="col-md-8 margin-top-4" style="width:600px; height:300px;">
+            </div>
+        </div>
+
+
+        <div class="row">
+            <div class="col-md-4">
+                <input type="hidden" name="date" value="timestamp"></input>
+                <input type="hidden" name="field" value="timestamp" />
+                <div class="input-group padding-top-4">
+                    <div class="input-group-addon"> Start date </div>
+                    <input id="start_date" class="form-control datetime" type="datetime" name="start_date" value="{{start_date}}"></input>
+                </div>
+                <input type="hidden" name="end_date" value="now"></input>
+            </div>
+        </div>
+
+        </form>
+
+    </div>
+{% endblock %}
+

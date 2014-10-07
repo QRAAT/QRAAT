@@ -32,7 +32,7 @@ use DBI ;
 my $Debug = 0 ;
 
 my $TableNameTimeCheck = "timecheck" ;		# The name of the db table
-my $TableNameSitelist = "sitelist" ;		# The name of the db table
+my $TableNameSitelist = "site" ;		# The name of the db table
 
 sub usage()
 {
@@ -94,12 +94,14 @@ sub main()
 		chomp($ip) ;
 		if( (not defined $ip) or ($ip eq "") ) { next ; }
 		my $time_offset = get_time_offset($sitename,$ip) ;
-		writetable($dbh,$TableNameTimeCheck,$sitename,[$time_offset]) ;
+		writetable($dbh,$TableNameTimeCheck,$sitename,$time_offset) ;
+		print "Time offset for '$sitename' is $time_offset\n" ;
 	}	
 	#
 	# Do timecheck on RMG server
 	my $time_offset = get_time_offset("") ;
-	writetable($dbh,$TableNameTimeCheck,"server",[$time_offset]) ;
+	writetable($dbh,$TableNameTimeCheck,"server",$time_offset) ;
+	print "Time offset for 'server' is $time_offset\n" ;
 	#
 	# Close database
 	closedatabase($dbh) ;
@@ -213,7 +215,7 @@ sub opendatabase($)	# connects to the database and returns the database handle
 
 sub writetable($$$$)
 {
-	my ( $dbh, $tablename, $sitename, $refdata ) = @_ ;
+	my ( $dbh, $tablename, $sitename, $time_offset ) = @_ ;
 	# Get the site number from the sitename table
 	my $query = "select id from $TableNameSitelist where name='${sitename}' ;" ;
 	if( $Debug ) { print "debug: writetable: query=$query\n" ; }
@@ -225,19 +227,18 @@ sub writetable($$$$)
 	}
 	my $site = $result ;
 	if( $Debug ) { print "debug: writetable: site code for site '$sitename' is $site\n" ; }
-	$query = "insert into $tablename values(DEFAULT" ;	# first column is ID, automatically allocated
-	$query .= ",'${site}'" ;				# next is the site ID value, from the above query
-	$query .= strftime ",'%Y-%m-%d %H:%M:%S','UTC'", gmtime();	# next the datetime and timezone
-	for my $value ( @$refdata )
+	my $timestamp = time() ;
+	$query = "insert into $tablename (siteid,datetime,timezone,timestamp,time_offset) values(" ;	# FIXME
+	$query .= "'${site}'" ;				# next is the site ID value, from the above query
+	$query .= strftime ",'%Y-%m-%d %H:%M:%S','UTC'", gmtime($timestamp);	# next the datetime and timezone
+	$query .= ",'$timestamp'" ;
+	if( (not defined $time_offset) or ($time_offset eq "") )
 	{
-		if( not defined $value or $value eq "" )
-		{
-			$query .= ",NULL" ;
-		}
-		else
-		{
-			$query .= ",'${value}'" ;
-		}
+		$query .= ",NULL" ;
+	}
+	else
+	{
+		$query .= ",'$time_offset'" ;
 	}
 	$query .= ") ;" ;
 	if( $Debug ) { print "debug: updatetable: query=$query\n" ; }

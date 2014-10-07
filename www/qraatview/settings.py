@@ -35,7 +35,7 @@ SECRET_KEY = base.key
 # SECURITY WARNING: don't run with debug turned on in production!
 # NOTE For testing purposes, this must be set to True in order 
 # to run 'python manage.py runserver'. 
-DEBUG = TEMPLATE_DEBUG = False
+DEBUG = TEMPLATE_DEBUG = False 
 
 TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
 
@@ -69,7 +69,8 @@ MIDDLEWARE_CLASSES = (
 ROOT_URLCONF = 'qraatview.urls'
 
 WSGI_APPLICATION = 'qraatview.wsgi.application'
-#AUTH_USER_MODEL = 'qraat_auth.QraatUser'
+
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
@@ -87,17 +88,23 @@ DATABASES = {
 		'USER': web_writer.user,
 		'PASSWORD': web_writer.password,
 	},
+	'qraat_ui': {
+		'ENGINE': 'django.db.backends.mysql',
+		'NAME': 'qraat',
+		'USER': web_reader.user,
+		'PASSWORD': web_reader.password,
+	},
 }
 
 DATABASE_ROUTERS = [ 'qraatview.router.DatabaseAppsRouter',]
-DATABASE_APPS_MAPPING = {'qraat_ui': 'qraat', 'qraatview': 'qraat' }	
+DATABASE_APPS_MAPPING = {'qraat_ui': 'qraat_ui', 'qraatview': 'qraat' }	
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Los_Angeles'
 
 USE_I18N = True
 

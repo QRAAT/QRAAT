@@ -29,7 +29,7 @@ project_patterns = patterns(
         r'^(?P<project_id>\d+)/manage-transmitters/(?P<transmitter_id>\d+)/$',
         'edit_transmitter',
         name='edit-transmitter'),
-    
+
     url(
         r'^(?P<project_id>\d+)/manage-targets/(?P<target_id>\d+)/$',
         'edit_target',
@@ -68,7 +68,7 @@ project_patterns = patterns(
         r'^(?P<project_id>\d+)/location/(?P<location_id>\d+)/$',
         'show_location',
         name='show-location'),
-    
+
     url(
         r'^(?P<project_id>\d+)/target/(?P<target_id>\d+)/$',
         'show_target',
@@ -92,7 +92,8 @@ project_patterns = patterns(
         'add_location', name='add-location'),
 
     url(
-        r'^(?P<project_id>\d+)/edit-project/add-transmitter/$', 'add_transmitter',
+        r'^(?P<project_id>\d+)/edit-project/add-transmitter/$',
+        'add_transmitter',
         name='add-transmitter'),
 
     url(
@@ -100,7 +101,8 @@ project_patterns = patterns(
         name='add-target'),
 
     url(
-        r'^(?P<project_id>\d+)/edit-project/add-deployment/$', 'add_deployment',
+        r'^(?P<project_id>\d+)/edit-project/add-deployment/$',
+        'add_deployment',
         name='add-deployment')
 )
 
@@ -112,5 +114,6 @@ urlpatterns = patterns(
     url(r'^auth/', include('qraat_auth.urls', namespace="auth")),
     url(r'^jsi18n/$', javascript_catalog),
     url(r'^$', 'index', name="index"),
-    url(r'^project/', include((project_patterns, 'qraat', 'qraatview')))
+    url(r'^project/', include((project_patterns, 'qraat', 'qraatview'))),
+    url(r'^data', 'render_data', name="get-data"),
 )

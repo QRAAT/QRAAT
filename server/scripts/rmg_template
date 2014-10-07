@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_template
 # Template for writing scripts. This program is part of QRAAT, 
 # an automated animal tracking system based on GNU Radio. 
@@ -47,11 +47,11 @@ try:
   cur.execute('SELECT count(*) FROM est')
   print "test: there are %d pulses in the database." % cur.fetchone()
 
-  sites = qraat.csv.csv(db_con=db_con, db_table='sitelist')
+  sites = qraat.csv.csv(db_con=db_con, db_table='site')
   print "template: here are the sites."
   print sites
 
-  txs = qraat.csv.csv(db_con=db_con, db_table='txlist').filter(use='yes')
+  txs = qraat.csv.csv(db_con=db_con, db_table='deployment').filter(is_active=True)
   print "template: here are the active transmitters."
   print txs
   

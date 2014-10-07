@@ -1,10 +1,15 @@
+import json
+import utils
+import rest_api
 from django.db.models import Q
 from django.shortcuts import render, redirect
 from django.core.urlresolvers import reverse
 from django.core.context_processors import csrf
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponseBadRequest
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
+from django.template import Context
 from models import Project, Tx, Location
 from models import Target, Deployment
 from forms import ProjectForm, OwnersEditProjectForm, AddTransmitterForm
@@ -15,12 +20,27 @@ from forms import EditDeploymentForm, EditProjectForm
 
 
 def not_allowed_page(request):
-    return HttpResponse("Action not allowed")
+    """This view renders a page for forbidden action
+    with HTTP 403 status and a message"""
+
+    return HttpResponseForbidden("Action not allowed")
 
 
 def get_query(obj_type):
-    """ Receives an object type and return it's specific
-    query"""
+    """ This function selects a query based in a model verbose name
+
+    :param obj_type: Object's verbose name
+    :type obj_type: str.
+    :returns:  func -- A function to query a model by id
+
+    .. note::
+
+       .. code-block:: python
+
+          #Example of usage:
+          query = get_query("transmitters")
+          transmitter_10 = query(10)
+    """
 
     query = None
     obj_type = obj_type.lower()
@@ -35,35 +55,46 @@ def get_query(obj_type):
             query = lambda obj_id: Location.objects.get(ID=obj_id)
         elif(obj_type == "deployment"):
             query = lambda obj_id: Deployment.objects.get(ID=obj_id)
+        else:
+            raise ObjectDoesNotExist
+
     except ObjectDoesNotExist:
         raise ObjectDoesNotExist
     else:
-        if not query:
-            raise ObjectDoesNotExist
-
         return query
 
 
 def get_objs_by_type(obj_type, obj_ids):
     """Receives an object type and a list of ids and return a list of
     Objects based in it's type i.e transmitter, location, target, or
-    deployment"""
+    deployment
 
-    try:
-        query = get_query(obj_type)
-        #  maps items selected on the form in a list of objects
-        objs = map(query, obj_ids)
-    except Exception, e:
-        raise e
+    :param obj_type: Model's verbose name
+    :type obj_type: str.
+    :returns:  list -- list of models for each given id
+    :raises: ObjectDoesNotExist
+    """
 
-    else:
-        return objs
+    query = get_query(obj_type)
+
+    #  maps items selected on the form in a list of objects
+    objs = map(query, obj_ids)
+
+    return objs
 
 
 def can_delete(project, user):
     """A user can delete content in a project if the user is the project owner or
     if the user is in the collaborators group and the group has permission
-    to delete content on the project"""
+    to delete content on the project
+
+    :param project: qraatview.models Project instance.
+    :type project: models.Project.
+    :param user: Django auth user instance.
+    :type user: User.
+    :returns:  bool -- returns if a user has permission \
+            to delete something in a project
+    """
 
     # With has_perm we can have different permissions for group
     return project.is_owner(user) or\
@@ -74,7 +105,14 @@ def can_delete(project, user):
 def can_change(project, user):
     """A user can change content in a project if the user is the project owner or
     if the user is in the collaborators group and the group has permission
-    to change content on the project"""
+    to change content in the project
+
+    :param project: qraatview.models Project instance.
+    :type project: models.Project.
+    :param user: Django auth user instance.
+    :type user: User.
+    :returns:  bool -- returns if a user has permission \
+            to change something in a project"""
 
     return project.is_owner(user) or\
         (project.is_collaborator(user)
@@ -84,7 +122,14 @@ def can_change(project, user):
 def can_view(project, user):
     """Users can view content in a project if the project is public,
     or the user is the project owner, or the user is a project collaborator
-    or the user is a project viewer"""
+    or the user is a project viewer
+
+    :param project: qraatview.models Project instance.
+    :type project: models.Project
+    :param user: Django auth user instance.
+    :type user: User.
+    :returns:  bool -- returns if a user has permission to view \
+            something in a project"""
 
     return project.is_public\
         or project.is_owner(user)\
@@ -93,6 +138,14 @@ def can_view(project, user):
 
 
 def index(request):
+    """This view renders the system's first page.
+    This page has a nav bar and users projects
+
+    :param request: Django's http request object
+    :type request: HttpRequest.
+    :returns:  HttpResponse -- Rendered http response object
+    """
+
     nav_options = get_nav_options(request)
     user = request.user
 
@@ -109,6 +162,14 @@ def index(request):
 
 
 def get_project(project_id):
+    """Function for intern use that queries a project by id
+
+    :param project_id: A valid project id
+    :type project_id: int.
+
+    :returns:  Project -- A Project Model instance
+    """
+
     try:
         project = Project.objects.get(ID=project_id)
     except ObjectDoesNotExist:
@@ -118,6 +179,23 @@ def get_project(project_id):
 
 
 def show_transmitter(request, project_id, transmitter_id):
+    """
+    This view renders transmitter's information
+
+    :param request:  Django's request obj.
+    :type request: HttpRequest.
+    :param project_id:  Id for transmitter's project.
+    :type project_id: int.
+    :param transmitter_id:  Transmitter's id.
+    :type transmitter_id: int.
+    :returns:  HttpResponse -- Serialized http response with \
+            transmitter's information.
+
+    .. note::
+
+       #TODO: Implement a nice view with a map in qraat_ui.
+    """
+
     user = request.user
     project = get_project(project_id)
 
@@ -132,6 +210,19 @@ def show_transmitter(request, project_id, transmitter_id):
 
 
 def show_deployment(request, project_id, deployment_id):
+    """
+    This view renders deployment's information
+
+    :param request:  Django's request obj.
+    :type request: HttpRequest.
+    :param project_id:  Id for deployment's project.
+    :type project_id: int.
+    :param transmitter_id:  Deployment's id.
+    :type deployment_id: int.
+    :returns:  HttpResponse -- Http response with rendered \
+            deployment's information placed in qraat_ui.views.view_by_dep
+    """
+
     user = request.user
     project = get_project(project_id)
 
@@ -144,6 +235,22 @@ def show_deployment(request, project_id, deployment_id):
 
 
 def show_target(request, project_id, target_id):
+    """
+    This view renders target's information
+
+    :param request:  Django's request obj.
+    :type request: HttpRequest.
+    :param project_id:  Id for target's project.
+    :type project_id: int.
+    :param target_id:  Target's id.
+    :type target_id: int.
+    :returns:  HttpResponse -- Serialized http response with \
+            target's information.
+
+    .. note::
+
+       #TODO: Implement a nice view with a map in qraat_ui.
+    """
 
     user = request.user
     project = get_project(project_id)
@@ -157,6 +264,23 @@ def show_target(request, project_id, target_id):
 
 
 def show_location(request, project_id, location_id):
+    """
+    This view renders location's information
+
+    :param request:  Django's request obj.
+    :type request: HttpRequest.
+    :param project_id:  Id for location's project.
+    :type project_id: int.
+    :param location_id:  Location's id.
+    :type location_id: int.
+    :returns:  HttpResponse -- Serialized http response with \
+            location's information.
+
+    .. note::
+
+       #TODO: Implement a nice view with a map in qraat_ui.
+    """
+
     user = request.user
     project = get_project(project_id)
 
@@ -172,6 +296,16 @@ def show_location(request, project_id, location_id):
 
 @login_required(login_url='/auth/login')
 def projects(request):
+    """This view renders a page with projects.
+    For a user projects are displayed as public projects,
+    projects the user owns, projects the user can collaborate,
+    and projects the user can visualize.
+
+    :param request: Django's http request object
+    :type request: HttpRequest.
+    :returns:  HttpResponse -- Rendered http response object
+    """
+
     user = request.user
 
     user_projects = Project.objects.filter(
@@ -206,6 +340,25 @@ def projects(request):
 def render_project_form(
         request, project_id, post_form,
         get_form, template_path, success_url):
+    """This is a main view called by other views that aim to render forms for
+    Transmitters, Locations, Targets, and Deployments
+
+    :param request: Django's http request object
+    :type request: HttpRequest.
+    :param project_id: Project's id to check user permissions
+    :type project_id: str.
+    :param post_form: Form to render when receives a post request
+    :type post_form: ProjectForm.
+    :param get_form: Form to render when receives a get request
+    :type get_form: ProjectForm.
+    :param template_path: The path of the template that will be rendered
+    :type template_path: str.
+    :param success_url: Url to redirect in case of success
+    :type success_url: str.
+    :returns:  HttpResponse -- Http response obj with a rendered page that \
+            contains a form to add or edit Transmitters, \
+            Locations, Targets, or Deployments
+    """
 
     user = request.user
     project = get_project(project_id)
@@ -535,19 +688,19 @@ def manage_targets(request, project_id):
 def manage_locations(request, project_id):
 
     project = get_project(project_id)
-    content = {}
-    content["nav_options"] = get_nav_options(request)
-    content["project"] = project
-    content["objects"] = project.get_locations()
-    content["obj_type"] = "location"
-    content["foreign_fields"] = []
-    content["excluded_fields"] = ["projectID", "ID", "is_hidden"]
+    context = Context() 
+    context["nav_options"] = get_nav_options(request)
+    context["project"] = project
+    context["objects"] = project.get_locations()
+    context["obj_type"] = "location"
+    context["foreign_fields"] = []
+    context["excluded_fields"] = ["projectID", "ID", "is_hidden"]
 
     return render_manage_page(
         request,
         project,
         "qraat_site/manage_locations.html",
-        content)
+        context)
 
 
 @login_required(login_url="/auth/login")
@@ -643,7 +796,11 @@ def edit_deployment(request, project_id, deployment_id):
         request=request,
         project_id=project_id,
         post_form=EditDeploymentForm(data=request.POST, instance=deployment),
-        get_form=EditDeploymentForm(instance=deployment),
+        get_form=EditDeploymentForm(
+            instance=deployment,
+            initial={'time_start':
+                     utils.strfdate(
+                         utils.timestamp_todate(deployment.time_start))}),
         template_path="qraat_site/edit-deployment.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:edit-deployment", args=(project_id, deployment_id)))
@@ -662,8 +819,32 @@ def get_nav_options(request):
                 {"url": "auth:users",
                  "name": "Users"},
                 {"url": "admin:index",
-                 "name": "Admin Pages"}]
+                 "name": "Admin Pages"},
+                {"url": "ui:system-status",
+                 "name": "System Status"}]
 
             for opt in super_user_opts:  # Add admin options
                 nav_options.append(opt)
     return nav_options
+
+
+def render_data(request):
+    """Renders a JSON serialized data
+       By now only admins have access to this"""
+
+    user = request.user
+
+    try:
+        data = rest_api.get_model_data(request)
+        data = rest_api.json_parse(data)
+
+        if user.is_superuser:
+            return HttpResponse(
+                json.dumps(data, cls=utils.DateTimeEncoder),
+                content_type="application/json")
+        else:
+            return not_allowed_page(request)
+
+    except Exception, e:
+        print e
+        return HttpResponseBadRequest("Object not found")

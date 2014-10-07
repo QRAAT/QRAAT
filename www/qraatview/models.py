@@ -3,7 +3,7 @@
 from django.db import models
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import ObjectDoesNotExist
-from utils import timestamp_todate
+from utils import timestamp_todate, strfdate
 
 QRAAT_APP_LABEL = 'qraatview'
 COLLABORATOR_PERMISSIONS = (
@@ -55,6 +55,15 @@ class Site(models.Model):
 
 
 class Project(models.Model):
+    """**Project Model Object**.
+    This is the Django's model representation for a project in QRAAT
+    Database.
+
+    :param ID: Project id
+    :param ownerID: id of the user that owns the project
+    :param name: Project's name
+    :param is_public: Flag indicating public project. default: false
+    :param is_hidden: Flag indicating hidden project. default: false"""
 
     def __init__(self, *args, **kwargs):
         super(Project, self).__init__(*args, **kwargs)
@@ -82,6 +91,13 @@ class Project(models.Model):
     is_hidden = models.BooleanField(default=False)  # boolean default false
 
     def add_collaborator_permissions(self, group):
+        """This method is called when the project is created.
+        It adds djago's permissions to change the project for a given group.
+
+        :param group:: Project's collaborators group in django's database
+        :type group: Group.
+        """
+
         [group.permissions.add(permission)
             for permission in map(
                 lambda p: Permission.objects.get(codename=p[0]),
@@ -89,26 +105,47 @@ class Project(models.Model):
                                   + self._viewer_permissions))]
 
     def add_viewers_permissions(self, group):
+        """This method is called when the project is created.
+        It adds djago's permissions to visualize the
+        project for a given group.
+
+        :param group: Project's viewers group in django's database
+        :type group: Group.
+        """
+
         [group.permissions.add(permission)
             for permission in map(
                 lambda p: Permission.objects.get(
                     codename=p[0]), self._viewer_permissions)]
 
     def get_locations(self):
+        """Project locations getter"""
+
         return Location.objects.filter(
             projectID=self.ID).exclude(is_hidden=True)
 
     def get_deployments(self):
+        """Project deployments getter"""
+
         return Deployment.objects.filter(
             projectID=self.ID).exclude(is_hidden=True).order_by('-is_active')
 
     def get_transmitters(self):
+        """Project transmitters getter"""
+
         return Tx.objects.filter(projectID=self.ID).exclude(is_hidden=True)
 
     def get_targets(self):
+        """Project targets getter"""
+
         return Target.objects.filter(projectID=self.ID).exclude(is_hidden=True)
 
     def create_viewers_group(self):
+        """This method is called when the project is created.
+        It creates a django's group and a row in qraat.auth_project_viewers.
+        Together they will be the viewers group
+        of the project"""
+
         try:
             group = Group.objects.create(
                 name="%d_viewers" % self.ID)
@@ -124,6 +161,11 @@ class Project(models.Model):
         return group
 
     def create_collaborators_group(self):
+        """This method is called when the project is created.
+        It creates a django's group and a row in qraat.auth_project_viewers.
+        Together they will be the collaborators group
+        of the project"""
+
         try:
             group = Group.objects.create(
                 name="%d_collaborators" % self.ID)
@@ -136,9 +178,17 @@ class Project(models.Model):
         return group
 
     def get_group(self, group_id):
+        """ Group getter, encapsulates a query to
+        groups objects to reuse code"""
+
         return Group.objects.get(id=group_id)
 
     def get_viewers_group(self):
+        """Project viewers group getter
+
+        **ObjectDoesNotExist**:
+            Creates the group if for some reason group doesn't exist"""
+
         try:
             group_id = AuthProjectViewer.objects.get(projectID=self.ID).groupID
         except ObjectDoesNotExist:  # for some reason group wasn't created
@@ -147,6 +197,10 @@ class Project(models.Model):
         return self.get_group(group_id)
 
     def get_collaborators_group(self):
+        """Project collaborators group getter
+        **ObjectDoesNotExist**:
+            Creates the group if for some reason group doesn't exist"""
+
         try:
             group_id = AuthProjectCollaborator.objects.get(
                 projectID=self.ID).groupID
@@ -156,15 +210,21 @@ class Project(models.Model):
         return self.get_group(group_id)
 
     def is_owner(self, user):
+        """Checks if given user is the owner of the project"""
         return user.id == self.ownerID
 
     def is_collaborator(self, user):
+        """Checks if given user is collaborator on the project"""
         return user in self.get_collaborators_group().user_set.all()
 
     def is_viewer(self, user):
+        """Checks if given user is viewer on the project"""
         return user in self.get_viewers_group().user_set.all()
 
     def set_permissions(self, group):
+        """Method that encapsulates permission
+        setter for viewers and collaborators"""
+
         if group == self.get_viewers_group():
             self.add_viewers_permissions(group)
         elif group == self.get_collaborators_group():
@@ -175,6 +235,14 @@ class Project(models.Model):
 
 
 class AuthProjectViewer(models.Model):
+    """**AuthProjectViewer Class**
+    This is the Django's model representation for a auth_project_viewer
+    object in QRAAT's Database
+
+    :param ID: obj id
+    :param projectID: id of the project that owns this obj
+    :param groupID: django's group id that this obj is linked to"""
+
     class Meta:
         app_label = QRAAT_APP_LABEL
         db_table = "auth_project_viewer"
@@ -190,6 +258,14 @@ class AuthProjectViewer(models.Model):
 
 
 class AuthProjectCollaborator(models.Model):
+    """**AuthProjectCollaborator Class**
+    This is the Django's model representation for a auth_project_collaborator
+    object in QRAAT's Database
+
+    :param ID: obj id
+    :param projectID: id of the project that owns this obj
+    :param groupID: django's group id that this obj is linked to"""
+
     class Meta:
         app_label = QRAAT_APP_LABEL
         db_table = "auth_project_collaborator"
@@ -205,6 +281,23 @@ class AuthProjectCollaborator(models.Model):
 
 
 class Position(models.Model):
+    """**Position Class**
+    This is the Django's model representation for a position
+    object in QRAAT's Database
+
+    :param ID: obj id
+    :param projectID: id of the project that owns this obj
+    :param deploymentID: deployment's id that this obj is linked to
+    :param timestamp: UTC timestamp
+    :param latitute:
+    :param longitude:
+    :param easting: (UTM north)
+    :param northing: (UTM zone)
+    :param utm_zone_number: (UTM zone)
+    :param utm_zone_letter: (UTM zone letter)
+    :param likelihood: Maximum likelihood value over search space
+    :param activity: Averaged over bearing data from all sites"""
+
     class Meta:
         app_label = QRAAT_APP_LABEL
         unique_together = (
@@ -271,6 +364,18 @@ class TxMake(models.Model):
 
 
 class Tx(models.Model):
+    """**Tx Model Object**.
+    This is the Django's model representation for a transmitter in QRAAT's
+    Database.
+
+    :param ID: Tx id
+    :param name: Transmitter's name
+    :param serial_no: Transmitter's serial number
+    :param tx_makeID: Foreign key for tx_make table
+    :param projectID: Foreign key for project that owns this transmitter
+    :param frequency: Transmitter's frequency
+    :param is_hidden: Transmitter's deletion status"""
+
     class Meta:
         verbose_name = "Transmitter"
         app_label = QRAAT_APP_LABEL
@@ -295,9 +400,16 @@ class Tx(models.Model):
     is_hidden = models.BooleanField(default=False)
 
     def verbose_name(self):
+        """Models verbose name getter
+
+        :returns: str -- Model's verbose name"""
+
         return self._meta.verbose_name
 
     def hide(self):
+        """This method hides a transmitter and it's
+        related objects recursively"""
+
         objs_related = self.get_objs_related()
 
         for obj in objs_related:
@@ -307,6 +419,11 @@ class Tx(models.Model):
         self.save()
 
     def get_objs_related(self):
+        """This method is for intern use. It returns objects that have
+        this transmitter as foreign key
+
+        :returns:  list -- List of model objects"""
+
         objs_related = Deployment.objects.exclude(
             is_hidden=True).filter(txID=self)
         return objs_related
@@ -316,6 +433,16 @@ class Tx(models.Model):
 
 
 class TxParameters(models.Model):
+    """**Tx Parameters Model Object**.
+    This is the Django's model representation for a tx_parameters in QRAAT's
+    Database.
+
+    :param ID: ID
+    :param txID: Foreign key for transmitter
+    :param name: parameter's name
+    :param value: parameter's value
+    :param units: parameter's units"""
+
     class Meta:
         app_label = QRAAT_APP_LABEL
         db_table = "tx_parameters"
@@ -334,6 +461,16 @@ class TxParameters(models.Model):
 
 
 class TxMakeParameters(models.Model):
+    """**Tx Make Parameters Model Object**.
+    This is the Django's model representation for a
+    tx_make_parameters in QRAAT's Database.
+
+    :param ID: ID
+    :param tx_makeID: Foreign key for tx_make
+    :param name: parameter's name
+    :param value: parameter's value
+    :param units: parameter's units"""
+
     class Meta:
         app_label = QRAAT_APP_LABEL
         db_table = "tx_make_parameters"
@@ -352,6 +489,17 @@ class TxMakeParameters(models.Model):
 
 
 class Target(models.Model):
+    """**Target Model Object**.
+    This is the Django's model representation for a target in QRAAT's
+    Database.
+
+    :param ID: ID
+    :param name: Target's name
+    :param description: target's description
+    :param max_speed_family: Type of max speed function: exp, linear, or cons.
+    :param projectID: Foreign key for project
+    :param is_hidden: target's deletion status"""
+
     class Meta:
         verbose_name = "Target"
         app_label = QRAAT_APP_LABEL
@@ -363,6 +511,15 @@ class Target(models.Model):
     name = models.CharField(max_length=50)
 
     description = models.TextField()  # text
+
+    max_speed_family = models.CharField(max_length=16,
+                                        choices=(('exp', 'Exponential'),
+                                                 ('linear', 'Piecewise linear'),
+                                                 ('const', 'Constant')))
+
+    speed_burst     = models.FloatField()
+    speed_sustained = models.FloatField()
+    speed_limit     = models.FloatField()
 
     projectID = models.ForeignKey(
         Project, db_column="projectID",
@@ -392,6 +549,21 @@ class Target(models.Model):
 
 
 class Deployment(models.Model):
+    """**Deployment Model Object**.
+    This is the Django's model representation for a deployment in QRAAT's
+    Database.
+
+    :param ID: ID
+    :param name: deployment's name
+    :param description: deployment's description
+    :param time_start: date that deployment has started (timestamp)
+    :param time_end: date that deployment has ended (timestamp)
+    :param txID: Foreign key for transmitter
+    :param targetID: Foreign key for target
+    :param projectID: Foreign key for project
+    :param is_active: deployment's status
+    :param is_hidden: deployment's deletion status"""
+
     class Meta:
         app_label = QRAAT_APP_LABEL
         db_table = "deployment"
@@ -442,45 +614,25 @@ class Deployment(models.Model):
         return self._meta.verbose_name
 
     def get_start(self):
-        return timestamp_todate(self.time_start)
+        return strfdate(timestamp_todate(self.time_start))
 
     def get_end(self):
-        return timestamp_todate(self.time_end)
+        return strfdate(timestamp_todate(self.time_end))
 
     def __unicode__(self):
         return u'%s active %s' % (self.name, self.is_active)
 
 
-class Track(models.Model):
-    class Meta:
-        app_label = QRAAT_APP_LABEL
-        db_table = "track"
-
-    SPEED_CHOICES = (('exp', 'exp'), ('linear', 'linear'), ('const', 'const'))
-
-    ID = models.AutoField(primary_key=True)
-
-    deploymentID = models.ForeignKey(
-        Deployment, db_column="deploymentID")
-
-    projectID = models.ForeignKey(Project, db_column="projectID")
-
-    max_speed_family = models.CharField(
-        max_length=6, choices=SPEED_CHOICES)  # enum('exp','linear','const')
-
-    speed_burst = models.FloatField()
-
-    speed_sustained = models.FloatField()
-
-    speed_limit = models.FloatField()
-
-    is_hidden = models.BooleanField(default=False)
-
-    def __unicode__(self):
-        return u'%s' % self.ID
-
-
 class Location(models.Model):
+    """**Location Model Object**.
+    This is the Django's model representation for a location in QRAAT's
+    Database.
+
+    :param ID: ID
+    :param name: location's name
+    :param projectID: Foreign key for project
+    :param is_hidden: locations's deletion status"""
+
     class Meta:
         verbose_name = "Location"
         app_label = QRAAT_APP_LABEL
@@ -537,3 +689,118 @@ class Location(models.Model):
 
     def __unicode__(self):
         return u'%s' % self.name
+
+
+class Telemetry(models.Model):
+    class Meta:
+        verbose_name = "Telemetry"
+        app_label = QRAAT_APP_LABEL
+        db_table = "telemetry"
+
+    ID = models.AutoField(primary_key=True)
+
+    siteID = models.ForeignKey(Site, db_column="siteID")
+
+    datetime = models.DateTimeField()
+
+    timezone = models.CharField(max_length=6)
+
+    intemp = models.DecimalField(max_digits=4, decimal_places=2)
+
+    extemp = models.DecimalField(max_digits=4, decimal_places=2)
+
+    voltage = models.DecimalField(max_digits=4, decimal_places=2)
+
+    ping_power = models.IntegerField(max_length=11)
+
+    ping_computer = models.IntegerField(max_length=11)
+
+    site_status = models.IntegerField(max_length=11)
+
+    timestamp = models.DecimalField(max_digits=16, decimal_places=6)
+
+
+class Est(models.Model):
+    class Meta:
+        verbose_name = "Est"
+        app_label = QRAAT_APP_LABEL
+        db_table = "est"
+
+    ID = models.AutoField(primary_key=True)
+
+    siteID = models.ForeignKey(Site, db_column="siteID")
+
+    timestamp = models.DecimalField(max_digits=16, decimal_places=6)
+
+    frequency = models.IntegerField(max_length=11)
+
+    center = models.IntegerField(max_length=11)
+
+    fdsp = models.FloatField()
+
+    fd1r = models.FloatField()
+    fd1i = models.FloatField()
+    fd2r = models.FloatField()
+    fd2i = models.FloatField()
+    fd3r = models.FloatField()
+    fd3i = models.FloatField()
+    fd4r = models.FloatField()
+    fd4i = models.FloatField()
+
+    band3 = models.SmallIntegerField(max_length=6)
+
+    band10 = models.SmallIntegerField(max_length=6)
+
+    edsp = models.FloatField()
+
+    ed1r = models.FloatField()
+    ed1i = models.FloatField()
+    ed2r = models.FloatField()
+    ed2i = models.FloatField()
+    ed3r = models.FloatField()
+    ed3i = models.FloatField()
+    ed4r = models.FloatField()
+    ed4i = models.FloatField()
+
+    ec = models.FloatField()
+
+    tnp = models.FloatField()
+
+    nc11r = models.FloatField()
+    nc11i = models.FloatField()
+    nc12r = models.FloatField()
+    nc12i = models.FloatField()
+    nc13r = models.FloatField()
+    nc13i = models.FloatField()
+    nc14r = models.FloatField()
+    nc14r = models.FloatField()
+    nc21r = models.FloatField()
+    nc21i = models.FloatField()
+    nc22r = models.FloatField()
+    nc22i = models.FloatField()
+    nc23r = models.FloatField()
+    nc23i = models.FloatField()
+    nc24r = models.FloatField()
+    nc24i = models.FloatField()
+    nc31r = models.FloatField()
+    nc31i = models.FloatField()
+    nc32r = models.FloatField()
+    nc32i = models.FloatField()
+    nc33r = models.FloatField()
+    nc33i = models.FloatField()
+    nc34r = models.FloatField()
+    nc34i = models.FloatField()
+    nc41r = models.FloatField()
+    nc41i = models.FloatField()
+    nc42r = models.FloatField()
+    nc42i = models.FloatField()
+    nc43r = models.FloatField()
+    nc43i = models.FloatField()
+    nc44r = models.FloatField()
+    nc44i = models.FloatField()
+
+    fdsnr = models.FloatField()
+
+    edsnr = models.FloatField()
+
+    deploymentID = models.ForeignKey(Deployment, db_column="deploymentID")

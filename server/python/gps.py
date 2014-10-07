@@ -22,6 +22,8 @@ import time, calendar
 import math
 import numpy as np
 
+#TODO use utm module for latlon-UTM conversion
+
 class gps:
     ''' Encapsulate raw GPS data.
       

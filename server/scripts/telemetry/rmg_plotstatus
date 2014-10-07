@@ -37,7 +37,7 @@ my $Debug = 0 ;					# Enable verbose output
 my $MovePlots = 1 ;				# Enable the moving of the plots to the WebPath
 
 my $TableNameTelemetry = "telemetry" ;		# Name of the database table that holds telemetry
-my $TableNameSitelist = "sitelist" ;		# Name of the database table that holds site list
+my $TableNameSitelist = "site" ;		# Name of the database table that holds site list
 #my $Interval = 2*86400 ;			# The plot interval, 2*1 day
 my $INTERVAL_DAY = 86400 ;			# The interval value for one day
 my $TmpPath = "/tmp" ;				# The path of a scratch directory
@@ -297,9 +297,11 @@ sub writecsv($$$$$)
 	}
 	my $site = $result ;
 	my $timenow = time() ;
+	my $tstart = $timenow-$interval;
 	my $dtstart = strftime "%Y-%m-%d %H:%M:%S", gmtime($timenow-$interval);
+	my $tstop = $timenow ;
 	my $dtstop = strftime "%Y-%m-%d %H:%M:%S", gmtime($timenow);
-	$query = "select count(id) from $tablename where siteid = $site and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	$query = "select count(id) from $tablename where siteid = $site and timestamp between \"$tstart\" and \"$tstop\";" ;
 	if( $Debug ) { print "debug: writecsv: query=$query\n" ; }
 	my $count = dblookup($dbh,$query) ;
 	if( not defined $count )
@@ -316,10 +318,11 @@ sub writecsv($$$$$)
 		print "ERROR: cannot write to csv file '$filename'\n" ;
 		return 1 ;
 	}
-	$query = "select datetime,timezone,$columns from $tablename where siteid = $site and datetime between \"$dtstart\" and \"$dtstop\";" ;
+	$query = "select timestamp,$columns from $tablename where siteid = $site and timestamp between \"$tstart\" and \"$tstop\";" ;
 	my @data = dbdata($dbh,$query) ;
 	$count = scalar @data ;
 	if( $Debug ) { print "debug: writecsv: query result has $count rows\n" ; }
+	my $timestamp ;
 	my $new_timezone ;
 	my $dt ;
 	my $data_timezone ;
@@ -329,11 +332,11 @@ sub writecsv($$$$$)
 		{
 			if( not defined $refrow ) { last ; }
 			my @row = @$refrow ;
-			#shift @row ;	# drop the ID column
-			#shift @row ;	# drop the siteid column
-			$dt = shift @row ;
-			if( not defined $dt ) { next ; }
-			$data_timezone = shift @row ;
+			$timestamp = shift @row ;
+			if( not defined $timestamp ) { next ; }
+			$dt = strftime "%Y-%m-%d %H:%M:%S",gmtime($timestamp) ;
+			$data_timezone = "UTC" ;
+			if( $Debug ) { print "debug: writecsv: timestamp=$timestamp dt=$dt tz=$data_timezone\n" ; }
 			( $dt, $new_timezone ) = tzconvert($dt,$data_timezone,$display_timezone) ;
 			print $fd "$dt" ;
 			print $fd ",$new_timezone" ;
@@ -372,17 +375,21 @@ sub writecsv($$$$$)
 sub tzconvert($$$)	# convert datetime string 'YYYY-MM-DD HH:mm:ss' between timezones 'localtime', 'UTC', 'GMT' or sources '[-]HHMM'
 {
 	my ( $source_dt, $source_tz, $target_tz ) = @_ ;
+	if( $Debug ) { print "debug: tzconvert: source_dt='$source_dt' source_tz='$source_tz' target_tz='$target_tz'\n" ; }
 	my ( $year, $mon, $day, $hour, $min, $sec ) = ($source_dt =~ m/^(\d{4})-(\d{2})-(\d{2})\s?(\d{2}):(\d{2}):(\d{2})$/) ;
+	if( $Debug ) { print "debug: tzconvert: year=$year mon=$mon day=$day hour=$hour min=$min sec=$sec\n" ; }
 	$year -= 1900 ;
 	$mon-- ;
 	my $gmt ;	# here's the goal: get the time in gmt seconds for the given time in the given timezone
 	if( $source_tz eq "localtime" )
 	{
 		$gmt = timelocal($sec,$min,$hour,$day,$mon,$year) ;	# convert the time to gmt seconds for an unidentfied timezone (bad, bad)
+		if( $Debug ) { print "debug: tzconvert: gmt=$gmt\n" ; }
 	}
 	else
 	{
 		$gmt = timegm($sec,$min,$hour,$day,$mon,$year) ;	# convert the time to gmt seconds for a gmt source timezone
+		if( $Debug ) { print "debug: tzconvert: gmt=$gmt\n" ; }
 		my $offset = 0 ;	# work out the correction between the given timezone and gmt, to correct the gmt value above
 		my ( $sign, $hours, $minutes ) = ( $source_tz =~ /(-|\+)?(\d{2})(\d{2})/ ) ;
 		if( (defined $hours) and (defined $minutes) )

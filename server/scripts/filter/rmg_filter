@@ -1,10 +1,9 @@
-#!/usr/bin/python2
-# rmg_template
-# Time filters a range of points specified by a starting and ending UNIX
-# timestamp.  This program is part of QRAAT, an automated animal tracking
-# system based on GNU Radio. 
+#!/usr/bin/env python2
+# rmg_filter
+# Template for writing scripts. This program is part of QRAAT, 
+# an automated animal tracking system based on GNU Radio. 
 #
-# Copyright (C) 2014 Sean Riddle
+# Copyright (C) 2013 Christopher Patton
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,88 +18,50 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import qraat
+import qraat, qraat.srv
 import time, os, sys, commands
 import MySQLdb as mdb
-import traceback
 from optparse import OptionParser
-
-import qraat.srv
 
 # Check for running instances of this program. 
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
 if int(output) > 1: 
-  print >>sys.stderr, "template: error: attempted reentry, exiting"
+  print >>sys.stderr, "filter: error: attempted reentry, exiting"
   sys.exit(1)
 
 parser = OptionParser()
 
-parser.description = '''This does nothing.'''
-parser.add_option('-s', '--site-id', action='store', type='int')
-parser.add_option('-t', '--dep-id', action='store', type='int')
-parser.add_option('-a', '--t-start', action='store', type='int')
-parser.add_option('-z', '--t-end', action='store', type='int')
+parser.description = '''Per site and transmitter signal filter.'''
+parser.add_option('--site-id', action='store', type='int', default=2)
+parser.add_option('--dep-id', action='store', type='int', default=51)
+parser.add_option('--t-start', action='store', type='float', default=1376427421)
+parser.add_option('--t-end', action='store', type='float', default=1376434446)
+
 
 (options, args) = parser.parse_args()
 
 try: 
   start = time.time()
-  print "template: start time:", time.asctime(time.localtime(start))
+  print "filter: start time:", time.asctime(time.localtime(start))
 
-  db_con = qraat.util.get_db('reader')
+  db_con = qraat.srv.util.get_db('writer')
+  qraat.srv.signal.VERBOSE = True
 
-  chunk_size = int(60 * 60)		# One hour (in seconds)
+  (total, _) = qraat.srv.signal.Filter(db_con,
+                                       options.dep_id, 
+                                       options.site_id,
+                                       options.t_start,
+                                       options.t_end)
 
-  t_start, t_end = options.t_start, options.t_end
-
-  site_id, dep_id = options.site_id, options.dep_id
-
-  total_chunks = int((t_end - t_start) / float(chunk_size)) + 1
-  start_times = [(t_start + (i * chunk_size)) for i in range(total_chunks)]
-  intervals = [(x, min(t_end, x + chunk_size)) for x in start_times]
-  print 'There are {} intervals'.format(len(intervals))
-  change_handler = qraat.srv.signal_filter.init_change_handler()
-  for start, end in intervals:
-    # Right now this rescores points within time range *only* when a score has
-    # not already been computed. Could change this to delete all those scores
-    # (and interval_cache values) and then not do a join filter. But what we do
-    # not want, I'm pretty sure, is more than one score per point.
-    q = 'select t.ID from estscore RIGHT JOIN (select ID from est where siteID = %s and deploymentID = %s and timestamp >= %s and timestamp <= %s) as t ON t.ID = estscore.estid where estscore.estid IS NULL;'
-    # cursor query:
-    # q = 'insert into `cursor` (name, value) values (%s, 1)'
-
-    cur = change_handler.add_sql(q, (site_id, dep_id, start, end))
-
-    l = []
-    while True:
-      r = cur.fetchone()
-      if r is None: break
-      r = tuple(r)
-      l.append(r[0])
-
-    print 'Got {} items: {}'.format(len(l), l[:10])
-
-    if len(l) == 0:
-      print 'No IDs to process.'
-    else:
-      print 'Here goes.'
-      qraat.srv.signal_filter.score(l)
-      print 'Done.'
-    
+  print "filter: scored %d pulses." % total
+  
 except mdb.Error, e:
-  print >>sys.stderr, "template: eror: [%d] %s" % (e.args[0], e.args[1])
-  #with open('/home/qraat/error.log', 'w') as f:
-  #  traceback.print_exc(file=f)
-  #  for k, vs in qraat.srv.signal_filter.reasoning.items():
-  #    f.write(str(k) + '\n')
-  #    for v in vs:
-  #      f.write('\t*' + str(v) + '\n')
-  #  f.write('len of reasoning:' + str(len(qraat.srv.signal_filter.reasoning)) + '\n')
-  # sys.exit(1)
+  print >>sys.stderr, "filter: error: [%d] %s" % (e.args[0], e.args[1])
+  sys.exit(1)
 
 except qraat.error.QraatError, e:
-  print >>sys.stderr, "template: error: %s." % e
+  print >>sys.stderr, "filter: error: %s." % e
 
 finally: 
-  print "template: finished in %.2f seconds." % (time.time() - start)
+  print "filter: finished in %.2f seconds." % (time.time() - start)
