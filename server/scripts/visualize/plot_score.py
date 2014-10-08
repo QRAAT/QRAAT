@@ -35,6 +35,8 @@ interval_data = np.array(cursor.fetchall(),dtype = float)
 
 db.close()
 
+est_score_threshold = float(os.environ['RMG_POS_EST_THRESHOLD'])
+
 print "deploymentID: {0}\ntimestamps: {1} - {2}, {3} - {4}".format(deploymentID, start_time, stop_time, time.strftime("%x %X",time.localtime(start_time)), time.strftime("%x %X",time.localtime(stop_time)))
 print "{} records found in est table".format(num_records)
 print "{} records not scored".format(np.sum(np.isnan(data[:,9])))
@@ -43,11 +45,13 @@ print "{} records scored < 0".format(np.sum(data[:,9] < 0))
 print "{} records scored == 0".format(np.sum(data[:,9] == 0))
 print "{} records scored > 0".format(np.sum(data[:,9] > 0))
 print "{} intervals found in estinterval table".format(num_intervals)
+print "EST score threshold: %0.2f" % est_score_threshold
+
 
 site_set = set(data[:,8])
 for siteID in site_set:
   mask = (data[:,8] == siteID)
-  filter_mask = data[mask,9] > 0
+  filter_mask = (data[mask,9] / data[mask,10]) > est_score_threshold
   #power filtered
   pp.plot(data[mask,0],10*np.log10(data[mask,1]),'.')
   pp.plot(data[mask,0][filter_mask],10*np.log10(data[mask,1][filter_mask]),'r.')

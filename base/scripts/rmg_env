@@ -137,7 +137,7 @@ export RMG_POS_TIME_STEP=15
 export RMG_POS_CAL_ID=3
 
 # EST Score Threshold for filter before position estimation
-export RMG_POS_EST_THRESHOLD=0.20
+export RMG_POS_EST_THRESHOLD=0.1
 
 # Quarantine directory for bad files
 export RMG_QUARANTINE_DIR=$RMG_SERVER_DIR/quarantine

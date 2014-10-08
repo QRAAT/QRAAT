@@ -143,7 +143,7 @@ try:
 
       pos[-1].append(false_pos); neg[-1].append(false_neg)
       
-  pickle.dump((X, Y, np.transpose(pos), np.transpose(neg)), 
+  pickle.dump((X, Y, np.array(pos), np.array(neg)), 
                  open('result%0.1f' % EST_SCORE_THRESHOLD, 'w')) # Dump result
   
 
