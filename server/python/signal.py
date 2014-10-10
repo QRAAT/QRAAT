@@ -161,7 +161,7 @@ def get_interval_data(db_con, dep_id, site_id, interval):
     data.append(list(row))
     data[-1][2] = int(data[-1][2] * TIMESTAMP_PRECISION)
   
-  return np.array(data, dtype=np.int)
+  return np.array(data, dtype=np.int64)
 
 
 def update_data(db_con, data): 
