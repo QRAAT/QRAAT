@@ -22,7 +22,7 @@ extent = [np.min(x), np.max(x),
 
 
 pp.imshow(pos, extent=extent, aspect='auto', interpolation='nearest')
-pp.plot(x, qraat.srv.signal.SCORE_ERROR(x), 'w-')
+pp.plot(x, qraat.srv.signal.SCORE_ERROR(x), 'k-')
 fig = pp.gcf()
 fig.set_size_inches(16,12)
 cb = pp.colorbar()
@@ -34,7 +34,7 @@ pp.ylabel("Score error")
 pp.clf()
 
 pp.imshow(neg, extent=extent, aspect='auto', interpolation='nearest')
-pp.plot(x, qraat.srv.signal.SCORE_ERROR(x), 'w-')
+pp.plot(x, qraat.srv.signal.SCORE_ERROR(x), 'k-')
 fig = pp.gcf()
 fig.set_size_inches(16,12)
 cb = pp.colorbar()

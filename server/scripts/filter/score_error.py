@@ -108,7 +108,7 @@ try:
   X = np.arange(0, 6, variation_step)
   pos = []; neg = []; 
 
-  for score_error in Y: 
+  for score_error in reversed(Y): 
     
     pos.append([]); neg.append([])
 
