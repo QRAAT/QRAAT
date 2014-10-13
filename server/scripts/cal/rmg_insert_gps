@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 # rmg_insert_gps
 # Insert GPS data for a calibration run into the database. Outputs to
 # qraat.GPS_Calibration_Data. This program is part of QRAAT, an 

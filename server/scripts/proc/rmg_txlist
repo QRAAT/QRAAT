@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 # Thus far, this script will only create a valid tx.csv for pulse type 
 # transmitters. We'll need to combine the parameter list for all transmitter
 # types. 

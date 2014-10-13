@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 # rmg_filter_auto
 # Script to call for time filtering things that haven't been time filtered yet.
 # This program is part of QRAAT, an automated animal tracking system based on
