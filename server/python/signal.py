@@ -40,7 +40,7 @@ SCORE_NEIGHBORHOOD = 20     # seconds
 # Score error for pulse corroboration, as a function of the variation over 
 # the interval. (Second moment of the mode pulse interval). This relationship
 # will be deduced emperically ... for now, it was simply "eye-balled". 
-SCORE_ERROR = lambda(x) : 0.01 * np.log(4*x+2)
+SCORE_ERROR = lambda(x) : 0.02 * np.log(12*x+2)
 
 # Minumum percentage of transmitter's nominal pulse interval that the expected
 # pulse_interval is allowed to drift. Tiny pulse intervals frequently result 
