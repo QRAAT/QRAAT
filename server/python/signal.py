@@ -40,7 +40,7 @@ SCORE_NEIGHBORHOOD = 20     # seconds
 # Score error for pulse corroboration, as a function of the variation over 
 # the interval. (Second moment of the mode pulse interval). This relationship
 # will be deduced emperically ... for now, it was simply "eye-balled". 
-SCORE_ERROR = lambda(x) : 0.02 * np.log(12*x+2)
+SCORE_ERROR = lambda(x) : 0.01 * np.log(12*x+2)
 
 # Minumum percentage of transmitter's nominal pulse interval that the expected
 # pulse_interval is allowed to drift. Tiny pulse intervals frequently result 
@@ -56,6 +56,8 @@ MAX_VARIATION = 4
 
 # Factor by which to multiply timestamps. 
 TIMESTAMP_PRECISION = 1000
+
+# Controls the number of bins in histograms. 
 BIN_WIDTH = 0.02 
 
 # Some constants. 
@@ -67,7 +69,7 @@ VERBOSE = False
 
 
 
-#### High level call. #########################################################
+#### High level calls. ########################################################
 
 def debug_output(msg): 
   if VERBOSE: 
@@ -135,6 +137,82 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
   update_intervals(db_con, dep_id, site_id, interval_data)
   
   return (total, max_id)
+
+
+
+def SiteFilter(db_con, dep_id, t_start, t_end): 
+  
+  total = 0; max_id = 0
+  tx_params = get_tx_params(db_con, dep_id)
+  debug_output("depID=%d parameters: band3=%s, band10=%s, pulse_rate=%s" 
+     % (dep_id, 'nil' if tx_params['band3'] == sys.maxint else tx_params['band3'],
+                'nil' if tx_params['band10'] == sys.maxint else tx_params['band10'], 
+                tx_params['pulse_rate']))
+  
+  
+  cur = db_con.cursor() 
+  cur.execute('SELECT ID FROM site')
+  sites = map(lambda(row) : row[0], cur.fetchall())
+
+
+  interval_data = {} # Keep track of pulse rate of each window. 
+  for site_id in sites: 
+    interval_data[site_id] = []
+
+  for interval in get_score_intervals(t_start, t_end):
+
+    # Using overlapping windows in order to mitigate 
+    # score bias on points at the end of the windows. 
+    augmented_interval = (interval[0] - (SCORE_NEIGHBORHOOD / 2), 
+                          interval[1] + (SCORE_NEIGHBORHOOD / 2))
+
+    pulse_stats = {}; data = {}
+    
+    for site_id in sites: 
+      data[site_id] = get_interval_data(db_con, dep_id, site_id, augmented_interval)
+      if data[site_id].shape[0] > 2: 
+        pulse_stats[site_id] = expected_pulse_interval(data[site_id], tx_params['pulse_rate'])
+      
+    for site_id in sites: 
+      if data[site_id].shape[0] == 0: # Skip empty chunks.
+        debug_output("skipping empty chunk")
+        continue
+
+      debug_output("processing %.2f to %.2f (%d pulses)" % (interval[0], 
+                                                            interval[1], 
+                                                            data[site_id].shape[0]))
+      
+      parametric_filter(data[site_id], tx_params)
+        
+      if data[site_id].shape[0] >= BURST_THRESHOLD: 
+        burst_filter(data[site_id], augmented_interval)
+
+      # Tbe only way to coroborate isolated points is with other sites. 
+      if data[site_id].shape[0] > 2:
+        (pulse_interval, pulse_variation) = pulse_stats[site_id]
+        if pulse_interval > 0 and pulse_variation < MAX_VARIATION:
+          time_filter(data[site_id], pulse_interval, pulse_variation)
+          pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
+        else: pulse_interval = pulse_variation = None 
+
+      else: pulse_interval = pulse_variation = None
+      
+      # When inserting, exclude overlapping points.
+      (count, id) = update_data(db_con, 
+         data[site_id][(data[site_id][:,2] >= (interval[0] * TIMESTAMP_PRECISION)) & 
+                       (data[site_id][:,2] <  (interval[1] * TIMESTAMP_PRECISION))])
+
+      interval_data[site_id].append((interval[0], pulse_interval, pulse_variation))
+  
+    total += count
+    max_id = id if max_id < id else max_id
+  
+  for site_id in sites:
+    update_intervals(db_con, dep_id, site_id, interval_data[site_id])
+  
+  return (total, max_id)
+
+
 
 
 
