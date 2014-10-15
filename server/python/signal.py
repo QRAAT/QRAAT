@@ -40,7 +40,7 @@ SCORE_NEIGHBORHOOD = 20     # seconds
 # Score error for pulse corroboration, as a function of the variation over 
 # the interval. (Second moment of the mode pulse interval). This relationship
 # will be deduced emperically ... for now, it was simply "eye-balled". 
-SCORE_ERROR = lambda(x) : 0.01 * np.log(12*x+2)
+SCORE_ERROR = lambda(x) : 0.02 * np.log(12*x+2)
 
 # Minumum percentage of transmitter's nominal pulse interval that the expected
 # pulse_interval is allowed to drift. Tiny pulse intervals frequently result 
@@ -116,7 +116,7 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
 
     # Tbe only way to coroborate isolated points is with other sites. 
     if data.shape[0] > 2:
-      (pulse_interval, pulse_variation) = expected_pulse_interval(data, tx_params['pulse_rate'])
+      (pulse_interval, pulse_variation) = expected_pulse_interval({site_id : data}, tx_params['pulse_rate'])
       if pulse_interval > 0 and pulse_variation < MAX_VARIATION:
         time_filter(data, pulse_interval, pulse_variation)
         pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
@@ -166,21 +166,22 @@ def SiteFilter(db_con, dep_id, t_start, t_end):
     augmented_interval = (interval[0] - (SCORE_NEIGHBORHOOD / 2), 
                           interval[1] + (SCORE_NEIGHBORHOOD / 2))
 
-    pulse_stats = {}; data = {}
-    
+    data = {}
     for site_id in sites: 
       data[site_id] = get_interval_data(db_con, dep_id, site_id, augmented_interval)
-      if data[site_id].shape[0] > 2: 
-        pulse_stats[site_id] = expected_pulse_interval(data[site_id], tx_params['pulse_rate'])
-      
+        
+    (pulse_interval, pulse_variation) = expected_pulse_interval(data, tx_params['pulse_rate'])
+
     for site_id in sites: 
+      
       if data[site_id].shape[0] == 0: # Skip empty chunks.
-        debug_output("skipping empty chunk")
+        debug_output("siteID=%s: skipping empty chunk" % site_id)
         continue
 
-      debug_output("processing %.2f to %.2f (%d pulses)" % (interval[0], 
-                                                            interval[1], 
-                                                            data[site_id].shape[0]))
+      debug_output("siteID=%s: processing %.2f to %.2f (%d pulses)" % (site_id,
+                                                                       interval[0], 
+                                                                       interval[1], 
+                                                                       data[site_id].shape[0]))
       
       parametric_filter(data[site_id], tx_params)
         
@@ -189,20 +190,14 @@ def SiteFilter(db_con, dep_id, t_start, t_end):
 
       # Tbe only way to coroborate isolated points is with other sites. 
       if data[site_id].shape[0] > 2:
-        (pulse_interval, pulse_variation) = pulse_stats[site_id]
-        if pulse_interval > 0 and pulse_variation < MAX_VARIATION:
-          time_filter(data[site_id], pulse_interval, pulse_variation)
-          pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
-        else: pulse_interval = pulse_variation = None 
-
-      else: pulse_interval = pulse_variation = None
+        time_filter(data[site_id], pulse_interval, pulse_variation)
       
       # When inserting, exclude overlapping points.
       (count, id) = update_data(db_con, 
          data[site_id][(data[site_id][:,2] >= (interval[0] * TIMESTAMP_PRECISION)) & 
                        (data[site_id][:,2] <  (interval[1] * TIMESTAMP_PRECISION))])
 
-      interval_data[site_id].append((interval[0], pulse_interval, pulse_variation))
+      interval_data[site_id].append((interval[0], float(pulse_interval) / TIMESTAMP_PRECISION, pulse_variation))
   
     total += count
     max_id = id if max_id < id else max_id
@@ -340,7 +335,7 @@ def get_tx_params(db_con, dep_id):
 
 ##### Per site/transmitter filters. ###########################################
 
-def expected_pulse_interval(data, pulse_rate): 
+def expected_pulse_interval(data_dict, pulse_rate): 
   ''' Compute expected pulse rate over data.
   
     Data is assumed to be sorted by timestamp and timestamps should be
@@ -349,18 +344,23 @@ def expected_pulse_interval(data, pulse_rate):
     :param pulse_rate: Transmitter's nominal pulse rate in pulses / minute. 
   ''' 
   
-  (rows, cols) = data.shape
   max_interval = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION
   min_interval = ((60 * MIN_DRIFT_PERCENTAGE) / pulse_rate) * TIMESTAMP_PRECISION
   bin_width = BIN_WIDTH * TIMESTAMP_PRECISION
 
   # Compute pairwise time differentials. 
   diffs = []
-  for i in range(rows):
-    for j in range(i+1, rows): 
-      diff = data[j,2] - data[i,2]
-      if min_interval < diff and diff < max_interval: 
-        diffs.append(diff)
+  for (_, data) in data_dict.iteritems():
+    if data.shape[0] > 0:
+      (rows, cols) = data.shape
+      for i in range(rows):
+        for j in range(i+1, rows): 
+          diff = data[j,2] - data[i,2]
+          if min_interval < diff and diff < max_interval: 
+            diffs.append(diff)
+
+  if len(diffs) <= 2: 
+    return (0, 0)
 
   # Create a histogram. Bins are scaled by `BIN_WIDTH`. 
   (hist, bins) = np.histogram(diffs, bins = (max(data[:,2]) - min(data[:,2])) / bin_width)
