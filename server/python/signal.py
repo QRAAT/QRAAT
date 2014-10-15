@@ -46,15 +46,16 @@ SCORE_ERROR = lambda(x) : 0.02 * np.log(12*x+2)
 # pulse_interval is allowed to drift. Tiny pulse intervals frequently result 
 # from particularly noisy, but it may not be enough to trigger the burst 
 # filter.
-# 
-#  FIXME This is a bit of a cludge to filter noisy intervals. Perhaps the 
-#        burst filter should be adjusted such that intervals with a mode
-#        pulse interval way too short are filtered out. 
 MIN_DRIFT_PERCENTAGE = 0.33
+
+# Eliminate noisy intervals. 
+MAX_VARIATION = 4
+
+
+#### System parameters ... these shouldn't be changed. ########################
 
 # Factor by which to multiply timestamps. 
 TIMESTAMP_PRECISION = 1000
-
 BIN_WIDTH = 0.02 
 
 # Some constants. 
@@ -114,7 +115,7 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
     # Tbe only way to coroborate isolated points is with other sites. 
     if data.shape[0] > 2:
       (pulse_interval, pulse_variation) = expected_pulse_interval(data, tx_params['pulse_rate'])
-      if pulse_interval > 0:
+      if pulse_interval > 0 and pulse_variation < MAX_VARIATION:
         time_filter(data, pulse_interval, pulse_variation)
         pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
       else: pulse_interval = pulse_variation = None 
