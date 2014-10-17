@@ -10,7 +10,7 @@ import os, sys, time
 import pickle
 
 dep_id  = 105
-site_id = 4
+site_id = 3
 t_start = 1410721127
 t_end   = 1410807696
 
