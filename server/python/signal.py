@@ -140,7 +140,7 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
 
 
 
-def SiteFilter(db_con, dep_id, t_start, t_end): 
+def Filter2(db_con, dep_id, t_start, t_end): 
   
   total = 0; max_id = 0
   tx_params = get_tx_params(db_con, dep_id)

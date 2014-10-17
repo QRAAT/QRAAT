@@ -75,7 +75,7 @@ try:
 
     if dep_id is not None: 
       print "filter_auto: depID=%d" % (dep_id,)
-      (total, id) = qraat.srv.signal.SiteFilter(db_con, dep_id, t_start, t_end)
+      (total, id) = qraat.srv.signal.Filter2(db_con, dep_id, t_start, t_end)
       max_id = id if max_id < id else max_id
       print "filter: scored %d pulses." % total
 
