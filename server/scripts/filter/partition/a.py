@@ -10,7 +10,7 @@ import os, sys, time
 import pickle
 
 dep_id  = 105
-site_id = 2
+site_id = 4
 t_start = 1410721127
 t_end   = 1410807696
 
@@ -52,11 +52,11 @@ try:
     for (id, t, edsp) in cur.fetchall():
       interval_points.append((id, t, 10 * np.log10(edsp)))
 
-    avg_power = np.mean(filter(lambda (pwr) : pwr > -20 and pwr < -12,
+    avg_power = np.mean(filter(lambda (pwr) : pwr > -22 and pwr < -15,
                             map(lambda (row) : row[2], interval_points)))
     
     for row in interval_points: 
-      if abs(row[2] - avg_power) < 0.33: good[row[0]] = True
+      if abs(row[2] - avg_power) < 0.40: good[row[0]] = True
       else:                              good[row[0]] = False
 
     points += interval_points 
