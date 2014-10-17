@@ -1,0 +1,8 @@
+
+a.py -- Generate rough partition -> rough.png, siteN.csv
+b.py -- Plot siteN.csv -> good_points_siteN.png
+
+siteN.csv       -- Partitioned points. 
+site3-rough.csv -- Partition for site 3 before fitting noisy parts to curve. 
+
+good_points_siteN.png -- Plot of good vs bad points.
