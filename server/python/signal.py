@@ -40,7 +40,7 @@ SCORE_NEIGHBORHOOD = 20     # seconds
 # Score error for pulse corroboration, as a function of the variation over 
 # the interval. (Second moment of the mode pulse interval). This relationship
 # will be deduced emperically ... for now, it was simply "eye-balled". 
-SCORE_ERROR = lambda(x) : 0.02 * np.log(12*x+2)
+SCORE_ERROR = lambda(x) : 0.02 * np.log(1000*x+2) # FIXME
 
 # Minumum percentage of transmitter's nominal pulse interval that the expected
 # pulse_interval is allowed to drift. Tiny pulse intervals frequently result 
@@ -199,8 +199,8 @@ def Filter2(db_con, dep_id, t_start, t_end):
 
       interval_data[site_id].append((interval[0], float(pulse_interval) / TIMESTAMP_PRECISION, pulse_variation))
   
-    total += count
-    max_id = id if max_id < id else max_id
+      total += count
+      max_id = id if max_id < id else max_id
   
   for site_id in sites:
     update_intervals(db_con, dep_id, site_id, interval_data[site_id])
@@ -344,7 +344,7 @@ def expected_pulse_interval(data_dict, pulse_rate):
     :param pulse_rate: Transmitter's nominal pulse rate in pulses / minute. 
   ''' 
   
-  max_interval = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION
+  max_interval = ((60 * (2 - MIN_DRIFT_PERCENTAGE)) / pulse_rate) * TIMESTAMP_PRECISION
   min_interval = ((60 * MIN_DRIFT_PERCENTAGE) / pulse_rate) * TIMESTAMP_PRECISION
   bin_width = BIN_WIDTH * TIMESTAMP_PRECISION
 
