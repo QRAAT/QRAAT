@@ -18,7 +18,7 @@ from qraatview.utils import DateTimeEncoder
 import qraatview.rest_api as rest_api
 import qraat, time, datetime, json, utm, math, copy
 from pytz import utc, timezone
-from qraatview.models import Position, Deployment, Site, Project
+from qraatview.models import Position, Deployment, Site, Project, Tx
 from qraat_ui.forms import Form
 from decimal import Decimal
 
@@ -381,22 +381,32 @@ def view_by_dep(request, project_id, dep_id):
            or (user.has_perm("can_view")
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
-
-        deps = project.get_deployments().filter(ID=dep_id)
+        pass
+        
       else:
         return HttpResponse("You're not allowed to view this.")
     
     else:
       return HttpResponse("You're not allowed to visualize this")
 
-  else:
-    deps = project.get_deployments().filter(ID=dep_id)
+  else: pass
+    
+  deps = project.get_deployments().filter(ID=dep_id)
+  
+  deployment = Deployment.objects.get(ID=dep_id)
+  target = deployment.targetID
+  target_name = target.name
+
+  transmitter = deployment.txID
+  transmitter_frequency = transmitter.frequency
    
   context = get_context(request, deps, deps)
 
   nav_options = get_nav_options(request)
   context["nav_options"] = nav_options
   context["project"] = project
+  context["target_name"] = target_name
+  context["transmitter_frequency"] = transmitter_frequency
 
   return render(request, 'qraat_ui/index.html', context)
 
@@ -570,8 +580,6 @@ def generic_graph(
         data = rest_api.get_model_data(request) 
     except Exception, e:
         print e
-        content["data"] = json.dumps(None)
-    else:
         content["data"] = json.dumps(rest_api.json_parse(data), cls=DateTimeEncoder)
 
     return render(
