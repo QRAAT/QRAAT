@@ -160,7 +160,7 @@ def get_context(request, deps=[], req_deps=[]):
         datetime_to_initial = float( dep_query.aggregate(Max('timestamp'))
                                       ['timestamp__max'] )
         datetime_to_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
-                    time.localtime(float(datetime_to_initial-7*60*60)))
+                    time.localtime(float(datetime_to_initial-7*60*60))) # FIXME 
       
         datetime_from_min_initial = float( dep_query.aggregate(
                                 Min('timestamp'))['timestamp__min'] )
@@ -171,7 +171,7 @@ def get_context(request, deps=[], req_deps=[]):
         else:
           datetime_from_initial = datetime_from_day_initial
         datetime_from_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
-                    time.localtime(float(datetime_from_initial-7*60*60)))
+                    time.localtime(float(datetime_from_initial-7*60*60))) # FIXME 
 
         likelihood_low_initial = dep_query.aggregate(Min('likelihood'))['likelihood__min']
         likelihood_high_initial = dep_query.aggregate(Max('likelihood'))['likelihood__max']
@@ -223,9 +223,9 @@ def get_context(request, deps=[], req_deps=[]):
       
       kwargs = {}
       if datetime_from:
-        kwargs['timestamp__gte'] =  float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) ) + 7*60*60
+        kwargs['timestamp__gte'] =  float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) ) + 7*60*60 # FIXME
       if datetime_to:
-        kwargs['timestamp__lte'] = float( time.mktime (datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()) ) + 7*60*60
+        kwargs['timestamp__lte'] = float( time.mktime (datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()) ) + 7*60*60 # FIXME
       if likelihood_low:
         kwargs['likelihood__gte'] = likelihood_low
       if likelihood_high:
@@ -266,8 +266,10 @@ def get_context(request, deps=[], req_deps=[]):
                  AND likelihood >= %s AND likelihood <= %s
                  AND activity >= %s AND activity <= %s
                ORDER BY position.timestamp''', (req_deps[0].ID, 
-            qraat.util.datetime_to_timestamp(datetime_from),
-            qraat.util.datetime_to_timestamp(datetime_to),
+            float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) ) + 7*60*60, # FIXME
+            float( time.mktime (datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()) ) + 7*60*60, # FIXME
+            #qraat.util.datetime_to_timestamp(datetime_from),
+            #qraat.util.datetime_to_timestamp(datetime_to),
             likelihood_low, likelihood_high, 
             activity_low, activity_high, ))
 

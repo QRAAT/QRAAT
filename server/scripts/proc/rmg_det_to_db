@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_det_to_db
 # Batch process det files into the datbase. This script is part of the 
 # QRAAT system. 
@@ -98,8 +98,8 @@ for site in dir_sitelist:
            
       if status == 0 and output:
     
-        # Batch process only the newest 20 directories that were created.
-        leaf_dirs = sorted(output.split('\n'), reverse=True)
+        # Batch process only the oldest 20 directories that were created.
+        leaf_dirs = sorted(output.split('\n'), reverse=False)
         total = len(leaf_dirs) 
         leaf_dirs = leaf_dirs[:20]
         print "det_to_db: %s: processing %d out of %d available directories" % ( 
@@ -133,10 +133,11 @@ for site in dir_sitelist:
           for row in table: 
             try:
               table.write_db_row(cur, row, site)
-            except:
+            except Exception as e:
               #could be qraat.ResolveIdError from est class
               #could be MySQLdb.error that we haven't anticipated
-              print >>sys.stderr, "det_to_db: warning: skipping est corresponding to '{0}'".format(leaf_dir)
+              print >>sys.stderr, "det_to_db: warning: skipping est row corresponding to '{0}' due to error from qraat.est.est.write_db_row()".format(row.fn)
+              print >>sys.stderr, "det_to_db: error was: {0}".format(e)
               det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
               q_dir = ("%s/%s_" % (det_q, site)) +\
                        ("%s.%s.%s.%s.%s/" % date_tuple)
@@ -145,7 +146,7 @@ for site in dir_sitelist:
               except OSError, e:            # Catch if directory exists;
                 if e.errno != errno.EEXIST: # otherwise, throw exception.  
                   raise e
-              commands.getstatusoutput("mv {0} {1}".format(e.filename,q_dir))
+              commands.getstatusoutput("mv {0} {1}".format(row.fn,q_dir))
           
                   
           # Archive table as est file. 

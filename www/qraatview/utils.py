@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """QRAAT View utils model.
 
 Here is encapsulated functions to handle and parse dates

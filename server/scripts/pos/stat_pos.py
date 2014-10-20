@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # stat_pos.py - Calculate velocity and acceleration of raw positions. 
 #
 # Copyright (C) 2013 Christopher Patton
@@ -44,7 +44,7 @@ try:
   start = time.time()
   print "stat_pos: start time:", time.asctime(time.localtime(start))
 
-  db_con = qraat.util.get_db('reader')
+  db_con = qraat.srv.util.get_db('reader')
   
   try: 
     t_start = time.mktime(time.strptime(options.t_start, "%Y-%m-%d"))

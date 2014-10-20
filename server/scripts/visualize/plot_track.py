@@ -43,7 +43,7 @@ parser.add_option('--t-end', type='float', metavar='SEC', default=1376442000.0,
 (options, args) = parser.parse_args()
 
 
-db_con = qraat.util.get_db('reader')
+db_con = qraat.srv.util.get_db('reader')
 
 overlay = True
 #M = qraat.track.maxspeed_exp((10, 1), (300, 0.1),0.05)

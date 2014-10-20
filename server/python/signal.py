@@ -5,10 +5,7 @@
 # useful extension to this work will be to coroborate points between
 # sites. 
 
-# TODO Record pulse interval for score window in DB.  
-
-# TODO Account for the percentage of time the system is listening
-#      for the transmitter. 
+# TODO Change estinterval.pulse_rate to pulse_interval. 
 
 # TODO Don't double count pulses that fall within the same error 
 #      window. To do this, throw pulses in a bucket data structure. 
@@ -21,30 +18,51 @@
 # NOTE The larger the score window, the more accurate we calculate 
 #      the expected pulse interval.
 
+# NOTE We don't yet account for the percentage of time the system is 
+#      listening for the transmitter. This should be encorpoerated 
+#      into the theoretical score over the pulse's neighborhood. 
+
+
 
 import sys
-import qraat
 import numpy as np
-import MySQLdb as mdb
 
 #### Constants and parameters for per site/transmitter pulse filtering. #######
 
-# Some parameters. 
+# Burst filter parameters. 
 BURST_INTERVAL = 10         # seconds
 BURST_THRESHOLD = 20        # pulses/second
-SCORE_INTERVAL = 60 * 15    # seconds
-SCORE_NEIGHBORHOOD = 60 * 3 # seconds
-SCORE_ERROR = 0.01          # seconds
 
-# Log output. 
-VERBOSE = False
+# Time filter paramters. 
+SCORE_INTERVAL = 60 * 3     # seconds
+SCORE_NEIGHBORHOOD = 20     # seconds
+
+# Score error for pulse corroboration, as a function of the variation over 
+# the interval. (Second moment of the mode pulse interval). This relationship
+# will be deduced emperically ... for now, it was simply "eye-balled". 
+SCORE_ERROR = lambda(x) : 0.01 * np.log(4*x+2)
+
+# Minumum percentage of transmitter's nominal pulse interval that the expected
+# pulse_interval is allowed to drift. Tiny pulse intervals frequently result 
+# from particularly noisy, but it may not be enough to trigger the burst 
+# filter.
+# 
+#  FIXME This is a bit of a cludge to filter noisy intervals. Perhaps the 
+#        burst filter should be adjusted such that intervals with a mode
+#        pulse interval way too short are filtered out. 
+MIN_DRIFT_PERCENTAGE = 0.33
 
 # Factor by which to multiply timestamps. 
 TIMESTAMP_PRECISION = 1000
 
+BIN_WIDTH = 0.02 
+
 # Some constants. 
 PARAM_BAD = -1
 BURST_BAD = -2 
+
+# Log output. 
+VERBOSE = False
 
 
 
@@ -64,10 +82,13 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
 
   total = 0; max_id = 0
   tx_params = get_tx_params(db_con, dep_id)
-  debug_output("depID=%d parameters: band3=%s, band10=%s" 
+  debug_output("depID=%d parameters: band3=%s, band10=%s, pulse_rate=%s" 
      % (dep_id, 'nil' if tx_params['band3'] == sys.maxint else tx_params['band3'],
-                'nil' if tx_params['band10'] == sys.maxint else tx_params['band10']))
+                'nil' if tx_params['band10'] == sys.maxint else tx_params['band10'], 
+                tx_params['pulse_rate']))
           
+  interval_data = [] # Keep track of pulse rate of each window. 
+
   for interval in get_score_intervals(t_start, t_end):
 
     # Using overlapping windows in order to mitigate 
@@ -76,7 +97,7 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
                           interval[1] + (SCORE_NEIGHBORHOOD / 2))
 
     data = get_interval_data(db_con, dep_id, site_id, augmented_interval)
-
+  
     if data.shape[0] == 0: # Skip empty chunks.
       debug_output("skipping empty chunk")
       continue
@@ -86,19 +107,31 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
                                                           data.shape[0]))
     
     parametric_filter(data, tx_params)
+      
+    if data.shape[0] >= BURST_THRESHOLD: 
+      burst_filter(data, augmented_interval)
 
     # Tbe only way to coroborate isolated points is with other sites. 
-    if data[data.shape[0]-1,2] - data[0,2] > 0: 
-      burst_filter(data, augmented_interval)
-      time_filter(data)
+    if data.shape[0] > 2:
+      (pulse_interval, pulse_variation) = expected_pulse_interval(data, tx_params['pulse_rate'])
+      if pulse_interval > 0:
+        time_filter(data, pulse_interval, pulse_variation)
+        pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
+      else: pulse_interval = pulse_variation = None 
+
+    else: pulse_interval = pulse_variation = None
     
     # When inserting, exclude overlapping points.
-    (count, id) = insert_data(db_con, 
+    (count, id) = update_data(db_con, 
        data[(data[:,2] >= (interval[0] * TIMESTAMP_PRECISION)) & 
-            (data[:,2] <= (interval[1] * TIMESTAMP_PRECISION))])
+            (data[:,2] <  (interval[1] * TIMESTAMP_PRECISION))])
 
+    interval_data.append((interval[0], pulse_interval, pulse_variation))
+  
     total += count
     max_id = id if max_id < id else max_id
+  
+  update_intervals(db_con, dep_id, site_id, interval_data)
   
   return (total, max_id)
 
@@ -110,12 +143,10 @@ def get_score_intervals(t_start, t_end):
   ''' Return a list of scoring windows given arbitrary start and finish. '''  
  
   t_start = int(t_start); t_end = int(t_end)
-  intervals = range(t_start - (t_start % SCORE_INTERVAL), 
-                    t_end + (t_end % SCORE_INTERVAL),
-                    SCORE_INTERVAL)
-                    
-  for i in range(1,len(intervals)): 
-    yield (intervals[i-1], intervals[i])
+  for i in range(t_start - (t_start % SCORE_INTERVAL), 
+                 t_end   + (t_end   % SCORE_INTERVAL),
+                 SCORE_INTERVAL):
+    yield (i, i + SCORE_INTERVAL)
 
 
 def get_interval_data(db_con, dep_id, site_id, interval):
@@ -140,10 +171,10 @@ def get_interval_data(db_con, dep_id, site_id, interval):
     data.append(list(row))
     data[-1][2] = int(data[-1][2] * TIMESTAMP_PRECISION)
   
-  return np.array(data, dtype=np.int)
+  return np.array(data, dtype=np.int64)
 
 
-def insert_data(db_con, data): 
+def update_data(db_con, data): 
   ''' Insert scored data, updating existng records. 
   
     Return the number of inserted scores and the maximum estID. 
@@ -155,7 +186,6 @@ def insert_data(db_con, data):
     inserts.append((data[i,0], data[i,5], data[i,6], data[i,7]))
     deletes.append(data[i,0])
 
-  # TODO Insert or update. 
   cur = db_con.cursor()
   cur.executemany('DELETE FROM estscore WHERE estID = %s', deletes)
   cur.executemany('''INSERT INTO estscore (estID, score, theoretical_score, max_score) 
@@ -165,13 +195,36 @@ def insert_data(db_con, data):
   return (len(inserts), max_id)
 
 
+def update_intervals(db_con, dep_id, site_id, intervals):
+  ''' Insert interval data for (dep, site). ''' 
+  
+  if len(intervals) > 0: 
+
+    cur = db_con.cursor()
+    cur.execute('''DELETE FROM estinterval 
+                    WHERE timestamp >= %s 
+                      AND timestamp <= %s
+                      AND deploymentID = %s
+                      AND siteID = %s''', 
+              (intervals[0][0], intervals[-1][0], dep_id, site_id))
+
+    inserts = []
+    for (t, pulse_rate, pulse_variation) in intervals:
+      inserts.append((dep_id, site_id, t, SCORE_INTERVAL, pulse_rate, pulse_variation))
+      
+    cur.executemany('''INSERT INTO estinterval (deploymentID, siteID, timestamp, 
+                                                duration, pulse_interval, pulse_variation)
+                             VALUE (%s, %s, %s, %s, %s, %s)''', inserts)
+
+
+
 def get_tx_params(db_con, dep_id): 
   ''' Get transmitter parameters for band filter as a dictionary.
     
     `band3` and `band10` are expected to be among the tramsitter's 
     paramters and converted to integers. If they're unspecified (NULL), 
-    they are given `sys.maxint`. All other paramters are treated as 
-    strings.
+    they are given `sys.maxint`. `pulse_ratae` is interpreted as a float
+    pulses / minute. All other paramters are treated as strings.
   ''' 
 
   cur = db_con.cursor()
@@ -196,6 +249,9 @@ def get_tx_params(db_con, dep_id):
       else: 
         params['band10'] = int(value)
 
+    elif name == 'pulse_rate': 
+      params[name] = float(value)
+
     else: 
       params[name] = value
 
@@ -205,29 +261,45 @@ def get_tx_params(db_con, dep_id):
 
 ##### Per site/transmitter filters. ###########################################
 
-def expected_pulse_interval(data): 
+def expected_pulse_interval(data, pulse_rate): 
   ''' Compute expected pulse rate over data.
   
     Data is assumed to be sorted by timestamp and timestamps should be
     multiplied by `TIMESTAMP_PRECISION`. (See `get_interval_data()`.)  
+
+    :param pulse_rate: Transmitter's nominal pulse rate in pulses / minute. 
   ''' 
   
   (rows, cols) = data.shape
-  
+  max_interval = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION
+  min_interval = ((60 * MIN_DRIFT_PERCENTAGE) / pulse_rate) * TIMESTAMP_PRECISION
+  bin_width = BIN_WIDTH * TIMESTAMP_PRECISION
+
   # Compute pairwise time differentials. 
   diffs = []
   for i in range(rows):
     for j in range(i+1, rows): 
-      diffs.append(data[j,2] - data[i,2])
+      diff = data[j,2] - data[i,2]
+      if min_interval < diff and diff < max_interval: 
+        diffs.append(diff)
 
-  # Create a histogram. Bins are scaled by `SCORE_ERROR`. 
-  (hist, bins) = np.histogram(diffs, bins = (max(data[:,2]) - min(data[:,2]))
-                                        / (SCORE_ERROR * TIMESTAMP_PRECISION))
+  # Create a histogram. Bins are scaled by `BIN_WIDTH`. 
+  (hist, bins) = np.histogram(diffs, bins = (max(data[:,2]) - min(data[:,2])) / bin_width)
   
+  # Mode pulse interval = expected pulse interval. 
   i = np.argmax(hist)
-  #print "Expected pulse interval is %.2f seconds" % ((bins[i] + bins[i+1])
-  #                                             / (2 * TIMESTAMP_PRECISION))
-  return int(bins[i] + bins[i+1]) / 2
+  mode = int(bins[i] + bins[i+1]) / 2
+
+  # Second moment of mode. 
+  second_moment = 0
+  if mode > 0:
+    m = float(mode) / TIMESTAMP_PRECISION
+    for j in range(hist.shape[0]-1): 
+      x = float(bins[j] + bins[j+1]) / (2 * TIMESTAMP_PRECISION)
+      f = float(hist[j]) / hist[i] 
+      second_moment += BIN_WIDTH * f * (x - m) ** 2 
+
+  return (mode, second_moment)
 
 
 def parametric_filter(data, tx_params): 
@@ -241,7 +313,7 @@ def parametric_filter(data, tx_params):
     if data[i,3] > tx_params['band3'] or data[i,4] > tx_params['band10']:
       data[i,5] = PARAM_BAD
 
-  return data[data[:,5] != PARAM_BAD]
+  #return data[data[:,5] != PARAM_BAD]
 
 
 def burst_filter(data, interval): 
@@ -279,19 +351,17 @@ def burst_filter(data, interval):
       if t0 <= data[i,2] and data[i,2] <= t1:
         data[i,5] = BURST_BAD
 
-  return data[data[:,5] != BURST_BAD]
+  #return data[data[:,5] != BURST_BAD]
 
 
-def time_filter(data, thresh=None):
+def time_filter(data, pulse_interval, pulse_variation, thresh=None):
   ''' Time filter. Calculate absolute score and normalize. 
     
     `thresh` is either None or in [0 .. 1]. If `thresh` is not none,
     it returns data with relative score of at least this value. 
   ''' 
 
-  # Compute expected pulse interval. 
-  pulse_interval = expected_pulse_interval(data)
-  pulse_error = int(SCORE_ERROR * TIMESTAMP_PRECISION)
+  pulse_error = int(SCORE_ERROR(pulse_variation) * TIMESTAMP_PRECISION)
   delta = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION / 2 
     
   # Best score theoretically possible for this interval. 
@@ -319,71 +389,74 @@ def time_filter(data, thresh=None):
   
   data[:,7] = np.max(data[:,5]) # Max count. 
 
-  if thresh:
-    return data[data[:,5].astype(np.float) / data[:,6] > thresh]
-  else:
-    return data
+  #if thresh:
+  #  return data[data[:,5].astype(np.float) / data[:,6] > thresh]
+  #else:
+  #  return data
 
 
 
 #### Testing, testing ... #####################################################
+if __name__ == '__main__':
+  import qraat
 
-def test1(): 
-  db_con = qraat.util.get_db('writer')
-  
-  # Calibration data
-  #dep_id = 51; site_id = 2; 
-  #t_start, t_end = 1376427421, 1376434446
-  
-  # A walk through the woods 
-  #dep_id = 61; site_id = 3; 
-  #t_start, t_end = 1396725598, 1396732325
-  
-  # A woodrat on Aug 8
-  dep_id = 102; site_id = 2; 
-  t_start, t_end = 1407448817.94, 1407466794.77
-
-  tx_params = get_tx_params(db_con, dep_id)
-  count = 0
-  p = 0 
-
-  for interval in get_score_intervals(t_start, t_end):
-    data = get_interval_data(db_con, dep_id, site_id, interval)
-    if data.shape[0] == 0: 
-      print "skipping empty chunk."
-      continue
+  def test1(): 
+    db_con = qraat.util.get_db('writer')
     
-    parametric_filter(data, tx_params)
+    # Calibration data
+    #dep_id = 51; site_id = 2; 
+    #t_start, t_end = 1376427421, 1376434446
+    
+    # A walk through the woods 
+    #dep_id = 61; site_id = 3; 
+    #t_start, t_end = 1396725598, 1396732325
+    
+    # A woodrat on Aug 8
+    dep_id = 102; site_id = 2; 
+    t_start, t_end = 1407448817.94, 1407466794.77
 
-    if data.shape[0] > 1 and data[data.shape[0]-1,2] - data[0,2] > 0: 
-      burst_filter(data, interval)
-      filtered_data = time_filter(data, 0.15)
+    tx_params = get_tx_params(db_con, dep_id)
+    count = 0
+    p = 0 
 
-      #insert_data(db_con, data)
+    for interval in get_score_intervals(t_start, t_end):
+      data = get_interval_data(db_con, dep_id, site_id, interval)
+      if data.shape[0] == 0: 
+        print "skipping empty chunk."
+        continue
+      
+      parametric_filter(data, tx_params)
 
-      # Output ... 
-        
-      if True: 
-        print "Time:", interval, "Count:", data.shape[0]
-        print data.shape, filtered_data.shape
-        fella = filtered_data
-        if fella.shape[0] > 0 and fella[fella.shape[0]-1,2] - fella[0,2] > 0: 
-          max_score = float(np.max(fella[:,5]))
-          for i in range(fella.shape[0]):
-            row = fella[i,:]
-            theoretical_score = float(row[6])
-            relscore = round(row[5] / theoretical_score, 3)
-            q = round(row[2] / 1000.0, 2)
-            print row[0], q, row[5], row[6], relscore, round(q-p, 2)
-            p = q
-          print 
+      if data.shape[0] > 1 and data[data.shape[0]-1,2] - data[0,2] > 0: 
+        burst_filter(data, interval)
+        filtered_data = time_filter(data, 0.15)
 
-    else: print "too small."
+        #update_data(db_con, data)
 
-def test2():
-  db_con = qraat.util.get_db('writer')
-  for interval in get_score_intervals(1376427421, 1376427421 + 23):
-    print interval
+        # Output ... 
+          
+        if True: 
+          print "Time:", interval, "Count:", data.shape[0]
+          print data.shape, filtered_data.shape
+          fella = filtered_data
+          if fella.shape[0] > 0 and fella[fella.shape[0]-1,2] - fella[0,2] > 0: 
+            max_score = float(np.max(fella[:,5]))
+            for i in range(fella.shape[0]):
+              row = fella[i,:]
+              theoretical_score = float(row[6])
+              relscore = round(row[5] / theoretical_score, 3)
+              q = round(row[2] / 1000.0, 2)
+              print row[0], q, row[5], row[6], relscore, round(q-p, 2)
+              p = q
+            print 
 
-if __name__ == '__main__': 
+      else: print "too small."
+
+  def test2():
+    db_con = qraat.util.get_db('writer')
+    for interval in get_score_intervals(1376427421, 1376427421 + 23):
+      print interval
+
+ 
   test1()
+#end main()

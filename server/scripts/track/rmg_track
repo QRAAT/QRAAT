@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_track
 #
 # Copyright (C) 2014 Christopher Patton
@@ -52,7 +52,7 @@ try:
   start = time.time()
   print "track: start time:", time.asctime(time.localtime(start))
 
-  db_con = qraat.util.get_db('writer')
+  db_con = qraat.srv.util.get_db('writer')
   
   print "track: fetching positions."
   pos_ids = qraat.srv.track.get_pos_ids(db_con, options.dep_id, options.t_start, options.t_end)

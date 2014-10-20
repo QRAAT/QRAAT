@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # plot_ll.py. This script is part of QRAAT, an automated 
 # animal tracking system based on GNU Radio. 
 #
@@ -32,7 +32,7 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import MySQLdb as mdb
 import numpy as np
 import time, os, sys
-import qraat, qraat.srv
+import qraat.srv
 from optparse import OptionParser
 
 parser = OptionParser()
@@ -131,7 +131,7 @@ def plot_ll(bl, i, j):
 
 
 
-db_con = qraat.util.get_db('reader')
+db_con = qraat.srv.util.get_db('reader')
 
 print "plot_ll: fetching site data."
 sv = qraat.srv.position.steering_vectors(db_con, options.cal_id)

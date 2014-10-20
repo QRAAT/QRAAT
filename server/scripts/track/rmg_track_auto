@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_track_auto_auto
 # 
 # Copyright (C) 2014 Christopher Patton
@@ -32,15 +32,15 @@ try:
   start = time.time()
   print "track_auto: start time:", time.asctime(time.localtime(start))
 
-  db_con = qraat.util.get_db('writer')
+  db_con = qraat.srv.util.get_db('writer')
 
   # Get positionID of last processed position.  
   cur = db_con.cursor()
-  cur.execute('SELECT value FROM qraat.cursor WHERE name=\'track_pos\'')
+  cur.execute('SELECT value FROM qraat.processing_cursor WHERE name=\'track_pos\'')
   last_processed = cur.fetchone()
   if last_processed is None: 
-    last_processed = 0
-    cur.execute('INSERT INTO qraat.cursor (name, value) VALUE (\'track_pos\', 0)')
+    print >>sys.stderr,  "track_auto: error: No cursor found for track_pos"
+    sys.exit(1)
   else: last_processed = int(last_processed[0])
 
   # Get a list of depIDs with new positions and their earliest timestamp. 
@@ -66,9 +66,6 @@ try:
     pos_ids = qraat.srv.track.get_pos_ids(db_con, dep_id, t_start, t_end)
     pos = qraat.srv.position.Position(db_con, pos_ids)
     print len(pos)
-  
-    if len(pos) < 2:  
-      continue 
 
     print "track_auto: deploymentID=%d: calculating ..." % dep_id,
     track = qraat.srv.track.calc_tracks(db_con, pos, dep_id, C=-5)
@@ -82,7 +79,7 @@ try:
 
   if max_processed > last_processed: 
     print "track_auto: updating cursor to positionID=%d." % max_processed
-    cur.execute('''UPDATE qraat.cursor 
+    cur.execute('''UPDATE qraat.processing_cursor 
                       SET value=%d 
                     WHERE name="track_pos" ''' % max_processed)  
   

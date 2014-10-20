@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # Run these programs with various experiments.
 import sys, os, re, time
 

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # rmg_csv
 # Input a CSV formatted site list on STDIN, return an entry or 
 # modify the file and output to STDOUT. This script is part of the 
