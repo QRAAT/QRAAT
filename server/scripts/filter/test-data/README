@@ -1,5 +1,6 @@
 a.py -- Generate rough partition -> rough.png, siteN.csv
 b.py -- Plot siteN.csv -> good_points_siteN.png
+c.py -- Compile siteN.csv's into one CSV -> test-data.csv
 
 siteN.csv       -- Partitioned points. 
 site3-rough.csv -- Partition for site 3 before fitting noisy parts to curve. 

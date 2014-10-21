@@ -49,61 +49,18 @@ try:
 
   intervals = list(cur.fetchall())
 
-  # Partition good/bad points. 
-  points = []  # (id, t, power) 
-  good = {}    # id -> {True, False}
+  # Partition good/bad points.
 
-  for i in range(len(intervals)-1):
-    
-    # Signal power for pulses in window. 
-    cur.execute('''SELECT id, timestamp, edsp
-                     FROM est
-                    WHERE deploymentID = %s 
-                      AND siteID = %s
-                      AND timestamp >= %s
-                      AND timestamp < %s
-                    ORDER BY timestamp''', (
-          dep_id, site_id, intervals[i][0], intervals[i+1][0]))
-    
-    interval_points = []
-    for (id, t, edsp) in cur.fetchall():
-      interval_points.append((id, t, 10 * np.log10(edsp)))
-
-    avg_power = np.mean(filter(lambda (pwr) : pwr > -20, 
-                            map(lambda (row) : row[2], interval_points)))
-    
-    for row in interval_points: 
-      if abs(row[2] - avg_power) < 0.33: good[row[0]] = True
-      else:                              good[row[0]] = False
-
-    points += interval_points 
- 
-  # Plot good vs bad points for sanity. 
-  good_points = []; bad_points = []
-  for (id, t, power) in points:
-    if good[id]: good_points.append((t, power))
-    else:        bad_points.append((t, power))
-
-  pp.plot([ t for (t,pwr) in good_points ], 
-          [ pwr for (t,pwr) in good_points ], '.')
-  pp.plot([ t for (t,pwr) in bad_points ], 
-          [ pwr for (t,pwr) in bad_points ], 'r.')
-  pp.xlabel("Time (seconds)")
-  pp.ylabel("edsp (dB)")
-  pp.title("Time vs. Power, deploymentID={0:d}, siteID={1:.0f}, {2:d}<timestamp<{3:d}".format(
-    dep_id, site_id, int(t_start), int(t_end)))
-  pp.legend(['Good','Bad'])
-  pp.grid(True)
-  fig = pp.gcf()
-  fig.set_size_inches(16,12)
-  pp.savefig('good_points.png')
-  pp.clf()
+  points = qraat.csv.csv('test-data.csv')
+  good = {} 
+  for p in points: 
+    good[int(p.est_id)] = True if int(p.good) is 1 else False
 
   # Create a grid of (false positive, false_negative)'s. The x-axis is pulse interval 
   # variation and the y-axis is pulse error. 
   
-  score_error_step = 0.005
-  variation_step = 0.04
+  score_error_step = 0.1#0.005
+  variation_step = 3#0.04
   Y = np.arange(0, 0.2, score_error_step)
   X = np.arange(0, 6, variation_step)
   pos = []; neg = []; 
@@ -135,7 +92,7 @@ try:
   
           for (id, score, theoretical_score) in cur.fetchall(): 
             rel_score = float(score) / theoretical_score
-            
+           
             if good[id] and rel_score > EST_SCORE_THRESHOLD:        pass # Ok 
             elif not good[id] and rel_score <= EST_SCORE_THRESHOLD: pass # Ok
             elif not good[id] and rel_score > EST_SCORE_THRESHOLD:  false_pos += 1 # False positive
