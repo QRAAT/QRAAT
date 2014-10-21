@@ -10,7 +10,7 @@ import os, sys, time
 import pickle
 
 dep_id  = 105
-site_id = 5
+site_id = 1
 t_start = 1410721127
 t_end   = 1410807696
 
@@ -52,7 +52,7 @@ try:
     for (id, t, edsp) in cur.fetchall():
       interval_points.append((id, t, 10 * np.log10(edsp)))
 
-    avg_power = np.mean(filter(lambda (pwr) : pwr > -35 and pwr < -28,
+    avg_power = np.mean(filter(lambda (pwr) : pwr > -35 and pwr < -29,
                             map(lambda (row) : row[2], interval_points)))
     
     for row in interval_points: 
