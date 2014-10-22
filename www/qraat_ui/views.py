@@ -274,7 +274,7 @@ def get_context(request, deps=[], req_deps=[]):
             activity_low, activity_high, ))
 
       else: 
-        raise Exception("Somethign is wrong.")
+        raise Exception("Something is wrong.")
      
       for row in queried_objects:
         #(lat, lon) = utm.to_latlon(float(row.easting), 
