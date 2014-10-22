@@ -4,39 +4,58 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as pp
+from scipy.optimize import curve_fit
 import os, sys, time
 import pickle
 
 EST_SCORE_THRESHOLD = float(sys.argv[1])
 
 (X, Y, pos, neg) = pickle.load(open('result%0.1f' % EST_SCORE_THRESHOLD))
-extent = [np.min(X), np.max(X), 
-          np.min(Y), np.max(Y)]
+extent = [0.0, 4.0, 
+          0.0, 0.2]
 
 
-pos_norm = float(np.max(pos.flat))
-neg_norm = float(np.max(neg.flat))
+pos_norm = 1#float(np.max(pos.flat))
+neg_norm = 1#float(np.max(neg.flat))
 
-C_p = 2 
-C_n = 1
+C_p = 10
+C_n = 1 
 opt = []
 for i in range(len(X)):
-  min_score = float("+inf")
-  min_index = 0 
-  for j in range(len(Y)): 
+  min_score = sys.maxint
+  min_index = len(Y) - 1 
+  for j in reversed(range(len(Y))): 
     score = (C_p * (pos[j,i] / pos_norm)) + (C_n * (neg[j,i] / neg_norm)) 
     if score < min_score:
       min_index = j
       min_score = score
   opt.append(Y[min_index])
 
-#X = np.array(list(reversed(X)))
-#opt = list(reversed(opt))
+Y = np.array(opt)
+
+
+# Fit a curve to the optimal false positive / negative trade-off. 
+class F:
+
+  def __call__(self, x, a, b, c): 
+    return (a / (x + b)) + c
+
+  def inverse(self, y, a, b, c):
+    return (a / (y - c)) - b 
+
+  def get(self, popt):
+    return "f = lambda(x) : (%0.4f / (x + %0.4f)) + %0.4f" % tuple(popt)
+
+f = F() 
+popt, pcov = curve_fit(f.__call__, X, Y)
+
+print "Curve:", f.get(popt)
+
 
 # False positives
 pp.imshow(pos, extent=extent, aspect='auto', interpolation='nearest')
-pp.plot(X, qraat.srv.signal.SCORE_ERROR(X), 'k-')
-pp.plot(X, opt, 'wo')
+pp.plot(X, 0.2 - f(X, *popt), 'k-', label="Fitted curve")
+pp.plot(X, 0.2 - Y, 'wo', label='Optimal trade-off')
 fig = pp.gcf()
 fig.set_size_inches(16,12)
 cb = pp.colorbar()
@@ -49,8 +68,8 @@ pp.clf()
 
 # False negatives
 pp.imshow(neg, extent=extent, aspect='auto', interpolation='nearest')
-pp.plot(X, qraat.srv.signal.SCORE_ERROR(X), 'k-')
-pp.plot(X, opt, 'wo')
+pp.plot(X, 0.2 - f(X, *popt), 'k-', label="Fitted curve")
+pp.plot(X, 0.2 - Y, 'wo', label='Optimal trade-off')
 fig = pp.gcf()
 fig.set_size_inches(16,12)
 cb = pp.colorbar()

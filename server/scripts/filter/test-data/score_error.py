@@ -23,7 +23,6 @@ import os, sys, time
 import pickle
 
 dep_id  = 105
-site_id = 8
 t_start = 1410721127
 t_end   = 1410807696
 
@@ -42,10 +41,9 @@ try:
   cur.execute('''SELECT timestamp, pulse_interval, pulse_variation
                    FROM estinterval
                   WHERE deploymentID = %s 
-                    AND siteID = %s
                     AND timestamp >= %s
                     AND timestamp <= %s
-                  ORDER BY timestamp''', (dep_id, site_id, t_start, t_end))
+                  ORDER BY timestamp''', (dep_id, t_start, t_end))
 
   intervals = list(cur.fetchall())
 
@@ -59,10 +57,10 @@ try:
   # Create a grid of (false positive, false_negative)'s. The x-axis is pulse interval 
   # variation and the y-axis is pulse error. 
   
-  score_error_step = 0.1#0.005
-  variation_step = 3#0.04
+  score_error_step = 0.005
+  variation_step = 0.04
   Y = np.arange(0, 0.2, score_error_step)
-  X = np.arange(0, 6, variation_step)
+  X = np.arange(0, 4, variation_step)
   pos = []; neg = []; 
 
   for score_error in reversed(Y): 
@@ -72,7 +70,7 @@ try:
     # Run signal filter.
     qraat.srv.signal.SCORE_ERROR = lambda(x) : score_error
     print >>sys.stderr, "score_error = %.3f" % qraat.srv.signal.SCORE_ERROR(0)
-    (total, _) = qraat.srv.signal.Filter(db_con, dep_id, site_id, t_start, t_end)
+    (total, _) = qraat.srv.signal.Filter2(db_con, dep_id, t_start, t_end)
 
     # Count the number of false positives and false negatives in each variation range. 
     false_pos = false_neg = 0
@@ -82,18 +80,16 @@ try:
         
         if variation <= intervals[i][2] and intervals[i][2] < variation + variation_step:
             
-          cur.execute('''SELECT estID, score, theoretical_score
+          cur.execute('''SELECT estID, score / theoretical_score
                            FROM estscore JOIN est ON est.ID = estscore.estID
                           WHERE deploymentID = %s 
-                            AND siteID = %s
                             AND timestamp >= %s
                             AND timestamp < %s''', (
-                  dep_id, site_id, intervals[i][0], intervals[i+1][0]))
+                  dep_id, intervals[i][0], intervals[i+1][0]))
   
-          for (id, score, theoretical_score) in cur.fetchall(): 
-            rel_score = float(score) / theoretical_score
-           
-            if good[id] and rel_score > EST_SCORE_THRESHOLD:        pass # Ok 
+          for (id, rel_score) in cur.fetchall():
+            if good.get(id) == None: print 'Uh oh!', id
+            elif good[id] and rel_score > EST_SCORE_THRESHOLD:        pass # Ok 
             elif not good[id] and rel_score <= EST_SCORE_THRESHOLD: pass # Ok
             elif not good[id] and rel_score > EST_SCORE_THRESHOLD:  false_pos += 1 # False positive
             elif good[id] and rel_score <= EST_SCORE_THRESHOLD:     false_neg += 1 # False negative
