@@ -709,7 +709,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
 
 <div id = "text">
 {% if project %}
-<a href={%url 'qraat:show-project' project.ID %}#deployments><h4>{{project.name}}</h4></a>
+<a href={%url 'qraat:show-project' project.ID %}#deployments><h4><center>{{project.name}}</center></h4></a>
 {% endif %}
 
 {% if target_name %}
@@ -721,7 +721,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
 {% endif %}
 
 <div class="section_title">PREFERENCES
-  <button onclick="submitForm()">Submit Form</button>
+  <button onclick="submitForm()">Update Map</button>
   <button onclick="submitDownloadForm()">Download CSV</button>
 </div>
 <div id ="prefs">
