@@ -5,12 +5,6 @@
 # useful extension to this work will be to coroborate points between
 # sites. 
 
-# TODO Change estinterval.pulse_rate to pulse_interval. 
-
-# TODO Don't double count pulses that fall within the same error 
-#      window. To do this, throw pulses in a bucket data structure. 
-
-
 # NOTE It would be nice if np.where() would return a shallow
 #      copy. Then we could do 
 #       time_filter(burst_filter(parametric_filter(data, _), _), _)
@@ -23,7 +17,7 @@
 #      into the theoretical score over the pulse's neighborhood. 
 
 
-
+import util
 import sys
 import numpy as np
 
@@ -172,7 +166,7 @@ def Filter2(db_con, dep_id, t_start, t_end):
         
     (pulse_interval, pulse_variation) = expected_pulse_interval(data, tx_params['pulse_rate'])
 
-    for site_id in sites: 
+    for site_id in sites:
       
       if data[site_id].shape[0] == 0: # Skip empty chunks.
         debug_output("siteID=%s: skipping empty chunk" % site_id)
@@ -446,6 +440,51 @@ def time_filter(data, pulse_interval, pulse_variation, thresh=None):
   # Best score theoretically possible for this interval. 
   theoretical_count = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION / pulse_interval
 
+  # Put pulses into at most score_neighborhood / pulse_error bins. 
+  bins = {}
+  for i in range(data.shape[0]):
+    if data[i,5] < 0: # Skip if pulse didn't pass a previous filter. 
+      continue
+  
+    t = data[i,2] - (data[i,2] % pulse_error)
+    if bins.get(t): 
+      bins[t].append(i)
+    else: bins[t] = [i]
+
+  # Score pulses in bins with exactly one pulse. 
+  for (_, points) in bins.iteritems():
+    if len(points) > 1: 
+      data[i,5] = 0
+
+    else:
+      count = 0
+      i = points[0]
+      N = (delta / pulse_interval) 
+      for n in range(-N+1, N):
+        t = data[i,2] + (pulse_interval * n)
+        t -= (t % pulse_error)
+        if bins.get(t):
+          count += 1 
+      data[i,5] = count - 1 # Counted myself.
+  
+  data[:,6] = theoretical_count
+  data[:,7] = np.max(data[:,5]) # Max count. 
+
+
+# TODO Deprecate
+def time_filter0(data, pulse_interval, pulse_variation, thresh=None):
+  ''' Time filter. Calculate absolute score and normalize. 
+    
+    `thresh` is either None or in [0 .. 1]. If `thresh` is not none,
+    it returns data with relative score of at least this value. 
+  ''' 
+
+  pulse_error = int(SCORE_ERROR(pulse_variation) * TIMESTAMP_PRECISION)
+  delta = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION / 2 
+    
+  # Best score theoretically possible for this interval. 
+  theoretical_count = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION / pulse_interval
+
   # For each pulse, count the number of coroborating points, i.e., 
   # points that are a pulse interval away within paramterized error.
   for i in range(data.shape[0]):
@@ -477,10 +516,10 @@ def time_filter(data, pulse_interval, pulse_variation, thresh=None):
 
 #### Testing, testing ... #####################################################
 if __name__ == '__main__':
-  import qraat
+  VERBOSE = True 
 
   def test1(): 
-    db_con = qraat.util.get_db('writer')
+    db_con = util.get_db('writer')
     
     # Calibration data
     #dep_id = 51; site_id = 2; 
@@ -490,49 +529,20 @@ if __name__ == '__main__':
     #dep_id = 61; site_id = 3; 
     #t_start, t_end = 1396725598, 1396732325
     
+    # Fixed tx test data 
+    dep_id  = 105
+    t_start = 1410721127.0
+    t_end   = 1410807696.0
+
     # A woodrat on Aug 8
-    dep_id = 102; site_id = 2; 
-    t_start, t_end = 1407448817.94, 1407466794.77
+    #dep_id = 102; site_id = 2; 
+    #t_start, t_end = 1407448817.94, 1407466794.77
 
-    tx_params = get_tx_params(db_con, dep_id)
-    count = 0
-    p = 0 
+    Filter2(db_con, dep_id, t_start, t_end)
 
-    for interval in get_score_intervals(t_start, t_end):
-      data = get_interval_data(db_con, dep_id, site_id, interval)
-      if data.shape[0] == 0: 
-        print "skipping empty chunk."
-        continue
-      
-      parametric_filter(data, tx_params)
-
-      if data.shape[0] > 1 and data[data.shape[0]-1,2] - data[0,2] > 0: 
-        burst_filter(data, interval)
-        filtered_data = time_filter(data, 0.15)
-
-        #update_data(db_con, data)
-
-        # Output ... 
-          
-        if True: 
-          print "Time:", interval, "Count:", data.shape[0]
-          print data.shape, filtered_data.shape
-          fella = filtered_data
-          if fella.shape[0] > 0 and fella[fella.shape[0]-1,2] - fella[0,2] > 0: 
-            max_score = float(np.max(fella[:,5]))
-            for i in range(fella.shape[0]):
-              row = fella[i,:]
-              theoretical_score = float(row[6])
-              relscore = round(row[5] / theoretical_score, 3)
-              q = round(row[2] / 1000.0, 2)
-              print row[0], q, row[5], row[6], relscore, round(q-p, 2)
-              p = q
-            print 
-
-      else: print "too small."
 
   def test2():
-    db_con = qraat.util.get_db('writer')
+    db_con = util.get_db('writer')
     for interval in get_score_intervals(1376427421, 1376427421 + 23):
       print interval
 
