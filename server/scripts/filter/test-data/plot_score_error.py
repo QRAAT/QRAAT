@@ -54,8 +54,8 @@ print "Limit: %0.4f" % (0.20 - f(1000, *popt))
 
 # False positives
 pp.imshow(pos, extent=extent, aspect='auto', interpolation='nearest')
-pp.plot(X, 0.2 - f(X, *popt), 'k-', label="Fitted curve")
-pp.plot(X, 0.2 - Y, 'wo', label='Optimal trade-off')
+pp.plot(X, f(X, *popt), 'k-', label="Fitted curve")
+pp.plot(X, Y, 'wo', label='Optimal trade-off')
 fig = pp.gcf()
 fig.set_size_inches(16,12)
 cb = pp.colorbar()
@@ -68,8 +68,8 @@ pp.clf()
 
 # False negatives
 pp.imshow(np.log(neg), extent=extent, aspect='auto', interpolation='nearest')
-pp.plot(X, 0.2 - f(X, *popt), 'k-', label="Fitted curve")
-pp.plot(X, 0.2 - Y, 'wo', label='Optimal trade-off')
+pp.plot(X, f(X, *popt), 'k-', label="Fitted curve")
+pp.plot(X, Y, 'wo', label='Optimal trade-off')
 fig = pp.gcf()
 fig.set_size_inches(16,12)
 cb = pp.colorbar()
