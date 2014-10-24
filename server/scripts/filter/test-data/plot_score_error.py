@@ -18,7 +18,7 @@ extent = [0.0, 4.0,
 pos_norm = 1#float(np.max(pos.flat))
 neg_norm = 1#float(np.max(neg.flat))
 
-C_p = 10
+C_p = 30
 C_n = 1 
 opt = []
 for i in range(X.shape[0]):
@@ -46,10 +46,14 @@ class F:
     return "lambda(x) : (%0.4f / (x + %0.4f)) + %0.4f" % tuple(popt)
 
 f = F() 
-popt, pcov = curve_fit(f.__call__, X, Y)
-
+popt = [-0.0034, 0.0591, 0.0818]
+#popt, pcov = curve_fit(f.__call__, X, Y)
 print "SCORE_ERROR =", f.get(popt)
-print "Limit: %0.4f" % (0.20 - f(1000, *popt))
+#print "Limit: %0.4f" % (0.20 - f(1000, *popt))
+#coeff = np.polyfit(X, Y, 4)
+#print map(lambda x : round(x, 5), list(coeff))
+#p = np.poly1d(coeff) 
+
 
 
 # False positives
