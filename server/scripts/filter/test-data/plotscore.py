@@ -14,22 +14,21 @@ EST_SCORE_THRESHOLD = float(sys.argv[1])
 extent = [0.0, 4.0, 
           0.0, 0.2]
 
-
-C_p = 2 
+C_p = 3
 C_n = 1
 opt = []
 for i in range(X.shape[0]):
   min_score = sys.maxint
   min_index = 0 
   for j in range(Y.shape[0]): 
-    score = (C_p * pos[j,i]) + (C_n * neg[j,i])
-    if pos[j,i] < 0.045 and score < min_score:
+    score = abs((C_p * pos[j,i]) - (C_n * neg[j,i]))
+    if pos[j,i] < 0.1 and score < min_score:
       min_index = j
       min_score = score
-  opt.append(Y[min_index])
+  opt.append(Y[-min_index])
 
 Y = np.array(opt)
-print "Optimal trade-off:", Y 
+print "Optimal trade-off:\n", Y 
 
 # Fit a curve to the optimal false positive / negative trade-off. 
 class F:
@@ -43,16 +42,13 @@ class F:
   def get(self, popt):
     return "lambda(x) : (%0.4f / (x + %0.4f)) + %0.4f" % tuple(popt)
 
-f = F() 
-
-#popt = [0.1203, 0.8985, -0.0086 + 0.1]
+#f = F() 
 #popt, pcov = curve_fit(f.__call__, X, Y)
 #print "SCORE_ERROR =", f.get(popt)
-#print "Limit: %0.4f" % (0.20 - f(1000, *popt))
 
-coeff = np.polyfit(X, Y, 4)
+coeff = np.polyfit(X, Y, 6)
 p = np.poly1d(coeff) 
-print "Coefficients:", map(lambda x : round(x, 5), list(coeff))
+print "SCORE_ERROR = np.poly1d(%s)" % map(lambda x : round(x, 5), list(coeff))
 print "p(0) = %0.4f" % p(0)
 print "p(1) = %0.4f" % p(1)
 print "p(2) = %0.4f" % p(2)
@@ -61,9 +57,9 @@ print "p(4) = %0.4f" % p(4)
 
 # False positives
 pp.imshow(pos, extent=extent, aspect='auto', interpolation='nearest')
-#pp.plot(X, f(X, *popt), 'k-', label="Fitted curve")
 pp.plot(X, Y, 'wo', label='Optimal trade-off')
 pp.plot(X, p(X), 'k-', label="Fitted curve")
+#pp.plot(X, f(X, *popt), 'k.', label="Fitted curve")
 fig = pp.gcf()
 fig.set_size_inches(16,12)
 cb = pp.colorbar()
@@ -76,9 +72,9 @@ pp.clf()
 
 # False negatives
 pp.imshow(neg, extent=extent, aspect='auto', interpolation='nearest')
-#pp.plot(X, f(X, *popt), 'k-', label="Fitted curve")
 pp.plot(X, Y, 'wo', label='Optimal trade-off')
 pp.plot(X, p(X), 'k-', label="Fitted curve")
+#pp.plot(X, f(X, *popt), 'k.', label="Fitted curve")
 fig = pp.gcf()
 fig.set_size_inches(16,12)
 cb = pp.colorbar()
