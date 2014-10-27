@@ -26,10 +26,6 @@ dep_id  = 105
 t_start = 1410721127
 t_end   = 1410807696
 
-EST_SCORE_THRESHOLD = float(sys.argv[1]) # float(os.environ["RMG_POS_EST_THRESHOLD"]) 
-                                         # greater than
-print "Score threshold:",  EST_SCORE_THRESHOLD
-
 try: 
   start = time.time()
   print >>sys.stderr, "score_error: start time:", time.asctime(time.localtime(start))
@@ -61,11 +57,12 @@ try:
   variation_step = 0.04
   Y = np.arange(0, 0.2, score_error_step)
   X = np.arange(0, 4, variation_step)
-  pos = []; neg = []; 
+  prescores = [ [ [] for j in Y ] for i in X ] 
 
+  y = len(Y)
   for score_error in reversed(Y): 
     
-    pos.append([]); neg.append([])
+    y -= 1
 
     # Run signal filter.
     qraat.srv.signal.SCORE_ERROR = lambda(x) : score_error
@@ -73,31 +70,23 @@ try:
     (total, _) = qraat.srv.signal.Filter2(db_con, dep_id, t_start, t_end)
 
     # Count the number of false positives and false negatives in each variation range. 
-    false_pos = false_neg = 0
+    x = 0
     for variation in X: 
-
       for i in range(len(intervals)-1): 
-        
         if variation <= intervals[i][2] and intervals[i][2] < variation + variation_step:
-            
           cur.execute('''SELECT estID, score / theoretical_score
                            FROM estscore JOIN est ON est.ID = estscore.estID
                           WHERE deploymentID = %s 
                             AND timestamp >= %s
                             AND timestamp < %s''', (
                   dep_id, intervals[i][0], intervals[i+1][0]))
-  
           for (id, rel_score) in cur.fetchall():
             if good.get(id) == None: print 'Uh oh!', id
-            elif good[id] and rel_score > EST_SCORE_THRESHOLD:        pass # Ok 
-            elif not good[id] and rel_score <= EST_SCORE_THRESHOLD: pass # Ok
-            elif not good[id] and rel_score > EST_SCORE_THRESHOLD:  false_pos += 1 # False positive
-            elif good[id] and rel_score <= EST_SCORE_THRESHOLD:     false_neg += 1 # False negative
+            else: prescores[x][y].append((good[id], rel_score))
 
-      pos[-1].append(false_pos); neg[-1].append(false_neg)
-      
-  pickle.dump((X, Y, np.array(pos), np.array(neg)), 
-                 open('result%0.1f' % EST_SCORE_THRESHOLD, 'w')) # Dump result
+      x += 1
+
+  pickle.dump((X, Y, prescores), open('result', 'w')) # Dump result
   
 
 except mdb.Error, e:

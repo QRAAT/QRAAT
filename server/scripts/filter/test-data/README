@@ -7,9 +7,14 @@ site3-rough.csv -- Partition for site 3 before fitting noisy parts to curve.
 
 good_points_siteN.png -- Plot of good vs bad points.
 
-score_error.py -- False positive/negative counts per variation and fixed 
-                  score error. --> resultX, X = score threshold for pos.
-                  estimator
+prescore.py -- Run pulse filter for various fixed pulse errors quantized by 
+               variation. Store the score for each pulse and whether or not 
+               it's good or bad. (Input is test-data.csv.) --> result
 
-plot_score_error.py -- Plot resultX. 
+postscore.py -- False positive/negative counts per variation and fixed score 
+                error. (Input is reslut.) --> resultX, X = score threshold for 
+                pos. estimator
+
+plotscore.py -- Plot false positves/negatives. (Input is resultX.) 
+                 --> false_{positives,negatives}_X.png
 

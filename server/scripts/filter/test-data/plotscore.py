@@ -15,23 +15,21 @@ extent = [0.0, 4.0,
           0.0, 0.2]
 
 
-pos_norm = 1#float(np.max(pos.flat))
-neg_norm = 1#float(np.max(neg.flat))
-
-C_p = 30
-C_n = 1 
+C_p = 2 
+C_n = 1
 opt = []
 for i in range(X.shape[0]):
   min_score = sys.maxint
   min_index = 0 
   for j in range(Y.shape[0]): 
-    score = (C_p * (pos[j,i] / pos_norm)) + (C_n * (neg[j,i] / neg_norm)) 
-    if score < min_score:
+    score = (C_p * pos[j,i]) + (C_n * neg[j,i])
+    if pos[j,i] < 0.045 and score < min_score:
       min_index = j
       min_score = score
   opt.append(Y[min_index])
 
 Y = np.array(opt)
+print "Optimal trade-off:", Y 
 
 # Fit a curve to the optimal false positive / negative trade-off. 
 class F:
@@ -46,20 +44,26 @@ class F:
     return "lambda(x) : (%0.4f / (x + %0.4f)) + %0.4f" % tuple(popt)
 
 f = F() 
-popt = [-0.0034, 0.0591, 0.0818]
+
+#popt = [0.1203, 0.8985, -0.0086 + 0.1]
 #popt, pcov = curve_fit(f.__call__, X, Y)
-print "SCORE_ERROR =", f.get(popt)
+#print "SCORE_ERROR =", f.get(popt)
 #print "Limit: %0.4f" % (0.20 - f(1000, *popt))
-#coeff = np.polyfit(X, Y, 4)
-#print map(lambda x : round(x, 5), list(coeff))
-#p = np.poly1d(coeff) 
 
-
+coeff = np.polyfit(X, Y, 4)
+p = np.poly1d(coeff) 
+print "Coefficients:", map(lambda x : round(x, 5), list(coeff))
+print "p(0) = %0.4f" % p(0)
+print "p(1) = %0.4f" % p(1)
+print "p(2) = %0.4f" % p(2)
+print "p(3) = %0.4f" % p(3)
+print "p(4) = %0.4f" % p(4)
 
 # False positives
 pp.imshow(pos, extent=extent, aspect='auto', interpolation='nearest')
-pp.plot(X, f(X, *popt), 'k-', label="Fitted curve")
+#pp.plot(X, f(X, *popt), 'k-', label="Fitted curve")
 pp.plot(X, Y, 'wo', label='Optimal trade-off')
+pp.plot(X, p(X), 'k-', label="Fitted curve")
 fig = pp.gcf()
 fig.set_size_inches(16,12)
 cb = pp.colorbar()
@@ -71,9 +75,10 @@ pp.ylabel("Score error")
 pp.clf()
 
 # False negatives
-pp.imshow(np.log(neg), extent=extent, aspect='auto', interpolation='nearest')
-pp.plot(X, f(X, *popt), 'k-', label="Fitted curve")
+pp.imshow(neg, extent=extent, aspect='auto', interpolation='nearest')
+#pp.plot(X, f(X, *popt), 'k-', label="Fitted curve")
 pp.plot(X, Y, 'wo', label='Optimal trade-off')
+pp.plot(X, p(X), 'k-', label="Fitted curve")
 fig = pp.gcf()
 fig.set_size_inches(16,12)
 cb = pp.colorbar()
@@ -83,3 +88,4 @@ pp.title("Frequency of false negatives (threshold = %0.1f" % EST_SCORE_THRESHOLD
 pp.xlabel("Variation")
 pp.ylabel("Score error")
 pp.clf()
+
