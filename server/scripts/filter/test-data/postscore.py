@@ -34,34 +34,35 @@ try:
   start = time.time()
   print >>sys.stderr, "score_error: start time:", time.asctime(time.localtime(start))
 
-  print "score_error: threshold:",  EST_SCORE_THRESHOLD
   print "score_error: loading file ... "
   (X, Y, prescores) = pickle.load(open('result'))
-  pos = []; neg = []; 
 
-  print "score_error: counting false positives / negatives ... "
-  for y in reversed(range(len(Y))): 
+  for EST_SCORE_THRESHOLD in map(lambda (x) : float(x), sys.argv[1:]):
+    pos = []; neg = []; 
+    print "score_error: counting false positives / negatives (%0.2f) ... " % EST_SCORE_THRESHOLD
     
-    pos.append([]); neg.append([])
-
-    # Count the number of false positives and false negatives in each variation range. 
-    false_pos = false_neg = 0
-    good_count = bad_count = 0
-    for x in range(len(X)):
-      for (good, rel_score) in prescores[x][y]:
-        if good and rel_score > EST_SCORE_THRESHOLD:        pass # Ok
-        elif not good and rel_score <= EST_SCORE_THRESHOLD: pass # Ok
-        elif not good and rel_score > EST_SCORE_THRESHOLD:  false_pos += 1 # False positive
-        elif good and rel_score <= EST_SCORE_THRESHOLD:     false_neg += 1 # False negative
-   
-        if good: good_count += 1
-        else: bad_count += 1
-        
-      pos[-1].append(float(false_pos) / bad_count)
-      neg[-1].append(float(false_neg) / good_count)
+    for y in reversed(range(len(Y))): 
       
-  pickle.dump((X, Y, np.array(pos), np.array(neg)), 
-                 open('result%0.1f' % EST_SCORE_THRESHOLD, 'w')) # Dump result
+      pos.append([]); neg.append([])
+
+      # Count the number of false positives and false negatives in each variation range. 
+      false_pos = false_neg = 0
+      good_count = bad_count = 0
+      for x in range(len(X)):
+        for (good, rel_score) in prescores[x][y]:
+          if good and rel_score > EST_SCORE_THRESHOLD:        pass # Ok
+          elif not good and rel_score <= EST_SCORE_THRESHOLD: pass # Ok
+          elif not good and rel_score > EST_SCORE_THRESHOLD:  false_pos += 1 # False positive
+          elif good and rel_score <= EST_SCORE_THRESHOLD:     false_neg += 1 # False negative
+     
+          if good: good_count += 1
+          else: bad_count += 1
+          
+        pos[-1].append(float(false_pos) / bad_count)
+        neg[-1].append(float(false_neg) / good_count)
+        
+    pickle.dump((X, Y, np.array(pos), np.array(neg)), 
+                   open('result%0.2f' % EST_SCORE_THRESHOLD, 'w')) # Dump result
   
 
 except mdb.Error, e:

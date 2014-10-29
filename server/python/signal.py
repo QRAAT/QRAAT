@@ -35,8 +35,7 @@ SCORE_NEIGHBORHOOD = 20     # seconds
 # the interval. (Second moment of the mode pulse interval). These curves were 
 # fit to a particular false negative / positive trade-off over a partitioned
 # data set. See server/scripts/filter/test-data for details. 
-#SCORE_ERROR = np.poly1d([-0.00039, 0.00467, -0.02141, 0.04718, -0.05185, 0.02651, 0.01509]) # pos. est. threshold = 0.1
-SCORE_ERROR = lambda(x) : (-0.0451 / (x + 1.7954)) + 0.0581                                  # pos. est. threshold = 0.2
+SCORE_ERROR = lambda(x) : (-0.6324 / (x + 7.7640)) + 0.1255
 
 # Minumum percentage of transmitter's nominal pulse interval that the expected
 # pulse_interval is allowed to drift. Tiny pulse intervals frequently result 
