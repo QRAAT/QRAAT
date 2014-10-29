@@ -35,7 +35,8 @@ SCORE_NEIGHBORHOOD = 20     # seconds
 # the interval. (Second moment of the mode pulse interval). These curves were 
 # fit to a particular false negative / positive trade-off over a partitioned
 # data set. See server/scripts/filter/test-data for details. 
-SCORE_ERROR = lambda(x) : (-0.6324 / (x + 7.7640)) + 0.1255
+SCORE_ERROR = lambda(x) : (-0.6324 / (x + 7.7640)) + 0.1255 # thresh = 0.2
+#SCORE_ERROR = lambda(x) : 0.1956                           # thresh = 0.2
 
 # Minumum percentage of transmitter's nominal pulse interval that the expected
 # pulse_interval is allowed to drift. Tiny pulse intervals frequently result 

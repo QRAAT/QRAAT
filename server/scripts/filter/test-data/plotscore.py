@@ -15,7 +15,7 @@ for EST_SCORE_THRESHOLD in map(lambda(x) : float(x), sys.argv[1:]):
   extent = [0.0, 4.0, 
             0.0, 0.2]
 
-  C_p = 2 
+  C_p = 2
   C_n = 1
   tradeoff = np.zeros(pos.shape)
   for i in range(X.shape[0]):
