@@ -162,19 +162,22 @@ class afsk:
       one_to_zero = np.where(np.diff(b_stream)==1)[0];
       zero_to_one = np.where(np.diff(b_stream)==-1)[0];
 
+      min_length = np.min((one_to_zero.shape[0],zero_to_one.shape[0]))
+
       bit_vector = [];
-      for j in range(one_to_zero.shape[0]-1):
-        symbol_len = one_to_zero[j] - zero_to_one[j];
+
+      if (min_length > 0):
+        for j in range(min_length-1):
+          symbol_len = one_to_zero[j] - zero_to_one[j];
+          for k in range( int( round( (symbol_len - zero_single) / zero_len) ) + 1):
+            bit_vector.append(0)
+          symbol_len = zero_to_one[j+1] - one_to_zero[j]
+          for k in range( int( round( (symbol_len - one_single) / one_len) ) + 1):
+            bit_vector.append(1)
+
+        symbol_len = one_to_zero[min_length-1] - zero_to_one[min_length-1]
         for k in range( int( round( (symbol_len - zero_single) / zero_len) ) + 1):
           bit_vector.append(0)
-        symbol_len = zero_to_one[j+1] - one_to_zero[j]
-        for k in range( int( round( (symbol_len - one_single) / one_len) ) + 1):
-          bit_vector.append(1)
-
-      j += 1
-      symbol_len = one_to_zero[j] - zero_to_one[j]
-      for k in range( int( round( (symbol_len - zero_single) / zero_len) ) + 1):
-        bit_vector.append(0)
 
       #assume trailing 1s to fill out last word
       num_char = int( np.ceil(len(bit_vector)/10.0) )
