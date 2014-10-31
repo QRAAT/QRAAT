@@ -44,7 +44,7 @@ class record_broadband_graph():
     self.directory = options.file_output_directory
     self.tx_name = options.tx_name
     self.pll_freq = round(options.frequency,-5)
-    self.tune_offset = options.frequency - self.pll_freq*10e5
+    self.tune_offset = options.frequency - self.pll_freq
     self.usb_rate = 256000
     self.af_sample_rate = 32000 
     fir_decim = long (self.usb_rate / self.af_sample_rate)
