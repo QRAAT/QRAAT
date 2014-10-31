@@ -114,7 +114,7 @@ try:
     # Run filter. 
     print "evaluate: running filter (%0.2f) ... " % EST_SCORE_THRESHOLD
     qraat.srv.signal.SCORE_ERROR = eval(score_err_str)
-    (total, _) = qraat.srv.signal.Filter2(db_con, dep_id, t_start, t_end)
+    (total, _) = qraat.srv.signal.Filter(db_con, dep_id, t_start, t_end)
     
     # Generate report. 
     cur = db_con.cursor()

@@ -1,5 +1,4 @@
-# score_error.py
-#
+# score_error.py #
 # This is a tool for (hopefullY) emperically deriving a good value for 
 # qraat.srv.filter.SCORE_ERROR for the time filter as a function of 
 # the pulse interval variation. 
@@ -67,7 +66,7 @@ try:
     # Run signal filter.
     qraat.srv.signal.SCORE_ERROR = lambda(x) : score_error
     print >>sys.stderr, "score_error = %.3f" % qraat.srv.signal.SCORE_ERROR(0)
-    (total, _) = qraat.srv.signal.Filter2(db_con, dep_id, t_start, t_end)
+    (total, _) = qraat.srv.signal.Filter(db_con, dep_id, t_start, t_end)
 
     # Count the number of false positives and false negatives in each variation range. 
     x = 0

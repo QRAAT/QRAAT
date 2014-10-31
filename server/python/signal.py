@@ -71,8 +71,7 @@ def debug_output(msg):
   if VERBOSE: 
     print "signal: %s" % msg
 
-
-def Filter(db_con, dep_id, site_id, t_start, t_end): 
+def Filter0(db_con, dep_id, site_id, t_start, t_end): 
   ''' Score points per site and transmitter, insert into database. 
   
     Return the number of pulses that were scored and the last id
@@ -136,7 +135,7 @@ def Filter(db_con, dep_id, site_id, t_start, t_end):
 
 
 
-def Filter2(db_con, dep_id, t_start, t_end): 
+def Filter(db_con, dep_id, t_start, t_end): 
   
   total = 0; max_id = 0
   tx_params = get_tx_params(db_con, dep_id)
