@@ -43,7 +43,8 @@ class record_broadband_graph():
 
     self.directory = options.file_output_directory
     self.tx_name = options.tx_name
-    self.tune_offset = 0
+    self.pll_freq = round(options.frequency,-5)
+    self.tune_offset = options.frequency - self.pll_freq*10e5
     self.usb_rate = 256000
     self.af_sample_rate = 32000 
     fir_decim = long (self.usb_rate / self.af_sample_rate)
@@ -59,10 +60,10 @@ class record_broadband_graph():
 
     # create pic_control
     self.pic = qraat.rmg.pic_interface.pic_interface(options.serial_port)
-    if options.frequency < 215000000:
-      self.pic.tune(options.frequency + 70000000)
+    if self.pll_freq < 215000000:
+      self.pic.tune(self.pll_freq + 70000000)
     else:
-      self.pic.tune(options.frequency - 70000000)
+      self.pic.tune(self.pll_freq - 70000000)
     self.pic.freq_check()
 
   def start(self):
