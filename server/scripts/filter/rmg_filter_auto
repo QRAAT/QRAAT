@@ -62,7 +62,7 @@ try:
                   WHERE ID > %s 
                     AND timestamp < %s''', (last_processed, now)) 
   
-  qraat.srv.signal.VERBOSE = True
+  qraat.srv.signal.VERBOSE = False
   max_id = last_processed
   
   for (dep_id,) in cur.fetchall(): 

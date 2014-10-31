@@ -184,7 +184,7 @@ def Filter(db_con, dep_id, t_start, t_end):
         burst_filter(data[site_id], augmented_interval)
 
       # Tbe only way to coroborate isolated points is with other sites. 
-      if data[site_id].shape[0] > 2:
+      if data[site_id].shape[0] > 2 and pulse_interval > 0:
         time_filter(data[site_id], pulse_interval, pulse_variation)
       
       # When inserting, exclude overlapping points.
