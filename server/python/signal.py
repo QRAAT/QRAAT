@@ -341,7 +341,7 @@ def expected_pulse_interval(data_dict, pulse_rate):
   
   max_interval = ((60 * (2 - MIN_DRIFT_PERCENTAGE)) / pulse_rate) * TIMESTAMP_PRECISION
   min_interval = ((60 * MIN_DRIFT_PERCENTAGE) / pulse_rate) * TIMESTAMP_PRECISION
-  bin_width = BIN_WIDTH * TIMESTAMP_PRECISION
+  bin_width = int(BIN_WIDTH * TIMESTAMP_PRECISION)
 
   # Compute pairwise time differentials. 
   diffs = []
@@ -358,7 +358,7 @@ def expected_pulse_interval(data_dict, pulse_rate):
     return (0, 0)
 
   # Create a histogram. Bins are scaled by `BIN_WIDTH`. 
-  (hist, bins) = np.histogram(diffs, bins = (max(diffs) - min(diffs)) / bin_width)
+  (hist, bins) = np.histogram(diffs, bins = 1 + ((max(diffs) - min(diffs)) / bin_width))
   
   # Mode pulse interval = expected pulse interval. 
   i = np.argmax(hist)
