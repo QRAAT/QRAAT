@@ -276,15 +276,17 @@ class gps_afsk(gr.hier_block2):
 
 
     #afsk
-    self.afsk = afsk_demod(input_rate, afsk_output_rate, mark_freq, space_freq)
-    afsk_actual_output_rate = self.afsk.output_rate
+    #self.afsk = afsk_demod(input_rate, afsk_output_rate, mark_freq, space_freq)
+    #afsk_actual_output_rate = self.afsk.output_rate
+    self.afsk = gr.quadrature_demod_cf(1)
+    afsk_actual_output_rate = input_rate
 
     import qraat.afsk
     (afsk_header, afsk_header_len) = qraat.afsk.header_create(afsk_actual_output_rate, center_freq, mark_freq, space_freq)
 
     self.afsk_out = file_sink(gr.sizeof_float, dirname, txname, ".afsk", afsk_header, afsk_header_len)
 
-    self.connect((self, 0), self.afsk, self.afsk_out)
+    self.connect((self, 1), self.afsk, self.afsk_out)
 
     #cov
     cc_vlen = int(input_rate / float(cc_output_rate))
