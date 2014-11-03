@@ -91,8 +91,8 @@ for siteID in site_set:
   pp.clf()
   #interval
   intmask = (interval_data[:,3] == siteID)
-  pp.plot(interval_data[intmask,0], interval_data[intmask,1],'.')
   pp.plot(interval_data[intmask,0], interval_data[intmask,4],'r.')
+  pp.plot(interval_data[intmask,0], interval_data[intmask,1],'.')
   pp.ylim([0,10])
   pp.xlabel("Time (seconds)")
   pp.ylabel("Pulse Interval (seconds)")
