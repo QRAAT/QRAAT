@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-# rmg_filter_auto
+# rmg_sitefilter_auto
 # Script to call for time filtering things that haven't been time filtered yet.
 # This program is part of QRAAT, an automated animal tracking system based on
 # GNU Radio. 
@@ -57,26 +57,25 @@ try:
 
   # Get a set of (dep_id, site_id) pairs for which there is new data, 
   # excluding the latest incomplete chunk. 
-  cur.execute('''SELECT DISTINCT deploymentID, siteID
+  cur.execute('''SELECT DISTINCT deploymentID
                    FROM est 
                   WHERE ID > %s 
                     AND timestamp < %s''', (last_processed, now)) 
   
-  qraat.srv.signal.VERBOSE = True
+  qraat.srv.signal.VERBOSE = False
   max_id = last_processed
   
-  for (dep_id, site_id) in cur.fetchall(): 
+  for (dep_id,) in cur.fetchall(): 
     cur.execute('''SELECT min(timestamp), max(timestamp)
                      FROM est 
                     WHERE ID > %s 
                       AND timestamp < %s
-                      AND deploymentID = %s
-                      AND siteID = %s''', (last_processed, now, dep_id, site_id)) 
+                      AND deploymentID = %s''', (last_processed, now, dep_id)) 
     (t_start, t_end) = cur.fetchone() 
 
     if dep_id is not None: 
-      print "filter_auto: depID=%d, siteID=%d" % (dep_id, site_id)
-      (total, id) = qraat.srv.signal.Filter(db_con, dep_id, site_id, t_start, t_end)
+      print "filter_auto: depID=%d" % (dep_id,)
+      (total, id) = qraat.srv.signal.Filter(db_con, dep_id, t_start, t_end)
       max_id = id if max_id < id else max_id
       print "filter: scored %d pulses." % total
 
@@ -85,9 +84,9 @@ try:
   print "filter_auto: updated processing_cursor to est.ID=%d." % max_id 
   
 
-except mdb.Error, e:
-  print >>sys.stderr, "filter_auto: error: [%d] %s" % (e.args[0], e.args[1])
-  sys.exit(1)
+#except mdb.Error, e:
+#  print >>sys.stderr, "filter_auto: error: [%d] %s" % (e.args[0], e.args[1])
+#  sys.exit(1)
 
 except qraat.error.QraatError, e:
   print >>sys.stderr, "filter_auto: error: %s." % e
