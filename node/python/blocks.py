@@ -269,7 +269,7 @@ class afsk_demod(gr.hier_block2):
 
 class gps_afsk(gr.hier_block2):
 
-  def __init__(self, num_ch, input_rate, mark_freq=1200.0, space_freq=1000.0, dirname = "./", txname = "tx", afsk_output_rate = 800.0, cc_output_rate = 50.0, center_freq = 0.0):
+  def __init__(self, num_ch, input_rate, mark_freq=1200.0, space_freq=1000.0, dirname = "./", txname = "tx", afsk_output_rate = 800.0, cc_output_rate = 5.0, center_freq = 0.0):
     gr.hier_block2.__init__(self, "afsk_demod",
                      gr.io_signature(num_ch, num_ch, gr.sizeof_gr_complex), # Input signature
                      gr.io_signature(0, 0, 0))     # Output signature
