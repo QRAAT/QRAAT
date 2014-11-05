@@ -197,7 +197,7 @@ function submitForm() {
 }
 function submitDownloadForm() {
   // This happens to append "/download" to the base URL; then the
-  // GET form data is appended ot the base URL + "/download". 
+  // GET form data is appended to the base URL + "/download". 
   document.getElementById('form').action = "download";
   document.getElementById('form').submit();
 }
@@ -708,6 +708,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
 {% block sidebar %}
 
 <div id = "text">
+
 {% if project %}
 <a href={%url 'qraat:show-project' project.ID %}#deployments><h4><center>{{project.name}}</center></h4></a>
 {% endif %}
@@ -720,44 +721,43 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <p><b>Transmitter Frequency: </b>{{transmitter_frequency}}</p>
 {% endif %}
 
-<div class="section_title">PREFERENCES
-  <button onclick="submitForm()">Update Map</button>
-  <button onclick="submitDownloadForm()">Download CSV</button>
-</div>
-<div id ="prefs">
-
+<div class = "sidebar-form">
+<div id ="prefs">	
 <form id="form" action ="" name="settings" method="get">
   <!-- <input type="submit" value="SUBMIT PREFERENCES" /> -->
   <font size="2">
-    {% for field in form %}
+	{% for field in form %}
+ 
+	  {% if field.auto_id = "id_deployment" %}
+	  <!-- Do nothing currently - prevents an extra <br> being added -->
 
-      {% if field.auto_id = "id_deployment"  or field.auto_id = "id_likelihood_low" or field.auto_id = "id_activity_low" %}
-        <b>{{field.label_tag}}</b> {{field}}
+	  {% elif field.auto_id = "id_likelihood_low" %}
+		<center><b>Likelihood</b><br></center>
+		<b>{{field.label_tag}}</b> {{field}}<br>
 
-      {% elif field.auto_id = "id_sites" %}
-        <b>{{field.label_tag}}</b> {{field}}<br>
-        <b><u>FILTER DATA BY:</u></b>
-        <p><font size="1">Date/Time Format: YYYY-MM-DD HH:MM:SS (24hr)</font></p>
+	  {% elif field.auto_id = "id_activity_low" %}
+		<center><b>Activity</b><br></center>
+		<b>{{field.label_tag}}</b> {{field}}<br>
 
-      {% elif field.auto_id = "id_activity_high" %}
-        <b>{{field.label_tag}}</b> {{field}}<br>
-        <b><u>GRAPH:</u></b><br>
-
-      {% else %}
-        <b>{{field.label_tag}}</b> {{field}}<br>
-      
-      {% endif %}
-    {% endfor %}
+	  {% else %}
+		<b>{{field.label_tag}}</b> {{field}}<br>
+		
+	  {% endif %}
+	{% endfor %}
+  
   </font>
 </form>
-
 
 <!-- <font size="1">date range: 2013-08-13  13:57:16 to 2014-06-16 14:28:12</font> -->
 </div><!-- end prefs -->
 
+<div class="section_title">
+  <center><button onclick="submitForm()">Update Map</button><button onclick="submitDownloadForm()">Download CSV</button></center>
+</div> <!-- end section_title -->
+</div> <!-- end sidebar-form -->
+
 <br>
 
-<div class="section_title">MAP INFO</div>
 <div id="mouseover">
 <font size="2">
 <!-- View Type: {{view_type}} <br>-->
@@ -777,36 +777,37 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <br><b>Map Center: </b><span id="current_center"></span>
 <!--<br><b>Clicked Lat, Long: </b> <input type="text" id="latlongclicked" style="width:300px; border:1px inset black;"></span> -->
 <br></font>
-</div>
-<br>
+</div> <!-- end mouseover -->
 </div> <!-- end text -->
+
+<br>
+
 <div class="mouse-over-info"></div>
 
-{% endblock %}
+{% endblock %} <!-- end sidebar block -->
 
 {% block content %}
 
 <div class="ui-content">
-    
-    <div class="row-3" id="map-canvas"></div>
+	
+	<div class="row-3" id="map-canvas"></div> <!-- end row-3, map-canvas -->
 
-    {% if positions %}
-    <!-- FLOT CHART -->
+	{% if positions %}
+	<!-- FLOT CHART -->
   <div class="row-3">
-      <center>
-      {% if graph_data == "1" or graph_data == "null" %}
-      <b><u>LIKELIHOOD vs. TIME</u></b>
-      {% endif %}
+	  <center>
+	  {% if graph_data == "1" or graph_data == "null" %}
+	  <b><u>LIKELIHOOD vs. TIME</u></b>
+	  {% endif %}
 
-      {% if graph_data == "2" %}
-      <b><u>ACTIVITY vs. TIME</u></b>
-      {% endif %}
-    <!-- uncomment next line for small overview graph -->
+	  {% if graph_data == "2" %}
+	  <b><u>ACTIVITY vs. TIME</u></b>
+	  {% endif %}
+	<!-- uncomment next line for small overview graph -->
 <!--   <div id="overview" class="demo-placeholder" style="float: right; width: 100px; height: 125px;"></div> -->
-    </center>
-    <div class="row-2" id="placeholder2"></div>
-    </div> 
-</div>
-
+	</center>
+	<div class="row-2" id="placeholder2"></div> <!-- end row-2, placeholder2 -->
+	</div>  <!-- end row-3 -->
+</div> <!-- end ui-content -->
 {% endif %} <!-- end if positions (if there is query data) -->
-{% endblock %}
+{% endblock %} <!-- end content block -->		
