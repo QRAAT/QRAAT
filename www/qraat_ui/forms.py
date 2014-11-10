@@ -32,9 +32,9 @@ def get_deps(req_deps=[]):
   
 #Fields for html form that queries and sets preferences
 class Form(forms.Form):
-  def __init__(self, deps=[], req_deps=[], data=None):
+  def __init__(self, deps=[], req_deps=[], data=None, label_suffix=''):
     #self.deployment_id = depID
-    super(forms.Form, self).__init__(data)
+    super(forms.Form, self).__init__(data, label_suffix='')
     self.fields['deployment'].choices = get_choices(deps)
     #self.fields['graph_dep'].choices = get_deps(req_deps)
     #Use get_choices(req_deps) if don't need to limit num of selected deps
@@ -53,27 +53,6 @@ class Form(forms.Form):
             #Note: initial doesn't work. it sets choices to '6' and '3'
             #In views.py: instance_of_form.fields['deployment'].initial = ['63']
  
-  data_type = forms.ChoiceField(
-            choices=DATA_CHOICES, 
-            required=True, 
-            label='Data Product', 
-            initial='1')
- 
-  display_type = forms.ChoiceField(
-            choices=DISPLAY_CHOICES, 
-            required=True, 
-            label='Display on Map as', 
-            initial="1")
-
-  sites = forms.BooleanField(
-            required=True, 
-            label="View Site Locations",
-            initial=True)
-
-
-
-  #Filtering parameters
-
   datetime_from = forms.DateTimeField(
             required = True, 
             label="Start Date & Time",
@@ -90,38 +69,52 @@ class Form(forms.Form):
               'class': 'filter',
               'size': '17'}),
             initial="2014-08-01 17:00:00")
-  
+ 
+ 
   likelihood_low = forms.FloatField(
             required=True, 
-            label="Likelihood Lowest", 
+            label="Min", 
             widget = forms.TextInput(attrs={
               'class': 'filter',
-              'size': '10'}),
-            initial=15.0)
-  
+              'size': '4'}),
+            initial=0.0)
+
   likelihood_high = forms.FloatField(
             required=True,
-            label="Highest", 
+            label="Max", 
             widget = forms.TextInput(attrs={
               'class': 'filter',
-              'size': '10'}),
+              'size': '4'}),
             initial=2000.0)
-  
+
   activity_low = forms.FloatField(
             required=True, 
-            label="Activity Lowest", 
+            label="Min", 
             widget = forms.TextInput(attrs={
               'class': 'filter',
-              'size': '10'}),
+              'size': '4'}),
             initial=0.0)
   
   activity_high = forms.FloatField(
             required=True, 
-            label="Highest", 
+            label="Max", 
             widget = forms.TextInput(attrs={
               'class': 'filter',
-              'size': '10'}),
+              'size': '4'}),
             initial=2.0)
+
+
+  data_type = forms.ChoiceField(
+            choices=DATA_CHOICES, 
+            required=True, 
+            label='Data Type', 
+            initial='1')
+ 
+  display_type = forms.ChoiceField(
+            choices=DISPLAY_CHOICES, 
+            required=True, 
+            label='Map Type', 
+            initial="1")
 
   #graph data
 
@@ -133,7 +126,17 @@ class Form(forms.Form):
   graph_data = forms.ChoiceField(
             choices=GRAPH_CHOICES, 
             required = True, 
-            label='Data displayed', 
+            label='Graph Type', 
             initial="1")
 
+  sites = forms.BooleanField(
+            required=True, 
+            label="View Site Locations",
+            initial=True)
+
+
+
+  
+
+  
 

@@ -18,7 +18,7 @@ from qraatview.utils import DateTimeEncoder
 import qraatview.rest_api as rest_api
 import qraat, time, datetime, json, utm, math, copy
 from pytz import utc, timezone
-from qraatview.models import Position, Deployment, Site, Project
+from qraatview.models import Position, Deployment, Site, Project, Tx
 from qraat_ui.forms import Form
 from decimal import Decimal
 
@@ -155,7 +155,7 @@ def get_context(request, deps=[], req_deps=[]):
       if len(dep_query) == 0: 
         print "No positions, returning empty context."
       
-      else: # Set default form vlaues, populate queried_data. 
+      else: # Set default form values, populate queried_data. 
         # Select the last day of data for deployment. 
         datetime_to_initial = float( dep_query.aggregate(Max('timestamp'))
                                       ['timestamp__max'] )
@@ -173,11 +173,11 @@ def get_context(request, deps=[], req_deps=[]):
         datetime_from_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                     time.localtime(float(datetime_from_initial-7*60*60))) # FIXME 
 
-        likelihood_low_initial = dep_query.aggregate(Min('likelihood'))['likelihood__min']
-        likelihood_high_initial = dep_query.aggregate(Max('likelihood'))['likelihood__max']
+        likelihood_low_initial = round(dep_query.aggregate(Min('likelihood'))['likelihood__min'], 2)
+        likelihood_high_initial = round(dep_query.aggregate(Max('likelihood'))['likelihood__max'], 2)
 
-        activity_low_initial = dep_query.aggregate(Min('activity'))['activity__min']
-        activity_high_initial = dep_query.aggregate(Max('activity'))['activity__max']
+        activity_low_initial = round(dep_query.aggregate(Min('activity'))['activity__min'], 2)
+        activity_high_initial = round(dep_query.aggregate(Max('activity'))['activity__max'], 2)
     
         index_form.fields['datetime_from'].initial = datetime_from_str_initial
         index_form.fields['datetime_to'].initial = datetime_to_str_initial
@@ -234,7 +234,7 @@ def get_context(request, deps=[], req_deps=[]):
         kwargs['activity__gte'] = activity_low
       if activity_high:
         kwargs['activity__lte'] = activity_high
-    
+        
       ''' FIXME. This limits the list of req_deps to 4, otherwise the points
       will display as the large default google maps markers.'''
       req_deps_ID = req_deps.values_list('ID', flat=True)
@@ -274,8 +274,8 @@ def get_context(request, deps=[], req_deps=[]):
             activity_low, activity_high, ))
 
       else: 
-        raise Exception("Somethign is wrong.")
-     
+        raise Exception("Something is wrong.")
+   
       for row in queried_objects:
         #(lat, lon) = utm.to_latlon(float(row.easting), 
         #    float(row.northing), row.utm_zone_number,
@@ -341,7 +341,7 @@ def get_context(request, deps=[], req_deps=[]):
             'display_type': json.dumps(display_type),
             'data_type': json.dumps(data_type), #position vs. track 
             }
-  
+
   return context
 
 def index(request):
@@ -381,22 +381,32 @@ def view_by_dep(request, project_id, dep_id):
            or (user.has_perm("can_view")
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
-
-        deps = project.get_deployments().filter(ID=dep_id)
+        pass
+        
       else:
         return HttpResponse("You're not allowed to view this.")
     
     else:
       return HttpResponse("You're not allowed to visualize this")
 
-  else:
-    deps = project.get_deployments().filter(ID=dep_id)
+  else: pass
+    
+  deps = project.get_deployments().filter(ID=dep_id)
+  
+  deployment = Deployment.objects.get(ID=dep_id)
+  target = deployment.targetID
+  target_name = target.name
+
+  transmitter = deployment.txID
+  transmitter_frequency = transmitter.frequency
    
   context = get_context(request, deps, deps)
 
   nav_options = get_nav_options(request)
   context["nav_options"] = nav_options
   context["project"] = project
+  context["target_name"] = target_name
+  context["transmitter_frequency"] = transmitter_frequency
 
   return render(request, 'qraat_ui/index.html', context)
 
@@ -570,8 +580,6 @@ def generic_graph(
         data = rest_api.get_model_data(request) 
     except Exception, e:
         print e
-        content["data"] = json.dumps(None)
-    else:
         content["data"] = json.dumps(rest_api.json_parse(data), cls=DateTimeEncoder)
 
     return render(

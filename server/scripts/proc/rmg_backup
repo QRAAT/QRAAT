@@ -119,8 +119,8 @@ fi
 echo Dumping database tables
 echo $0 starting database dump `date`
 rmg_dbarchive $RMG_BACKUP_DIR/database
-# Make an explicit dump of the Archive_Log table, so that it contains a record of the other dump files
-rmg_dbarchive Archive_Log $RMG_BACKUP_DIR/database
+# Make an explicit dump of the archive_log table, so that it contains a record of the other dump files
+rmg_dbarchive archive_log $RMG_BACKUP_DIR/database
 echo $0 finished database dump `date`
 
 # Check for secondary backup
