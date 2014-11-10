@@ -41,8 +41,7 @@
 #endif 
 
 RMG_API detectmod_afsk_sink_sptr 
-detectmod_make_file_sink (
-    //size_t _size, only works for floats
+detectmod_make_afsk_sink (
     const char *_directory, 
     const char *_tx_name,
     const char *_file_extension,

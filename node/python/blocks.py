@@ -24,7 +24,7 @@
 """
 
 from gnuradio import gr, blks2, uhd, gru
-from rmg_swig import detect, continuous_covariance, file_sink
+from rmg_swig import detect, continuous_covariance, file_sink, afsk_sink
 import params
 
 import sys, time, struct
@@ -305,11 +305,9 @@ class gps_afsk(gr.hier_block2):
     self.connect(self.cc, self.cc_out)
 
   def enable(self):
-    self.afsk_out.enable()
     self.cc_out.enable()
 
   def disable(self):
-    self.afsk_out.disable()
     self.cc_out.disable()
 
 
