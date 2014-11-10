@@ -155,7 +155,7 @@ def get_context(request, deps=[], req_deps=[]):
       if len(dep_query) == 0: 
         print "No positions, returning empty context."
       
-      else: # Set default form vlaues, populate queried_data. 
+      else: # Set default form values, populate queried_data. 
         # Select the last day of data for deployment. 
         datetime_to_initial = float( dep_query.aggregate(Max('timestamp'))
                                       ['timestamp__max'] )
@@ -173,11 +173,11 @@ def get_context(request, deps=[], req_deps=[]):
         datetime_from_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                     time.localtime(float(datetime_from_initial-7*60*60))) # FIXME 
 
-        likelihood_low_initial = dep_query.aggregate(Min('likelihood'))['likelihood__min']
-        likelihood_high_initial = dep_query.aggregate(Max('likelihood'))['likelihood__max']
+        likelihood_low_initial = round(dep_query.aggregate(Min('likelihood'))['likelihood__min'], 2)
+        likelihood_high_initial = round(dep_query.aggregate(Max('likelihood'))['likelihood__max'], 2)
 
-        activity_low_initial = dep_query.aggregate(Min('activity'))['activity__min']
-        activity_high_initial = dep_query.aggregate(Max('activity'))['activity__max']
+        activity_low_initial = round(dep_query.aggregate(Min('activity'))['activity__min'], 2)
+        activity_high_initial = round(dep_query.aggregate(Max('activity'))['activity__max'], 2)
     
         index_form.fields['datetime_from'].initial = datetime_from_str_initial
         index_form.fields['datetime_to'].initial = datetime_to_str_initial
@@ -234,7 +234,7 @@ def get_context(request, deps=[], req_deps=[]):
         kwargs['activity__gte'] = activity_low
       if activity_high:
         kwargs['activity__lte'] = activity_high
-    
+        
       ''' FIXME. This limits the list of req_deps to 4, otherwise the points
       will display as the large default google maps markers.'''
       req_deps_ID = req_deps.values_list('ID', flat=True)
@@ -275,7 +275,7 @@ def get_context(request, deps=[], req_deps=[]):
 
       else: 
         raise Exception("Something is wrong.")
-     
+   
       for row in queried_objects:
         #(lat, lon) = utm.to_latlon(float(row.easting), 
         #    float(row.northing), row.utm_zone_number,
@@ -341,7 +341,7 @@ def get_context(request, deps=[], req_deps=[]):
             'display_type': json.dumps(display_type),
             'data_type': json.dumps(data_type), #position vs. track 
             }
-  
+
   return context
 
 def index(request):
