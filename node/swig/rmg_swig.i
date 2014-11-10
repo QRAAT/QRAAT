@@ -51,6 +51,7 @@
 #include "detectmod_detect.h"
 #include "detectmod_continuous_covariance.h"
 #include "detectmod_file_sink.h"
+#include "detectmod_afsk_sink.h"
 %}
 
 GR_SWIG_BLOCK_MAGIC(detectmod,detect);
@@ -61,4 +62,7 @@ GR_SWIG_BLOCK_MAGIC(detectmod,continuous_covariance);
 
 GR_SWIG_BLOCK_MAGIC(detectmod,file_sink);
 %include "detectmod_file_sink.h"
+
+GR_SWIG_BLOCK_MAGIC(detectmod,afsk_sink);
+%include "detectmod_afsk_sink.h"
 
