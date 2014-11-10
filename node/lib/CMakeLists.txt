@@ -28,6 +28,7 @@ add_library(gnuradio-rmg SHARED
   peak_detect.cc 
   detectmod_continuous_covariance.cc
   detectmod_file_sink.cc
+  detectmod_afsk_sink.cc
 )
 
 target_link_libraries(gnuradio-rmg rmg-pulse ${Boost_LIBRARIES} ${GRUEL_LIBRARIES} ${GNURADIO_CORE_LIBRARIES})
@@ -45,14 +46,14 @@ install(TARGETS gnuradio-rmg
 ########################################################################
 # Build and register unit test
 ########################################################################
-find_package(Boost COMPONENTS unit_test_framework)
+#find_package(Boost COMPONENTS unit_test_framework)
 
-include(GrTest)
-set(GR_TEST_TARGET_DEPS gnuradio-rmg)
+#include(GrTest)
+#set(GR_TEST_TARGET_DEPS gnuradio-rmg)
 #turn each test cpp file into an executable with an int main() function
-add_definitions(-DBOOST_TEST_DYN_LINK -DBOOST_TEST_MAIN)
+#add_definitions(-DBOOST_TEST_DYN_LINK -DBOOST_TEST_MAIN)
 
-add_executable(qa_rmg qa_rmg.cc)
-target_link_libraries(qa_rmg gnuradio-rmg ${Boost_LIBRARIES})
-GR_ADD_TEST(qa_rmg qa_rmg)
+#add_executable(qa_rmg qa_rmg.cc)
+#target_link_libraries(qa_rmg gnuradio-rmg ${Boost_LIBRARIES})
+#GR_ADD_TEST(qa_rmg qa_rmg)
 

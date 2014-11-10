@@ -212,7 +212,7 @@ class software_backend(gr.hier_block2):
         self.disable()
         self.enable(bands)
 
-class afsk_demod(gr.hier_block2):
+class afsk_demod(gr.hier_block2):#don't use
 
   def __init__(self, input_rate, min_output_rate, mark_freq, space_freq):
     
@@ -269,7 +269,7 @@ class afsk_demod(gr.hier_block2):
 
 class gps_afsk(gr.hier_block2):
 
-  def __init__(self, num_ch, input_rate, mark_freq=1200.0, space_freq=1000.0, dirname = "./", txname = "tx", afsk_output_rate = 800.0, cc_output_rate = 5.0, center_freq = 0.0):
+  def __init__(self, num_ch, input_rate, mark_freq=1270.0, space_freq=1070.0, dirname = "./", txname = "tx",  cc_output_rate = 5.0, center_freq = 0.0):
     gr.hier_block2.__init__(self, "afsk_demod",
                      gr.io_signature(num_ch, num_ch, gr.sizeof_gr_complex), # Input signature
                      gr.io_signature(0, 0, 0))     # Output signature
@@ -284,7 +284,7 @@ class gps_afsk(gr.hier_block2):
     import qraat.afsk
     (afsk_header, afsk_header_len) = qraat.afsk.header_create(afsk_actual_output_rate, center_freq, mark_freq, space_freq)
 
-    self.afsk_out = file_sink(gr.sizeof_float, dirname, txname, ".afsk", afsk_header, afsk_header_len)
+    self.afsk_out = afsk_sink(dirname, txname, ".afsk", afsk_header, afsk_header_len, 2.0, int(input_rate*0.25), int(input_rate*10.0))
 
     self.connect((self, 1), self.afsk, self.afsk_out)
 

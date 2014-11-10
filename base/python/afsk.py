@@ -88,6 +88,8 @@ class decode_string:
     return (data_str, error_flag)
 
 
+
+
 class afsk:
 
   def __init__(self, filename=None):
@@ -105,8 +107,7 @@ class afsk:
         with open(filename) as afsk_file:
           afsk_file.seek(read_len)
           data = np.fromfile(afsk_file,dtype=np.float32)
-        self.mark_data = data[::2]
-        self.space_data = data[1::2]
+        self.audio_data = data
       else:
         raise IOError("Couldn't read tagname from file or not an afsk file")
 
@@ -117,75 +118,56 @@ class afsk:
       self.center_freq = 0.0
       self.mark_freq = 0.0
       self.space_freq = 0.0
-      self.mark_data = np.zeros((0),dtype=np.float32)
-      self.space_data = np.zeros((0),dtype=np.float32)
+      self.audio_data = np.zeros((0,),dtype=np.float32)
 
 
   def decode(self):
 
     self.decoded_list = []
 
-    
-    step_size = 32000/self.rate; #number of samples (at 32k) between measurement windows
+    num_space_cycles = 3
+    num_mark_cycles = 4
+    num_space_samples = self.rate/self.space_freq
+    num_mark_samples = self.rate/self.mark_freq
+    cycle_threshold = (num_space_samples+num_mark_samples)/2.0
 
-    one_single = 145.0/step_size;
-    one_len = 103.0/step_size;
-    zero_single = 47.0/step_size;
-    zero_len = 92.5/step_size;
+    cycle_counter = 0
+    zero_crossings = []
+    for j in range(self.audio_data.shape[0]-1):
+      if self.audio_data[j] <=0 and self.audio_data[j+1] > 0:
+        zero_crossings.append(cycle_counter)
+        cycle_counter = 0
+      else:
+        cycle_counter += 1
 
-    data_sum = self.mark_data + self.space_data
+    b_stream = (np.array(zero_crossings) < cycle_threshold)*1
 
-    power_threashold = np.max(data_sum)/2.0 #0.74 TODO
+    one_to_zero = np.where(np.diff(b_stream)==1)[0];
+    zero_to_one = np.where(np.diff(b_stream)==-1)[0];
 
-    signal_indexes = np.where(data_sum > power_threashold)[0]
-    signal_indexes = np.append(signal_indexes,self.mark_data.shape[0])
-    diff_indexes = np.hstack((signal_indexes[0], np.diff(signal_indexes)))
-    signal_ranges = []
-    for j in range(diff_indexes.shape[0]):
-      if diff_indexes[j] > 10:
-        signal_ranges.append(signal_indexes[j] - diff_indexes[j] +1)
-        signal_ranges.append(signal_indexes[j])
+    min_length = np.min((one_to_zero.shape[0],zero_to_one.shape[0]))
 
+    bit_vector = []
 
-    sr = 0;
-    while sr < len(signal_ranges)-1:
-
-      if not ( ((signal_ranges[sr+1] - signal_ranges[sr]) > 10*one_single) and np.any(data_sum[signal_ranges[sr]+1:signal_ranges[sr+1]-1] > power_threashold) ):
-        sr += 1;
-        continue;
-     
-      m_range = (signal_ranges[sr], signal_ranges[sr+1]);
-
-      b_stream = np.zeros(np.diff(m_range))
-      b_stream[self.mark_data[m_range[0]:m_range[1]] > self.space_data[m_range[0]:m_range[1]]] = 1
-
-      one_to_zero = np.where(np.diff(b_stream)==1)[0];
-      zero_to_one = np.where(np.diff(b_stream)==-1)[0];
-
-      min_length = np.min((one_to_zero.shape[0],zero_to_one.shape[0]))
-
-      bit_vector = [];
-
-      if (min_length > 0):
-        for j in range(min_length-1):
-          symbol_len = one_to_zero[j] - zero_to_one[j];
-          for k in range( int( round( (symbol_len - zero_single) / zero_len) ) + 1):
-            bit_vector.append(0)
-          symbol_len = zero_to_one[j+1] - one_to_zero[j]
-          for k in range( int( round( (symbol_len - one_single) / one_len) ) + 1):
-            bit_vector.append(1)
-
-        symbol_len = one_to_zero[min_length-1] - zero_to_one[min_length-1]
-        for k in range( int( round( (symbol_len - zero_single) / zero_len) ) + 1):
+    if (min_length > 0):
+      for j in range(min_length-1):
+        symbol_len = one_to_zero[j] - zero_to_one[j];
+        for k in range( int( round( symbol_len / float(num_space_cycles)))):
           bit_vector.append(0)
+        symbol_len = zero_to_one[j+1] - one_to_zero[j]
+        for k in range( int( round( symbol_len / float(num_mark_cycles)))):
+          bit_vector.append(1)
+      symbol_len = one_to_zero[min_length-1] - zero_to_one[min_length-1]
+      for k in range( int( round( symbol_len / float(num_space_cycles)))):
+        bit_vector.append(0)
 
-      #assume trailing 1s to fill out last word
-      num_char = int( np.ceil(len(bit_vector)/10.0) )
-      for j in range(num_char*10 - len(bit_vector)):
-        bit_vector.append(1)
+    #assume trailing 1s to fill out last word
+    num_char = int( np.ceil(len(bit_vector)/10.0) )
+    for j in range(num_char*10 - len(bit_vector)):
+      bit_vector.append(1)
 
-      self.decoded_list.append(decode_string(m_range[0], m_range[1], bit_vector))
-      sr += 2
+    self.decoded_list.append(decode_string(m_range[0], m_range[1], bit_vector))
+
 
   def write_to_db(self, db_con, siteID = 'NULL'):
     if not hasattr(self, 'decoded_list'):
