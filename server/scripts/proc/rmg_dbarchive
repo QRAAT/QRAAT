@@ -32,8 +32,8 @@ use DBI ;	# for database connector
 
 my $Debug = 0 ;
 my $ENV_NAME_DB_AUTH = "RMG_SERVER_DB_AUTH" ;	# The name of the environment variable for the DB_AUTH filename
-my $Archive_Config_Table_Name = "Archive_Config" ;
-my $Archive_Log_Table_Name = "Archive_Log" ;
+my $Archive_Config_Table_Name = "archive_config" ;
+my $Archive_Log_Table_Name = "archive_log" ;
 my $Default_Archive = "TRUE" ;		# TRUE means do archive this table, FALSE means don't
 my $Default_LastID = 0 ;		# Start at 0, meaning nothing written yet
 my $Default_Chunk_Size = 1000000 ;	# General value for largest chunk size, in records
