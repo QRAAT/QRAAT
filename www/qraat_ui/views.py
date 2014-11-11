@@ -150,18 +150,18 @@ def get_context(request, deps=[], req_deps=[]):
       Auto-filter by min/max range of likelihood & activity, for last 24 hrs
       of data in the db. Also set these filters as initial values of html 
       form. '''
-      datetime_to_initial = float(Position.objects.filter(
-                                deploymentID = req_deps[0].ID).aggregate(
-                                   Max('timestamp'))['timestamp__max'])
-      datetime_from_initial = datetime_to_initial - INITIAL_DATA_WINDOW
-      queried_objects = Position.objects.filter(deploymentID = req_deps[0].ID, 
-                                                timestamp__gte = datetime_from_initial)
       queried_data=[]
       
-      if len(queried_objects) == 0: 
-        print "No positions, returning empty context."
+      q = Position.objects.filter(deploymentID = req_deps[0].ID).aggregate(
+                                    Max('timestamp'))['timestamp__max']
       
-      else: # Set default form values, populate queried_data. 
+      if q != None:
+        
+        datetime_to_initial = float(q)
+        datetime_from_initial = datetime_to_initial - INITIAL_DATA_WINDOW
+        queried_objects = Position.objects.filter(deploymentID = req_deps[0].ID, 
+                                                  timestamp__gte = datetime_from_initial)
+      
         datetime_to_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                     time.localtime(float(datetime_to_initial-7*60*60))) # FIXME 
       
