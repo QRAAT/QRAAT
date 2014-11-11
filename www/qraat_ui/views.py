@@ -25,6 +25,8 @@ from decimal import Decimal
 import csv
 import qraat
 
+# For view /ui/project/X/deployment/Y, initial time range for data to display.
+INITIAL_DATA_WINDOW = 60 * 60 * 4
 
 
 def get_context(request, deps=[], req_deps=[]):
@@ -135,7 +137,12 @@ def get_context(request, deps=[], req_deps=[]):
     ''' Either a dep is passed by URL, or dep(s) selected in html form'''
     print "------- req deps exists"
    
-    if (datetime_from == None) and (datetime_to == None) and (likelihood_low == None) and (likelihood_high == None) and (activity_low == None) and (activity_high == None): 
+    if (datetime_from == None) and \
+           (datetime_to == None) and \
+           (likelihood_low == None) and \
+           (likelihood_high == None) and \
+           (activity_low == None) and \
+           (activity_high == None): 
       req_deps_int.append(req_deps[0].ID) # /ui/project/X/deployment/Y
 
       ''' /ui/project/1/deployment/63/
@@ -143,61 +150,38 @@ def get_context(request, deps=[], req_deps=[]):
       Auto-filter by min/max range of likelihood & activity, for last 24 hrs
       of data in the db. Also set these filters as initial values of html 
       form. '''
-      print "-------when deployment page first loads"
-
-      #dep_query = Position.objects.filter(deploymentID__in = map(lambda(row) : row.ID, req_deps)) 
-      dep_query = Position.objects.filter(deploymentID = req_deps[0].ID)
-      ''' Query db for min/max value for selected deployment.
-        Used to automatically populate html form intial values. '''
-      
+      datetime_to_initial = float(Position.objects.filter(
+                                deploymentID = req_deps[0].ID).aggregate(
+                                   Max('timestamp'))['timestamp__max'])
+      datetime_from_initial = datetime_to_initial - INITIAL_DATA_WINDOW
+      queried_objects = Position.objects.filter(deploymentID = req_deps[0].ID, 
+                                                timestamp__gte = datetime_from_initial)
       queried_data=[]
       
-      if len(dep_query) == 0: 
+      if len(queried_objects) == 0: 
         print "No positions, returning empty context."
       
       else: # Set default form values, populate queried_data. 
-        # Select the last day of data for deployment. 
-        datetime_to_initial = float( dep_query.aggregate(Max('timestamp'))
-                                      ['timestamp__max'] )
         datetime_to_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                     time.localtime(float(datetime_to_initial-7*60*60))) # FIXME 
       
-        datetime_from_min_initial = float( dep_query.aggregate(
-                                Min('timestamp'))['timestamp__min'] )
-        datetime_from_day_initial = float(datetime_to_initial - 86400.00) 
-          # minus 24 hrs
-        if datetime_from_day_initial < datetime_from_min_initial:
-          datetime_from_initial = datetime_from_min_initial
-        else:
-          datetime_from_initial = datetime_from_day_initial
         datetime_from_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                     time.localtime(float(datetime_from_initial-7*60*60))) # FIXME 
 
-        likelihood_low_initial = round(dep_query.aggregate(Min('likelihood'))['likelihood__min'], 2)
-        likelihood_high_initial = round(dep_query.aggregate(Max('likelihood'))['likelihood__max'], 2)
-
-        activity_low_initial = round(dep_query.aggregate(Min('activity'))['activity__min'], 2)
-        activity_high_initial = round(dep_query.aggregate(Max('activity'))['activity__max'], 2)
     
         index_form.fields['datetime_from'].initial = datetime_from_str_initial
         index_form.fields['datetime_to'].initial = datetime_to_str_initial
+   
+        likelihood_low_initial = round(queried_objects.aggregate(Min('likelihood'))['likelihood__min'], 2)
+        likelihood_high_initial = round(queried_objects.aggregate(Max('likelihood'))['likelihood__max'], 2)
+
+        activity_low_initial = round(queried_objects.aggregate(Min('activity'))['activity__min'], 2)
+        activity_high_initial = round(queried_objects.aggregate(Max('activity'))['activity__max'], 2)
+        
         index_form.fields['likelihood_low'].initial = likelihood_low_initial
         index_form.fields['likelihood_high'].initial = likelihood_high_initial
         index_form.fields['activity_low'].initial = activity_low_initial
         index_form.fields['activity_high'].initial = activity_high_initial
-   
-        ''' FIXME: For blank form value(s), default them to min/max values of that dep. Notify the user that this happened. '''
-        
-        # Query data. 
-        queried_objects = Position.objects.filter(
-                            deploymentID = req_deps[0].ID,
-                            timestamp__gte = datetime_from_initial,
-                            timestamp__lte = datetime_to_initial,
-                            likelihood__gte = likelihood_low_initial,
-                            likelihood__lte = likelihood_high_initial,
-                            activity__gte = activity_low_initial,
-                            activity__lte = activity_high_initial
-                            )
 
         for q in queried_objects:
           #(lat, lon) = utm.to_latlon(float(q.easting), float(q.northing), 
@@ -392,14 +376,17 @@ def view_by_dep(request, project_id, dep_id):
   else: pass
     
   deps = project.get_deployments().filter(ID=dep_id)
-  
+  print "-----------------------------------------------------"
+  print request.GET
+  print request.POST
+  print "-----------------------------------------------------"
   deployment = Deployment.objects.get(ID=dep_id)
   target = deployment.targetID
   target_name = target.name
 
   transmitter = deployment.txID
   transmitter_frequency = transmitter.frequency
-   
+  
   context = get_context(request, deps, deps)
 
   nav_options = get_nav_options(request)
@@ -412,8 +399,6 @@ def view_by_dep(request, project_id, dep_id):
 
 
 def download_by_dep(request, project_id, dep_id): 
-  print request
-  
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
