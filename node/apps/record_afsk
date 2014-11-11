@@ -115,9 +115,9 @@ if __name__ == '__main__':
                       help="transmitter frequency in Hz")
     parser.add_option("-t", "--time", type="int", default=0,
                       help="recording time")
-    parser.add_option("-m", "--mark_freq", type="float", default=1200,
+    parser.add_option("-m", "--mark_freq", type="float", default=1270,
                       help="audio frequency for a mark")
-    parser.add_option("-s", "--space_freq", type="float", default=1000,
+    parser.add_option("-s", "--space_freq", type="float", default=1070,
                       help="audio frequency for a space")
     (options, args) = parser.parse_args()
 

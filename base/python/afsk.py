@@ -123,8 +123,6 @@ class afsk:
 
   def decode(self):
 
-    self.decoded_list = []
-
     num_space_cycles = 3
     num_mark_cycles = 4
     num_space_samples = self.rate/self.space_freq
@@ -166,16 +164,14 @@ class afsk:
     for j in range(num_char*10 - len(bit_vector)):
       bit_vector.append(1)
 
-    self.decoded_list.append(decode_string(m_range[0], m_range[1], bit_vector))
+    self.decoded = decode_string(0, self.audio_data.shape[0], bit_vector)
 
 
   def write_to_db(self, db_con, siteID = 'NULL'):
-    if not hasattr(self, 'decoded_list'):
+    if not hasattr(self, 'decoded'):
       self.decode()
-    if self.decoded_list:
-      cur = db_con.cursor()
-      for ds in self.decoded_list:
-        calc_start_time = self.unix_time + ds.start_sample/self.rate
-        calc_stop_time = self.unix_time + ds.end_sample/self.rate
-        cur.execute("INSERT INTO afsk (deploymentID, siteID, start_timestamp, stop_timestamp, message, binary_data, error) VALUES (%s, %s, %s, %s, %s, x%s, %s);", [self.tag_name, siteID, calc_start_time, calc_stop_time, ds.string, ds.raw_hex_str, ds.error])
+    cur = db_con.cursor()
+    calc_start_time = self.unix_time + self.decoded.start_sample/self.rate
+    calc_stop_time = self.unix_time + self.decoded.end_sample/self.rate
+    cur.execute("INSERT INTO afsk (deploymentID, siteID, start_timestamp, stop_timestamp, message, binary_data, error) VALUES (%s, %s, %s, %s, %s, x%s, %s);", [self.tag_name, siteID, calc_start_time, calc_stop_time, self.decoded.string, self.decoded.raw_hex_str, self.decoded.error])
 
