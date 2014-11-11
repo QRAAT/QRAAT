@@ -1,8 +1,5 @@
 # File: qraat_ui/views.py
 #
-# TODO Clean up get_context(). The way it's written necessitates a redundant 
-#      query in the calling functions, e.g. get_by_dep() and download_by_dep(). 
-# 
 # TODO Cache last query (result of get_context()) for download.  
 #
 # TODO Post handler for "Submit Form"? 
@@ -357,12 +354,12 @@ def view_by_dep(request, project_id, dep_id):
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
     return HttpResponse("We didn't find this project") 
-  
+ 
   if not project.is_public:
     if request.user.is_authenticated():
       user = request.user
       if project.is_owner(user)\
-           or (user.has_perm("can_view")
+           or (user.has_perm("qraatview.can_view")
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
         pass
@@ -408,7 +405,7 @@ def download_by_dep(request, project_id, dep_id):
     if request.user.is_authenticated():
       user = request.user
       if project.is_owner(user)\
-           or (user.has_perm("can_view")
+           or (user.has_perm("qraatview.can_view")
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
 
