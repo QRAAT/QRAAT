@@ -89,7 +89,8 @@ private:
   void	       *d_fp;
   
   //! Enable record flag.
-  char enable_record;
+  unsigned char enable_record;
+  unsigned char enable_demod;
 
   //! Counter variables
   unsigned int below_count;

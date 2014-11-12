@@ -31,10 +31,10 @@
 #include <stdexcept>
 #include <sys/time.h>
 #include <string.h>
-#include <math.h>
+//#include <math.h>
 #include <errno.h>
 #include "boost/filesystem.hpp"
-
+#include <gr_math.h>
 
 #ifndef O_BINARY
 #define	O_BINARY 0
@@ -77,12 +77,13 @@ detectmod_afsk_sink::detectmod_afsk_sink (
     const unsigned int _threshold_timeout,
     const unsigned int _sample_timeout)
   : gr_sync_block ("detectmod_afsk_sink",
-    gr_make_io_signature (1, 1, sizeof(float)),
+    gr_make_io_signature (1, 1, sizeof(gr_complex)),
     gr_make_io_signature (0,0,0))
 /**
  * Private constructor used internally 
  */
 {
+  set_history (2);	// we need to look at the previous value
   threshold = _threshold;
   threshold_timeout = _threshold_timeout;
   sample_timeout = _sample_timeout;
@@ -116,6 +117,7 @@ void detectmod_afsk_sink::initialize_variables(
   memcpy(header_data, _header_data, header_len);
 
   d_fp = 0;
+  enable_demod = 0;
   enable_record = 0;
   below_count = 0;
   total_count = 0;
@@ -141,37 +143,46 @@ detectmod_afsk_sink::work (int noutput_items,
 			       gr_vector_const_void_star &input_items,
 			       gr_vector_void_star &output_items)
 {
-  float *input_buffer = (float*)input_items[0];
+  gr_complex *input_buffer = (gr_complex*)input_items[0];
+  input_buffer++;//advance to new value
+  gr_complex product;
+  float demod_signal;
   for (int j = 0; j < noutput_items; j++){
-    if (enable_record > 0){
-      if (input_buffer[j]*input_buffer[j] < threshold){//below threashold
-        below_count++;
-      }
+    product = input_buffer[j]*conj(input_buffer[j-1]);
+    if (enable_demod > 0){
+      demod_signal = gr_fast_atan2f(imag(product), real(product));
+      if (demod_signal*demod_signal < 0.5){//below demod_signal threashold
+          below_count++;
+        }
       else{
-        below_count=0;
-      }
-      if (below_count > threshold_timeout){
-        close();//close file
+        below_count = 0;
         enable_record = 1;
       }
-      else{
-        fwrite(input_buffer+j, sizeof(float), 1, (FILE *)d_fp);
-        total_count++;
-        if (total_count > sample_timeout){
-          close();
-          gen_file_ptr();
-          total_count = 0;
+      if (enable_record > 0){
+        if (below_count > threshold_timeout){
+          close();//close file
+          enable_record = 0;
+        }
+        else{
+          if (!d_fp){
+            gen_file_ptr();
+          }
+          fwrite(&demod_signal, sizeof(float), 1, (FILE *)d_fp);
+          total_count++;
+          if (total_count > sample_timeout){
+            close();
+            gen_file_ptr();
+            total_count = 0;
+          }
         }
       }
     }
     else{
       //if (!d_fp) {
       //if above threshold and !d_fp
-      if (input_buffer[j]*input_buffer[j] > threshold && !d_fp) {
-        enable_record = 1;
-        total_count = 1;
-        gen_file_ptr();
-        fwrite(input_buffer+j, sizeof(float), 1, (FILE *)d_fp);
+      if (abs(product) > threshold) {//above carrier threshold
+        enable_demod = 1;
+        total_count = 0;
       }
     }
   }
