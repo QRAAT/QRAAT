@@ -163,9 +163,9 @@ function addInfoWindow(marker, data, map){
         data[4] + ', ' + 
       data[5] +
           data[9] +
-      '<br><b>Date/Time: </b>' + data[10] + 
-        '<br><b>Activity: </b>' + data[7] +
-    '<br><b>Likelihood: </b>' + data[6];
+      '<br><b>Date & Time: </b>' + data[10] + 
+        '<br><b>Animal Activity: </b>' + data[7].toFixed(2) +
+    '<br><b>Position Likelihood: </b>' + data[6].toFixed(2);
 
     var infoWindow = new google.maps.InfoWindow({content: content});
     
@@ -197,7 +197,7 @@ function submitForm() {
 }
 function submitDownloadForm() {
   // This happens to append "/download" to the base URL; then the
-  // GET form data is appended ot the base URL + "/download". 
+  // GET form data is appended to the base URL + "/download". 
   document.getElementById('form').action = "download";
   document.getElementById('form').submit();
 }
@@ -471,13 +471,13 @@ function initialize(){
     google.maps.event.addListener(marker, 'mouseover', function() {
             $("<ul>" +
                 "<li><strong>Deployment ID: </strong>" + this.qraat_pos[1]  + "</li>" +
-                "<li><strong>Data point ID: </strong>" + this.qraat_pos[0]  + "</li>" +
+                "<li><strong>Data ID: </strong>" + this.qraat_pos[0]  + "</li>" +
                 "<li><strong>Lat, Lon: </strong>" + this.qraat_pos[8]    + "</li>" + 
-                "<li><strong>Easting, Northing, Zone: </strong>" + [this.qraat_pos[3],
-                        this.qraat_pos[4], this.qraat_pos[5]] + "</li>"  +
+                "<li><strong>Easting, Northing, Zone: </strong>" + this.qraat_pos[3] + ", " +
+                        this.qraat_pos[4] + ", " + this.qraat_pos[5]+this.qraat_pos[9] + "</li>"  +
                 "<li><strong>Date & Time: </strong>" + this.qraat_pos[10]  + "</li>" +
-                "<li><strong>Position Likelihood: </strong>" + this.qraat_pos[6].toFixed(6)  + "</li>" +
-                "<li><strong>Animal Activity: </strong>" + this.qraat_pos[7].toFixed(6)  + "</li>" +
+                "<li><strong>Position Likelihood: </strong>" + this.qraat_pos[6].toFixed(2)  + "</li>" +
+                "<li><strong>Animal Activity: </strong>" + this.qraat_pos[7].toFixed(2)  + "</li>" +
                 "</ul>").appendTo(".mouse-over-info");
 
     }); // end mouseover event function
@@ -708,47 +708,75 @@ google.maps.event.addDomListener(window, 'load', initialize);
 {% block sidebar %}
 
 <div id = "text">
-{% if project %}
-<a href={%url 'qraat:show-project' project.ID %}#deployments><h4>Project</h4></a>
-{% endif %}
-<div class="section_title">PREFERENCES
-  <button onclick="submitForm()">Submit Form</button>
-  <button onclick="submitDownloadForm()">Download CSV</button>
-</div>
-<div id ="prefs">
 
+{% if project %}
+<a href={%url 'qraat:show-project' project.ID %}#deployments><h4><center>{{project.name}}</center></h4></a>
+{% endif %}
+
+{% if target_name %}
+<p><b>Target: </b>{{target_name}}</p>
+{% endif %}
+
+{% if transmitter_frequency %}
+<p><b>Transmitter Frequency: </b>{{transmitter_frequency}}</p>
+{% endif %}
+
+<div class = "sidebar-form">
+<div id ="prefs">	
 <form id="form" action ="" name="settings" method="get">
   <!-- <input type="submit" value="SUBMIT PREFERENCES" /> -->
   <font size="2">
-    {% for field in form %}
+	{% for field in form %}
+ 
+	  {% if field.auto_id = "id_deployment" %}
+		<!-- Do nothing currently - prevents an extra <br> being added -->
 
-      {% if field.auto_id = "id_deployment"  or field.auto_id = "id_likelihood_low" or field.auto_id = "id_activity_low" %}
-        <b>{{field.label_tag}}</b> {{field}}
+      {% elif field.auto_id = "id_datetime_from" or field.auto_id = "id_datetime_to" %}
+		<div id = "tooltip" tooltip="YYYY-MM-DD HH:MM:SS (24hr)"> <b>{{field.label_tag}}</b> {{field}} </div> <!-- end tooltip-->
 
-      {% elif field.auto_id = "id_sites" %}
-        <b>{{field.label_tag}}</b> {{field}}<br>
-        <b><u>FILTER DATA BY:</u></b>
-        <p><font size="1">Date/Time Format: YYYY-MM-DD HH:MM:SS (24hr)</font></p>
+	  {% elif field.auto_id = "id_likelihood_low" %}
+	  <table>
+			<tr>
+				<th></th>
+				<th>Min</th>
+				<th>Max</th>
+			</tr>
+			<tr>
+				<th>Likelihood</th>
+				<td>{{field}}</td>
+		{% elif field.auto_id = "id_likelihood_high" %}
+				<td>{{field}}</td>
+			</tr>
+			
+		{% elif field.auto_id = "id_activity_low" %}
+			<tr>
+				<th>Activity</th>
+				<td>{{field}}</td>
+				
+		{% elif field.auto_id = "id_activity_high" %}
+				<td>{{field}}</td>
+			</tr>
+		</table>
 
-      {% elif field.auto_id = "id_activity_high" %}
-        <b>{{field.label_tag}}</b> {{field}}<br>
-        <b><u>GRAPH:</u></b><br>
-
-      {% else %}
-        <b>{{field.label_tag}}</b> {{field}}<br>
-      
-      {% endif %}
-    {% endfor %}
+	  {% else %}
+		<b>{{field.label_tag}}</b> {{field}}<br>
+		
+	  {% endif %}
+	{% endfor %}
+  
   </font>
 </form>
-
 
 <!-- <font size="1">date range: 2013-08-13  13:57:16 to 2014-06-16 14:28:12</font> -->
 </div><!-- end prefs -->
 
+<div class="section_title">
+  <center><button onclick="submitForm()">Update Map</button><button onclick="submitDownloadForm()">Download CSV</button></center>
+</div> <!-- end section_title -->
+</div> <!-- end sidebar-form -->
+
 <br>
 
-<div class="section_title">MAP INFO</div>
 <div id="mouseover">
 <font size="2">
 <!-- View Type: {{view_type}} <br>-->
@@ -766,47 +794,39 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <!--<br><b>Clicked Lat, Lon: </b>--><input type="hidden" class="current_info" id="clicked_lat_lng"></span>
 <br><b>Map Bounds: <font size="1"></b><span id="bounds"></span></font>
 <br><b>Map Center: </b><span id="current_center"></span>
-<br><b>Map Zoom: </b><span id="current_zoom"></span>
 <!--<br><b>Clicked Lat, Long: </b> <input type="text" id="latlongclicked" style="width:300px; border:1px inset black;"></span> -->
 <br></font>
-</div>
-<br>
+</div> <!-- end mouseover -->
 </div> <!-- end text -->
+
+<br>
+
 <div class="mouse-over-info"></div>
 
-{% endblock %}
+{% endblock %} <!-- end sidebar block -->
 
 {% block content %}
 
 <div class="ui-content">
-    
-    <div class="row-3" id="map-canvas"></div>
+	
+	<div class="row-3" id="map-canvas"></div> <!-- end row-3, map-canvas -->
 
-    {% if positions %}
-    <!-- FLOT CHART -->
-  <div class="row-3">
-      <center>
-      {% if graph_data == "1" or graph_data == "null" %}
-      <b><u>LIKELIHOOD vs. TIME</u></b>
-      <br>Deployment Shown = 
-      {% if graph_dep_django %}
-        <span id="dep_id"></span>
-      {% else %}
-      {{deps.0}}
-      {% endif %}
+	{% if positions %}
+	<!-- FLOT CHART -->
+  <div class="row-4">
+	  <center>
+	  {% if graph_data == "1" or graph_data == "null" %}
+	  <b><u>LIKELIHOOD vs. TIME</u></b>
+	  {% endif %}
 
-      {% endif %}
-
-      {% if graph_data == "2" %}
-      <b><u>ACTIVITY vs. TIME</u></b>
-      <br>Deployment Shown = <span id="dep_id"></span> 
-      {% endif %}
-    <!-- uncomment next line for small overview graph -->
+	  {% if graph_data == "2" %}
+	  <b><u>ACTIVITY vs. TIME</u></b>
+	  {% endif %}
+	<!-- uncomment next line for small overview graph -->
 <!--   <div id="overview" class="demo-placeholder" style="float: right; width: 100px; height: 125px;"></div> -->
-    </center>
-    <div class="row-2" id="placeholder2"></div>
-    </div> 
-</div>
-
+	</center>
+	<div class="row-2" id="placeholder2"></div> <!-- end row-2, placeholder2 -->
+	</div>  <!-- end row-4 -->
+</div> <!-- end ui-content -->
 {% endif %} <!-- end if positions (if there is query data) -->
-{% endblock %}
+{% endblock %} <!-- end content block -->		
