@@ -135,7 +135,7 @@ def Filter0(db_con, dep_id, site_id, t_start, t_end):
 
 
 
-def Filter(db_con, dep_id, t_start, t_end): 
+def Filter(db_con, dep_id, t_start, t_end, param_filter=True): 
   
   total = 0; max_id = 0
   tx_params = get_tx_params(db_con, dep_id)
@@ -178,7 +178,8 @@ def Filter(db_con, dep_id, t_start, t_end):
                                                                        interval[1], 
                                                                        data[site_id].shape[0]))
       
-      parametric_filter(data[site_id], tx_params)
+      if param_filter:
+        parametric_filter(data[site_id], tx_params)
         
       if data[site_id].shape[0] >= BURST_THRESHOLD: 
         burst_filter(data[site_id], augmented_interval)
