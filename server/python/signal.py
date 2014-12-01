@@ -24,19 +24,22 @@ import numpy as np
 #### Constants and parameters for per site/transmitter pulse filtering. #######
 
 # Burst filter parameters. 
-BURST_INTERVAL = 10         # seconds
-BURST_THRESHOLD = 20        # pulses/second
+BURST_INTERVAL = 10     # seconds
+BURST_THRESHOLD = 20    # pulses/second
 
 # Time filter paramters. 
-SCORE_INTERVAL = 60 * 3     # seconds
-SCORE_NEIGHBORHOOD = 20     # seconds
+SCORE_INTERVAL = 60     # seconds
+SCORE_NEIGHBORHOOD = 20 # seconds
 
 # Score error for pulse corroboration, as a function of the variation over 
 # the interval. (Second moment of the mode pulse interval). These curves were 
 # fit to a particular false negative / positive trade-off over a partitioned
-# data set. See server/scripts/filter/test-data for details. 
-SCORE_ERROR = lambda(x) : (-0.6324 / (x + 7.7640)) + 0.1255 # thresh = 0.2
-#SCORE_ERROR = lambda(x) : 0.1956                           # thresh = 0.2
+# data set. See github.com/qraat/time-filter for details. 
+
+# Results for SCORE_THRESHOLD=0.2. 
+#SCORE_ERROR = lambda(x) : (-0.6324 / (x + 7.7640)) + 0.1255 # hyper
+#SCORE_ERROR = lambda(x) : 0.02                              # const_low
+SCORE_ERROR = lambda(x) : 0.1255                             # const_high
 
 # Minumum percentage of transmitter's nominal pulse interval that the expected
 # pulse_interval is allowed to drift. Tiny pulse intervals frequently result 

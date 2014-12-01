@@ -101,14 +101,12 @@ for i in range(len(chunks)):
 
   print "position: fetching chunk %d of %d." % (i+1, len(chunks)) 
 
-  estimator = qraat.srv.position.estimator(options.dep_id,  chunks[i][0], chunks[i][1], options.t_window, options.t_delta)
+  estimator = qraat.srv.position.estimator(options.dep_id, chunks[i][0], chunks[i][1], options.t_window, options.t_delta)
   num_est = estimator.get_est_data(db_con, options.thresh)
   if num_est > 0:
     estimator.get_bearing_likelihood(sv)
     for new_estimator in estimator.windowed():
-      print "position: calculating bearings"
       new_estimator.insert_bearings(db_con)
-      print "position: calculating positions"
       new_estimator.insert_positions(db_con, center)
   else:
     print "Skipping empty chunk"
