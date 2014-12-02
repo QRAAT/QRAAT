@@ -23,6 +23,8 @@ import re, time
 import MySQLdb as mdb
 import qraat 
 
+DIRECTORY_THROTTLE=20
+
 # Check for running instances of this program. 
 (status, output) = commands.getstatusoutput(
   'pgrep -c `basename %s`' % (sys.argv[0]))
@@ -92,94 +94,105 @@ for site in dir_sitelist:
     # Don't process sites currently being fetched or that don't have files in them. 
     if os.path.isdir(site_dir) and not os.path.isfile('%s/fetching.site' % (site_dir)):
               
-      (status, output) = commands.getstatusoutput(
-        '/usr/bin/find %s/????/??/??/??/?? -type d' % site_dir )
+      #(status, output) = commands.getstatusoutput(
+      #  '/usr/bin/find %s/????/??/??/??/?? -type d' % site_dir )
 
            
-      if status == 0 and output:
+      #if status == 0 and output:
     
         # Batch process only the oldest 20 directories that were created.
-        leaf_dirs = sorted(output.split('\n'), reverse=False)
-        total = len(leaf_dirs) 
-        leaf_dirs = leaf_dirs[:20]
-        print "det_to_db: %s: processing %d out of %d available directories" % ( 
-          site, len(leaf_dirs), total) 
+       # leaf_dirs = sorted(output.split('\n'), reverse=False)
+       # total = len(leaf_dirs) 
+       # leaf_dirs = leaf_dirs[:20]
+       # print "det_to_db: %s: processing %d out of %d available directories" % ( 
+        #  site, len(leaf_dirs), total) 
 
-        for leaf_dir in leaf_dirs:
+        #for leaf_dir in leaf_dirs:
+      directory_counter = 0
+      for leaf_dir,sublist,filelist in os.walk(site_dir):
+        if directory_counter >= DIRECTORY_THROTTLE:
+          break
+        elif sublist:
+          sublist.sort()
+        elif filelist:
 
           #get directories
-          date_tuple = leaf_regex.search(leaf_dir).groups(0)
+          search_result = leaf_regex.search(leaf_dir)
+          if search_result:
+            directory_counter+=1
+            print "Found {} {}".format(leaf_dir,directory_counter)
+            date_tuple = search_result.groups(0)
 
-          # Process det files, store signals in the database. 
-          det_list, bad_list = qraat.det.det.read_dir(leaf_dir)
+            # Process det files, store signals in the database. 
+            det_list, bad_list = qraat.det.det.read_dir(leaf_dir)
                     
-          if bad_list: #there are non-readable det files
+            if bad_list: #there are non-readable det files
             
-            det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
-            q_dir = ("%s/%s_" % (det_q, site)) +\
-                       ("%s.%s.%s.%s.%s/" % date_tuple)
-            try:
-              os.makedirs(q_dir)
-            except OSError:
-              if not os.path.isdir(q_dir):
-                raise
-            
-            for f in bad_list:
-              commands.getstatusoutput("mv {0} {1}".format(f,q_dir))
-          
-          table = qraat.est.est(dets=det_list)
-  
-          cur = db_con.cursor()
-          for row in table: 
-            try:
-              table.write_db_row(cur, row, site)
-            except Exception as e:
-              #could be qraat.ResolveIdError from est class
-              #could be MySQLdb.error that we haven't anticipated
-              print >>sys.stderr, "det_to_db: warning: skipping est row corresponding to '{0}' due to error from qraat.est.est.write_db_row()".format(row.fn)
-              print >>sys.stderr, "det_to_db: error was: {0}".format(e)
               det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
               q_dir = ("%s/%s_" % (det_q, site)) +\
                        ("%s.%s.%s.%s.%s/" % date_tuple)
               try:
                 os.makedirs(q_dir)
-              except OSError, e:            # Catch if directory exists;
-                if e.errno != errno.EEXIST: # otherwise, throw exception.  
-                  raise e
-              commands.getstatusoutput("mv {0} {1}".format(row.fn,q_dir))
+              except OSError:
+                if not os.path.isdir(q_dir):
+                  raise
+            
+              for f in bad_list:
+                commands.getstatusoutput("mv {0} {1}".format(f,q_dir))
+          
+            table = qraat.est.est(dets=det_list)
+  
+            cur = db_con.cursor()
+            for row in table: 
+              try:
+                table.write_db_row(cur, row, site)
+              except Exception as e:
+                #could be qraat.ResolveIdError from est class
+                #could be MySQLdb.error that we haven't anticipated
+                print >>sys.stderr, "det_to_db: warning: skipping est row corresponding to '{0}' due to error from qraat.est.est.write_db_row()".format(row.fn)
+                print >>sys.stderr, "det_to_db: error was: {0}".format(e)
+                det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
+                q_dir = ("%s/%s_" % (det_q, site)) +\
+                       ("%s.%s.%s.%s.%s/" % date_tuple)
+                try:
+                  os.makedirs(q_dir)
+                except OSError, e:            # Catch if directory exists;
+                  if e.errno != errno.EEXIST: # otherwise, throw exception.  
+                    raise e
+                commands.getstatusoutput("mv {0} {1}".format(row.fn,q_dir))
           
                   
-          # Archive table as est file. 
-          table.write(("%s/%s/" % (est_arch, site)) +\
-                       ("%s/%s/%s/%s/%s/" % date_tuple))
+            # Archive table as est file. 
+            table.write(("%s/%s/" % (est_arch, site)) +\
+                         ("%s/%s/%s/%s/%s/" % date_tuple))
           
-          # Archive processed det files.
-          arch_fn = ("%s/%s/" % (det_arch, site)) +\
+            # Archive processed det files.
+            arch_fn = ("%s/%s/" % (det_arch, site)) +\
                      ("%s/%s/%s/%s/%s/" % date_tuple)
-          try:
-            os.makedirs(arch_fn)
-          except OSError, e:            # Catch if directory exists;
-            if e.errno != errno.EEXIST: # otherwise, throw exception.  
-              raise e
+            try:
+              os.makedirs(arch_fn)
+            except OSError, e:            # Catch if directory exists;
+              if e.errno != errno.EEXIST: # otherwise, throw exception.  
+                raise e
 
-          arch_fn += site + (".%s.%s.%s.%s.%s.tar" % date_tuple)
-          if os.path.isfile(arch_fn): 
-            (status, output) = commands.getstatusoutput(
-              '/bin/tar -rf %s -C %s .' % (arch_fn, leaf_dir))
-          else: 
-            (status, output) = commands.getstatusoutput(
-              '/bin/tar -cf %s -C %s .' % (arch_fn, leaf_dir))
+            arch_fn += site + (".%s.%s.%s.%s.%s.tar" % date_tuple)
+            if os.path.isfile(arch_fn): 
+              (status, output) = commands.getstatusoutput(
+                '/bin/tar -rf %s -C %s .' % (arch_fn, leaf_dir))
+            else: 
+              (status, output) = commands.getstatusoutput(
+                '/bin/tar -cf %s -C %s .' % (arch_fn, leaf_dir))
 
-          # Delete processed det files. 
-          if status != 0: 
-            print >>sys.stderr, "det_to_db: error: archiving %s: %s" % (
-              site, output)
-          else:  
-            commands.getstatusoutput('rm -fr %s' % leaf_dir)
+            # Delete processed det files. 
+            if status != 0: 
+              print >>sys.stderr, "det_to_db: error: archiving %s: %s" % (
+                site, output)
+            else:  
+              commands.getstatusoutput('rm -fr %s' % leaf_dir)
 
-      else:# error in find or it returned nothing
-        print >>sys.stderr, "det_to_db: error: {2}: find returned \"{0}\" with status {1}".format(output,status,site_dir)
-
+      #else:# error in find or it returned nothing
+        #print >>sys.stderr, "det_to_db: error: {2}: find returned \"{0}\" with status {1}".format(output,status,site_dir)
+      print "det_to_db: {}: processed {} directories".format(site,directory_counter) 
   else:
     print >>sys.stderr, "det_to_db: error: {0} not in database sitelist".format(site)
 
