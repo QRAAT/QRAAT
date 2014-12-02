@@ -189,7 +189,15 @@ for site in dir_sitelist:
                 site, output)
             else:  
               commands.getstatusoutput('rm -fr %s' % leaf_dir)
-
+          else:#doesn't pass regex
+            pass#quarantine weird thing
+        else:#no files or subdirectories
+          #delete directory
+          try:
+            os.rmdir(leaf_dir)
+          except OSError, e:
+            print "Tried to delete {}".format(directory)
+            print e
       #else:# error in find or it returned nothing
         #print >>sys.stderr, "det_to_db: error: {2}: find returned \"{0}\" with status {1}".format(output,status,site_dir)
       print "det_to_db: {}: processed {} directories".format(site,directory_counter) 
