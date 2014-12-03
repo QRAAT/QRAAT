@@ -1,15 +1,13 @@
 # File: qraat_ui/views.py
 #
-# TODO Clean up get_context(). The way it's written necessitates a redundant 
-#      query in the calling functions, e.g. get_by_dep() and download_by_dep(). 
-# 
 # TODO Cache last query (result of get_context()) for download.  
 #
 # TODO Post handler for "Submit Form"? 
 
 from django.template import Context, loader, RequestContext
 from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.shortcuts import render, render_to_response, get_object_or_404
+from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
+from django.shortcuts import render, render_to_response, get_object_or_404, redirect
 from django.core.urlresolvers import reverse
 from django.db.models import Q, Max, Min
 from django.contrib.auth.decorators import login_required
@@ -18,13 +16,15 @@ from qraatview.utils import DateTimeEncoder
 import qraatview.rest_api as rest_api
 import qraat, time, datetime, json, utm, math, copy
 from pytz import utc, timezone
-from qraatview.models import Position, Deployment, Site, Project
+from qraatview.models import Position, Deployment, Site, Project, Tx
 from qraat_ui.forms import Form
 from decimal import Decimal
 
 import csv
 import qraat
 
+# For view /ui/project/X/deployment/Y, initial time range for data to display.
+INITIAL_DATA_WINDOW = 60 * 60 * 4
 
 
 def get_context(request, deps=[], req_deps=[]):
@@ -135,7 +135,12 @@ def get_context(request, deps=[], req_deps=[]):
     ''' Either a dep is passed by URL, or dep(s) selected in html form'''
     print "------- req deps exists"
    
-    if (datetime_from == None) and (datetime_to == None) and (likelihood_low == None) and (likelihood_high == None) and (activity_low == None) and (activity_high == None): 
+    if (datetime_from == None) and \
+           (datetime_to == None) and \
+           (likelihood_low == None) and \
+           (likelihood_high == None) and \
+           (activity_low == None) and \
+           (activity_high == None): 
       req_deps_int.append(req_deps[0].ID) # /ui/project/X/deployment/Y
 
       ''' /ui/project/1/deployment/63/
@@ -143,61 +148,38 @@ def get_context(request, deps=[], req_deps=[]):
       Auto-filter by min/max range of likelihood & activity, for last 24 hrs
       of data in the db. Also set these filters as initial values of html 
       form. '''
-      print "-------when deployment page first loads"
-
-      #dep_query = Position.objects.filter(deploymentID__in = map(lambda(row) : row.ID, req_deps)) 
-      dep_query = Position.objects.filter(deploymentID = req_deps[0].ID)
-      ''' Query db for min/max value for selected deployment.
-        Used to automatically populate html form intial values. '''
-      
       queried_data=[]
       
-      if len(dep_query) == 0: 
-        print "No positions, returning empty context."
+      q = Position.objects.filter(deploymentID = req_deps[0].ID).aggregate(
+                                    Max('timestamp'))['timestamp__max']
       
-      else: # Set default form vlaues, populate queried_data. 
-        # Select the last day of data for deployment. 
-        datetime_to_initial = float( dep_query.aggregate(Max('timestamp'))
-                                      ['timestamp__max'] )
+      if q != None:
+        
+        datetime_to_initial = float(q)
+        datetime_from_initial = datetime_to_initial - INITIAL_DATA_WINDOW
+        queried_objects = Position.objects.filter(deploymentID = req_deps[0].ID, 
+                                                  timestamp__gte = datetime_from_initial)
+      
         datetime_to_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                     time.localtime(float(datetime_to_initial-7*60*60))) # FIXME 
       
-        datetime_from_min_initial = float( dep_query.aggregate(
-                                Min('timestamp'))['timestamp__min'] )
-        datetime_from_day_initial = float(datetime_to_initial - 86400.00) 
-          # minus 24 hrs
-        if datetime_from_day_initial < datetime_from_min_initial:
-          datetime_from_initial = datetime_from_min_initial
-        else:
-          datetime_from_initial = datetime_from_day_initial
         datetime_from_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                     time.localtime(float(datetime_from_initial-7*60*60))) # FIXME 
 
-        likelihood_low_initial = dep_query.aggregate(Min('likelihood'))['likelihood__min']
-        likelihood_high_initial = dep_query.aggregate(Max('likelihood'))['likelihood__max']
-
-        activity_low_initial = dep_query.aggregate(Min('activity'))['activity__min']
-        activity_high_initial = dep_query.aggregate(Max('activity'))['activity__max']
     
         index_form.fields['datetime_from'].initial = datetime_from_str_initial
         index_form.fields['datetime_to'].initial = datetime_to_str_initial
+   
+        likelihood_low_initial = round(queried_objects.aggregate(Min('likelihood'))['likelihood__min'], 2)
+        likelihood_high_initial = round(queried_objects.aggregate(Max('likelihood'))['likelihood__max'], 2)
+
+        activity_low_initial = round(queried_objects.aggregate(Min('activity'))['activity__min'], 2)
+        activity_high_initial = round(queried_objects.aggregate(Max('activity'))['activity__max'], 2)
+        
         index_form.fields['likelihood_low'].initial = likelihood_low_initial
         index_form.fields['likelihood_high'].initial = likelihood_high_initial
         index_form.fields['activity_low'].initial = activity_low_initial
         index_form.fields['activity_high'].initial = activity_high_initial
-   
-        ''' FIXME: For blank form value(s), default them to min/max values of that dep. Notify the user that this happened. '''
-        
-        # Query data. 
-        queried_objects = Position.objects.filter(
-                            deploymentID = req_deps[0].ID,
-                            timestamp__gte = datetime_from_initial,
-                            timestamp__lte = datetime_to_initial,
-                            likelihood__gte = likelihood_low_initial,
-                            likelihood__lte = likelihood_high_initial,
-                            activity__gte = activity_low_initial,
-                            activity__lte = activity_high_initial
-                            )
 
         for q in queried_objects:
           #(lat, lon) = utm.to_latlon(float(q.easting), float(q.northing), 
@@ -234,7 +216,7 @@ def get_context(request, deps=[], req_deps=[]):
         kwargs['activity__gte'] = activity_low
       if activity_high:
         kwargs['activity__lte'] = activity_high
-    
+        
       ''' FIXME. This limits the list of req_deps to 4, otherwise the points
       will display as the large default google maps markers.'''
       req_deps_ID = req_deps.values_list('ID', flat=True)
@@ -274,8 +256,8 @@ def get_context(request, deps=[], req_deps=[]):
             activity_low, activity_high, ))
 
       else: 
-        raise Exception("Somethign is wrong.")
-     
+        raise Exception("Something is wrong.")
+   
       for row in queried_objects:
         #(lat, lon) = utm.to_latlon(float(row.easting), 
         #    float(row.northing), row.utm_zone_number,
@@ -341,7 +323,7 @@ def get_context(request, deps=[], req_deps=[]):
             'display_type': json.dumps(display_type),
             'data_type': json.dumps(data_type), #position vs. track 
             }
-  
+
   return context
 
 def index(request):
@@ -372,57 +354,75 @@ def view_by_dep(request, project_id, dep_id):
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
-    return HttpResponse("We didn't find this project") 
-  
+    raise Http404
+ 
   if not project.is_public:
     if request.user.is_authenticated():
       user = request.user
       if project.is_owner(user)\
-           or (user.has_perm("can_view")
+           or (user.has_perm("qraatview.can_view")
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
-
-        deps = project.get_deployments().filter(ID=dep_id)
+        pass
+        
       else:
-        return HttpResponse("You're not allowed to view this.")
+        raise PermissionDenied #403
     
     else:
-      return HttpResponse("You're not allowed to visualize this")
+			return redirect("/auth/login/?next=%s" % request.path)
 
-  else:
-    deps = project.get_deployments().filter(ID=dep_id)
-   
+  else: pass
+    
+  deps = project.get_deployments().filter(ID=dep_id)
+  print "-----------------------------------------------------"
+  print request.GET
+  print request.POST
+  print "-----------------------------------------------------"
+  
+  try:
+    deployment = Deployment.objects.get(ID=dep_id)
+  except ObjectDoesNotExist:
+    #return render(request, "404.html")
+    raise Http404
+ 
+  target = deployment.targetID
+  target_name = target.name
+
+  transmitter = deployment.txID
+  transmitter_frequency = transmitter.frequency
+  
   context = get_context(request, deps, deps)
 
   nav_options = get_nav_options(request)
   context["nav_options"] = nav_options
   context["project"] = project
+  context["target_name"] = target_name
+  context["transmitter_frequency"] = transmitter_frequency
 
   return render(request, 'qraat_ui/index.html', context)
 
 
 def download_by_dep(request, project_id, dep_id): 
-  print request
-  
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
-    return HttpResponse("We didn't find this project") 
-  
+		raise Http404
+      
   if not project.is_public:
     if request.user.is_authenticated():
       user = request.user
       if project.is_owner(user)\
-           or (user.has_perm("can_view")
+           or (user.has_perm("qraatview.can_view")
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
 
         deps = project.get_deployments().filter(ID=dep_id)
       else:
-        return HttpResponse("You're not allowed to view this.")
-    
+        raise PermissionDenied #403
+
     else:
-      return HttpResponse("You're not allowed to visualize this")
+			return redirect("/auth/login/?next=%s" % request.path)
+
 
   else:
     deps = project.get_deployments().filter(ID=dep_id)
@@ -443,12 +443,12 @@ def download_by_dep(request, project_id, dep_id):
 
 def view_by_target(request, target_id): 
   ''' Compile a list of deployments associated with `target_id`. ''' 
-  return HttpResponse('Not implemneted yet. (targetID=%s)' % target_id)
+  return HttpResponse('Not implemented yet. (targetID=%s)' % target_id)
 
 
 def view_by_tx(request, tx_id): 
   ''' Compile a list of deployments associated with `tx_id`. ''' 
-  return HttpResponse('Not implemneted yet. (txID=%s)' % tx_id)
+  return HttpResponse('Not implemented yet. (txID=%s)' % tx_id)
 
 
 @login_required(login_url="auth/login")
@@ -570,8 +570,6 @@ def generic_graph(
         data = rest_api.get_model_data(request) 
     except Exception, e:
         print e
-        content["data"] = json.dumps(None)
-    else:
         content["data"] = json.dumps(rest_api.json_parse(data), cls=DateTimeEncoder)
 
     return render(

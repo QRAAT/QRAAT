@@ -247,7 +247,9 @@ class estimator:
       time_center += self.t_delta
 
 
-  def insert_bearings(self, db_con):
+  def insert_bearings(self, db_con, dep_id=None):
+    if dep_id is None: 
+      dep_id = self.deploymentID
     timestamp = (self.t_start + self.t_stop) / 2.0
     cur = db_con.cursor()
     for site, data in self.per_site.iteritems():
@@ -257,7 +259,7 @@ class estimator:
         cur.execute('''INSERT INTO bearing 
                    (deploymentID, siteID, timestamp, bearing, likelihood, activity)
                    VALUES (%s, %s, %s, %s, %s, %s)''',
-                   (self.deploymentID, site, timestamp,
+                   (dep_id, site, timestamp,
                     theta_hat, norm_max_likelihood, activity))
         data.bearingID = cur.lastrowid
         handle_provenance_insertion(cur, {'est':tuple(data.estID), 'calibration_information':(data.calID,)}, {'bearing':(data.bearingID,)})
@@ -295,12 +297,13 @@ class estimator:
   def get_activity(self):
     return np.mean([ s.get_activity() for s in self.per_site.itervalues() ])
 
-  def insert_positions(self, db_con, center=None):
+  def insert_positions(self, db_con, center=None, dep_id=None):
     if len(self.per_site) > 1:
       if center is None:
         (center_position, utm_number, utm_letter) = get_center(db_con)
       else:
         (center_position, utm_number, utm_letter) = center
+      if dep_id is None: dep_id = self.deploymentID
       timestamp = (self.t_start + self.t_stop) / 2.0
       position_hat, likelihood = self.position_estimate(center_position)
       activity = self.get_activity()
@@ -311,7 +314,7 @@ class estimator:
                           utm_zone_number, utm_zone_letter, likelihood, 
                           activity, latitude, longitude)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                     (self.deploymentID, timestamp, position_hat.imag, position_hat.real,
+                     (dep_id, timestamp, position_hat.imag, position_hat.real,
                       utm_number, utm_letter, likelihood,
                       activity, round(lat,6), round(lon,6)))
       self.positionID = cur.lastrowid
