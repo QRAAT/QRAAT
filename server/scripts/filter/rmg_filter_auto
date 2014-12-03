@@ -74,9 +74,9 @@ try:
                     WHERE ID > %s
                       AND ID <= %s 
                       AND timestamp < %s
-                      AND deploymentID = %s''', (last_processed, last_processed+EST_THROTTLE, now, dep_id)) 
+                      AND deploymentID = %s
+                 ORDER BY timestamp ASC''', (last_processed, last_processed+EST_THROTTLE, now, dep_id)) 
       times = np.array(cur.fetchall(),dtype=float)
-      print times.shape
       #determine time range needed to be processed
       #time_ranges is a list of tuples determining the start and stop of a time_range
       #a time_range is a block of contiguous time_windows over which there is a signal

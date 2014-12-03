@@ -20,7 +20,6 @@
 import util
 import sys
 import numpy as np
-import time
 
 #### Constants and parameters for per site/transmitter pulse filtering. #######
 
@@ -64,16 +63,7 @@ BURST_BAD = -2
 # Log output. 
 VERBOSE = False
 
-# Instrumentation accumulators
-processing_time = {}
-processing_time['setup'] = 0.0
-processing_time['get_interval_data']=0.0
-processing_time['expected_pulse_interval']=0.0
-processing_time['param_filter']=0.0
-processing_time['burst_filter']=0.0
-processing_time['time_filter']=0.0
-processing_time['update_data']=0.0
-processing_time['update_intervals']=0.0
+
 
 #### High level calls. ########################################################
 
@@ -146,9 +136,7 @@ def Filter0(db_con, dep_id, site_id, t_start, t_end):
 
 
 def Filter(db_con, dep_id, t_start, t_end): 
-
-  total_processing_timer_start = time.time()
-  processing_timer_start = time.time()  
+  
   total = 0; max_id = 0
   tx_params = get_tx_params(db_con, dep_id)
   debug_output("depID=%d parameters: band3=%s, band10=%s, pulse_rate=%s" 
@@ -161,13 +149,10 @@ def Filter(db_con, dep_id, t_start, t_end):
   cur.execute('SELECT ID FROM site')
   sites = map(lambda(row) : row[0], cur.fetchall())
 
-  processing_timer_stop = time.time()
-  processing_time['setup'] += processing_timer_stop - processing_timer_start
+
   interval_data = {} # Keep track of pulse rate of each window. 
   for site_id in sites: 
     interval_data[site_id] = []
-
-  cur.execute('CREATE TEMPORARY TABLE tempest AS SELECT ID, siteID, timestamp, band3, band10 FROM est WHERE deploymentID=%s AND timestamp > %s AND timestamp < %s', (dep_id, t_start - SCORE_NEIGHBORHOOD, t_end + SCORE_NEIGHBORHOOD))
 
   for interval in get_score_intervals(t_start, t_end):
 
@@ -215,12 +200,6 @@ def Filter(db_con, dep_id, t_start, t_end):
   for site_id in sites:
     update_intervals(db_con, dep_id, site_id, interval_data[site_id])
   
-  total_processing_time = time.time() - total_processing_timer_start
-  for k,v in processing_time.iteritems():
-    print k,v,v/total_processing_time
-
-  cur.execute("DROP TEMPORARY TABLE tempest")
-  print 'total time', total_processing_time, total_processing_time/total_processing_time
   return (total, max_id)
 
 
@@ -246,63 +225,48 @@ def get_interval_data(db_con, dep_id, site_id, interval):
     record. (X[:,5], X[:,6] resp.) Initially, there values are 0. 
   ''' 
 
-  processing_timer_start = time.time()
-
   cur = db_con.cursor()
   cur.execute('''SELECT ID, siteID, timestamp, band3, band10, 0, 0, 0  
-                   FROM tempest
-                   WHERE timestamp >= %s
+                   FROM est
+                  WHERE deploymentID = %s
+                    AND timestamp >= %s
                     AND timestamp < %s
                     AND siteID = %s
                   ORDER BY timestamp''', 
-                (interval[0], interval[1], site_id,))
+                (dep_id, interval[0], interval[1], site_id,))
  
-                  #WHERE deploymentID = %s
-  #data = []
-  #for row in cur.fetchall():
-  #  data.append(list(row))
-  #  data[-1][2] = int(data[-1][2] * TIMESTAMP_PRECISION)
-  data = np.array(cur.fetchall(),dtype=float)
-  if data.shape[0] > 0:
-    data[:,2] *= TIMESTAMP_PRECISION
-  processing_timer_stop = time.time()
-  processing_time['get_interval_data'] += processing_timer_stop - processing_timer_start
+  data = []
+  for row in cur.fetchall():
+    data.append(list(row))
+    data[-1][2] = int(data[-1][2] * TIMESTAMP_PRECISION)
+  
+  return np.array(data, dtype=np.int64)
 
- 
-  #return np.array(data, dtype=np.int64)
-  return data
 
 def update_data(db_con, data): 
   ''' Insert scored data, updating existng records. 
   
     Return the number of inserted scores and the maximum estID. 
   ''' 
- 
-  processing_timer_start = time.time()
- 
+  
   (row, _) = data.shape; 
-  inserts = []#; deletes = []
+  inserts = []; deletes = []
   for i in range(row):
-    inserts.append((data[i,0], data[i,5], data[i,6], data[i,7],data[i,0], data[i,5], data[i,6], data[i,7]))
-    #deletes.append(data[i,0])
+    inserts.append((data[i,0], data[i,5], data[i,6], data[i,7]))
+    deletes.append(data[i,0])
 
   cur = db_con.cursor()
-  #cur.executemany('DELETE FROM estscore WHERE estID = %s', deletes)
-  cur.executemany('INSERT INTO estscore (estID, score, theoretical_score, max_score) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE estID=%s, score=%s, theoretical_score=%s, max_score=%s', inserts)
+  cur.executemany('DELETE FROM estscore WHERE estID = %s', deletes)
+  cur.executemany('''INSERT INTO estscore (estID, score, theoretical_score, max_score) 
+                            VALUES (%s, %s, %s, %s)''', inserts)
 
   max_id = np.max(data[:,0]) if len(inserts) > 0 else 0
-
-  processing_timer_stop = time.time()
-  processing_time['update_data'] += processing_timer_stop - processing_timer_start
-
   return (len(inserts), max_id)
 
 
 def update_intervals(db_con, dep_id, site_id, intervals):
   ''' Insert interval data for (dep, site). ''' 
- 
-  processing_timer_start = time.time()
- 
+  
   if len(intervals) > 0: 
 
     cur = db_con.cursor()
@@ -320,8 +284,6 @@ def update_intervals(db_con, dep_id, site_id, intervals):
     cur.executemany('''INSERT INTO estinterval (deploymentID, siteID, timestamp, 
                                                 duration, pulse_interval, pulse_variation)
                              VALUE (%s, %s, %s, %s, %s, %s)''', inserts)
-  processing_timer_stop = time.time()
-  processing_time['update_intervals'] += processing_timer_stop - processing_timer_start
 
 
 
@@ -376,9 +338,7 @@ def expected_pulse_interval(data_dict, pulse_rate):
 
     :param pulse_rate: Transmitter's nominal pulse rate in pulses / minute. 
   ''' 
- 
-  processing_timer_start = time.time()
- 
+  
   max_interval = ((60 * (2 - MIN_DRIFT_PERCENTAGE)) / pulse_rate) * TIMESTAMP_PRECISION
   min_interval = ((60 * MIN_DRIFT_PERCENTAGE) / pulse_rate) * TIMESTAMP_PRECISION
   bin_width = int(BIN_WIDTH * TIMESTAMP_PRECISION)
@@ -413,10 +373,6 @@ def expected_pulse_interval(data_dict, pulse_rate):
       f = float(hist[j]) / hist[i] 
       second_moment += BIN_WIDTH * f * (x - m) ** 2 
 
-  processing_timer_stop = time.time()
-  processing_time['expected_pulse_interval'] += processing_timer_stop - processing_timer_start
-
-
   return (mode, second_moment)
 
 
@@ -426,16 +382,10 @@ def parametric_filter(data, tx_params):
     So far we only look at `band3` and `band10`. 
   '''
 
-  processing_timer_start = time.time()
-
   (rows, _) = data.shape
   for i in range(rows): 
     if data[i,3] > tx_params['band3'] or data[i,4] > tx_params['band10']:
       data[i,5] = PARAM_BAD
-
-  processing_timer_stop = time.time()
-  processing_time['param_filter'] += processing_timer_stop - processing_timer_start
-
 
   #return data[data[:,5] != PARAM_BAD]
 
@@ -449,8 +399,6 @@ def burst_filter(data, interval):
     Note that we could eventually use the 'pulse_rate' parameter
     in `qraat.tx_parameter`. 
   ''' 
-
-  processing_timer_start = time.time()
 
   # Create histogram of pulses with `BURST_INTERVAL` second bins. 
   (hist, bins) = np.histogram(data[:,2], 
@@ -477,10 +425,6 @@ def burst_filter(data, interval):
       if t0 <= data[i,2] and data[i,2] <= t1:
         data[i,5] = BURST_BAD
 
-  processing_timer_stop = time.time()
-  processing_time['burst_filter'] += processing_timer_stop - processing_timer_start
-
-
   #return data[data[:,5] != BURST_BAD]
 
 
@@ -490,8 +434,6 @@ def time_filter(data, pulse_interval, pulse_variation, thresh=None):
     `thresh` is either None or in [0 .. 1]. If `thresh` is not none,
     it returns data with relative score of at least this value. 
   ''' 
-
-  processing_timer_start = time.time()
 
   pulse_error = int(SCORE_ERROR(pulse_variation) * TIMESTAMP_PRECISION)
   delta = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION / 2 
@@ -528,10 +470,6 @@ def time_filter(data, pulse_interval, pulse_variation, thresh=None):
   
   data[:,6] = theoretical_count
   data[:,7] = np.max(data[:,5]) # Max count. 
-
-  processing_timer_stop = time.time()
-  processing_time['time_filter'] += processing_timer_stop - processing_timer_start
-
 
 
 # TODO Deprecate
@@ -601,7 +539,7 @@ if __name__ == '__main__':
     #dep_id = 102; site_id = 2; 
     #t_start, t_end = 1407448817.94, 1407466794.77
 
-    Filter(db_con, dep_id, t_start, t_end)
+    Filter2(db_con, dep_id, t_start, t_end)
 
 
   def test2():
