@@ -19,12 +19,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from math import ceil
-import qraat
 import qraat.srv
-import time, os, sys, commands
-import MySQLdb as mdb
-from optparse import OptionParser
+import time, sys, commands
+import numpy as np
+
+
+
+EST_THROTTLE=10000
+time_window=60#from signal.py
 
 # Check for running instances of this program. 
 (status, output) = commands.getstatusoutput(
@@ -57,27 +59,48 @@ try:
 
   # Get a set of (dep_id, site_id) pairs for which there is new data, 
   # excluding the latest incomplete chunk. 
-  cur.execute('''SELECT DISTINCT deploymentID
+  num_dep = cur.execute('''SELECT DISTINCT deploymentID
                    FROM est 
                   WHERE ID > %s 
-                    AND timestamp < %s''', (last_processed, now)) 
+                    AND ID <= %s
+                    AND timestamp < %s''', (last_processed, last_processed+EST_THROTTLE, now)) 
   
   qraat.srv.signal.VERBOSE = False
   max_id = last_processed
-  
-  for (dep_id,) in cur.fetchall(): 
-    cur.execute('''SELECT min(timestamp), max(timestamp)
+  if num_dep > 0:  
+    for (dep_id,) in cur.fetchall(): 
+      cur.execute('''SELECT timestamp
                      FROM est 
-                    WHERE ID > %s 
+                    WHERE ID > %s
+                      AND ID <= %s 
                       AND timestamp < %s
-                      AND deploymentID = %s''', (last_processed, now, dep_id)) 
-    (t_start, t_end) = cur.fetchone() 
+                      AND deploymentID = %s''', (last_processed, last_processed+EST_THROTTLE, now, dep_id)) 
+      times = np.array(cur.fetchall(),dtype=float)
+      print times.shape
+      #determine time range needed to be processed
+      #time_ranges is a list of tuples determining the start and stop of a time_range
+      #a time_range is a block of contiguous time_windows over which there is a signal
+      time_ranges = []
+      if times.shape[0] > 0:
+        temp_range = [times[0,0], times[0,0]]
+        for j in range(1,times.shape[0]):
+          if times[j,0] - time_window < temp_range[1] + time_window:
+            temp_range[1] = times[j,0]
+          else:
+            time_ranges.append(temp_range)
+            temp_range = [times[j,0], times[j,0]]
+        time_ranges.append(temp_range)
 
-    if dep_id is not None: 
-      print "filter_auto: depID=%d" % (dep_id,)
-      (total, id) = qraat.srv.signal.Filter(db_con, dep_id, t_start, t_end)
-      max_id = id if max_id < id else max_id
-      print "filter: scored %d pulses." % total
+    #(t_start, t_end) = cur.fetchone() 
+      for (t_start,t_end) in time_ranges:
+        print "filter_auto: depID={},start_time={},end_time={}".format(dep_id,t_start,t_end)
+        (total, id) = qraat.srv.signal.Filter(db_con, dep_id, t_start, t_end)
+        if id > max_id:
+          if id < last_processed+EST_THROTTLE:
+            max_id = id
+          else:
+            max_id = last_processed+EST_THROTTLE        
+        print "filter: scored %d pulses." % total
 
   cur.execute('UPDATE `processing_cursor` SET value=%s WHERE name=\'estscore\'', 
                                                 (max_id,))
@@ -88,8 +111,10 @@ try:
 #  print >>sys.stderr, "filter_auto: error: [%d] %s" % (e.args[0], e.args[1])
 #  sys.exit(1)
 
-except qraat.error.QraatError, e:
-  print >>sys.stderr, "filter_auto: error: %s." % e
+#except qraat.error.QraatError, e:
+#  print >>sys.stderr, "filter_auto: error: %s." % e
+except:
+  raise
 
 finally: 
   print "filter_auto: finished in %.2f seconds." % (time.time() - start)
