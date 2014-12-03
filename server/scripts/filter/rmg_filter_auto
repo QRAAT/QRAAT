@@ -25,7 +25,7 @@ import numpy as np
 
 
 
-EST_THROTTLE=10000
+EST_THROTTLE=50000
 time_window=60#from signal.py
 
 # Check for running instances of this program. 
