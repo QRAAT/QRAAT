@@ -178,7 +178,7 @@ class estimator:
                   WHERE deploymentID={0:d}
                     AND timestamp >= {1:f} 
                     AND timestamp <= {2:f}
-                    AND (score / theoretical_score) > {3:f}'''.format(
+                    AND (score / theoretical_score) >= {3:f}'''.format(
                          self.deploymentID, self.t_start-self.t_window,
                          self.t_stop+self.t_window, score_threshold))
     if self.num_est:
