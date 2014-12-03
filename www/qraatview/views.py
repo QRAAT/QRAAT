@@ -5,10 +5,10 @@ from django.db.models import Q
 from django.shortcuts import render, redirect
 from django.core.urlresolvers import reverse
 from django.core.context_processors import csrf
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden, Http404
 from django.http import HttpResponseBadRequest
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.template import Context
 from models import Project, Tx, Location
 from models import Target, Deployment
@@ -23,7 +23,7 @@ def not_allowed_page(request):
     """This view renders a page for forbidden action
     with HTTP 403 status and a message"""
 
-    return HttpResponseForbidden("Action not allowed")
+    raise PermissionDenied #403
 
 
 def get_query(obj_type):
@@ -173,7 +173,7 @@ def get_project(project_id):
     try:
         project = Project.objects.get(ID=project_id)
     except ObjectDoesNotExist:
-        return HttpResponse("We didn't find this project")
+				raise Http404
     else:
         return project
 
@@ -503,7 +503,7 @@ def edit_project(request, project_id):
         project = Project.objects.get(ID=project_id)
 
     except ObjectDoesNotExist:
-        return HttpResponse("Error: We did not find this project")
+        raise Http404
 
     except Exception, e:
         return HttpResponse("Error: %s please contact administration" % str(e))
@@ -553,7 +553,7 @@ def add_manufacturer(request, project_id):
         project = Project.objects.get(ID=project_id)
 
     except ObjectDoesNotExist:
-        return HttpResponse("Error: we didn't find this project")
+				raise Http404
 
     else:
         if user.id == project.ownerID and user.is_superuser:
@@ -662,7 +662,8 @@ def show_project(request, project_id):
                 return not_allowed_page(request)
 
     except ObjectDoesNotExist:
-        return HttpResponse("Project not found")
+        raise Http404
+
 
 
 @login_required(login_url="/auth/login")

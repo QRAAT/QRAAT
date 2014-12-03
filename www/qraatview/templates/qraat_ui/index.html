@@ -15,6 +15,7 @@
     <script src="/static/flot/jquery.flot.resize.min.js"></script>
     <script src="/static/qraat_ui/js/jquery-ui.min.js"></script>
 <script>
+
 // Global variables
 var highlightedPoly;
 var map;
@@ -130,7 +131,7 @@ function loadFlot(pos_markers, map, dep_id){
     
     var plot = $.plot("#placeholder2", graph_data, options);
 
-    // Select maker in map when clicked on flot
+    // Select marker in map when clicked on flot
     $("#placeholder2").bind("plotclick", function (event, pos, item) {
         if (item == undefined) return false;
         //uncomment to have this show up after enablePosition2 in the html (perhaps clickdata2?) 
@@ -722,7 +723,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
 {% endif %}
 
 <div class = "sidebar-form">
-<div id ="prefs">	
+<div id ="prefs">
 <form id="form" action ="" name="settings" method="get">
   <!-- <input type="submit" value="SUBMIT PREFERENCES" /> -->
   <font size="2">
@@ -731,8 +732,10 @@ google.maps.event.addDomListener(window, 'load', initialize);
 	  {% if field.auto_id = "id_deployment" %}
 		<!-- Do nothing currently - prevents an extra <br> being added -->
 
-      {% elif field.auto_id = "id_datetime_from" or field.auto_id = "id_datetime_to" %}
-		<div id = "tooltip" tooltip="YYYY-MM-DD HH:MM:SS (24hr)"> <b>{{field.label_tag}}</b> {{field}} </div> <!-- end tooltip-->
+    {% elif field.auto_id = "id_datetime_from" or field.auto_id = "id_datetime_to" %}
+		<!--<b>{{field.label_tag}}</b> <div id = "tooltip" tooltip="YYYY-MM-DD HH:MM:SS (24hr)"> {{field}} </div> <!-- end tooltip-->
+		
+		<b>{{field.label_tag}}</b> <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="YYYY-MM-DD HH:MM:SS (24hr)"> {{field}} </div>
 
 	  {% elif field.auto_id = "id_likelihood_low" %}
 	  <table>
@@ -766,7 +769,6 @@ google.maps.event.addDomListener(window, 'load', initialize);
   
   </font>
 </form>
-
 <!-- <font size="1">date range: 2013-08-13  13:57:16 to 2014-06-16 14:28:12</font> -->
 </div><!-- end prefs -->
 
@@ -829,4 +831,4 @@ google.maps.event.addDomListener(window, 'load', initialize);
 	</div>  <!-- end row-4 -->
 </div> <!-- end ui-content -->
 {% endif %} <!-- end if positions (if there is query data) -->
-{% endblock %} <!-- end content block -->		
+{% endblock %} <!-- end content block -->

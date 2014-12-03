@@ -76,24 +76,4 @@ th,td {
 
 th {
     text-align: center;
-} 
-
-[tooltip]:before {
-    content: attr(tooltip);
-    position: absolute;
-    opacity: 0;
-  
-    transition: all 0.25s ease;
-    padding: 5px;
-    color: #000000;
-    border-radius: 5px;
-    box-shadow: 2px 2px 1px silver;  
-}
-
-[tooltip]:hover:before {
-    opacity: 1;
-    
-    background: #D8D8D8;
-    margin-top: -35px;
-    margin-left: 0px;  
 }

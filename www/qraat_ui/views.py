@@ -6,7 +6,8 @@
 
 from django.template import Context, loader, RequestContext
 from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.shortcuts import render, render_to_response, get_object_or_404
+from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
+from django.shortcuts import render, render_to_response, get_object_or_404, redirect
 from django.core.urlresolvers import reverse
 from django.db.models import Q, Max, Min
 from django.contrib.auth.decorators import login_required
@@ -353,7 +354,7 @@ def view_by_dep(request, project_id, dep_id):
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
-    return HttpResponse("We didn't find this project") 
+    raise Http404
  
   if not project.is_public:
     if request.user.is_authenticated():
@@ -365,10 +366,10 @@ def view_by_dep(request, project_id, dep_id):
         pass
         
       else:
-        return HttpResponse("You're not allowed to view this.")
+        raise PermissionDenied #403
     
     else:
-      return HttpResponse("You're not allowed to visualize this")
+			return redirect("/auth/login/?next=%s" % request.path)
 
   else: pass
     
@@ -377,7 +378,13 @@ def view_by_dep(request, project_id, dep_id):
   print request.GET
   print request.POST
   print "-----------------------------------------------------"
-  deployment = Deployment.objects.get(ID=dep_id)
+  
+  try:
+    deployment = Deployment.objects.get(ID=dep_id)
+  except ObjectDoesNotExist:
+    #return render(request, "404.html")
+    raise Http404
+ 
   target = deployment.targetID
   target_name = target.name
 
@@ -399,8 +406,8 @@ def download_by_dep(request, project_id, dep_id):
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
-    return HttpResponse("We didn't find this project") 
-  
+		raise Http404
+      
   if not project.is_public:
     if request.user.is_authenticated():
       user = request.user
@@ -411,10 +418,11 @@ def download_by_dep(request, project_id, dep_id):
 
         deps = project.get_deployments().filter(ID=dep_id)
       else:
-        return HttpResponse("You're not allowed to view this.")
-    
+        raise PermissionDenied #403
+
     else:
-      return HttpResponse("You're not allowed to visualize this")
+			return redirect("/auth/login/?next=%s" % request.path)
+
 
   else:
     deps = project.get_deployments().filter(ID=dep_id)
@@ -435,12 +443,12 @@ def download_by_dep(request, project_id, dep_id):
 
 def view_by_target(request, target_id): 
   ''' Compile a list of deployments associated with `target_id`. ''' 
-  return HttpResponse('Not implemneted yet. (targetID=%s)' % target_id)
+  return HttpResponse('Not implemented yet. (targetID=%s)' % target_id)
 
 
 def view_by_tx(request, tx_id): 
   ''' Compile a list of deployments associated with `tx_id`. ''' 
-  return HttpResponse('Not implemneted yet. (txID=%s)' % tx_id)
+  return HttpResponse('Not implemented yet. (txID=%s)' % tx_id)
 
 
 @login_required(login_url="auth/login")
