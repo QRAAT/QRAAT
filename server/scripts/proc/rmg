@@ -281,9 +281,9 @@ then
   do
     if [[ "$TASK" = "auto_on" ]]
     then
-      rmg_csv $SITE auto auto < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+      rmg_csv $SITE auto auto < $SITELIST > tmp.csv && mv -f -b tmp.csv $SITELIST
     else
-      rmg_csv $SITE auto off < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+      rmg_csv $SITE auto off < $SITELIST > tmp.csv && mv -f -b tmp.csv $SITELIST
     fi
   done
   exit 0
@@ -359,7 +359,7 @@ do
       echo "$TASK $SITE"
       if [[ "$ping_computer" == "success" ]]
         then 
-          rmg_csv $SITE state $TASK < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+          rmg_csv $SITE state $TASK < $SITELIST > tmp.csv && mv -f -b tmp.csv $SITELIST
           do_update $SITE
         else 
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
@@ -375,7 +375,7 @@ do
               echo "Powertype is nil; setting site to up instead of down"
               TASK=up
           fi
-          rmg_csv $SITE state $TASK < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+          rmg_csv $SITE state $TASK < $SITELIST > tmp.csv && mv -f -b tmp.csv $SITELIST
           do_update $SITE
           TASK=down
         else
@@ -390,10 +390,10 @@ do
           if [[ "$powertype" == "nil" ]]
             then
               echo "Powertype is nil; setting site to up instead of down"
-              rmg_csv $SITE state up < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+              rmg_csv $SITE state up < $SITELIST > tmp.csv && mv -f -b tmp.csv $SITELIST
               do_update $SITE
           fi
-          rmg_csv $SITE state down < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+          rmg_csv $SITE state down < $SITELIST > tmp.csv && mv -f -b tmp.csv $SITELIST
           do_update $SITE
           mkdir -p $RMG_SERVER_DET_DIR/$SITE 
           touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
@@ -420,7 +420,7 @@ do
       echo "start $SITE"
       if [[ "$ping_computer" == "success" ]]
         then 
-          rmg_csv $SITE state active < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+          rmg_csv $SITE state active < $SITELIST > tmp.csv && mv -f -b tmp.csv $SITELIST
           do_update $SITE
         else 
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
@@ -431,7 +431,7 @@ do
       echo "stop $SITE"
       if [[ "$ping_computer" == "success" ]]
         then
-          rmg_csv $SITE state up < $SITELIST > tmp.csv && mv -f tmp.csv $SITELIST
+          rmg_csv $SITE state up < $SITELIST > tmp.csv && mv -f -b tmp.csv $SITELIST
           do_update $SITE
         else 
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
