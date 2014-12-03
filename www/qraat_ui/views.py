@@ -354,7 +354,6 @@ def view_by_dep(request, project_id, dep_id):
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
-    #return render(request,"404.html")
     raise Http404
  
   if not project.is_public:
@@ -407,8 +406,7 @@ def download_by_dep(request, project_id, dep_id):
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
-    #return render(request, "404.html")
-    raise Http404
+		raise Http404
       
   if not project.is_public:
     if request.user.is_authenticated():
@@ -445,12 +443,12 @@ def download_by_dep(request, project_id, dep_id):
 
 def view_by_target(request, target_id): 
   ''' Compile a list of deployments associated with `target_id`. ''' 
-  return HttpResponse('Not implemneted yet. (targetID=%s)' % target_id)
+  return HttpResponse('Not implemented yet. (targetID=%s)' % target_id)
 
 
 def view_by_tx(request, tx_id): 
   ''' Compile a list of deployments associated with `tx_id`. ''' 
-  return HttpResponse('Not implemneted yet. (txID=%s)' % tx_id)
+  return HttpResponse('Not implemented yet. (txID=%s)' % tx_id)
 
 
 @login_required(login_url="auth/login")
