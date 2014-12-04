@@ -3,13 +3,24 @@ Tracking (QRAAT) project. It remains under major development, but is
 distributed nonetheless under the terms of the GNU General Public License, 
 in the hopes that it will be useful. 
 
-Root directories:
+Root directories and dependencies: 
 
   base/ - The base QRAAT software distribution. This includes C++ and Python
           libraries, as well as some scripts used both by the nodes and 
           server. Build with CMake.  
+  
+    [apt-get] build-essentials, git-core, cmake, swig 
+
 
   node/ - Software for QRAAT nodes, including the RMG module. Requires Gnu
-          Radio to install. Build with CMake. 
+          Radio to install. Build with CMake.
+          
+    [build from surce] GNU Radio, UHD driver 
+
 
   server/ - Server code. Build with CMake.
+  
+    [apt-get] mysql-server, numpy, python-numpy, -scipy, -django, -mysqldb, -pip
+    [pip] utm
+  
+  www/ - Web app frontend for managing QRAAT and visualizing data.
