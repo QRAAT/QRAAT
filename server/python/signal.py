@@ -215,9 +215,9 @@ def Filter(db_con, dep_id, t_start, t_end, param_filter=True):
 def get_score_intervals(t_start, t_end): 
   ''' Return a list of scoring windows given arbitrary start and finish. '''  
  
-  t_start = int(t_start); t_end = int(t_end)
+  t_start = int(t_start); t_end = int(t_end)+1
   for i in range(t_start - (t_start % SCORE_INTERVAL), 
-                 t_end   + (t_end   % SCORE_INTERVAL),
+                 t_end,
                  SCORE_INTERVAL):
     yield (i, i + SCORE_INTERVAL)
 
