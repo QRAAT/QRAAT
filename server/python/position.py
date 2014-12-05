@@ -314,7 +314,7 @@ class estimator:
                          (deploymentID, timestamp, latitude, longitude, easting, northing, 
                           utm_zone_number, utm_zone_letter, likelihood, 
                           activity, number_est_used)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                      (dep_id, timestamp, round(lat,6), round(lon,6),
                       position_hat.imag, position_hat.real,
                       utm_number, utm_letter, norm_likelihood,
