@@ -66,9 +66,8 @@ def get_interval(db_con, dep_id, t_start, t_end):
   ''' Get time interval. 
 
     Compute a chunk of time for running the tracker encompassing `t_start` 
-    and `t_end`. Ensure that it contains at least `WINDOW_LENGTH` points 
-    and overlaps the preceeding chunk by `OVERLAP_LENGTH` points, if they
-    exist. 
+    and `t_end`. Ensure that it contains at least `WINDOW_LENGTH` points, 
+    overlapping with previous windows if they exist. 
   '''
 
   cur = db_con.cursor()
@@ -79,15 +78,15 @@ def get_interval(db_con, dep_id, t_start, t_end):
                     AND timestamp <= %s''', (dep_id, t_start, t_end))
    
   ct = cur.fetchone()[0]
-  if ct < WINDOW_LENGTH + OVERLAP_LENGTH:
+  if ct < WINDOW_LENGTH:
     cur.execute('''SELECT timestamp
                      FROM position
                     WHERE deploymentID = %s
                       AND timestamp <= %s 
                     ORDER BY timestamp DESC
-                    LIMIT %s''', (dep_id, WINDOW_LENGTH + OVERLAP_LENGTH))
-    t_start = min(map(lambda (row) : row[0], cur.fetchall()))
-    
+                    LIMIT %s''', (dep_id, t_end, WINDOW_LENGTH))
+    t_start = min(map(lambda (row) : float(row[0]), cur.fetchall()))
+  
   return (t_start, t_end)
     
     
