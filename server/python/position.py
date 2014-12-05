@@ -257,7 +257,7 @@ class estimator:
         theta_hat, norm_max_likelihood = data.bearing_estimate()
         activity = data.get_activity()
         cur.execute('''INSERT INTO bearing 
-                   (deploymentID, siteID, timestamp, bearing, likelihood, activity, num_est)
+                   (deploymentID, siteID, timestamp, bearing, likelihood, activity, number_est_used)
                    VALUES (%s, %s, %s, %s, %s, %s, %s)''',
                    (dep_id, site, timestamp,
                     theta_hat, norm_max_likelihood, activity, data.num_est))
@@ -313,7 +313,7 @@ class estimator:
       cur.execute('''INSERT INTO position
                          (deploymentID, timestamp, latitude, longitude, easting, northing, 
                           utm_zone_number, utm_zone_letter, likelihood, 
-                          activity, num_est)
+                          activity, number_est_used)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                      (dep_id, timestamp, round(lat,6), round(lon,6),
                       position_hat.imag, position_hat.real,
