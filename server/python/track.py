@@ -219,12 +219,16 @@ class Track:
   def _calc_tracks_windowed(self, M, C):
     ''' Calculate tracks over overlapping windows of positions. 
     
-      Note that the solution may be sub-optimal over the entire time window. 
+      A track is computed for each window. Since the windows overlap, there 
+      may be 0, 1, or 2 distinct points for each timestamp. The maximum 
+      likelihood point is taken as the track point. 
+
+        Note that the solution may be sub-optimal over the entire time window. 
       The optimal algorithm necessarily has a quadratic factor, which we 
       mitigate here by running it over a small, fixed number of positions. 
     '''
-    pos_dict = {}
-    self.track = []
+
+    pos_dict = {} # timestamp -> position set
     i = 0; j = WINDOW_LENGTH 
 
     while i < len(self.pos):
@@ -240,9 +244,9 @@ class Track:
         j -= 1
       
       roots = self.graph(self.pos[i:j+1], M)
-      guy = self.critical_path(self.toposort(roots), C)
+      windowed_track = self.critical_path(self.toposort(roots), C)
       
-      for node in guy: 
+      for node in windowed_track: 
         if not pos_dict.get(node.t):
           pos_dict[node.t] = set()
         pos_dict[node.t].add(node)
@@ -253,6 +257,7 @@ class Track:
     # position with higher likelihood. (NOTE that it may be better 
     # to rerun the critical path algorithm over the tree created 
     # in this process.)
+    self.track = []
     for (t, val) in sorted(pos_dict.items(), key=lambda(m) : m[0]):
       node = max(val, key=lambda(row) : node.t)
       self.track.append(node)
