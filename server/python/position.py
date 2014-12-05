@@ -145,7 +145,7 @@ class per_site_data:
   def get_activity(self):
     a = None
     if self.num_est > 0:
-      a = np.std(self.power) / np.mean(self.power)
+      a = (np.sum((self.power-np.mean(self.power))**2)**0.5)/np.sum(self.power)
     return a
 
   def bearing_estimate(self):
@@ -257,10 +257,10 @@ class estimator:
         theta_hat, norm_max_likelihood = data.bearing_estimate()
         activity = data.get_activity()
         cur.execute('''INSERT INTO bearing 
-                   (deploymentID, siteID, timestamp, bearing, likelihood, activity)
-                   VALUES (%s, %s, %s, %s, %s, %s)''',
+                   (deploymentID, siteID, timestamp, bearing, likelihood, activity, num_est)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)''',
                    (dep_id, site, timestamp,
-                    theta_hat, norm_max_likelihood, activity))
+                    theta_hat, norm_max_likelihood, activity, data.num_est))
         data.bearingID = cur.lastrowid
         handle_provenance_insertion(cur, {'est':tuple(data.estID), 'calibration_information':(data.calID,)}, {'bearing':(data.bearingID,)})
     
@@ -306,17 +306,19 @@ class estimator:
       if dep_id is None: dep_id = self.deploymentID
       timestamp = (self.t_start + self.t_stop) / 2.0
       position_hat, likelihood = self.position_estimate(center_position)
+      norm_likelihood = likelihood / float(self.num_est)
       activity = self.get_activity()
       lat, lon = utm.to_latlon(position_hat.imag, position_hat.real, utm_number, utm_letter)
       cur = db_con.cursor()
       cur.execute('''INSERT INTO position
-                         (deploymentID, timestamp, easting, northing, 
+                         (deploymentID, timestamp, latitude, longitude, easting, northing, 
                           utm_zone_number, utm_zone_letter, likelihood, 
-                          activity, latitude, longitude)
+                          activity, num_est)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                     (dep_id, timestamp, position_hat.imag, position_hat.real,
-                      utm_number, utm_letter, likelihood,
-                      activity, round(lat,6), round(lon,6)))
+                     (dep_id, timestamp, round(lat,6), round(lon,6),
+                      position_hat.imag, position_hat.real,
+                      utm_number, utm_letter, norm_likelihood,
+                      activity, self.num_est))
       self.positionID = cur.lastrowid
       bearingID = [ data.bearingID for data in self.per_site.itervalues() ]
       handle_provenance_insertion(cur, {'bearing':bearingID}, {'position':(self.positionID,)})
