@@ -22,17 +22,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-# Location of metadata on a remote machine. Files included in this
-# directory are: site.csv, tx.csv, and status.log. Any debug information
-# is also stored here. We currently log the standard output and standard
-# error of the last run of the pulse detector. This value is used by the
-# server and must be the same at each site.
-export RMG_SITE_METADATA_DIR="/home/rmg"
-
-# Location of det data files on a remote machine. This is typically a
-# subdirectory of a temporary filesystem created with /etc/fstab.
-# This value is used by the sever and must be the same at each site.
-export RMG_SITE_DET_DIR="/tmp/ramdisk/det_files"
+#Server directory and file locations
 
 # The directory on the server where the server RMG files are stored.
 # This convenience variable is local to this script.
@@ -75,27 +65,13 @@ export RMG_SERVER_EST_DIR="$RMG_SERVER_DIR/est_files"
 # The location on the server for est files that have been uploaded to the database.
 export RMG_SERVER_EST_ARCHIVE="$RMG_SERVER_ARCHIVE_DIR/est_files"
 
-# The maximum number of attempts to start the pulse detector before a
-# fatal error state is reached. This value is needed by the site.
-export RETRY_MAX=3
-
-# Set the path used by gnuplot to find fonts used for the status plots
-export GDFONTPATH=/usr/share/fonts/truetype/ttf-dejavu
-
-# Set the name of the default font that gnuplot should use for the status plots
-export GNUPLOT_DEFAULT_GDFONT=DejaVuSans
-
-# Serial Port to communicate to the RMG receiver with
-export RMG_SERIAL_PORT=/dev/ttyUSB0
-
-# Time interval (in seconds) to look at frequency tunings
-export RMG_TUNE_TIME=10
-
-# Log directory for remotes
-export RMG_SITE_LOG_DIR="$RMG_SITE_METADATA_DIR/log"
-
 # Log directory for server
 export RMG_SERVER_LOG_DIR="/var/log/rmg"
+
+#END#Server directory and file locations
+
+
+#Backup system files and parameters
 
 # Path for mount point of backup drive
 # Used in rmg_backup
@@ -127,6 +103,80 @@ export RMG_BACKUP_FRONTEND=qraat-frontend:/media/backup/backup/rmg_server
 # Used in rmg_clean
 export RMG_ARCHIVE_DAYS=3
 
+#END#Backup system files and parameters
+
+
+#RMG receiver operation parameters
+
+# Location of metadata on a remote machine. Files included in this
+# directory are: site.csv, tx.csv, and status.log. Any debug information
+# is also stored here. We currently log the standard output and standard
+# error of the last run of the pulse detector. This value is used by the
+# server and must be the same at each site.
+export RMG_SITE_METADATA_DIR="/home/rmg"
+
+# Location of det data files on a remote machine. This is typically a
+# subdirectory of a temporary filesystem created with /etc/fstab.
+# This value is used by the sever and must be the same at each site.
+export RMG_SITE_DET_DIR="/tmp/ramdisk/det_files"
+
+# Log directory for remotes
+export RMG_SITE_LOG_DIR="$RMG_SITE_METADATA_DIR/log"
+
+# The maximum number of attempts to start the pulse detector before a
+# fatal error state is reached. This value is needed by the site.
+export RETRY_MAX=3
+
+# Serial Port to communicate to the RMG receiver with
+export RMG_SERIAL_PORT=/dev/ttyUSB0
+
+# Time interval (in seconds) to look at frequency tunings
+export RMG_TUNE_TIME=10
+
+#END#RMG receiver operation parameters
+
+
+#Status plotting parameters
+
+# Set the path used by gnuplot to find fonts used for the status plots
+export GDFONTPATH=/usr/share/fonts/truetype/ttf-dejavu
+
+# Set the name of the default font that gnuplot should use for the status plots
+export GNUPLOT_DEFAULT_GDFONT=DejaVuSans
+
+#END#Status plotting parameters
+
+
+#Processing parameters
+
+#det_to_db
+
+# Quarantine directory for bad files
+export RMG_QUARANTINE_DIR=$RMG_SERVER_DIR/quarantine
+
+# Quarantine directory for bad det files
+export RMG_SERVER_DET_QUARANTINE=$RMG_QUARANTINE_DIR/det_files
+
+# Max number of minute-directories per site to process at a time
+export RMG_DIRECTORY_THROTTLE=20
+
+#END#det_to_db
+
+#filter_auto
+
+# Max number of est records to be processed at a time (not a hard limit, see documentation)
+export RMG_EST_THROTTLE=50000
+
+# Time window to estimate the pulse interval
+export RMG_EST_SCORE_INTERVAL=60
+
+# Time window to score est records for corroborators
+export RMG_EST_SCORE_NEIGHBORHOOD=20
+
+#END#filter_auto
+
+#position_auto
+
 # Averaging window used for auto position calculation
 export RMG_POS_TIME_WINDOW=30
 
@@ -139,11 +189,16 @@ export RMG_POS_CAL_ID=3
 # EST Score Threshold for filter before position estimation
 export RMG_POS_EST_THRESHOLD=0.0
 
-# Quarantine directory for bad files
-export RMG_QUARANTINE_DIR=$RMG_SERVER_DIR/quarantine
+#END#position_auto
 
-# Quarantine directory for bad det files
-export RMG_SERVER_DET_QUARANTINE=$RMG_QUARANTINE_DIR/det_files
+#track_auto
+
+#END#track_auto
+
+#END#Processing parameters
+
+
+#transmitter default parameters
 
 # RMG pulse detector default rise theshold trigger
 export RMG_PULSE_RISE=1.5
@@ -151,6 +206,7 @@ export RMG_PULSE_RISE=1.5
 # RMG pulse detector default time constant
 export RMG_PULSE_TIME_CONSTANT=10.0
 
+#END#transmitter default parameters
 
 #END
 

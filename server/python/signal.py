@@ -27,7 +27,7 @@ import numpy as np
 BURST_INTERVAL = 10     # seconds
 BURST_THRESHOLD = 20    # pulses/second
 
-# Time filter paramters. 
+# Time filter paramters. These defaults may be overwritten by the calling script.
 SCORE_INTERVAL = 60     # seconds
 SCORE_NEIGHBORHOOD = 20 # seconds
 

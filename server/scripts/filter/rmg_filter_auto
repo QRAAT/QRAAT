@@ -20,13 +20,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import qraat.srv
-import time, sys, commands
+import time, sys, commands, os
 import numpy as np
 
-
-
-EST_THROTTLE=50000
-time_window=60#from signal.py
 
 # Check for running instances of this program. 
 (status, output) = commands.getstatusoutput(
@@ -34,6 +30,16 @@ time_window=60#from signal.py
 if int(output) > 1: 
   print >>sys.stderr, "filter_auto: error: attempted reentry, exiting"
   sys.exit(1)
+
+try: # Get some environment variables. 
+  EST_THROTTLE=int(os.environ['RMG_EST_THROTTLE'])
+  qraat.srv.signal.SCORE_INTERVAL=int(os.environ['RMG_EST_SCORE_INTERVAL'])
+  qraat.srv.signal.SCORE_NEIGHBORHOOD=int(os.environ['RMG_EST_SCORE_NEIGHBORHOOD'])
+except KeyError: 
+  print >>sys.stderr, "filter_auto: error: undefined environment variables. Try `source rmg_env.`"
+  sys.exit(1)
+
+time_window = qraat.srv.signal.SCORE_INTERVAL
 
 try: 
   start = time.time()

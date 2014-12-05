@@ -23,7 +23,6 @@ import re, time
 import MySQLdb as mdb
 import qraat 
 
-DIRECTORY_THROTTLE=20
 
 # Check for running instances of this program. 
 (status, output) = commands.getstatusoutput(
@@ -36,6 +35,7 @@ try: # Get some environment variables.
   det_dir  = os.environ['RMG_SERVER_DET_DIR']
   det_arch = os.environ['RMG_SERVER_DET_ARCHIVE']
   est_arch = os.environ['RMG_SERVER_EST_ARCHIVE']
+  DIRECTORY_THROTTLE=int(os.environ['RMG_DIRECTORY_THROTTLE'])
 except KeyError: 
   print >>sys.stderr, "det_to_db: error: undefined environment variables. Try `source rmg_env.`"
   sys.exit(1)
