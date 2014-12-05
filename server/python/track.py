@@ -199,7 +199,9 @@ class Track:
                           node.utm_number, node.utm_letter, node.ll, node.activity))
 
     return track
-    
+
+  def __len__(self):
+    return len(self.table)
  
   def insert_db(self, db_con):
     # Overwrite existing tracks for time window. 
@@ -651,6 +653,7 @@ class Node:
 class Position:
   
   def __init__(self, db_con, dep_id, t_start, t_end):
+    self.max_id = -1
     self.table = []
     cur = db_con.cursor()
     cur.execute('''SELECT ID, deploymentID, timestamp, easting, northing, 
@@ -663,13 +666,18 @@ class Position:
                     ORDER BY timestamp ASC''', (dep_id, t_start, t_end))
     for row in cur.fetchall():
       self.table.append(row)
+      if row[0] > self.max_id: 
+        self.max_id = row[0]
 
   def __len__(self):
     return len(self.table)
 
   def __getitem__(self, i):
     return self.table[i]
-  
+
+  def get_max_id(self): 
+    return self.max_id
+
   def export_kml(self, name, dep_id):
 
     fd = open('%s_pos.kml' % name, 'w')
