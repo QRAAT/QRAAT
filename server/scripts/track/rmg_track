@@ -56,7 +56,7 @@ try:
 
   print "track: calculating."
   (t_start, t_end) = qraat.srv.track.get_interval(db_con, options.dep_id, options.t_start, options.t_end)
-  track = qraat.srv.track.calc_tracks(db_con, options.dep_id, t_start, t_end, C=-5)
+  track = qraat.srv.track.calc_tracks(db_con, options.dep_id, t_start, t_end, C=0)
 
   print "track: updating tracks."
   track.insert_db(db_con)

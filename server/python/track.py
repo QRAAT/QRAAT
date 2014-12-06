@@ -232,16 +232,20 @@ class Track:
 
     while i < len(self.pos):
       
+      # i = Index of first point at time t. (There may be many.)
       t = self.pos[i][2]
       while self.pos[i-1][2] == t:
         i -= 1
 
+      # j = i + WINDOW_LENGTH or end of data. 
       j =  min(len(self.pos) - 1, i + WINDOW_LENGTH)
       
+      # J = Index of last point at time t. 
       t = self.pos[j][2]
       while self.pos[j-1][2] == t:
         j -= 1
       
+      # Compute critical path over point DAG. 
       roots = self.graph(self.pos[i:j+1], M)
       windowed_track = self.critical_path(self.toposort(roots), C)
       
