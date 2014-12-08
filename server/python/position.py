@@ -251,19 +251,20 @@ class estimator:
     if dep_id is None: 
       dep_id = self.deploymentID
     timestamp = (self.t_start + self.t_stop) / 2.0
+    num_inserts = 0
     cur = db_con.cursor()
     for site, data in self.per_site.iteritems():
       if data.num_bearing > 0 and data.num_est > 0:
         theta_hat, norm_max_likelihood = data.bearing_estimate()
         activity = data.get_activity()
-        cur.execute('''INSERT INTO bearing 
+        num_inserts += cur.execute('''INSERT INTO bearing 
                    (deploymentID, siteID, timestamp, bearing, likelihood, activity, number_est_used)
                    VALUES (%s, %s, %s, %s, %s, %s, %s)''',
                    (dep_id, site, timestamp,
                     theta_hat, norm_max_likelihood, activity, data.num_est))
         data.bearingID = cur.lastrowid
         handle_provenance_insertion(cur, {'est':tuple(data.estID), 'calibration_information':(data.calID,)}, {'bearing':(data.bearingID,)})
-    
+    return num_inserts
                     
   def get_position_likelihood(self, positions):
     likelihoods = np.zeros(positions.shape, dtype=float)
@@ -298,6 +299,7 @@ class estimator:
     return np.mean([ s.get_activity() for s in self.per_site.itervalues() ])
 
   def insert_positions(self, db_con, center=None, dep_id=None):
+    num_inserts = 0
     if len(self.per_site) > 1:
       if center is None:
         (center_position, utm_number, utm_letter) = get_center(db_con)
@@ -310,7 +312,7 @@ class estimator:
       activity = self.get_activity()
       lat, lon = utm.to_latlon(position_hat.imag, position_hat.real, utm_number, utm_letter)
       cur = db_con.cursor()
-      cur.execute('''INSERT INTO position
+      num_inserts = cur.execute('''INSERT INTO position
                          (deploymentID, timestamp, latitude, longitude, easting, northing, 
                           utm_zone_number, utm_zone_letter, likelihood, 
                           activity, number_est_used)
@@ -322,6 +324,7 @@ class estimator:
       self.positionID = cur.lastrowid
       bearingID = [ data.bearingID for data in self.per_site.itervalues() ]
       handle_provenance_insertion(cur, {'bearing':bearingID}, {'position':(self.positionID,)})
+      return num_inserts
 
 
 def handle_provenance_insertion(cur, depends_on, obj):
