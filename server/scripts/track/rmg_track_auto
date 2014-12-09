@@ -7,10 +7,11 @@
 # the window is extended (back in time) so that that the chunk 
 # includes at least 500 points. The tracker (`qraat.srv.calc_tracks()`)
 # is called on the chunk. It divides the data into overlapping windows 
-# of at most 500 points and executes the quadratic-time tracking 
-# algorithm on each set of points. Now, since the windows overlap, 
-# each time index t has 0, 1, or 2 track points. In the case that 
-# there are two, we take the one with the highest likelihood. 
+# of 500 points that overlap by at least 100 points (see `OVERLAP_LENGTH`)
+# and executes the quadratic-time tracking algorithm on each set of points. 
+# Now, since the windows overlap, each time index t has 0, 1, or 2 track 
+# points. In the case that there are two, we take the one with the highest 
+# likelihood. 
 #
 # TODO A potential issue arises in online processing. When new data 
 # arrive, we grab about 500 points from the past and recalculate. The 

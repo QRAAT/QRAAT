@@ -57,7 +57,7 @@ SUSTAINED_INTERVAL = 1800  # 30 minutes
 WINDOW_LENGTH = 500 
 
 #: The overlap (in number of positions) between neighboring positions. 
-OVERLAP_LENGTH = 50
+OVERLAP_LENGTH = 100
 
 
 ### High level calls. #########################################################
@@ -228,18 +228,30 @@ class Track:
     '''
 
     pos_dict = {} # timestamp -> position set
-    i = 0; j = WINDOW_LENGTH 
+    
+    # Compute windows.
+    windows = []
+    t = len(self.pos)
+    a = WINDOW_LENGTH
+    b = OVERLAP_LENGTH
+    
+    if t > a:
+      n = (t / (a - b)) + (1 if (t % (a - b)) != 0 else 0)
+      b = a - (t / n)
+      for i in range(0, t - b, a - b):
+        windows.append((i, i + a))
+      windows[-1] = (windows[-1][0], t-1)
+    
+    else: # May be a small amount of data in the first (ever) window. 
+      windows.append((0, t-1))
 
-    while i < len(self.pos):
+    for (i, j) in windows: 
       
       # i = Index of first point at time t. (There may be many.)
       t = self.pos[i][2]
       while self.pos[i-1][2] == t:
         i -= 1
 
-      # j = i + WINDOW_LENGTH or end of data. 
-      j =  min(len(self.pos) - 1, i + WINDOW_LENGTH)
-      
       # J = Index of last point at time t. 
       t = self.pos[j][2]
       while self.pos[j-1][2] == t:
@@ -253,8 +265,6 @@ class Track:
         if not pos_dict.get(node.t):
           pos_dict[node.t] = set()
         pos_dict[node.t].add(node)
-
-      i += WINDOW_LENGTH - OVERLAP_LENGTH
 
     # When there are many possibilities for a timestep, choose the
     # position with higher likelihood. (NOTE that it may be better 
