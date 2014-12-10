@@ -351,6 +351,7 @@ def index(request):
 
 def view_by_dep(request, project_id, dep_id):
   ''' Compile a list of deployments associated with `dep_id`. ''' 
+  
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
@@ -369,9 +370,9 @@ def view_by_dep(request, project_id, dep_id):
         raise PermissionDenied #403
     
     else:
-			return redirect("/auth/login/?next=%s" % request.path)
+			return redirect("/auth/login/?next=%s" % request.get_full_path())
 
-  else: pass
+  else: pass #public project
     
   deps = project.get_deployments().filter(ID=dep_id)
   print "-----------------------------------------------------"
@@ -421,7 +422,7 @@ def download_by_dep(request, project_id, dep_id):
         raise PermissionDenied #403
 
     else:
-			return redirect("/auth/login/?next=%s" % request.path)
+			return redirect("/auth/login/?next=%s" % request.get_full_path())
 
 
   else:
