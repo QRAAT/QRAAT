@@ -29,12 +29,23 @@ else:
   last_processed = last_processed[0]
 print "Last EST record processed: {}".format(last_processed)
 
+# Get id of last processed est record. 
+cursor.execute("SELECT value FROM qraat.processing_cursor WHERE name='estscore'")
+last_processed_est = cursor.fetchone()
+if last_processed_est == None:
+  print >>sys.stderr,  "position_auto: error: No cursor found for estscore"
+  last_processed_est = sys.maxint
+else: 
+  last_processed_est = last_processed_est[0]
+print "Last EST record scored: {}".format(last_processed_est)
+
 # Get deployments that have been scored but not processed. 
 cursor.execute('''SELECT DISTINCT deploymentID 
                     FROM est JOIN estscore 
                       ON est.ID = estscore.estID
                    WHERE ID > %s
-                     AND (score/theoretical_score) > %s;''', (last_processed,EST_SCORE_THRESHOLD))
+                     AND ID <= %s
+                     AND (score/theoretical_score) >= %s;''', (last_processed,last_processed_est,EST_SCORE_THRESHOLD))
 deployment_list = cursor.fetchall()
 print "{} transmitters found in new records".format(len(deployment_list))
 print deployment_list
@@ -54,8 +65,8 @@ for deployment in deployment_list:
   cursor.execute('''SELECT ID, timestamp 
                       FROM est JOIN estscore
                         ON est.ID = estscore.estID
-                     WHERE ID > %s AND deploymentID = %s 
-                     ORDER BY timestamp ASC;''', (last_processed,deployment_id))
+                     WHERE ID > %s AND ID <= %s AND deploymentID = %s 
+                     ORDER BY timestamp ASC;''', (last_processed,last_processed_est,deployment_id))
   times = np.array(cursor.fetchall(),dtype=float)
   print "Found {} records".format(times.shape[0])
   print "Calculating time range"
@@ -92,6 +103,10 @@ for deployment in deployment_list:
   temp_max_id = estimator.max_estID
   if temp_max_id > max_id:
     max_id = temp_max_id
+
+#don't move position cursor past estscore cursor due to chunking bug
+if max_id > last_processed_est:
+  max_id = last_processed_est
 
 #store id of last processed record
 if max_id > last_processed:

@@ -1,6 +1,25 @@
 #!/usr/bin/env python2
-# rmg_track_auto_auto
-# 
+# rmg_track_auto
+#
+# Read in new positions and update tracks for each deployment. New 
+# data is divided into for hour chunks (`TRACK_THROTTLE`). If the 
+# time chunk contains less than 500 positions (see `WINDOW_LENGTH`),
+# the window is extended (back in time) so that that the chunk 
+# includes at least 500 points. The tracker (`qraat.srv.calc_tracks()`)
+# is called on the chunk. It divides the data into overlapping windows 
+# of 500 points that overlap by at least 100 points (see `OVERLAP_LENGTH`)
+# and executes the quadratic-time tracking algorithm on each set of points. 
+# Now, since the windows overlap, each time index t has 0, 1, or 2 track 
+# points. In the case that there are two, we take the one with the highest 
+# likelihood. 
+#
+# TODO A potential issue arises in online processing. When new data 
+# arrive, we grab about 500 points from the past and recalculate. The 
+# result is the last time a point is touched (on average), it is at the 
+# very edge of the window. It's possible that a decision to include or 
+# exclude this point would be better made if it were right in the 
+# middle of the window. Think about this.
+#
 # Copyright (C) 2014 Christopher Patton
 # 
 # This program is free software: you can redistribute it and/or modify
@@ -20,6 +39,27 @@ import qraat, qraat.srv
 import time, os, sys, commands
 import MySQLdb as mdb
 from optparse import OptionParser
+
+
+TRACK_THROTTLE = 60 * 60 * 4 # 4 hour chunks
+
+def chunk(timestamps): 
+  ''' Return a set of time intervals for new data. '''  
+  
+  t_start = min(timestamps)
+  t_end = max(timestamps)
+  a = t_start - (t_start % TRACK_THROTTLE) 
+  b = t_end - (t_end % TRACK_THROTTLE)
+  n = int(b - a) / TRACK_THROTTLE
+  bins = [ 0 for i in range(n+1) ]
+  for t in timestamps: 
+    i = int((t - t_start) / TRACK_THROTTLE)
+    bins[i] += 1
+  for (i, ct) in enumerate(bins):
+    if ct > 0: 
+      yield (a + (i * TRACK_THROTTLE), (a + ((i + 1) * TRACK_THROTTLE)))
+
+
 
 # Check for running instances of this program. 
 (status, output) = commands.getstatusoutput(
@@ -54,28 +94,24 @@ try:
   # Process new positions for each depID. 
   max_processed = last_processed
   for dep_id in rows:
-    cur.execute('''SELECT min(timestamp), max(timestamp) 
+    cur.execute('''SELECT timestamp 
                      FROM qraat.position 
                     WHERE deploymentID=%d
                       AND ID > %d''' % (dep_id, last_processed))
-    
-    (t_start, t_end) = map(lambda(t) : float(t), (cur.fetchone()))
-    print "track_auto: deploymentID=%d, [%.2f, %.2f]" % (dep_id, t_start, t_end)
-  
-    print "track_auto: deploymentID=%d: fetching positions ..." % dep_id,
-    pos_ids = qraat.srv.track.get_pos_ids(db_con, dep_id, t_start, t_end)
-    pos = qraat.srv.position.Position(db_con, pos_ids)
-    print len(pos)
 
-    print "track_auto: deploymentID=%d: calculating ..." % dep_id,
-    track = qraat.srv.track.calc_tracks(db_con, pos, dep_id, C=-5)
-    print len(track)
+    for (t_start, t_end) in chunk(map(lambda(row) : float(row[0]), cur.fetchall())): 
+      
+      (t_start, t_end) = qraat.srv.track.get_interval(db_con, dep_id, t_start, t_end)
+      
+      print "track_auto: deploymentID=%d, [%.2f, %.2f]" % (dep_id, t_start, t_end)
+      track = qraat.srv.track.calc_tracks(db_con, dep_id, t_start, t_end, C=0)
 
-    print "track_auto: deploymentID=%d: updating tracks." % dep_id
-    track.insert_db(db_con)
-    
-    # New cursor is the maximum id processed during this run
-    max_processed = max(max_processed, max(pos_ids))
+      print "track_auto: deploymentID=%d, updating tracks, %d out of %d." % (
+                                             dep_id, len(track), len(track.pos))
+      track.insert_db(db_con)
+      
+      # New cursor is the maximum id processed during this run
+      max_processed = max(max_processed, track.pos.get_max_id())
 
   if max_processed > last_processed: 
     print "track_auto: updating cursor to positionID=%d." % max_processed

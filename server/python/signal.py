@@ -27,7 +27,7 @@ import numpy as np
 BURST_INTERVAL = 10     # seconds
 BURST_THRESHOLD = 20    # pulses/second
 
-# Time filter paramters. 
+# Time filter paramters. These defaults may be overwritten by the calling script.
 SCORE_INTERVAL = 60     # seconds
 SCORE_NEIGHBORHOOD = 20 # seconds
 
@@ -215,9 +215,9 @@ def Filter(db_con, dep_id, t_start, t_end, param_filter=True):
 def get_score_intervals(t_start, t_end): 
   ''' Return a list of scoring windows given arbitrary start and finish. '''  
  
-  t_start = int(t_start); t_end = int(t_end)
+  t_start = int(t_start); t_end = int(t_end)+1
   for i in range(t_start - (t_start % SCORE_INTERVAL), 
-                 t_end   + (t_end   % SCORE_INTERVAL),
+                 t_end,
                  SCORE_INTERVAL):
     yield (i, i + SCORE_INTERVAL)
 

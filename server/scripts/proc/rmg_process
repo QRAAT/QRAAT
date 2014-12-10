@@ -39,8 +39,6 @@ echo Starting `date`
 echo
 echo det_to_db
 rmg_det_to_db
-#remove empty directories
-find $RMG_SERVER_DET_DIR -mindepth 1 -depth -type d -empty -delete
 echo
 echo filter_auto
 rmg_filter_auto
