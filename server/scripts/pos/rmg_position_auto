@@ -11,8 +11,11 @@ if int(output) > 1:
   print >>sys.stderr, "position_auto: error: attempted reentry, exiting"
   sys.exit(1)
 
+#processing stats
 runtime_start = time.time()
 print "position_auto: start time: {}".format(time.asctime(time.localtime(runtime_start)))
+total_input = 0
+total_output = 0
 
 db_con = qraat.srv.util.get_db('writer')#will throw missing environment error here
 cursor = db_con.cursor()
@@ -92,10 +95,13 @@ for deployment in deployment_list:
     estimator = qraat.srv.position.estimator(deployment_id, time_range[0], time_range[1], time_window, time_delta)
     num_est = estimator.get_est_data(db_con, EST_SCORE_THRESHOLD)
     if num_est > 0:
+      total_input += num_est
       estimator.get_bearing_likelihood(sv)
       for new_estimator in estimator.windowed():
         new_estimator.insert_bearings(db_con)
-        new_estimator.insert_positions(db_con, center)
+        num_output = new_estimator.insert_positions(db_con, center)
+        if num_output is not None:
+          total_output += num_output
     else:
       print "Skipping empty chunk"
       continue 
@@ -115,4 +121,7 @@ if max_id > last_processed:
 else:
   print "no new records processed (max_id={0})".format(max_id)
 
-print "position_auto: finished in {0:.2f} seconds.".format(time.time() - runtime_start)
+duration = time.time() - runtime_start
+print "position_auto: finished in {0:.2f} seconds.".format(duration)
+cursor.execute('INSERT INTO processing_statistics (timestamp, duration, process, beginning_index, ending_index, number_records_input, number_records_output) VALUES (%s, %s, \'position_auto\', %s, %s, %s, %s)', (int(runtime_start), duration, last_processed+1, max_id, total_input, total_output))
+

@@ -68,10 +68,13 @@ if int(output) > 1:
   print >>sys.stderr, "track_auto: error: attempted reentry, exiting"
   sys.exit(1)
 
-try: 
-  start = time.time()
-  print "track_auto: start time:", time.asctime(time.localtime(start))
+#processing stats
+start = time.time()
+print "track_auto: start time:", time.asctime(time.localtime(start))
+total_input = 0
+total_output = 0
 
+try: 
   db_con = qraat.srv.util.get_db('writer')
 
   # Get positionID of last processed position.  
@@ -94,7 +97,7 @@ try:
   # Process new positions for each depID. 
   max_processed = last_processed
   for dep_id in rows:
-    cur.execute('''SELECT timestamp 
+    total_input += cur.execute('''SELECT timestamp 
                      FROM qraat.position 
                     WHERE deploymentID=%d
                       AND ID > %d''' % (dep_id, last_processed))
@@ -109,6 +112,7 @@ try:
       print "track_auto: deploymentID=%d, updating tracks, %d out of %d." % (
                                              dep_id, len(track), len(track.pos))
       track.insert_db(db_con)
+      total_output += len(track)
       
       # New cursor is the maximum id processed during this run
       max_processed = max(max_processed, track.pos.get_max_id())
@@ -119,6 +123,8 @@ try:
                       SET value=%d 
                     WHERE name="track_pos" ''' % max_processed)  
   
+  duration = time.time() - start
+  cur.execute('INSERT INTO processing_statistics (timestamp, duration, process, beginning_index, ending_index, number_records_input, number_records_output) VALUES (%s, %s, \'track_auto\', %s, %s, %s, %s)', (int(start), duration, last_processed, max_processed, total_input, total_output))
 
 except mdb.Error, e:
   print >>sys.stderr, "track_auto: error: [%d] %s" % (e.args[0], e.args[1])

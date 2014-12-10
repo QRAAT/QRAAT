@@ -44,9 +44,11 @@ except KeyError:
 
 leaf_regex = re.compile("([0-9]{4})/([0-9]{2})/([0-9]{2})/([0-9]{2})/([0-9]{2})") 
 
+#processing_stats
 start = time.time()
 print "det_to_db: start time:", time.asctime(time.localtime(start))
-
+total_directories = 0
+total_det_files = 0
 
 db_con = qraat.srv.util.get_db('writer')
 try: 
@@ -122,6 +124,7 @@ for site in dir_sitelist:
             for row in table: 
               try:
                 table.write_db_row(cur, row, site)
+                total_det_files+=1
               except Exception as e:
                 #could be qraat.ResolveIdError from est class
                 #could be MySQLdb.error that we haven't anticipated
@@ -165,6 +168,7 @@ for site in dir_sitelist:
                 site, output)
             else:  
               commands.getstatusoutput('rm -fr %s' % leaf_dir)
+              total_directories+=1
           else:#there are some type of file and directory doesn't pass regex
             pass#quarantine weird thing
         else:#no files or subdirectories, i.e. leaf_dir is empty
@@ -181,5 +185,6 @@ for site in dir_sitelist:
   else:
     print >>sys.stderr, "det_to_db: error: {0} not in database sitelist".format(site)
 
-
-print "det_to_db: finished in %.2f seconds." % (time.time() - start)
+duration=time.time()-start
+print "det_to_db: finished in {0:.2f} seconds.".format(duration)
+cur.execute("INSERT INTO processing_statistics (timestamp, duration, process, number_records_input, number_records_output) VALUES (%s, %s, \'det_to_db\', %s, %s)", (int(start), duration, total_directories, total_det_files))
