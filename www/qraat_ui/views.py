@@ -158,7 +158,7 @@ def get_context(request, deps=[], req_deps=[]):
         datetime_to_initial = float(q)
         datetime_from_initial = datetime_to_initial - INITIAL_DATA_WINDOW
         queried_objects = Position.objects.filter(deploymentID = req_deps[0].ID, 
-                                                  timestamp__gte = datetime_from_initial)
+                                                  timestamp__gte = datetime_from_initial).order_by('timestamp') #why not timestamp_lte = datetime_to_initial also???
       
         datetime_to_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                     time.localtime(float(datetime_to_initial-7*60*60))) # FIXME 
@@ -237,9 +237,9 @@ def get_context(request, deps=[], req_deps=[]):
         args = args | each_args
   
       # Query data. 
-      if int(data_type) == 1: 
-        queried_objects = Position.objects.filter(*(args,), **kwargs)
-      elif int(data_type) == 2: 
+      if int(data_type) == 1: #raw positions
+        queried_objects = Position.objects.filter(*(args,), **kwargs).order_by('timestamp')
+      elif int(data_type) == 2: #track
         queried_objects = Position.objects.raw(
            '''SELECT * FROM position
                 JOIN track_pos ON track_pos.positionID = position.ID
