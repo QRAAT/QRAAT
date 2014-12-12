@@ -112,8 +112,7 @@ function loadFlot(pos_markers, map, dep_id){
 
     data = getGraphData(pos_markers, dep_id, sel_data);
 
-    //var graph_data =[ { data: data.graph, label: graph_dep, lines: {show:false} } ];
-    var graph_data =[ { data: data.graph, label: graph_dep, lines: {show:true} } ];
+    var graph_data =[ { data: data.graph, label: graph_dep, lines: {show:false} } ];
 
     var color = ["#8383FF", "yellow", "green", "#B00000"];
 
@@ -132,8 +131,7 @@ function loadFlot(pos_markers, map, dep_id){
 
     var options = {
         legend: { show: false },
-        //points: { show: true, fill: true, radius: 2 },
-        series: { lines: { show: true }, points: { show: false } },
+        points: { show: true, fill: true, radius: 2 },
         grid: { hoverable: true, clickable: true },
         xaxis: {
 					mode: "time",
