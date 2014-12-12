@@ -41,10 +41,13 @@ except KeyError:
 
 time_window = qraat.srv.signal.SCORE_INTERVAL
 
+#processing_stats
+start = time.time()
+print "filter_auto: start time:", time.asctime(time.localtime(start))
+total_input = 0
+total_output = 0
+
 try: 
-  start = time.time()
-  print "filter_auto: start time:", time.asctime(time.localtime(start))
-  
   db_con = qraat.srv.util.get_db('writer')
 
   cur = db_con.cursor()
@@ -70,12 +73,17 @@ try:
                   WHERE ID > %s 
                     AND ID <= %s
                     AND timestamp < %s''', (last_processed, last_processed+EST_THROTTLE, now)) 
+
+  #stats
+  beginning_index = last_processed+1
+  ending_index = last_processed+EST_THROTTLE
+  ending_timestamp = now
   
   qraat.srv.signal.VERBOSE = False
   max_id = last_processed
   if num_dep > 0:  
     for (dep_id,) in cur.fetchall(): 
-      cur.execute('''SELECT timestamp
+      total_input += cur.execute('''SELECT timestamp
                      FROM est 
                     WHERE ID > %s
                       AND ID <= %s 
@@ -101,6 +109,7 @@ try:
       for (t_start,t_end) in time_ranges:
         print "filter_auto: depID={},start_time={},end_time={}".format(dep_id,t_start,t_end)
         (total, id) = qraat.srv.signal.Filter(db_con, dep_id, t_start, t_end)
+        total_output += total
         if id > max_id:
           if id < last_processed+EST_THROTTLE:
             max_id = id
@@ -111,7 +120,9 @@ try:
   cur.execute('UPDATE `processing_cursor` SET value=%s WHERE name=\'estscore\'', 
                                                 (max_id,))
   print "filter_auto: updated processing_cursor to est.ID=%d." % max_id 
-  
+  ending_index = max_id
+  duration = time.time() - start
+  cur.execute('INSERT INTO processing_statistics (timestamp, duration, process, ending_timestamp, beginning_index, ending_index, number_records_input, number_records_output) VALUES (%s, %s, \'filter_auto\', %s, %s, %s, %s, %s)', (int(start), duration, ending_timestamp, beginning_index, ending_index, total_input, total_output))
 
 #except mdb.Error, e:
 #  print >>sys.stderr, "filter_auto: error: [%d] %s" % (e.args[0], e.args[1])
