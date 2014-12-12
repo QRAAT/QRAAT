@@ -9,8 +9,8 @@ class VonMises2:
     
     assert 0 <= mu1 and mu1 < 2*np.pi
     assert 0 <= mu2 and mu2 < 2*np.pi
-    assert kappa1 > 0
-    assert kappa2 > 0 
+    assert kappa1 >= 0
+    assert kappa2 >= 0 
 
     self.mu1    = mu1
     self.mu2    = mu2
@@ -45,11 +45,13 @@ if __name__ == '__main__':
 
   import matplotlib.pyplot as pp
   fig, ax = pp.subplots(1, 1)
+  fig.canvas.draw()
 
   x = np.arange(0, 2*np.pi, np.pi / 100)
   
   print np.sum(p(x) * (np.pi / 100))
-  ax.plot(x, p(x), 'k-', lw=1, 
+  pp.xlim([0,2*np.pi])
+  ax.plot(x, p(x), 'k-', lw=2, 
     label='$\mu_1=%.2f$, $\mu_2=%.2f$, $\kappa_1=%.2f$, $\kappa_2=%.2f$' % (
              mu1, mu2, kappa1, kappa2))
   ax.legend(loc='best', frameon=False)
