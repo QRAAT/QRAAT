@@ -22,8 +22,10 @@ from forms import EditDeploymentForm, EditProjectForm
 def not_allowed_page(request):
     """This view renders a page for forbidden action
     with HTTP 403 status and a message"""
-
-    raise PermissionDenied #403
+    if request.user.is_authenticated():
+        raise PermissionDenied #403
+    else:
+        return redirect("/auth/login/?next=%s" % request.get_full_path()) #redirect user to login page to see if they have access permission
 
 
 def get_query(obj_type):
