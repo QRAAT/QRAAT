@@ -1,5 +1,7 @@
 # gvm.py -- Bimodal von Mises distribution. 
 
+import util
+
 import numpy as np
 import matplotlib.pyplot as pp
 from scipy.special import iv as I # Modified Bessel of the first kind.
@@ -57,13 +59,63 @@ class VonMises2:
     kappa1 = 0.8; kappa2 = 3
     
     return cls(mu1, mu2, kappa1, kappa2)
-    
+
+
+class Bearing:
+  
+  def __init__(self, db_con, dep_id, t_start, t_end):
+    self.length = None
+    self.max_id = -1
+    self.dep_id = dep_id
+    self.site_table = {}
+    cur = db_con.cursor()
+    cur.execute('''SELECT siteID, ID, timestamp, bearing, likelihood, activity
+                     FROM bearing
+                    WHERE deploymentID = %s
+                      AND timestamp >= %s
+                      AND timestamp <= %s
+                    ORDER BY timestamp ASC''', (dep_id, t_start, t_end))
+    for row in cur.fetchall():
+      site_id = int(row[0])
+      row = (int(row[1]), float(row[2]), float(row[3]), float(row[4]), float(row[5]))
+      if self.site_table.get(site_id) is None:
+        self.site_table[site_id] = [row]
+      else: self.site_table[site_id].append(row)
+      if row[0] > self.max_id: 
+        self.max_id = row[0]
+
+  def __len__(self):
+    if self.length is None:
+      self.length = sum(map(lambda(table): len(table), self.site_table.values()))
+    return self.length
+
+  def __getitem__(self, *index):
+    if len(index) == 1: 
+      return self.site_table[index[0]]
+    elif len(index) == 2:
+      return self.site_table[index[0]][index[1]]
+    elif len(index) == 3:
+      return self.site_table[index[0]][index[1]][index[2]]
+    else: return None
+  
+  def get_sites(self):
+    return self.site_table.keys()
+
+  def get_site_bearings(self, site_id):
+    #return map(lambda(row) : row[2], self.site_table[site_id])
+    return map(lambda(row) : (row[2] * np.pi) / 180, self.site_table[site_id])
+
+  def get_max_id(self): 
+    return self.max_id
+
+
+
 
 
 
 ### Testing, testing ... ######################################################
 
-if __name__ == '__main__':
+def test_mle():
 
   # Generate a noisy bearing distribution "sample".  
   mu1 = 0;      mu2 = 1
@@ -91,3 +143,33 @@ if __name__ == '__main__':
   
   ax.legend(loc='best', frameon=False)
   pp.show()
+
+
+def test_bearing(): 
+  
+  dep_id = 105
+  t_start = 1407452400
+  t_end = 1407455985 #- (50 * 60)
+
+  db_con = util.get_db('reader')
+  bearing = Bearing(db_con, dep_id, t_start, t_end)
+  
+  #(hist, bins) = np.histogram(bearing.get_site_bearings(2), 360)
+  fig, ax = pp.subplots(1, 1)
+
+  N = 100
+  n, bins, patches = ax.hist(bearing.get_site_bearings(3), 
+                             bins = [ (i * 2 * np.pi) / N for i in range(N) ],
+                             facecolor='blue', alpha=0.25)
+ 
+  # Plot most likely distribution.
+  pp.xlim([0,2*np.pi])
+  
+  ax.legend(loc='best', frameon=False)
+  pp.show()
+
+
+if __name__ == '__main__':
+  
+  test_bearing()
+  #test_mle()
