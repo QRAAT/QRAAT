@@ -6,7 +6,8 @@ import sys
 import numpy as np
 import matplotlib.pyplot as pp
 from scipy.special import iv as I # Modified Bessel of the first kind.
-
+from scipy.optimize import fmin # Downhill simplex minimization algorithm. 
+from scipy.optimize import minimize
 class VonMises2: 
 
   def __init__(self, mu1, mu2, kappa1, kappa2):
@@ -39,7 +40,8 @@ class VonMises2:
                   self.kappa2 * np.cos(2 * (theta - self.mu2))) 
     return num / self.denom
 
-  def normalizingFactor(self, delta, kappa1, kappa2, rounds=10):
+  @classmethod
+  def normalizingFactor(cls, delta, kappa1, kappa2, rounds=10):
     ''' Compute the normalizing factor. ''' 
     G0 = 0 
     for j in range(1,rounds):
@@ -51,15 +53,44 @@ class VonMises2:
   def mle(cls, bearings):
     ''' Maximum likelihood estimator for the von Mises distribution. 
       
-      Find the most likely parameters for the observed bearing probability 
-      distribution and return an instance of this class. 
+      Find the most likely parameters for the set of bearing observations
+      `bearings` and return an instance of this class. A generalized von
+      Mises distribution can be represented in canonical form as a member
+      of the exponential family. This yields a maximul likelihood estimator.
+      The parameters are found with the Simplex algorithm. 
     '''
     
-    # TODO 
-    mu1 = 0;      mu2 = 1
-    kappa1 = 0.8; kappa2 = 3
+    n = len(bearings)
+
+    T = np.zeros(4, dtype=float)
+    for theta in bearings:
+      T += np.array([np.cos(theta),     np.sin(theta),
+                     np.cos(2 * theta), np.sin(2 * theta)])
+
+    ll = lambda(u1, u2, k1, k2) : (-1) * (np.dot(np.array(
+                [k1 * np.cos(u1),     k1 * np.sin(u1), 
+                 k2 * np.cos(2 * u2), k2 * np.sin(2 * u2)]), T) - \
+              n * cls.normalizingFactor((u1 - u2) % np.pi, k1, k2, rounds=10))
     
-    return cls(mu1, mu2, kappa1, kappa2)
+
+    #ll_hat = fmin(ll, np.array([0,0,0,0])) 
+    #print ll_hat
+    #ll_hat[0] %= 2 * np.pi
+    #ll_hat[1] %= 2 * np.pi
+    #ll_hat[2] = max(ll_hat[2], 0)
+    #ll_hat[3] = max(ll_hat[3], 0)
+    #return cls(*ll_hat)
+    
+    opt = minimize(ll, np.array([0,0,0,0], dtype=float), method='SLSQP',
+                    bounds=[(0, 2 * np.pi), (0, 2 * np.pi), 
+                            (0, None), (0, None)])
+        
+    if opt.success: 
+      print opt.x
+      return cls(*opt.x)
+        
+    else: raise RuntimeError(opt.message)
+
 
 
 ### class Signal. #############################################################
