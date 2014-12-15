@@ -1,7 +1,8 @@
 # gvm.py -- Bimodal von Mises distribution. 
 
-import util
+import util, position
 
+import sys
 import numpy as np
 import matplotlib.pyplot as pp
 from scipy.special import iv as I # Modified Bessel of the first kind.
@@ -61,13 +62,108 @@ class VonMises2:
     return cls(mu1, mu2, kappa1, kappa2)
 
 
+### class Signal. #############################################################
+
+class Signal:
+
+  def __init__(self, db_con, dep_id, t_start, t_end, score_threshold=0):
+    
+    self.table = {}
+    cur = db_con.cursor()
+    ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
+                               ed1r,  ed1i,  ed2r,  ed2i,  
+                               ed3r,  ed3i,  ed4r,  ed4i 
+                   FROM est
+                   JOIN estscore ON est.ID = estscore.estID
+                  WHERE deploymentID= %s
+                    AND timestamp >= %s 
+                    AND timestamp <= %s
+                    AND (score / theoretical_score) >= %s''', 
+              (dep_id, t_start, t_end, score_threshold))
+ 
+    if ct:
+      raw_data = np.array(cur.fetchall(), dtype=float)
+      est_ids = np.array(raw_data[:,0], dtype=int)
+      self.max_est_id = np.max(est_ids)
+      site_ids = np.array(raw_data[:,1], dtype=int)
+      timestamps = raw_data[:,2]
+      power = raw_data[:,3]
+      signal_vector = np.zeros((raw_data.shape[0], position.num_ch),dtype=np.complex)
+      for j in range(position.num_ch):
+        signal_vector[:,j] = raw_data[:,2*j+4] + np.complex(0,-1)*raw_data[:,2*j+5]
+      
+      for site_id in set(site_ids):
+        site = _site_data(site_id)
+        site.est_ids = est_ids[site_ids == site_id]
+        site.t = timestamps[site_ids == site_id]
+        site.power = power[site_ids == site_id]
+        site.signal_vector = signal_vector[site_ids == site_id]
+        site.count = np.sum(site_ids == site_id)
+        self.table[site_id] = site
+  
+  def __getitem__(self, *index):
+    if len(index) == 1: 
+      return self.table[index[0]]
+    else: return None
+
+  def get_sites(self):
+    return self.table.keys()
+
+  def get_bearings(self, sv, site_id):
+    return map(lambda (theta) : (theta * np.pi) / 180, 
+               self.table[site_id].bartlets_estimator(sv))
+
+
+class _site_data: 
+
+  def __init__(self, site_id):
+    self.site_id = site_id
+    self.est_ids = None
+    self.t = None
+    self.power = None
+    self.signal_vector = None
+    self.count = 0
+    
+    self.cal_id = None
+    self.bearing = None 
+    self.bearing_likelihood = None
+    self.theta_hat = None
+
+  def __len__(self):
+    return self.count
+
+  def bartlets_estimator(self, sv):
+    ''' Compute the most likely bearing for each signal. '''
+
+    if self.cal_id != sv.calID[self.site_id]:
+      
+      # Compute bearing likelihood for each pulse.
+      V = self.signal_vector #records X channels
+      G = sv.steering_vectors[self.site_id] #bearings X channels
+      self.bearing = sv.bearings[self.site_id]
+      self.cal_id = sv.calID[self.site_id]
+      left_half = np.dot(V, np.conj(np.transpose(G))) #records X bearings
+      self.bearing_likelihood = np.real(left_half * np.conj(left_half)) #records X bearings
+      self.site_position = sv.sites.get(ID=self.site_id).pos
+    
+      # Most likely bearing for each pulse.
+      self.bearing_estimate = np.argmax(self.bearing_likelihood)
+      self.theta_hat = np.zeros(self.count, dtype=float)
+      for i in range(self.count):
+        self.theta_hat[i] = np.argmax(self.bearing_likelihood[i])
+        self.theta_hat[i] = self.bearing[self.theta_hat[i]]
+      return self.theta_hat
+
+
+### class Bearing. ############################################################
+
 class Bearing:
   
   def __init__(self, db_con, dep_id, t_start, t_end):
     self.length = None
     self.max_id = -1
     self.dep_id = dep_id
-    self.site_table = {}
+    self.table = {}
     cur = db_con.cursor()
     cur.execute('''SELECT siteID, ID, timestamp, bearing, likelihood, activity
                      FROM bearing
@@ -77,33 +173,33 @@ class Bearing:
                     ORDER BY timestamp ASC''', (dep_id, t_start, t_end))
     for row in cur.fetchall():
       site_id = int(row[0])
-      row = (int(row[1]), float(row[2]), float(row[3]), float(row[4]), float(row[5]))
-      if self.site_table.get(site_id) is None:
-        self.site_table[site_id] = [row]
-      else: self.site_table[site_id].append(row)
+      row = (int(row[1]), float(row[2]), 
+             float(row[3]), float(row[4]), float(row[5]))
+      if self.table.get(site_id) is None:
+        self.table[site_id] = [row]
+      else: self.table[site_id].append(row)
       if row[0] > self.max_id: 
         self.max_id = row[0]
 
   def __len__(self):
     if self.length is None:
-      self.length = sum(map(lambda(table): len(table), self.site_table.values()))
+      self.length = sum(map(lambda(table): len(table), self.table.values()))
     return self.length
 
   def __getitem__(self, *index):
     if len(index) == 1: 
-      return self.site_table[index[0]]
+      return self.table[index[0]]
     elif len(index) == 2:
-      return self.site_table[index[0]][index[1]]
+      return self.table[index[0]][index[1]]
     elif len(index) == 3:
-      return self.site_table[index[0]][index[1]][index[2]]
+      return self.table[index[0]][index[1]][index[2]]
     else: return None
   
   def get_sites(self):
-    return self.site_table.keys()
+    return self.table.keys()
 
-  def get_site_bearings(self, site_id):
-    #return map(lambda(row) : row[2], self.site_table[site_id])
-    return map(lambda(row) : (row[2] * np.pi) / 180, self.site_table[site_id])
+  def get_bearings(self, site_id):
+    return map(lambda(row) : (row[2] * np.pi) / 180, self.table[site_id])
 
   def get_max_id(self): 
     return self.max_id
@@ -147,18 +243,21 @@ def test_mle():
 
 def test_bearing(): 
   
+  cal_id = 3
   dep_id = 105
-  t_start = 1407452400
-  t_end = 1407455985 #- (50 * 60)
+  t_start = 1407452400 - 36000
+  t_end = 1407455985 + 36000 #- (50 * 60)
 
   db_con = util.get_db('reader')
   bearing = Bearing(db_con, dep_id, t_start, t_end)
-  
+  sv = position.steering_vectors(db_con, cal_id)
+  signal = Signal(db_con, dep_id, t_start, t_end)
+
   #(hist, bins) = np.histogram(bearing.get_site_bearings(2), 360)
   fig, ax = pp.subplots(1, 1)
 
   N = 100
-  n, bins, patches = ax.hist(bearing.get_site_bearings(3), 
+  n, bins, patches = ax.hist(signal.get_bearings(sv, 3), 
                              bins = [ (i * 2 * np.pi) / N for i in range(N) ],
                              facecolor='blue', alpha=0.25)
  
