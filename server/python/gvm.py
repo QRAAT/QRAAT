@@ -34,7 +34,7 @@ class VonMises2:
     self.kappa2 = kappa2
 
     delta = (mu1 - mu2) % np.pi
-    G0 = self.normalizingFactor(delta, kappa1, kappa2)
+    G0 = self.normalizingFactor(delta, kappa1, kappa2, rounds=100)
     self.denom = 2 * np.pi * G0
 
   def __call__(self, theta):
@@ -83,7 +83,7 @@ class VonMises2:
     obj = lambda(x) : -ll(x[0], x[1], np.exp(x[2]), np.exp(x[3]))
 
     x = fmin(obj, np.array([0,0,0,0], dtype=np.float128),
-             ftol=0.001, disp=True)
+             ftol=0.001, disp=False)
     
     x[0] %= two_pi
     x[1] %= two_pi
@@ -242,7 +242,6 @@ class Bearing:
 
 ### Testing, testing ... ######################################################
 
-
 def test_exp():
   
   # von Mises
@@ -256,7 +255,7 @@ def test_exp():
                     k2 * np.cos(2 * u2), k2 * np.sin(2 * u2)])
       T = np.array([np.cos(theta),    np.sin(theta),
                     np.cos(2 * theta), np.sin(2 * theta)])
-      G0 = VonMises2.normalizingFactor((u1 - u2) % np.pi, k1, k2, rounds=10)
+      G0 = VonMises2.normalizingFactor((u1 - u2) % np.pi, k1, k2)
       K = np.log(2*np.pi) + np.log(G0)
       return np.exp(np.dot(l, T) - K) 
           
@@ -275,8 +274,6 @@ def test_exp():
   
   ax.legend(loc='best', frameon=False)
   pp.show()
-
-
 
 
 def test_mle():
@@ -310,7 +307,7 @@ def test_mle():
   pp.xlim([0,2*np.pi])
   ax.plot(x, p(x), 'k-', lw=2, 
     label='$\mu_1=%.2f$, $\mu_2=%.2f$, $\kappa_1=%.2f$, $\kappa_2=%.2f$' % (
-             mu1, mu2, kappa1, kappa2))
+             p.mu1, p.mu2, p.kappa1, p.kappa2))
   
   ax.legend(loc='best', frameon=False)
   pp.show()
@@ -320,23 +317,33 @@ def test_bearing():
   
   cal_id = 3
   dep_id = 105
-  t_start = 1407452400 - 36000
-  t_end = 1407455985 + 36000 #- (50 * 60)
+  t_start = 1407452400 
+  t_end = 1407455985 #- (50 * 60)
 
   db_con = util.get_db('reader')
-  bearing = Bearing(db_con, dep_id, t_start, t_end)
   sv = position.steering_vectors(db_con, cal_id)
   signal = Signal(db_con, dep_id, t_start, t_end)
 
-  #(hist, bins) = np.histogram(bearing.get_site_bearings(2), 360)
+  bearings = signal.get_bearings(sv, 3)
+  p = VonMises2.mle(bearings)
+
   fig, ax = pp.subplots(1, 1)
 
+  # Plot bearing distribution.
   N = 100
-  n, bins, patches = ax.hist(signal.get_bearings(sv, 3), 
+  n, bins, patches = ax.hist(bearings,
                              bins = [ (i * 2 * np.pi) / N for i in range(N) ],
+                             normed = 1.0,
                              facecolor='blue', alpha=0.25)
- 
-  # Plot most likely distribution.
+
+  # Plot fitted vonMises distribution.
+  x = np.arange(0, 2*np.pi, np.pi / 180)
+  print np.sum(p(x) * (np.pi / 180))
+  pp.xlim([0,2*np.pi])
+  ax.plot(x, p(x), 'k-', lw=2, 
+    label='$\mu_1=%.2f$, $\mu_2=%.2f$, $\kappa_1=%.2f$, $\kappa_2=%.2f$' % (
+             p.mu1, p.mu2, p.kappa1, p.kappa2))
+
   pp.xlim([0,2*np.pi])
   
   ax.legend(loc='best', frameon=False)
@@ -346,5 +353,5 @@ def test_bearing():
 if __name__ == '__main__':
   
   #test_exp()
-  #test_bearing()
-  test_mle()
+  test_bearing()
+  #test_mle()
