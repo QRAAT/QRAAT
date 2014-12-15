@@ -8,6 +8,9 @@ import matplotlib.pyplot as pp
 from scipy.special import iv as I # Modified Bessel of the first kind.
 from scipy.optimize import fmin # Downhill simplex minimization algorithm. 
 from scipy.optimize import minimize
+
+two_pi = 2 * np.pi
+
 class VonMises2: 
 
   def __init__(self, mu1, mu2, kappa1, kappa2):
@@ -20,8 +23,8 @@ class VonMises2:
       resp., analogous to variance. 
     ''' 
     
-    assert 0 <= mu1 and mu1 < 2*np.pi
-    assert 0 <= mu2 and mu2 < 2*np.pi
+    assert 0 <= mu1 and mu1 < two_pi
+    assert 0 <= mu2 and mu2 < two_pi
     assert kappa1 >= 0
     assert kappa2 >= 0 
 
@@ -43,7 +46,7 @@ class VonMises2:
   @classmethod
   def normalizingFactor(cls, delta, kappa1, kappa2, rounds=10):
     ''' Compute the normalizing factor. ''' 
-    G0 = 0 
+    G0 = 0.0 
     for j in range(1,rounds):
       G0 += I(2*j, kappa1) * I(j, kappa2) * np.cos(2 * j * delta)
     G0 = (G0 * 2) + (I(0,kappa1) * I(0,kappa2))
@@ -62,34 +65,31 @@ class VonMises2:
     
     n = len(bearings)
 
-    T = np.zeros(4, dtype=float)
+    T = np.array([0,0,0,0], dtype=np.float128)
     for theta in bearings:
       T += np.array([np.cos(theta),     np.sin(theta),
-                     np.cos(2 * theta), np.sin(2 * theta)])
+                     np.cos(2 * theta), np.sin(2 * theta)], dtype=np.float128)
 
-    ll = lambda(u1, u2, k1, k2) : (-1) * (np.dot(np.array(
-                [k1 * np.cos(u1),     k1 * np.sin(u1), 
-                 k2 * np.cos(2 * u2), k2 * np.sin(2 * u2)]), T) - \
-              n * cls.normalizingFactor((u1 - u2) % np.pi, k1, k2, rounds=10))
-    
+    def ll(u1, u2, k1, k2) :
+          
+       return np.dot(np.array([k1 * np.cos(u1),     k1 * np.sin(u1), 
+                               k2 * np.cos(2 * u2), k2 * np.sin(2 * u2)], 
+                         dtype=np.float128), 
+                           
+                 T) - (n * (np.log(two_pi) + np.log(
+                  cls.normalizingFactor((u1 - u2) % np.pi, 
+                                        k1, k2, rounds=10))))
 
-    #ll_hat = fmin(ll, np.array([0,0,0,0])) 
-    #print ll_hat
-    #ll_hat[0] %= 2 * np.pi
-    #ll_hat[1] %= 2 * np.pi
-    #ll_hat[2] = max(ll_hat[2], 0)
-    #ll_hat[3] = max(ll_hat[3], 0)
-    #return cls(*ll_hat)
+    obj = lambda(x) : -ll(x[0], x[1], np.exp(x[2]), np.exp(x[3]))
+
+    x = fmin(obj, np.array([0,0,0,0], dtype=np.float128),
+             ftol=0.001, disp=True)
     
-    opt = minimize(ll, np.array([0,0,0,0], dtype=float), method='SLSQP',
-                    bounds=[(0, 2 * np.pi), (0, 2 * np.pi), 
-                            (0, None), (0, None)])
-        
-    if opt.success: 
-      print opt.x
-      return cls(*opt.x)
-        
-    else: raise RuntimeError(opt.message)
+    x[0] %= two_pi
+    x[1] %= two_pi
+    x[2] = np.exp(x[2])
+    x[3] = np.exp(x[3])
+    return cls(*x)
 
 
 
@@ -242,6 +242,43 @@ class Bearing:
 
 ### Testing, testing ... ######################################################
 
+
+def test_exp():
+  
+  # von Mises
+  mu1 = 0;      mu2 = 1
+  kappa1 = 0.8; kappa2 = 3
+  p = VonMises2(mu1, mu2, kappa1, kappa2)
+
+  # Exponential representation
+  def yeah(theta, u1, u2, k1, k2):
+      l = np.array([k1 * np.cos(u1),     k1 * np.sin(u1),      
+                    k2 * np.cos(2 * u2), k2 * np.sin(2 * u2)])
+      T = np.array([np.cos(theta),    np.sin(theta),
+                    np.cos(2 * theta), np.sin(2 * theta)])
+      G0 = VonMises2.normalizingFactor((u1 - u2) % np.pi, k1, k2, rounds=10)
+      K = np.log(2*np.pi) + np.log(G0)
+      return np.exp(np.dot(l, T) - K) 
+          
+  f = lambda(x) : yeah(x, mu1, mu2, kappa1, kappa2)
+
+  fig, ax = pp.subplots(1, 1)
+  
+  # Plot most likely distribution.
+  x = np.arange(0, 2*np.pi, np.pi / 180)
+  print np.sum(p(x) * (np.pi / 180))
+  pp.xlim([0,2*np.pi])
+  ax.plot(x, f(x), 'r-', lw=10, alpha=0.25, label='Exponential representation')
+  ax.plot(x, p(x), 'k-', lw=1, 
+    label='$\mu_1=%.2f$, $\mu_2=%.2f$, $\kappa_1=%.2f$, $\kappa_2=%.2f$' % (
+             mu1, mu2, kappa1, kappa2))
+  
+  ax.legend(loc='best', frameon=False)
+  pp.show()
+
+
+
+
 def test_mle():
 
   # Generate a noisy bearing distribution "sample".  
@@ -308,5 +345,6 @@ def test_bearing():
 
 if __name__ == '__main__':
   
+  #test_exp()
   #test_bearing()
   test_mle()
