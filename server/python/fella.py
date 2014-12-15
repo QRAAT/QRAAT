@@ -48,7 +48,7 @@ class VonMises2:
     return G0
 
   @classmethod 
-  def mle(cls, theta, prob):
+  def mle(cls, bearings):
     ''' Maximum likelihood estimator for the von Mises distribution. 
       
       Find the most likely parameters for the observed bearing probability 
@@ -220,18 +220,25 @@ def test_mle():
   
   theta = np.arange(0, 2*np.pi, np.pi / 30)
   prob = P(theta) + np.random.uniform(-0.1, 0.1, 60)
-  
+  bearings = []
+  for (a, b) in zip(theta, prob):
+    bearings += [ a for i in range(int(b * 100)) ]
+
   # Find most likely parameters for a von Mises distribution
   # fit to (theta, prob). 
-  p = VonMises2.mle(theta, prob)
+  p = VonMises2.mle(bearings)
 
   # Plot observation.
   fig, ax = pp.subplots(1, 1)
-  ax.plot(theta, prob, linestyle='steps')
+  N = 50
+  n, bins, patches = ax.hist(bearings, 
+                             bins = [ (i * 2 * np.pi) / N for i in range(N) ],
+                             normed=1.0,
+                             facecolor='blue', alpha=0.25)
  
   # Plot most likely distribution.
   x = np.arange(0, 2*np.pi, np.pi / 180)
-  print np.sum(p(x) * (np.pi / 360))
+  print np.sum(p(x) * (np.pi / 180))
   pp.xlim([0,2*np.pi])
   ax.plot(x, p(x), 'k-', lw=2, 
     label='$\mu_1=%.2f$, $\mu_2=%.2f$, $\kappa_1=%.2f$, $\kappa_2=%.2f$' % (
@@ -270,5 +277,5 @@ def test_bearing():
 
 if __name__ == '__main__':
   
-  test_bearing()
-  #test_mle()
+  #test_bearing()
+  test_mle()
