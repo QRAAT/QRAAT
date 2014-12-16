@@ -10,7 +10,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as pp
 from scipy.special import iv as I # Modified Bessel of the first kind.
-from scipy.optimize import fmin # Downhill simplex minimization algorithm. 
+from scipy.optimize import fmin   # Downhill simplex minimization algorithm. 
 
 two_pi = 2 * np.pi
 
@@ -23,7 +23,7 @@ class GeneralizedVonMises:
       Compute a probability density function from the bimodal von Mises 
       distribution paramterized by `mu1` and `mu2`, the peaks of the two 
       humps, and `kappa1` and `kappa2`, the "spread" of `mu1` and `mu2`
-      resp., analogous to variance. 
+      resp., the concentration parameters. 
     ''' 
     
     assert 0 <= mu1 and mu1 < two_pi
@@ -48,7 +48,7 @@ class GeneralizedVonMises:
 
   @classmethod
   def normalizingFactor(cls, delta, kappa1, kappa2, rounds=10):
-    ''' Compute the normalizing factor. ''' 
+    ''' Compute the GvM normalizing factor. ''' 
     G0 = 0.0 
     for j in range(1,rounds):
       G0 += I(2*j, kappa1) * I(j, kappa2) * np.cos(2 * j * delta)
@@ -63,7 +63,7 @@ class GeneralizedVonMises:
       `bearings` and return an instance of this class. A generalized von
       Mises distribution can be represented in canonical form as a member
       of the exponential family. This yields a maximul likelihood estimator.
-      The parameters are found with the Simplex algorithm. 
+      The Simplex algorithm is used to solve the system.
     '''
     
     n = len(bearings)
@@ -101,7 +101,14 @@ class GeneralizedVonMises:
 class Signal:
 
   def __init__(self, db_con, dep_id, t_start, t_end, score_threshold=0):
-    
+   
+    ''' Reprsent signals in the `qraat.est` table.
+      
+      Store data on a per site basis. Compute the bearing of each pulse 
+      using Bartlet's estimator [ref] with respect to a set of steering 
+      vectors (computed in calibration). 
+    '''
+
     self.table = {}
     cur = db_con.cursor()
     ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
@@ -150,6 +157,8 @@ class Signal:
 
 class _site_data: 
 
+  ''' Per site signal object. ''' 
+
   def __init__(self, site_id):
     self.site_id = site_id
     self.est_ids = None
@@ -194,6 +203,9 @@ class _site_data:
 class Bearing:
   
   def __init__(self, db_con, dep_id, t_start, t_end):
+    
+    ''' Represent bearings stored in the `qraat.bearing` table. ''' 
+   
     self.length = None
     self.max_id = -1
     self.dep_id = dep_id
