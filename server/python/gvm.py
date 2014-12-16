@@ -7,11 +7,10 @@ import numpy as np
 import matplotlib.pyplot as pp
 from scipy.special import iv as I # Modified Bessel of the first kind.
 from scipy.optimize import fmin # Downhill simplex minimization algorithm. 
-from scipy.optimize import minimize
 
 two_pi = 2 * np.pi
 
-class VonMises2: 
+class GeneralizedVonMises: 
 
   def __init__(self, mu1, mu2, kappa1, kappa2):
   
@@ -70,7 +69,7 @@ class VonMises2:
       T += np.array([np.cos(theta),     np.sin(theta),
                      np.cos(2 * theta), np.sin(2 * theta)], dtype=np.float128)
 
-    def ll(u1, u2, k1, k2) :
+    def l(u1, u2, k1, k2) :
           
        return np.dot(np.array([k1 * np.cos(u1),     k1 * np.sin(u1), 
                                k2 * np.cos(2 * u2), k2 * np.sin(2 * u2)], 
@@ -80,7 +79,7 @@ class VonMises2:
                   cls.normalizingFactor((u1 - u2) % np.pi, 
                                         k1, k2, rounds=10))))
 
-    obj = lambda(x) : -ll(x[0], x[1], np.exp(x[2]), np.exp(x[3]))
+    obj = lambda(x) : -l(x[0], x[1], np.exp(x[2]), np.exp(x[3]))
 
     x = fmin(obj, np.array([0,0,0,0], dtype=np.float128),
              ftol=0.001, disp=False)
@@ -247,7 +246,7 @@ def test_exp():
   # von Mises
   mu1 = 0;      mu2 = 1
   kappa1 = 0.8; kappa2 = 3
-  p = VonMises2(mu1, mu2, kappa1, kappa2)
+  p = GeneralizedVonMises(mu1, mu2, kappa1, kappa2)
 
   # Exponential representation
   def yeah(theta, u1, u2, k1, k2):
@@ -255,7 +254,7 @@ def test_exp():
                     k2 * np.cos(2 * u2), k2 * np.sin(2 * u2)])
       T = np.array([np.cos(theta),    np.sin(theta),
                     np.cos(2 * theta), np.sin(2 * theta)])
-      G0 = VonMises2.normalizingFactor((u1 - u2) % np.pi, k1, k2)
+      G0 = GeneralizedVonMises.normalizingFactor((u1 - u2) % np.pi, k1, k2)
       K = np.log(2*np.pi) + np.log(G0)
       return np.exp(np.dot(l, T) - K) 
           
@@ -281,7 +280,7 @@ def test_mle():
   # Generate a noisy bearing distribution "sample".  
   mu1 = 0;      mu2 = 1
   kappa1 = 0.8; kappa2 = 3
-  P = VonMises2(mu1, mu2, kappa1, kappa2)
+  P = GeneralizedVonMises(mu1, mu2, kappa1, kappa2)
   
   theta = np.arange(0, 2*np.pi, np.pi / 30)
   prob = P(theta) + np.random.uniform(-0.1, 0.1, 60)
@@ -291,7 +290,7 @@ def test_mle():
 
   # Find most likely parameters for a von Mises distribution
   # fit to (theta, prob). 
-  p = VonMises2.mle(bearings)
+  p = GeneralizedVonMises.mle(bearings)
 
   # Plot observation.
   fig, ax = pp.subplots(1, 1)
@@ -325,7 +324,7 @@ def test_bearing():
   signal = Signal(db_con, dep_id, t_start, t_end)
 
   bearings = signal.get_bearings(sv, 3)
-  p = VonMises2.mle(bearings)
+  p = GeneralizedVonMises.mle(bearings)
 
   fig, ax = pp.subplots(1, 1)
 
