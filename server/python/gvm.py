@@ -1,8 +1,8 @@
 # gvm.py -- Bimodal von Mises distribution. This method and the maximum 
 # likelihood estimator in particular are due to [GJ06]. 
 #
-#  [GJ06] Ricardo Gatto, Sreenivasa Rao Jammalamadaka. "The generalized 
-#         von Mises distribution." 2006. 
+#  [GJ06] Riccardo Gatto, Sreenivasa Rao Jammalamadaka. "The generalized 
+#         von Mises distribution." In Statistical Methodology, 2006. 
 
 import util, position
 
