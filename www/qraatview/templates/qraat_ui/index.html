@@ -138,13 +138,13 @@ function loadFlot(pos_markers, map, dep_id){
 					timeformat: "%m-%d %H:%M",
 					axisLabel: "Time", 
 					axisLabelUseCanvas: true,
-					axisLabelFontSizePixels: 15, 
+					axisLabelFontSizePixels: 12, 
 					axisLabelFontFamily: "Lucida Grande,Verdana,Arial,sans-serif",
 					axisLabelPadding: 15},
 				yaxis: {
 					axisLabel: yaxis_label, 
 					axisLabelUseCanvas: true,
-					axisLabelFontSizePixels: 15, 
+					axisLabelFontSizePixels: 12, 
 					axisLabelFontFamily: "Lucida Grande,Verdana,Arial,sans-serif",
 					axisLabelPadding: 10},
         highlightColor: 'red',
@@ -188,8 +188,8 @@ function addInfoWindow(marker, data, map){
       data[5] +
           data[9] +
       '<br><b>Date & Time: </b>' + data[10] + 
-        '<br><b>Animal Activity: </b>' + data[7].toFixed(2) +
-    '<br><b>Position Likelihood: </b>' + data[6].toFixed(2);
+      '<br><b>Position Likelihood: </b>' + data[6].toFixed(2) + 
+        '<br><b>Animal Activity: </b>' + data[7].toFixed(2);
 
     var infoWindow = new google.maps.InfoWindow({content: content});
     

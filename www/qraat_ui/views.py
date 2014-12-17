@@ -382,6 +382,7 @@ def view_by_dep(request, project_id, dep_id):
   else: pass #public project
     
   deps = project.get_deployments().filter(ID=dep_id)
+
   print "-----------------------------------------------------"
   print request.GET
   print request.POST
@@ -390,7 +391,6 @@ def view_by_dep(request, project_id, dep_id):
   try:
     deployment = Deployment.objects.get(ID=dep_id)
   except ObjectDoesNotExist:
-    #return render(request, "404.html")
     raise Http404
  
   target = deployment.targetID
