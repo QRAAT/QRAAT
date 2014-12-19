@@ -113,7 +113,11 @@ class Signal:
     cur = db_con.cursor()
     ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
                                ed1r,  ed1i,  ed2r,  ed2i,  
-                               ed3r,  ed3i,  ed4r,  ed4i 
+                               ed3r,  ed3i,  ed4r,  ed4i, tnp,
+                               nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+                               nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+                               nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+                               nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i 
                    FROM est
                    JOIN estscore ON est.ID = estscore.estID
                   WHERE deploymentID= %s
@@ -132,6 +136,12 @@ class Signal:
       signal_vector = np.zeros((raw_data.shape[0], position.num_ch),dtype=np.complex)
       for j in range(position.num_ch):
         signal_vector[:,j] = raw_data[:,2*j+4] + np.complex(0,-1)*raw_data[:,2*j+5]
+
+      tnp = raw_data[:,12]
+      noise_cov = np.zeros((raw_data.shape[0],position.num_ch,position.num_ch),dtype=np.complex)
+      for i in range(position.num_ch):
+        for j in range(position.num_ch):
+          noise_cov[:,i,j] = raw_data[:,2*j+13] + np.complex(0,-1)*raw_data[:,2*j+14]
       
       for site_id in set(site_ids):
         site = _site_data(site_id)
@@ -139,6 +149,8 @@ class Signal:
         site.t = timestamps[site_ids == site_id]
         site.power = power[site_ids == site_id]
         site.signal_vector = signal_vector[site_ids == site_id]
+        site.tnp = tnp[site_ids == site_id]
+        site.noise_cov = noise_cov[site_ids == site_id]
         site.count = np.sum(site_ids == site_id)
         self.table[site_id] = site
   
@@ -174,6 +186,39 @@ class _site_data:
 
   def __len__(self):
     return self.count
+
+  def prob(self, theta, sv): 
+    ''' Probability of received signals given bearing `theta`. ''' 
+    bearing = (180 / np.pi) * theta
+    
+    print "bearing", bearing
+    V = np.matrix(self.signal_vector)
+    index = sv.bearings[self.site_id][bearing]
+    G = np.matrix(sv.steering_vectors[self.site_id][index]).transpose()
+
+    R = np.zeros((self.count,4,4), dtype=np.complex)
+    guy = np.dot(G, np.conj(np.transpose(G)))
+    for i in range(R.shape[0]):
+      R[i] = self.tnp[i] * guy + self.noise_cov[i].reshape(4,4)
+    
+    det = np.linalg.det(R)
+   
+    p = np.zeros(self.count, dtype=np.complex)
+    for i in range(R.shape[0]):
+      p[i] = np.dot(np.conj(V[i]), np.dot(np.linalg.pinv(R[i]), np.transpose(V[i]))).flat[0]
+    
+    print p
+    
+    sys.exit(0)
+  
+    print G.shape
+    print self.tnp.shape
+    print self.noise_cov.shape
+
+
+    left_half = np.dot(V, np.conj(np.transpose(G)))
+    likelihood = np.real(left_half * np.conj(left_half))
+    return likelihood
 
   def bartlets_estimator(self, sv):
     ''' Compute the most likely bearing for each signal. '''
@@ -365,8 +410,24 @@ def test_bearing():
   pp.show()
 
 
+def test1(): 
+  
+  cal_id = 3
+  dep_id = 105
+  t_start = 1407452400 
+  t_end = 1407455985 #- (50 * 60)
+
+  db_con = util.get_db('reader')
+  sv = position.steering_vectors(db_con, cal_id)
+  signal = Signal(db_con, dep_id, t_start, t_end)
+  
+  
+  print signal[2].prob(np.pi, sv)
+
+
 if __name__ == '__main__':
   
   #test_exp()
-  test_bearing()
+  #test_bearing()
   #test_mle()
+  test1()
