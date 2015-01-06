@@ -13,6 +13,7 @@ from scipy.special import iv as I # Modified Bessel of the first kind.
 from scipy.optimize import fmin   # Downhill simplex minimization algorithm. 
 
 two_pi = 2 * np.pi
+pi_n = np.pi ** position.num_ch
 
 class GeneralizedVonMises: 
 
@@ -189,24 +190,42 @@ class _site_data:
   def __len__(self):
     return self.count
 
-  def prob(self, theta, i, sv): 
-    ''' Probability of received signals given bearing `theta`. ''' 
-    bearing = (180 / np.pi) * theta
-    
-    V = np.matrix(self.signal_vector[i])
-    index = sv.bearings[self.site_id][bearing]
-    G = np.matrix(sv.steering_vectors[self.site_id][index]).transpose()
+  def prob(self, sv): 
+    p = np.zeros((self.count, 360), dtype=np.float)
+    V = np.matrix(self.signal_vector)
+    for j in range(360):
+      G = np.matrix(sv.steering_vectors[self.site_id][j]).transpose()
+      G = np.dot(G, np.conj(np.transpose(G)))
+      for i in range(self.count):
+        R = G + (self.noise_cov[i] / self.tnp[i])
+        det = np.abs(np.linalg.det(R))
+        R = np.linalg.pinv(R)
+        a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
+                       np.dot(R, np.transpose(V[i])))
+        p[i,j] = np.exp(-np.abs(a.flat[0])) / (det * pi_n)
+    return p
 
-    R = np.dot(G, np.conj(np.transpose(G))) + (self.noise_cov[i] / self.tnp[i])
-    det = np.abs(np.linalg.det(R))
-    
-    if det != 0: 
-      R = np.linalg.inv(R)
-      p = np.dot(np.transpose(np.conj(np.transpose(V))), 
-                     np.dot(R, np.transpose(V)))
-      p = np.exp(-np.abs(p.flat[0])) / (det * (np.pi ** position.num_ch))
-      return p
-    else: return 0.0
+  def mle(self, sv): # argmin
+    p = np.zeros((self.count, 360), dtype=np.float)
+    V = np.matrix(self.signal_vector)
+    for j in range(360):
+      G = np.matrix(sv.steering_vectors[self.site_id][j]).transpose()
+      G = np.dot(G, np.conj(np.transpose(G)))
+      for i in range(self.count):
+        R = G + (self.noise_cov[i] / self.tnp[i])
+        det = np.abs(np.linalg.det(R))
+        R = np.linalg.pinv(R)
+        a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
+                       np.dot(R, np.transpose(V[i])))
+        p[i,j] = np.abs(a.flat[0]) + np.log(det) 
+    return p
+
+  def bartlet(self, sv): # argmax
+    V = self.signal_vector #records X channels
+    G = sv.steering_vectors[self.site_id] #bearings X channels
+    self.bearing = sv.bearings[self.site_id]
+    left_half = np.dot(V, np.conj(np.transpose(G))) #records X bearings
+    return np.real(left_half * np.conj(left_half)) #records X bearings
 
 
   def bartlets_estimator(self, sv):
@@ -407,11 +426,24 @@ def test1():
   t_end = 1407455985 - (50 * 60)
 
   db_con = util.get_db('reader')
+  print float(t_end - t_start) / 3600, "hours"
   sv = position.steering_vectors(db_con, cal_id)
   signal = Signal(db_con, dep_id, t_start, t_end)
   
-  for theta in np.arange(0,two_pi,two_pi/100): 
-    print signal[2].prob(theta, 22, sv)
+  print "Prob"
+  a = signal[2].prob(sv)
+  
+  print "MLE"
+  c = signal[2].mle(sv)
+  
+  print "Bartlet"
+  b = signal[2].bartlet(sv)
+  
+  #for bearing in range(360): 
+  #  print "%0.5f" % a[22,bearing],
+  #  print "%0.5f" % c[22,bearing],
+  #  print "%0.5f" % b[22,bearing]
+
 
 
 if __name__ == '__main__':
