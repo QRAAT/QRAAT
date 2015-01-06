@@ -119,12 +119,12 @@ class Signal:
                                nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
                                nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
                                nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i 
-                   FROM est
-                   JOIN estscore ON est.ID = estscore.estID
-                  WHERE deploymentID= %s
-                    AND timestamp >= %s 
-                    AND timestamp <= %s
-                    AND (score / theoretical_score) >= %s''', 
+                          FROM est
+                          JOIN estscore ON est.ID = estscore.estID
+                         WHERE deploymentID= %s
+                           AND timestamp >= %s 
+                           AND timestamp <= %s
+                           AND (score / theoretical_score) >= %s''', 
               (dep_id, t_start, t_end, score_threshold))
  
     if ct:
@@ -182,11 +182,6 @@ class _site_data:
     self.signal_vector = None
     self.count = 0
     
-    self.cal_id = None
-    self.bearing = None 
-    self.bearing_likelihood = None
-    self.theta_hat = None
-
   def __len__(self):
     return self.count
 
