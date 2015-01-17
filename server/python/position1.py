@@ -336,7 +336,10 @@ def compute_position(sites, splines, center, half_span=15, obj='max'):
     transmitter signal in Euclidean space, given a bearing distribution from a 
     set of receiver sites. 
 
-    Inputs: sites, center 
+    Inputs: 
+      
+      sites, center - UTM positions of receiver sites and center, the initial 
+                      guess of the transmitter's position. 
       
       splines -- a list of splines corresponding to the bearing likelihood
                  distributions for each site.
