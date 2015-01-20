@@ -207,6 +207,16 @@ class Signal:
     ''' Return a list of site ID's. ''' 
     return self.table.keys()
 
+  @classmethod
+  def MLE(self, per_site_data, sv):
+    assert isinstance(per_site_data, _per_site_data)
+    return per_site_data.MLE(sv)
+  
+  @classmethod
+  def Bartlet(self, per_site_data, sv):
+    assert isinstance(per_site_data, _per_site_data)
+    return per_site_data.Bartlet(sv)
+
 
 class _per_site_data: 
 
@@ -254,7 +264,7 @@ class _per_site_data:
         p[i,j] = np.exp(-np.abs(a.flat[0])) / (det * pi_n)
     return p
 
-  def mle(self, sv):
+  def MLE(self, sv):
     ''' ML estimator for DOA given the model. Use `argmin`. '''
     p = np.zeros((self.count, 360), dtype=np.float)
     V = np.matrix(self.signal_vector)
@@ -270,7 +280,7 @@ class _per_site_data:
         p[i,j] = np.abs(a.flat[0]) + np.log(det) 
     return p
 
-  def bartlet(self, sv): 
+  def Bartlet(self, sv): 
     ''' Bartlet's estimator for DOA. Use `argmax`. ''' 
     V = self.signal_vector 
     G = sv.steering_vectors[self.site_id] 
@@ -281,7 +291,7 @@ class _per_site_data:
 
 ### Position estimation. ######################################################
 
-def PositionEstimator(sites, center, signal, sv):
+def PositionEstimator(sites, center, signal, sv, method=Signal.Bartlet):
   ''' Estimate the source of a signal. 
   
     Inputs: 
@@ -297,15 +307,21 @@ def PositionEstimator(sites, center, signal, sv):
 
       sv -- instance of `class SteeringVectors`, calibration data. 
 
+      method -- Specify method for computing bearing likelihood distribution.
+
     Returns UTM position estimate as a complex number. 
   ''' 
 
+  if method == Signal.Bartlet: obj = 'max'
+  elif method == Signal.MLE:   obj = 'min'
+  else: obj = 'max'
+
   splines = {}
   for site_id in signal.get_site_ids():
-    splines[site_id] = compute_bearing_spline(signal[site_id].bartlet(sv))
+    splines[site_id] = compute_bearing_spline(method(signal[site_id], sv))
   
   p_hat, likelihood = compute_position(sites, splines, center, 
-                                          half_span=15, obj='max')
+                                          half_span=15, obj=obj)
   
   return p_hat, likelihood
 
