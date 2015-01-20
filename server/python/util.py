@@ -21,6 +21,7 @@ import MySQLdb as mdb
 import os, sys
 import qraat
 import time, datetime
+import numpy as np
 
 def remove_field(l, i):
   ''' Provenance function. *TODO* '''  
@@ -54,3 +55,46 @@ def datetime_to_timestamp(string):
 
 def timestamp_to_datetime(t): 
   return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(t)) 
+
+
+
+### Common database accessors. ################################################
+
+def get_center(db_con):
+  ''' Get the center defined in the database. '''
+  cur = db_con.cursor()
+  cur.execute('''SELECT northing, easting, utm_zone_number, utm_zone_letter
+                   FROM qraat.location
+                  WHERE name = 'center' ''')
+  (n, e, number, letter) = cur.fetchone()
+  return np.complex(n, e), (number, letter)
+
+
+def get_sites(db_con):
+  ''' Get receiver locations defined in the database. 
+      
+    Return a map from site ID's to positions.
+  '''
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID, northing, easting
+                   FROM qraat.site''')
+  sites = {}
+  for (id, n, e) in cur.fetchall():
+    sites[int(id)] = np.complex(n, e)
+  return sites
+
+
+def get_utm_zone(db_con):
+  ''' Get UTM zone of receiver locations. 
+    
+    Assert that all of the sites have the same zone. 
+  '''
+  cur = db_con.cursor()
+  cur.execute('''SELECT utm_zone_number, utm_zone_letter
+                   FROM qraat.site''')
+  rows = cur.fetchall()
+  (number, letter) = rows[0]
+  for row in rows:
+    assert row == (number, letter)
+  return (number, letter)
+ 

@@ -38,6 +38,7 @@ import matplotlib.pyplot as pp
 from scipy.special import iv as I # Modified Bessel of the first kind.
 from scipy.optimize import fmin   # Downhill simplex minimization algorithm. 
 from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
+import utm
 
 num_ch = 4
 two_pi = 2 * np.pi
@@ -199,7 +200,10 @@ class Signal:
         return self.table[index[0]].getattr(index[1])[index[2]]
     return None
 
-  def get_sites(self):
+  def __len__(self):
+    return len(self.table)
+
+  def get_site_ids(self):
     ''' Return a list of site ID's. ''' 
     return self.table.keys()
 
@@ -282,7 +286,7 @@ def PositionEstimator(sites, center, signal, sv):
   
     Inputs: 
       
-      sites -- a list of site locations represented in UTM easting/northing 
+      sites -- a set of site locations represented in UTM easting/northing 
                as an `np.complex`. The imaginary component is easting and 
                the real part is northing.
 
@@ -295,7 +299,16 @@ def PositionEstimator(sites, center, signal, sv):
 
     Returns UTM position estimate as a complex number. 
   ''' 
-  return center # TODO 
+
+  splines = {}
+  for site_id in signal.get_site_ids():
+    splines[site_id] = compute_bearing_spline(signal[site_id].bartlet(sv))
+  
+  p_hat, likelihood = compute_position(sites, splines, center, 
+                                          half_span=15, obj='max')
+  
+  return p_hat, likelihood
+
 
 def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win):
   ''' Estimate the source of a signal. 
@@ -310,6 +323,7 @@ def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win):
     Returns a sequence of UTM positions. 
   ''' 
   return [center] # TODO 
+
 
 def compute_bearing_spline(p): 
   ''' Interpolate a spline on a bearing likelihood distribuiton. 
@@ -341,7 +355,7 @@ def compute_position(sites, splines, center, half_span=15, obj='max'):
       sites, center - UTM positions of receiver sites and center, the initial 
                       guess of the transmitter's position. 
       
-      splines -- a list of splines corresponding to the bearing likelihood
+      splines -- a set of splines corresponding to the bearing likelihood
                  distributions for each site.
 
       half_span -- scaling factor for generating a grid of candidate positions. 
@@ -354,7 +368,6 @@ def compute_position(sites, splines, center, half_span=15, obj='max'):
   '''
 
   assert obj in ['min', 'max']
-  assert len(sites) == len(splines) 
   
   if obj is 'min': 
     obj = np.argmin
@@ -374,9 +387,9 @@ def compute_position(sites, splines, center, half_span=15, obj='max'):
     # Compute the likelihood of each position as the sum of the likelihoods 
     # of bearing to each site. 
     likelihoods = np.zeros(positions.shape, dtype=float)
-    for site, p in zip(sites, splines):
-      bearing_to_positions = np.angle(positions - site) * 180 / np.pi
-      likelihoods += p(bearing_to_positions.flat).reshape(bearing_to_positions.shape)
+    for id in splines.keys():
+      bearing_to_positions = np.angle(positions - sites[id]) * 180 / np.pi
+      likelihoods += splines[id](bearing_to_positions.flat).reshape(bearing_to_positions.shape)
     
     index = obj(likelihoods)
     p_hat = positions.flat[index]
@@ -384,13 +397,6 @@ def compute_position(sites, splines, center, half_span=15, obj='max'):
     scale /= 10
 
   return p_hat, likelihood
-
-
-
-
-
-
-
 
 
 
@@ -653,25 +659,18 @@ def test1():
   t_end = 1407455985 - (50 * 60)
 
   db_con = util.get_db('reader')
-  print float(t_end - t_start) / 3600, "hours"
   sv = SteeringVectors(db_con, cal_id)
   signal = Signal(db_con, dep_id, t_start, t_end)
-  
-  #print "Prob"
-  #a = signal[2].p(sv)
-  
-  #print "MLE"
-  #c = signal[2].mle(sv)
-  
-  print "Bartlet"
-  B = compute_bearing_spline(signal[2].bartlet(sv))
 
+  sites = util.get_sites(db_con)
+  (center, zone) = util.get_center(db_con)
+  (pos, ll) = PositionEstimator(sites, center, signal, sv)
+  
+  assert zone == util.get_utm_zone(db_con)
 
-  #for bearing in range(360): 
-  #  print "%0.5f" % a[22,bearing],
-  #  print "%0.5f" % c[22,bearing],
-  #  print "%0.5f" % b[22,bearing]
-
+  (lat, lon) = utm.to_latlon(pos.imag, pos.real, zone[0], zone[1])
+  print 'lat:', lat
+  print 'lon:', lon
 
 
 if __name__ == '__main__':
