@@ -189,6 +189,9 @@ class Signal:
         site.noise_cov = noise_cov[site_ids == site_id]
         site.count = np.sum(site_ids == site_id)
         self.table[site_id] = site
+
+      self.t_start = np.min(timestamps)
+      self.t_end = np.max(timestamps)
   
   def __getitem__(self, *index):
     if len(index) == 1: 
@@ -237,10 +240,28 @@ class _per_site_data:
     self.tnp = None            # Total noise power
     self.edsp = None           # eigenvalue decomposition signal power
     self.signal_vector = None  # eigenvalue decomposition of signal 
+    self.noise_cov = None      # noise covariance matrix
     self.count = 0             # Number of signals (pulses)
     
   def __len__(self):
     return self.count
+
+#  def filter(self, t_start, t_end):
+#    ''' Filter data by time. 
+#      
+#      Return an instance of `_per_site_data` containing a subset of 
+#      data ocurring within [t_start, t_end).
+#    '''
+#    site = _per_site_data(self.site_id)
+#    mask = (t_start <= self.t) & (self.t < t_end)
+#    site.est_ids = self.est_ids[mask]
+#    site.t = self.t[mask]
+#    site.tnp = self.tnp[mask]
+#    site.edsp = self.edsp[mask]
+#    site.signal_vector = self.signal_vector[mask]
+#    site.noise_cov = self.noise_cov[mask]
+#    site.count = site.est_ids.shape[0]
+#    return site
 
   def p(self, sv): 
     ''' Compute p(V | theta) in the signal model.  
@@ -326,7 +347,8 @@ def PositionEstimator(sites, center, signal, sv, method=Signal.Bartlet):
   return p_hat, likelihood
 
 
-def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win):
+def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win, 
+                              method=Signal.Bartlet):
   ''' Estimate the source of a signal. 
   
     Inputs: 
@@ -338,7 +360,31 @@ def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win):
 
     Returns a sequence of UTM positions. 
   ''' 
-  return [center] # TODO 
+  
+  if method == Signal.Bartlet: obj = 'max'
+  elif method == Signal.MLE:   obj = 'min'
+  else: obj = 'max'
+  
+  positions = []
+
+  A = {} # Precomputed bearing likelihoods. 
+  for site_id in signal.get_site_ids():
+    A[site_id] = method(signal[site_id], sv)
+  
+  for (t_start, t_end) in util.compute_time_windows(
+                      signal.t_start, signal.t_end, t_step, t_win):
+    splines = {}
+    for (id, L) in A.iteritems():
+      l = L[(t_start <= signal[id].t) & (signal[id].t < t_end)]
+      if l.shape[0] > 0:
+        splines[id] = compute_bearing_spline(l)
+    
+    p_hat, likelihood = compute_position(sites, splines, center, 
+                                            half_span=15, obj=obj)
+    
+    positions.append((p_hat, likelihood))
+  
+  return positions
 
 
 def compute_bearing_spline(p): 
@@ -680,13 +726,13 @@ def test1():
 
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
-  (pos, ll) = PositionEstimator(sites, center, signal, sv)
-  
   assert zone == util.get_utm_zone(db_con)
-
-  (lat, lon) = utm.to_latlon(pos.imag, pos.real, zone[0], zone[1])
-  print 'lat:', lat
-  print 'lon:', lon
+  
+  positions = WindowedPositionEstimator(sites, center, signal, sv, 5, 30)
+  
+  for (pos, ll) in positions:
+    (lat, lon) = utm.to_latlon(pos.imag, pos.real, zone[0], zone[1])
+    print (lat, lon)
 
 
 if __name__ == '__main__':
