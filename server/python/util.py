@@ -57,6 +57,16 @@ def timestamp_to_datetime(t):
   return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(t)) 
 
 
+### Common miscellaneous computations. ########################################
+
+def compute_time_windows(t_start, t_end, t_step, t_window):
+  half = t_window / 2.0
+  t_start = int(t_start + half); t_end = int(t_end - half) + 1
+  for i in range(t_start - (t_start % t_step), 
+                 t_end, 
+                 t_step):
+    yield (i - half, i + half)
+
 
 ### Common database accessors. ################################################
 
@@ -68,7 +78,6 @@ def get_center(db_con):
                   WHERE name = 'center' ''')
   (n, e, number, letter) = cur.fetchone()
   return np.complex(n, e), (number, letter)
-
 
 def get_sites(db_con):
   ''' Get receiver locations defined in the database. 
@@ -83,7 +92,6 @@ def get_sites(db_con):
     sites[int(id)] = np.complex(n, e)
   return sites
 
-
 def get_utm_zone(db_con):
   ''' Get UTM zone of receiver locations. 
     
@@ -97,4 +105,3 @@ def get_utm_zone(db_con):
   for row in rows:
     assert row == (number, letter)
   return (number, letter)
- 

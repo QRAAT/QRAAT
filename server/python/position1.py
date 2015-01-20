@@ -246,23 +246,6 @@ class _per_site_data:
   def __len__(self):
     return self.count
 
-#  def filter(self, t_start, t_end):
-#    ''' Filter data by time. 
-#      
-#      Return an instance of `_per_site_data` containing a subset of 
-#      data ocurring within [t_start, t_end).
-#    '''
-#    site = _per_site_data(self.site_id)
-#    mask = (t_start <= self.t) & (self.t < t_end)
-#    site.est_ids = self.est_ids[mask]
-#    site.t = self.t[mask]
-#    site.tnp = self.tnp[mask]
-#    site.edsp = self.edsp[mask]
-#    site.signal_vector = self.signal_vector[mask]
-#    site.noise_cov = self.noise_cov[mask]
-#    site.count = site.est_ids.shape[0]
-#    return site
-
   def p(self, sv): 
     ''' Compute p(V | theta) in the signal model.  
     
@@ -279,7 +262,7 @@ class _per_site_data:
       for i in range(self.count):
         R = G + (self.noise_cov[i] / self.tnp[i])
         det = np.abs(np.linalg.det(R))
-        R = np.linalg.pinv(R)
+        R = np.linalg.inv(R)
         a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
                        np.dot(R, np.transpose(V[i])))
         p[i,j] = np.exp(-np.abs(a.flat[0])) / (det * pi_n)
@@ -295,7 +278,7 @@ class _per_site_data:
       for i in range(self.count):
         R = G + (self.noise_cov[i] / self.tnp[i])
         det = np.abs(np.linalg.det(R))
-        R = np.linalg.pinv(R)
+        R = np.linalg.inv(R)
         a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
                        np.dot(R, np.transpose(V[i])))
         p[i,j] = np.abs(a.flat[0]) + np.log(det) 
@@ -340,11 +323,13 @@ def PositionEstimator(sites, center, signal, sv, method=Signal.Bartlet):
   splines = {}
   for site_id in signal.get_site_ids():
     splines[site_id] = compute_bearing_spline(method(signal[site_id], sv))
+ 
+  if len(splines) > 1: # Need at least two site bearings. 
+    p_hat, likelihood = compute_position(sites, splines, center, 
+                                            half_span=15, obj=obj)
+    return p_hat, likelihood
   
-  p_hat, likelihood = compute_position(sites, splines, center, 
-                                          half_span=15, obj=obj)
-  
-  return p_hat, likelihood
+  else: return None
 
 
 def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win, 
@@ -379,8 +364,9 @@ def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win,
       if l.shape[0] > 0:
         splines[id] = compute_bearing_spline(l)
     
-    p_hat, likelihood = compute_position(sites, splines, center, 
-                                            half_span=15, obj=obj)
+    if len(splines) > 1: # Need at lesat two site bearings.
+      p_hat, likelihood = compute_position(sites, splines, center, 
+                                              half_span=15, obj=obj)
     
     positions.append((p_hat, likelihood))
   
