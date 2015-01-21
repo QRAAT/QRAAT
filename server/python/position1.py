@@ -315,17 +315,17 @@ def PositionEstimator(sites, center, signal, sv, method=Signal.Bartlet):
 
     Returns UTM position estimate as a complex number. 
   ''' 
-  if method == Signal.Bartlet: obj = 'max'
-  elif method == Signal.MLE:   obj = 'min'
-  else: obj = 'max'
+  if method == Signal.Bartlet: obj = np.argmax
+  elif method == Signal.MLE:   obj = np.argmin
+  else: obj = np.argmax
 
   splines = {}
   for site_id in signal.get_site_ids():
-    splines[site_id] = compute_bearing_spline(method(signal[site_id], sv))
+    l = aggregate_bearing(method(signal[site_id], sv))
+    splines[site_id] = compute_bearing_spline(l)
  
   if len(splines) > 1: # Need at least two site bearings. 
-    p_hat, likelihood = compute_position(sites, splines, center, 
-                                            half_span=15, obj=obj)
+    p_hat, likelihood = compute_position(sites, splines, center, obj, half_span=15)
     return p_hat
   
   else: return None
@@ -333,7 +333,7 @@ def PositionEstimator(sites, center, signal, sv, method=Signal.Bartlet):
 
 def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win, 
                               method=Signal.Bartlet):
-  ''' Estimate the source of a signal. 
+  ''' Estimate the source of a signal, aggregate site data. 
   
     Inputs: 
     
@@ -344,9 +344,9 @@ def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win,
 
     Returns a sequence of UTM positions. 
   ''' 
-  if method == Signal.Bartlet: obj = 'max'
-  elif method == Signal.MLE:   obj = 'min'
-  else: obj = 'max'
+  if method == Signal.Bartlet: obj = np.argmax
+  elif method == Signal.MLE:   obj = np.argmin
+  else: obj = np.argmax
   
   positions = []
 
@@ -356,24 +356,33 @@ def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win,
   
   for (t_start, t_end) in util.compute_time_windows(
                       signal.t_start, signal.t_end, t_step, t_win):
-    num_est = 0; activity = {}; splines = {}
+    
+    # Aggregate site data, compute splines for pos. estimation. 
+    num_est = 0
+    splines = {}  
+    activity = {}
+    bearing = {}
     for (id, L) in A.iteritems():
       mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
       edsp = signal[id].edsp[mask]
-      l = L[mask]
-      if l.shape[0] > 0:
+      if edsp.shape[0] > 0:
+        l = aggregate_bearing(L[mask])
         splines[id] = compute_bearing_spline(l)
         activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
+        theta = obj(l); bearing[id] = (theta, l[theta])
         num_est += edsp.shape[0]
    
     if len(splines) > 1: # Need at lesat two site bearings.
-      p_hat, likelihood = compute_position(sites, splines, center, 
-                                              half_span=15, obj=obj)
-      t = (t_end + t_start) / 2
-      positions.append((p_hat, t, 
-                        likelihood,
-                        num_est,
-                        activity))
+      p_hat, likelihood = compute_position(sites, splines, center, obj, half_span=15)
+    else: p_hat, likelihood = None, None
+      
+    t = (t_end + t_start) / 2
+    positions.append((p_hat,       # pos. estimate
+                      t,           # middle of time window 
+                      likelihood,  # likelihood of pos. esstimate
+                      num_est,     # total pulses used in calculation
+                      bearing,     # siteID -> (theta, likelihood)
+                      activity))   # siteID -> activity
   
   return positions
 
@@ -383,7 +392,9 @@ def InsertPositions(db_con, dep_id, positions, zone):
   cur = db_con.cursor()
   number, letter = zone
   max_id = 0
-  for (pos, t, likelihood, num_est, activity) in positions:
+  for (pos, t, likelihood, num_est, bearing, activity) in positions:
+    if pos is None: 
+      continue
     lat, lon = utm.to_latlon(pos.imag, pos.real, number, letter)
     cur.execute('''INSERT INTO position
                      (deploymentID, timestamp, latitude, longitude, easting, northing, 
@@ -399,26 +410,26 @@ def InsertPositions(db_con, dep_id, positions, zone):
   return max_id
 
 
-
-
-def compute_bearing_spline(p): 
-  ''' Interpolate a spline on a bearing likelihood distribuiton. 
-    
-    Input is a set of distributions corresponding to a set of time-ordered 
-    pulses from a single site, e.g. the output of `_per_site_data.mle()` or 
-    `_per_site_data.bartlet()`.
-  '''
+def aggregate_bearing(p):
+  ''' Sum a set of bearing likelihoods. '''
   # Average the likelihoods of the pulses for each bearing. TODO The idea here 
   # is that multiplie data may bias the result of the DOA or position estimator. 
   # Is there anything wrong with this? 
-  sum_p = np.sum(p, 0) / p.shape[0]
-  
+  return np.sum(p, 0) / p.shape[0]
+
+def compute_bearing_spline(l): 
+  ''' Interpolate a spline on a bearing likelihood distribuiton. 
+    
+    Input an aggregated bearing distribution, e.g. the output of 
+    `aggregate_bearing(p)` where p is the output of `_per_site_data.mle()` 
+    or `_per_site_data.bartlet()`.
+  '''
   bearing_domain = np.arange(-360,360)         
-  likelihood_range = np.hstack((sum_p, sum_p)) 
+  likelihood_range = np.hstack((l, l)) 
   return spline1d(bearing_domain, likelihood_range)
 
 
-def compute_position(sites, splines, center, half_span=15, obj='max'): 
+def compute_position(sites, splines, center, obj, half_span=15): 
   ''' Maximize (resp. minimize) over position space. 
 
     A simple, speedy algorithm for finding the most likely source of a 
@@ -437,17 +448,10 @@ def compute_position(sites, splines, center, half_span=15, obj='max'):
                    This is half the length of a side of the square bounding the
                    grid.
 
-      obj -- Maximize ('max') or minimize ('min')? 
+      obj -- np.argmin or np.argmax
     
       Returns UTM position estimate as a complex number. 
   '''
-  assert obj in ['min', 'max']
-  
-  if obj is 'min': 
-    obj = np.argmin
-  elif obj is 'max': 
-    obj = np.argmax
-
   scale = 100
   p_hat = center
   while scale >= 1:
