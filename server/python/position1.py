@@ -32,7 +32,7 @@
 import qraat
 import util
 
-import sys
+import sys, time
 import numpy as np
 import matplotlib.pyplot as pp
 from scipy.special import iv as I # Modified Bessel of the first kind.
@@ -40,6 +40,7 @@ from scipy.optimize import fmin   # Downhill simplex minimization algorithm.
 from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
 import utm
 
+HALF_SPAN = 15
 num_ch = 4
 two_pi = 2 * np.pi
 pi_n = np.pi ** num_ch
@@ -293,9 +294,112 @@ class _per_site_data:
     return np.real(left_half * np.conj(left_half)) 
 
 
+### class Position. ###########################################################
+
+class Position:
+  
+  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines):
+    
+    assert len(bearing) == len(activity) and len(bearing) == len(splines)
+    self.dep_id = dep_id
+    self.num_sites = len(bearing)
+    self.num_est = num_est
+    self.p = p
+    self.t = t
+    self.likelihood = likelihood
+    self.bearing = bearing
+    self.activity = activity
+    self.splines = splines
+
+  @classmethod
+  def calc(cls, dep_id, P, signal, obj, sites, center, t_start, t_end):
+    ''' Compute a position given bearing likelihood data. ''' 
+    
+    # Aggregate site data. 
+    (splines, bearing, activity, num_est) = aggregate_window(
+                                  P, signal, obj, t_start, t_end)
+    
+    if len(splines) > 1: # Need at least two site bearings. 
+      p_hat, likelihood = compute_position(sites, splines, center, obj, half_span=HALF_SPAN)
+    else: p_hat, likelihood = None, None
+     
+    # Return a position object. 
+    num_sites = len(bearing)
+    t = (t_end + t_start) / 2
+    return cls(dep_id,      # deployment ID
+               p_hat,       # pos. estimate
+               t,           # middle of time window 
+               likelihood,  # likelihood of pos. esstimate
+               num_est,     # total pulses used in calculation
+               bearing,     # siteID -> (theta, likelihood)
+               activity,    # siteID -> activity
+               splines)     # siteID -> bearing likelihood spline
+
+  def get_likelihood(self):
+    ''' Return normalized position likelihood. ''' 
+    if self.likelihood and self.num_sites > 0:
+      return self.likelihood / self.num_sites
+    else: return None
+  
+  def get_activity(self): 
+    ''' Return activity measurement. ''' 
+    if self.num_sites > 0:
+      return np.mean(self.activity.values())
+    else: return None
+
+  def plot(self, fn, sites, center, scale, half_span):
+    ''' Plot search space, return point of maximum likelihood. '''
+    
+    (positions, likelihoods) = compute_likelihood(
+                         sites, self.splines, center, scale, half_span)
+
+    fig = pp.gcf()
+    
+    # Transform to plot's coordinate system.
+    e = lambda(x) : ((x - center.imag) / scale) + half_span
+    n = lambda(y) : ((y - center.real) / scale) + half_span 
+    
+    x_left =  center.imag - (half_span * scale)
+    x_right = center.imag + (half_span * scale)
+    
+    # Search space
+    p = pp.imshow(likelihoods.transpose(), 
+        origin='lower',
+        extent=(0, half_span * 2, 0, half_span * 2),
+        cmap='YlGnBu',
+        aspect='auto', interpolation='nearest')
+
+    # Sites
+    pp.scatter(
+      [e(float(s.imag)) for s in sites.values()],
+      [n(float(s.real)) for s in sites.values()],
+       s=HALF_SPAN, facecolor='0.5', label='sites', zorder=10)
+    
+    # Pos. estimate
+    if self.p is not None: 
+      pp.plot(e(self.p.imag), n(self.p.real), 'wo', label='position', zorder=11)
+
+    pp.clim()   # clamp the color limits
+    pp.legend()
+    pp.axis([0, half_span * 2, 0, half_span * 2])
+    
+    t = time.localtime(self.t)
+    pp.title('%04d-%02d-%02d %02d%02d:%02d depID=%d' % (
+         t.tm_year, t.tm_mon, t.tm_mday,
+         t.tm_hour, t.tm_min, t.tm_sec,
+         self.dep_id))
+    
+    pp.savefig(fn)
+    pp.clf()
+   
+    
+
+
+
+
 ### Position estimation. ######################################################
 
-def PositionEstimator(sites, center, signal, sv, method=Signal.Bartlet):
+def PositionEstimator(dep_id, sites, center, signal, sv, method=Signal.Bartlet):
   ''' Estimate the source of a signal. 
   
     Inputs: 
@@ -318,20 +422,15 @@ def PositionEstimator(sites, center, signal, sv, method=Signal.Bartlet):
   if method == Signal.Bartlet: obj = np.argmax
   elif method == Signal.MLE:   obj = np.argmin
   else: obj = np.argmax
-
-  splines = {}
-  for site_id in signal.get_site_ids():
-    l = aggregate_bearing(method(signal[site_id], sv))
-    splines[site_id] = compute_bearing_spline(l)
- 
-  if len(splines) > 1: # Need at least two site bearings. 
-    p_hat, likelihood = compute_position(sites, splines, center, obj, half_span=15)
-    return p_hat
   
-  else: return None
+  P = {} # Compute bearing likelihood distributions.  
+  for site_id in signal.get_site_ids():
+    P[site_id] = method(signal[site_id], sv)
 
+  return Position.calc(dep_id, P, signal, obj, sites, center,
+                                    signal.t_start, signal.t_end)
 
-def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win, 
+def WindowedPositionEstimator(dep_id, sites, center, signal, sv, t_step, t_win, 
                               method=Signal.Bartlet):
   ''' Estimate the source of a signal, aggregate site data. 
   
@@ -350,64 +449,69 @@ def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win,
   
   positions = []
 
-  A = {} # Precomputed bearing likelihoods. 
+  P = {} # Compute bearing likelihood distributions. 
   for site_id in signal.get_site_ids():
-    A[site_id] = method(signal[site_id], sv)
+    P[site_id] = method(signal[site_id], sv)
   
   for (t_start, t_end) in util.compute_time_windows(
                       signal.t_start, signal.t_end, t_step, t_win):
-    
-    # Aggregate site data, compute splines for pos. estimation. 
-    num_est = 0
-    splines = {}  
-    activity = {}
-    bearing = {}
-    for (id, L) in A.iteritems():
-      mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
-      edsp = signal[id].edsp[mask]
-      if edsp.shape[0] > 0:
-        l = aggregate_bearing(L[mask])
-        splines[id] = compute_bearing_spline(l)
-        activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
-        theta = obj(l); bearing[id] = (theta, l[theta])
-        num_est += edsp.shape[0]
-   
-    if len(splines) > 1: # Need at lesat two site bearings.
-      p_hat, likelihood = compute_position(sites, splines, center, obj, half_span=15)
-    else: p_hat, likelihood = None, None
-      
-    t = (t_end + t_start) / 2
-    positions.append((p_hat,       # pos. estimate
-                      t,           # middle of time window 
-                      likelihood,  # likelihood of pos. esstimate
-                      num_est,     # total pulses used in calculation
-                      bearing,     # siteID -> (theta, likelihood)
-                      activity))   # siteID -> activity
+  
+    positions.append(Position.calc(dep_id, P, signal, obj, 
+                                    sites, center, t_start, t_end))
   
   return positions
 
-
-def InsertPositions(db_con, dep_id, positions, zone):
+def InsertPositions(db_con, positions, zone):
   ''' Insert positions into database. ''' 
   cur = db_con.cursor()
   number, letter = zone
   max_id = 0
-  for (pos, t, likelihood, num_est, bearing, activity) in positions:
-    if pos is None: 
+  for pos in positions:
+    if pos.p is None: 
       continue
-    lat, lon = utm.to_latlon(pos.imag, pos.real, number, letter)
+    lat, lon = utm.to_latlon(pos.p.imag, pos.p.real, number, letter)
     cur.execute('''INSERT INTO position
                      (deploymentID, timestamp, latitude, longitude, easting, northing, 
                       utm_zone_number, utm_zone_letter, likelihood, 
                       activity, number_est_used)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                     (dep_id, t, round(lat,6), round(lon,6),
-                      pos.imag, pos.real, number, letter, 
-                      likelihood / len(activity), 
-                      np.mean(activity.values()), num_est))
+                     (pos.dep_id, pos.t, round(lat,6), round(lon,6),
+                      pos.p.imag, pos.p.real, number, letter, 
+                      pos.get_likelihood(), pos.get_activity(),
+                      pos.num_est))
     max_id = max(cur.lastrowid, max_id)
 
   return max_id
+
+
+
+
+
+
+
+def aggregate_window(P, signal, obj, t_start, t_end):
+  ''' Aggregate site data, compute splines for pos. estimation. 
+  
+    Site data includes the most likely bearing to each site, 
+    measurement of activity at each site, and a spline 
+    interpolation of bearing distribution at each site. 
+  '''
+
+  num_est = 0
+  splines = {}  
+  activity = {}
+  bearing = {}
+  for (id, L) in P.iteritems():
+    mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
+    edsp = signal[id].edsp[mask]
+    if edsp.shape[0] > 0:
+      l = aggregate_bearing(L[mask])
+      splines[id] = compute_bearing_spline(l)
+      activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
+      theta = obj(l); bearing[id] = (theta, l[theta])
+      num_est += edsp.shape[0]
+  
+  return (splines, bearing, activity, num_est)
 
 
 def aggregate_bearing(p):
@@ -416,6 +520,7 @@ def aggregate_bearing(p):
   # is that multiplie data may bias the result of the DOA or position estimator. 
   # Is there anything wrong with this? 
   return np.sum(p, 0) / p.shape[0]
+
 
 def compute_bearing_spline(l): 
   ''' Interpolate a spline on a bearing likelihood distribuiton. 
@@ -429,7 +534,26 @@ def compute_bearing_spline(l):
   return spline1d(bearing_domain, likelihood_range)
 
 
-def compute_position(sites, splines, center, obj, half_span=15): 
+def compute_likelihood(sites, splines, center, scale, half_span):
+  ''' Compute a grid of candidate points and their likelihoods. '''
+    
+  # Generate a grid of positions with center at the center. 
+  positions = np.zeros((half_span*2+1, half_span*2+1),np.complex)
+  for e in range(-half_span,half_span+1):
+    for n in range(-half_span,half_span+1):
+      positions[e + half_span, n + half_span] = center + np.complex(n * scale, e * scale)
+
+  # Compute the likelihood of each position as the sum of the likelihoods 
+  # of bearing to each site. 
+  likelihoods = np.zeros(positions.shape, dtype=float)
+  for id in splines.keys():
+    bearing_to_positions = np.angle(positions - sites[id]) * 180 / np.pi
+    likelihoods += splines[id](bearing_to_positions.flat).reshape(bearing_to_positions.shape)
+  
+  return (positions, likelihoods)
+
+
+def compute_position(sites, splines, center, obj, half_span=HALF_SPAN): 
   ''' Maximize (resp. minimize) over position space. 
 
     A simple, speedy algorithm for finding the most likely source of a 
@@ -455,19 +579,9 @@ def compute_position(sites, splines, center, obj, half_span=15):
   scale = 100
   p_hat = center
   while scale >= 1:
-
-    # Generate a grid of positions with p_hat at the center. 
-    positions = np.zeros((half_span*2+1, half_span*2+1),np.complex)
-    for e in range(-half_span,half_span+1):
-      for n in range(-half_span,half_span+1):
-        positions[e + half_span, n + half_span] = p_hat + np.complex(n * scale, e * scale)
-
-    # Compute the likelihood of each position as the sum of the likelihoods 
-    # of bearing to each site. 
-    likelihoods = np.zeros(positions.shape, dtype=float)
-    for id in splines.keys():
-      bearing_to_positions = np.angle(positions - sites[id]) * 180 / np.pi
-      likelihoods += splines[id](bearing_to_positions.flat).reshape(bearing_to_positions.shape)
+  
+    (positions, likelihoods) = compute_likelihood(
+                           sites, splines, p_hat, scale, half_span)
     
     index = obj(likelihoods)
     p_hat = positions.flat[index]
@@ -734,7 +848,7 @@ def test1():
   cal_id = 3
   dep_id = 105
   t_start = 1407452400 
-  t_end = 1407455985# - (50 * 60)
+  t_end = 1407455985 #- (55 * 60)
 
   db_con = util.get_db('writer')
   sv = SteeringVectors(db_con, cal_id)
@@ -744,9 +858,15 @@ def test1():
   (center, zone) = util.get_center(db_con)
   assert zone == util.get_utm_zone(db_con)
   
-  positions = WindowedPositionEstimator(sites, center, signal, sv, 5, 30,
+  positions = WindowedPositionEstimator(dep_id, sites, center, signal, sv, 5, 30,
                                          method=Signal.Bartlet)
-  InsertPositions(db_con, dep_id, positions, zone)
+
+  InsertPositions(db_con, positions, zone)
+  #for i, pos in enumerate(positions):
+    #pos.plot('pos%d.png' % (i+1), sites, center, 10, 150) 
+
+#  pos = PositionEstimator(dep_id, sites, center, signal, sv) 
+#  pos.plot('fella.png', sites, center, 10, 150)
 
 if __name__ == '__main__':
   
