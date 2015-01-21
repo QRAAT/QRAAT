@@ -126,7 +126,7 @@ class Signal:
       Store data in a dictionary mapping sites to time-indexed signal data. 
       The relevant data are the eigenvalue decomposition of the signal (ed1r, 
       ed1i, ... ed4r, ed4i), the noise covariance matrix (nc11r, nc11i, ... 
-      nc44r, nc44i), and the total noise power (tnp). Each pulse is assigned
+      nc44r, nc44i), and the signal power (edsp). Each pulse is assigned
       an ID (est_id). Time is represented in seconds as a floating point 
       number (timestamp). 
 
@@ -260,7 +260,7 @@ class _per_site_data:
       G = np.matrix(sv.steering_vectors[self.site_id][j]).transpose()
       G = np.dot(G, np.conj(np.transpose(G)))
       for i in range(self.count):
-        R = G + (self.noise_cov[i] / self.tnp[i])
+        R = G + (self.noise_cov[i] / self.edsp[i])
         det = np.abs(np.linalg.det(R))
         R = np.linalg.inv(R)
         a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
@@ -276,7 +276,7 @@ class _per_site_data:
       G = np.matrix(sv.steering_vectors[self.site_id][j]).transpose()
       G = np.dot(G, np.conj(np.transpose(G)))
       for i in range(self.count):
-        R = G + (self.noise_cov[i] / self.tnp[i])
+        R = G + (self.noise_cov[i] / self.edsp[i])
         det = np.abs(np.linalg.det(R))
         R = np.linalg.inv(R)
         a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
@@ -315,7 +315,6 @@ def PositionEstimator(sites, center, signal, sv, method=Signal.Bartlet):
 
     Returns UTM position estimate as a complex number. 
   ''' 
-
   if method == Signal.Bartlet: obj = 'max'
   elif method == Signal.MLE:   obj = 'min'
   else: obj = 'max'
@@ -327,7 +326,7 @@ def PositionEstimator(sites, center, signal, sv, method=Signal.Bartlet):
   if len(splines) > 1: # Need at least two site bearings. 
     p_hat, likelihood = compute_position(sites, splines, center, 
                                             half_span=15, obj=obj)
-    return p_hat, likelihood
+    return p_hat
   
   else: return None
 
@@ -345,7 +344,6 @@ def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win,
 
     Returns a sequence of UTM positions. 
   ''' 
-  
   if method == Signal.Bartlet: obj = 'max'
   elif method == Signal.MLE:   obj = 'min'
   else: obj = 'max'
@@ -358,19 +356,49 @@ def WindowedPositionEstimator(sites, center, signal, sv, t_step, t_win,
   
   for (t_start, t_end) in util.compute_time_windows(
                       signal.t_start, signal.t_end, t_step, t_win):
-    splines = {}
+    num_est = 0; activity = {}; splines = {}
     for (id, L) in A.iteritems():
-      l = L[(t_start <= signal[id].t) & (signal[id].t < t_end)]
+      mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
+      edsp = signal[id].edsp[mask]
+      l = L[mask]
       if l.shape[0] > 0:
         splines[id] = compute_bearing_spline(l)
-    
+        activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
+        num_est += edsp.shape[0]
+   
     if len(splines) > 1: # Need at lesat two site bearings.
       p_hat, likelihood = compute_position(sites, splines, center, 
                                               half_span=15, obj=obj)
-    
-    positions.append((p_hat, likelihood))
+      t = (t_end + t_start) / 2
+      positions.append((p_hat, t, 
+                        likelihood,
+                        num_est,
+                        activity))
   
   return positions
+
+
+def InsertPositions(db_con, dep_id, positions, zone):
+  ''' Insert positions into database. ''' 
+  cur = db_con.cursor()
+  number, letter = zone
+  max_id = 0
+  for (pos, t, likelihood, num_est, activity) in positions:
+    lat, lon = utm.to_latlon(pos.imag, pos.real, number, letter)
+    cur.execute('''INSERT INTO position
+                     (deploymentID, timestamp, latitude, longitude, easting, northing, 
+                      utm_zone_number, utm_zone_letter, likelihood, 
+                      activity, number_est_used)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                     (dep_id, t, round(lat,6), round(lon,6),
+                      pos.imag, pos.real, number, letter, 
+                      likelihood / len(activity), 
+                      np.mean(activity.values()), num_est))
+    max_id = max(cur.lastrowid, max_id)
+
+  return max_id
+
+
 
 
 def compute_bearing_spline(p): 
@@ -380,7 +408,6 @@ def compute_bearing_spline(p):
     pulses from a single site, e.g. the output of `_per_site_data.mle()` or 
     `_per_site_data.bartlet()`.
   '''
-  
   # Average the likelihoods of the pulses for each bearing. TODO The idea here 
   # is that multiplie data may bias the result of the DOA or position estimator. 
   # Is there anything wrong with this? 
@@ -414,7 +441,6 @@ def compute_position(sites, splines, center, half_span=15, obj='max'):
     
       Returns UTM position estimate as a complex number. 
   '''
-
   assert obj in ['min', 'max']
   
   if obj is 'min': 
@@ -704,9 +730,9 @@ def test1():
   cal_id = 3
   dep_id = 105
   t_start = 1407452400 
-  t_end = 1407455985 - (50 * 60)
+  t_end = 1407455985# - (50 * 60)
 
-  db_con = util.get_db('reader')
+  db_con = util.get_db('writer')
   sv = SteeringVectors(db_con, cal_id)
   signal = Signal(db_con, dep_id, t_start, t_end)
 
@@ -714,12 +740,9 @@ def test1():
   (center, zone) = util.get_center(db_con)
   assert zone == util.get_utm_zone(db_con)
   
-  positions = WindowedPositionEstimator(sites, center, signal, sv, 5, 30)
-  
-  for (pos, ll) in positions:
-    (lat, lon) = utm.to_latlon(pos.imag, pos.real, zone[0], zone[1])
-    print (lat, lon)
-
+  positions = WindowedPositionEstimator(sites, center, signal, sv, 5, 30,
+                                         method=Signal.Bartlet)
+  InsertPositions(db_con, dep_id, positions, zone)
 
 if __name__ == '__main__':
   
