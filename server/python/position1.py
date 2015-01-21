@@ -27,109 +27,13 @@ import util, signal1
 import sys, time
 import numpy as np
 import matplotlib.pyplot as pp
+from matplotlib.patches import Ellipse
 from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
+import numdifftools as nd
 import utm
 
 HALF_SPAN = 15
-
-
-### class Position. ###########################################################
-
-class Position:
-  
-  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines):
-    
-    assert len(bearing) == len(activity) and len(bearing) == len(splines)
-    self.dep_id = dep_id
-    self.num_sites = len(bearing)
-    self.num_est = num_est
-    self.p = p
-    self.t = t
-    self.likelihood = likelihood
-    self.bearing = bearing
-    self.activity = activity
-    self.splines = splines
-
-  @classmethod
-  def calc(cls, dep_id, P, signal, obj, sites, center, t_start, t_end):
-    ''' Compute a position given bearing likelihood data. ''' 
-    
-    # Aggregate site data. 
-    (splines, bearing, activity, num_est) = aggregate_window(
-                                  P, signal, obj, t_start, t_end)
-    
-    if len(splines) > 1: # Need at least two site bearings. 
-      p_hat, likelihood = compute_position(sites, splines, center, obj, half_span=HALF_SPAN)
-    else: p_hat, likelihood = None, None
-     
-    # Return a position object. 
-    num_sites = len(bearing)
-    t = (t_end + t_start) / 2
-    return cls(dep_id,      # deployment ID
-               p_hat,       # pos. estimate
-               t,           # middle of time window 
-               likelihood,  # likelihood of pos. esstimate
-               num_est,     # total pulses used in calculation
-               bearing,     # siteID -> (theta, likelihood)
-               activity,    # siteID -> activity
-               splines)     # siteID -> bearing likelihood spline
-
-  def get_likelihood(self):
-    ''' Return normalized position likelihood. ''' 
-    if self.likelihood and self.num_sites > 0:
-      return self.likelihood / self.num_sites
-    else: return None
-  
-  def get_activity(self): 
-    ''' Return activity measurement. ''' 
-    if self.num_sites > 0:
-      return np.mean(self.activity.values())
-    else: return None
-
-  def plot(self, fn, sites, center, scale, half_span):
-    ''' Plot search space, return point of maximum likelihood. '''
-    
-    (positions, likelihoods) = compute_likelihood(
-                         sites, self.splines, center, scale, half_span)
-
-    fig = pp.gcf()
-    
-    # Transform to plot's coordinate system.
-    e = lambda(x) : ((x - center.imag) / scale) + half_span
-    n = lambda(y) : ((y - center.real) / scale) + half_span 
-    
-    x_left =  center.imag - (half_span * scale)
-    x_right = center.imag + (half_span * scale)
-    
-    # Search space
-    p = pp.imshow(likelihoods.transpose(), 
-        origin='lower',
-        extent=(0, half_span * 2, 0, half_span * 2),
-        cmap='YlGnBu',
-        aspect='auto', interpolation='nearest')
-
-    # Sites
-    pp.scatter(
-      [e(float(s.imag)) for s in sites.values()],
-      [n(float(s.real)) for s in sites.values()],
-       s=HALF_SPAN, facecolor='0.5', label='sites', zorder=10)
-    
-    # Pos. estimate
-    if self.p is not None: 
-      pp.plot(e(self.p.imag), n(self.p.real), 'wo', label='position', zorder=11)
-
-    pp.clim()   # clamp the color limits
-    pp.legend()
-    pp.axis([0, half_span * 2, 0, half_span * 2])
-    
-    t = time.localtime(self.t)
-    pp.title('%04d-%02d-%02d %02d%02d:%02d depID=%d' % (
-         t.tm_year, t.tm_mon, t.tm_mday,
-         t.tm_hour, t.tm_min, t.tm_sec,
-         self.dep_id))
-    
-    pp.savefig(fn)
-    pp.clf()
+ELLIPSE_PLOT_SCALE = 4
 
 
 
@@ -220,6 +124,123 @@ def InsertPositions(db_con, positions, zone):
     max_id = max(cur.lastrowid, max_id)
 
   return max_id
+
+
+
+
+
+### class Position. ###########################################################
+
+class Position:
+  
+  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines):
+    
+    assert len(bearing) == len(activity) and len(bearing) == len(splines)
+    self.dep_id = dep_id
+    self.num_sites = len(bearing)
+    self.num_est = num_est
+    self.p = p
+    self.t = t
+    self.likelihood = likelihood
+    self.bearing = bearing
+    self.activity = activity
+    self.splines = splines
+
+  @classmethod
+  def calc(cls, dep_id, P, signal, obj, sites, center, t_start, t_end):
+    ''' Compute a position given bearing likelihood data. ''' 
+    
+    # Aggregate site data. 
+    (splines, bearing, activity, num_est) = aggregate_window(
+                                  P, signal, obj, t_start, t_end)
+    
+    if len(splines) > 1: # Need at least two site bearings. 
+      p_hat, likelihood = compute_position(sites, splines, center, obj, half_span=HALF_SPAN)
+    else: p_hat, likelihood = None, None
+     
+    # Return a position object. 
+    num_sites = len(bearing)
+    t = (t_end + t_start) / 2
+    return cls(dep_id,      # deployment ID
+               p_hat,       # pos. estimate
+               t,           # middle of time window 
+               likelihood,  # likelihood of pos. esstimate
+               num_est,     # total pulses used in calculation
+               bearing,     # siteID -> (theta, likelihood)
+               activity,    # siteID -> activity
+               splines)     # siteID -> bearing likelihood spline
+
+  def get_likelihood(self):
+    ''' Return normalized position likelihood. ''' 
+    if self.likelihood and self.num_sites > 0:
+      return self.likelihood / self.num_sites
+    else: return None
+  
+  def get_activity(self): 
+    ''' Return activity measurement. ''' 
+    if self.num_sites > 0:
+      return np.mean(self.activity.values())
+    else: return None
+
+  def plot(self, fn, sites, center, scale, half_span):
+    ''' Plot search space. '''
+
+    if self.num_sites == 0:
+      return 
+
+    (positions, likelihoods) = compute_likelihood(
+                         sites, self.splines, center, scale, half_span)
+
+    fig = pp.gcf()
+    
+    # Transform to plot's coordinate system.
+    e = lambda(x) : ((x - center.imag) / scale) + half_span
+    n = lambda(y) : ((y - center.real) / scale) + half_span 
+    f = lambda(p) : [e(p.imag), n(p.real)]
+    
+    x_left =  center.imag - (half_span * scale)
+    x_right = center.imag + (half_span * scale)
+    
+    # Search space
+    p = pp.imshow(likelihoods.transpose(), 
+        origin='lower',
+        extent=(0, half_span * 2, 0, half_span * 2),
+        cmap='YlGnBu',
+        aspect='auto', interpolation='nearest')
+
+    # Sites
+    pp.scatter(
+      [e(float(s.imag)) for s in sites.values()],
+      [n(float(s.real)) for s in sites.values()],
+       s=HALF_SPAN, facecolor='0.5', label='sites', zorder=10)
+    
+    # Pos. estimate with confidence ellipse
+    if self.p is not None: 
+      ax = fig.add_subplot(111)
+      (x, alpha) = compute_conf(compute_covariance(self.p, sites, self.splines))
+      if x is not None: 
+        ellipse = Ellipse(xy=f(self.p), width=x[0]*2*ELLIPSE_PLOT_SCALE, 
+                        height=x[1]*2*ELLIPSE_PLOT_SCALE, angle=alpha)
+        ax.add_artist(ellipse)
+        ellipse.set_clip_box(ax.bbox)
+        ellipse.set_alpha(0.2)
+        ellipse.set_facecolor([1.0,1.0,1.0])
+      else: print "Skipping non-positive definite cov. matrix"
+      pp.plot(e(self.p.imag), n(self.p.real), 
+            'w.', markersize=2.0,  label='position', zorder=11)
+
+    pp.clim()   # clamp the color limits
+    pp.legend()
+    pp.axis([0, half_span * 2, 0, half_span * 2])
+    
+    t = time.localtime(self.t)
+    pp.title('%04d-%02d-%02d %02d%02d:%02d depID=%d' % (
+         t.tm_year, t.tm_mon, t.tm_mday,
+         t.tm_hour, t.tm_min, t.tm_sec,
+         self.dep_id))
+    
+    pp.savefig(fn)
+    pp.clf()
 
 
 
@@ -327,6 +348,46 @@ def compute_position(sites, splines, center, obj, half_span=HALF_SPAN):
   return p_hat, likelihood
 
 
+def compute_covariance(p, sites, splines, half_span=150, scale=1):
+
+  e = lambda(x0) : int((x0 - p.imag) / scale) + half_span
+  n = lambda(y1) : int((y1 - p.real) / scale) + half_span
+  f = lambda(p) : [e(p.imag), n(p.real)]
+    
+  (positions, likelihoods) = compute_likelihood(
+                           sites, splines, p, scale, half_span)
+    
+  J = lambda (x) : likelihoods[x[0], x[1]]
+  H = nd.Hessian(J)
+  Del = nd.Gradient(J)
+  
+  a = Del(f(p))
+  b = np.linalg.inv(H(f(p)))
+  C = np.dot(b, np.dot(a, np.dot(np.transpose(a), b)))
+  return C # TODO double check!
+
+
+def compute_conf(C, sig=0.95, scale=1):
+  
+  chi_squared = {0.95 : 5.991} 
+  assert sig in chi_squared.keys()
+
+  w, v = np.linalg.eig(C)
+  if w[0] > 0 and w[1] > 0: # Positive definite 
+
+    i = np.argmax(w) # Major w[i], v[:,i]
+    j = np.argmin(w) # Minor w[i], v[:,j]
+
+    a = np.arctan2(v[:,i][1], v[:,i][0]) * 180 / np.pi
+    x = np.array([2 * np.sqrt(chi_squared[sig] * w[i]), 
+                  2 * np.sqrt(chi_squared[sig] * w[j])])
+    return (x * scale, a) # TODO double check!
+
+  else: return (None, None)
+
+  
+
+
 
 
 
@@ -338,7 +399,7 @@ def test1():
   cal_id = 3
   dep_id = 105
   t_start = 1407452400 
-  t_end = 1407455985 #- (55 * 60)
+  t_end = 1407455985 - (50 * 60)
 
   db_con = util.get_db('writer')
   sv = signal1.SteeringVectors(db_con, cal_id)
@@ -348,15 +409,18 @@ def test1():
   (center, zone) = util.get_center(db_con)
   assert zone == util.get_utm_zone(db_con)
   
-  positions = WindowedPositionEstimator(dep_id, sites, center, signal, sv, 5, 30,
+  positions = WindowedPositionEstimator(dep_id, sites, center, signal, sv, 5, 5,
                                          method=signal1.Signal.Bartlet)
 
   #InsertPositions(db_con, positions, zone)
-  #for i, pos in enumerate(positions):
-    #pos.plot('pos%d.png' % (i+1), sites, center, 10, 150) 
+  for i, pos in enumerate(positions):
+    pos.plot('pos%d.png' % (i+1), sites, center, 10, 150) 
 
-  pos = PositionEstimator(dep_id, sites, center, signal, sv) 
-  pos.plot('fella.png', sites, center, 10, 150)
+  #pos = PositionEstimator(dep_id, sites, center, signal, sv)
+  #C = compute_covariance(pos.p, sites, pos.splines)
+  #print C
+  #print compute_conf(C)
+  #pos.plot('fella.png', sites, center, 10, 150)
 
 if __name__ == '__main__':
   
