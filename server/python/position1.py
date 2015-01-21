@@ -399,7 +399,7 @@ def test1():
   cal_id = 3
   dep_id = 105
   t_start = 1407452400 
-  t_end = 1407455985 - (50 * 60)
+  t_end = 1407455985 #- (50 * 60)
 
   db_con = util.get_db('writer')
   sv = signal1.SteeringVectors(db_con, cal_id)
@@ -409,12 +409,13 @@ def test1():
   (center, zone) = util.get_center(db_con)
   assert zone == util.get_utm_zone(db_con)
   
-  positions = WindowedPositionEstimator(dep_id, sites, center, signal, sv, 5, 5,
+  positions = WindowedPositionEstimator(dep_id, sites, center, signal, sv, 60, 120,
                                          method=signal1.Signal.Bartlet)
 
   #InsertPositions(db_con, positions, zone)
   for i, pos in enumerate(positions):
     pos.plot('pos%d.png' % (i+1), sites, center, 10, 150) 
+
 
   #pos = PositionEstimator(dep_id, sites, center, signal, sv)
   #C = compute_covariance(pos.p, sites, pos.splines)
