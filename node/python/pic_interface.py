@@ -125,7 +125,7 @@ class pic_interface:
       self._change_lo(0)
 
     def _change_lo(self, n):
-      """ Do the clange in display(?) """ 
+      """ Do the change in display frequency calculation """ 
       self.ser.write('a')
       time.sleep(.8)
       self.ser.write('o')
@@ -153,21 +153,18 @@ class pic_interface:
     def check(self, in_freq):
       """ Verify the PLL frequency. 
        
-          :param in_freq: Expected frequency. 
-          :type in_freq: int(?)
-          :rtype: (?) 
+          :param in_freq: Expected frequency in Hz. 
+          :type in_freq: int
+          :rtype: boolean
       """
       self._read()
-      out = (self.freq == in_freq, self.w, self.lock)
+      out = (self.freq == in_freq) and self.w and self.lock
       return out
 
-    def freq_check(self):
+    def print_status(self):
       """ Print frequency to the terminal. """ 
       self._read()
-      if self.lock:
-        print "Frequency: %d LOCKED" % (self.freq,)
-      else:
-        print "Write Status: %d, Lock Status: %d" %(self.w, self.lock)
+      print "Frequency: {0:d} Hz, Write: {1}, Lock: {2}".format(self.freq, self.w, self.lock)
 
     def check_lo(self):
       """ Get the current LO display setting. """ 
@@ -190,7 +187,7 @@ if __name__ == "__main__":
     sc = pic_interface()
 #    sc.reset_pic()
     sc.check_lo()
-    sc.freq_check()
+    sc.print_status()
     del sc
 
 
