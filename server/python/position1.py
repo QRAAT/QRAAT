@@ -7,6 +7,12 @@
 #
 # class Position -- represent computed positions. 
 #
+# References
+#
+#  [ZB11] Handbook of Position Location: Theory, Practice, and 
+#         Advances. Edited by Seyad A. Zekevat, R. Michael 
+#         Beuhrer.
+#
 # Copyright (C) 2015 Todd, Borrowman, Chris Patton
 # 
 # This program is free software: you can redistribute it and/or modify
@@ -32,8 +38,9 @@ from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
 import numdifftools as nd
 import utm
 
-HALF_SPAN = 15
-ELLIPSE_PLOT_SCALE = 4
+HALF_SPAN = 15         # Meters
+SCALE_LIMIT = 1        # Meters
+ELLIPSE_PLOT_SCALE = 3 # Scaling factor
 
 
 
@@ -219,8 +226,8 @@ class Position:
       ax = fig.add_subplot(111)
       (x, alpha) = compute_conf(compute_covariance(self.p, sites, self.splines))
       if x is not None: 
-        ellipse = Ellipse(xy=f(self.p), width=x[0]*2*ELLIPSE_PLOT_SCALE, 
-                        height=x[1]*2*ELLIPSE_PLOT_SCALE, angle=alpha)
+        ellipse = Ellipse(xy=f(self.p), width=x[0]*ELLIPSE_PLOT_SCALE, 
+                        height=x[1]*ELLIPSE_PLOT_SCALE, angle=alpha)
         ax.add_artist(ellipse)
         ellipse.set_clip_box(ax.bbox)
         ellipse.set_alpha(0.2)
@@ -333,9 +340,9 @@ def compute_position(sites, splines, center, obj, half_span=HALF_SPAN):
     
       Returns UTM position estimate as a complex number. 
   '''
-  scale = 100
+  scale = 100.0
   p_hat = center
-  while scale >= 1:
+  while scale >= SCALE_LIMIT:
   
     (positions, likelihoods) = compute_likelihood(
                            sites, splines, p_hat, scale, half_span)
@@ -348,10 +355,15 @@ def compute_position(sites, splines, center, obj, half_span=HALF_SPAN):
   return p_hat, likelihood
 
 
-def compute_covariance(p, sites, splines, half_span=150, scale=1):
+def compute_covariance(p, sites, splines, half_span=HALF_SPAN * 10, scale=SCALE_LIMIT):
+  ''' Compute covariance matrix of position estimate `p`. 
+
+    Assuming the estimate follows a bivariate normal distribution. 
+    This follows [ZB11] equation 2.169. 
+  '''
 
   e = lambda(x0) : int((x0 - p.imag) / scale) + half_span
-  n = lambda(y1) : int((y1 - p.real) / scale) + half_span
+  n = lambda(x1) : int((x1 - p.real) / scale) + half_span
   f = lambda(p) : [e(p.imag), n(p.real)]
     
   (positions, likelihoods) = compute_likelihood(
@@ -360,28 +372,35 @@ def compute_covariance(p, sites, splines, half_span=150, scale=1):
   J = lambda (x) : likelihoods[x[0], x[1]]
   H = nd.Hessian(J)
   Del = nd.Gradient(J)
-  
+ 
   a = Del(f(p))
   b = np.linalg.inv(H(f(p)))
-  C = np.dot(b, np.dot(a, np.dot(np.transpose(a), b)))
-  return C # TODO double check!
+  C = np.dot(np.dot(b, np.dot(a, np.transpose(a))), b)
+  return C
 
 
-def compute_conf(C, sig=0.95, scale=1):
-  
-  chi_squared = {0.95 : 5.991} 
-  assert sig in chi_squared.keys()
+def compute_conf(C, level=0.95, scale=SCALE_LIMIT):
+  ''' Compute a confidence ellipse of a covariance matrix.
+
+    Return a tuple (x, alpha), where x[0] gives the magnitude of the major 
+    axis, x[1]s give the magnitude of the minor axis, and alpha gives the 
+    angular orientation (relative to the x-axis) of the ellipse in degrees. 
+    If C is not positive definite, then the distribution has no density: 
+    return (None, None). 
+  ''' 
+  chi_squared = {0.90 : 4.605, 0.95 : 5.991, 0.99 : 9.210} 
+  assert level in chi_squared.keys()
 
   w, v = np.linalg.eig(C)
-  if w[0] > 0 and w[1] > 0: # Positive definite 
+  if w[0] > 0 and w[1] > 0: # Positive definite. 
 
     i = np.argmax(w) # Major w[i], v[:,i]
     j = np.argmin(w) # Minor w[i], v[:,j]
 
-    a = np.arctan2(v[:,i][1], v[:,i][0]) * 180 / np.pi
-    x = np.array([2 * np.sqrt(chi_squared[sig] * w[i]), 
-                  2 * np.sqrt(chi_squared[sig] * w[j])])
-    return (x * scale, a) # TODO double check!
+    alpha = np.arctan2(v[:,i][1], v[:,i][0]) * 180 / np.pi
+    x = np.array([2 * np.sqrt(chi_squared[level] * w[i]), 
+                  2 * np.sqrt(chi_squared[level] * w[j])])
+    return (x * scale, alpha) 
 
   else: return (None, None)
 
@@ -409,19 +428,19 @@ def test1():
   (center, zone) = util.get_center(db_con)
   assert zone == util.get_utm_zone(db_con)
   
-  positions = WindowedPositionEstimator(dep_id, sites, center, signal, sv, 60, 120,
-                                         method=signal1.Signal.Bartlet)
+  #positions = WindowedPositionEstimator(dep_id, sites, center, signal, sv, 120, 30,
+  #                                       method=signal1.Signal.Bartlet)
 
   #InsertPositions(db_con, positions, zone)
-  for i, pos in enumerate(positions):
-    pos.plot('pos%d.png' % (i+1), sites, center, 10, 150) 
+  #for i, pos in enumerate(positions):
+  #  pos.plot('pos%d.png' % (i+1), sites, center, 10, 150) 
 
 
-  #pos = PositionEstimator(dep_id, sites, center, signal, sv)
-  #C = compute_covariance(pos.p, sites, pos.splines)
-  #print C
-  #print compute_conf(C)
-  #pos.plot('fella.png', sites, center, 10, 150)
+  pos = PositionEstimator(dep_id, sites, center, signal, sv)
+  C = compute_covariance(pos.p, sites, pos.splines)
+  print C
+  print compute_conf(C)
+  pos.plot('fella.png', sites, center, 10, 150)
 
 if __name__ == '__main__':
   
