@@ -428,12 +428,12 @@ def test1():
   (center, zone) = util.get_center(db_con)
   assert zone == util.get_utm_zone(db_con)
   
-  #positions = WindowedPositionEstimator(dep_id, sites, center, signal, sv, 120, 30,
-  #                                       method=signal1.Signal.Bartlet)
+  positions = WindowedPositionEstimator(dep_id, sites, center, signal, sv, 120, 30,
+                                         method=signal1.Signal.Bartlet)
 
-  #InsertPositions(db_con, positions, zone)
-  #for i, pos in enumerate(positions):
-  #  pos.plot('pos%d.png' % (i+1), sites, center, 10, 150) 
+  InsertPositions(db_con, positions, zone)
+  for i, pos in enumerate(positions):
+    pos.plot('pos%d.png' % (i), sites, center, 10, 150) 
 
 
   pos = PositionEstimator(dep_id, sites, center, signal, sv)
