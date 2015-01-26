@@ -45,7 +45,10 @@ pi_n = np.pi ** num_ch
 
 class SteeringVectors:
   
-  def __init__(self, db_con, cal_id):
+  suffix = 'csv'
+  delim = '\t'
+
+  def __init__(self, db_con=None, cal_id=None):
 
     ''' Represent steering vectors ($G_i(\theta)$).
       
@@ -68,35 +71,74 @@ class SteeringVectors:
     self.bearings = {}         # site.ID -> bearing
     self.svID = {}
     self.calID = {}
-    to_be_removed = []
-    cur = db_con.cursor()
-    for site_id in util.get_sites(db_con).keys():
-      cur.execute('''SELECT ID, Bearing,
-                            sv1r, sv1i, sv2r, sv2i,
-                            sv3r, sv3i, sv4r, sv4i
-                       FROM steering_vectors
-                      WHERE SiteID=%s and Cal_InfoID=%s
-                   ORDER BY Bearing''', (site_id, cal_id))
-      raw_data = cur.fetchall()
-      sv_data = np.array(raw_data,dtype=float)
-      if sv_data.shape[0] > 0:
-        self.steering_vectors[site_id] = np.array(sv_data[:,2::2] + np.complex(0,1) * sv_data[:,3::2])
-        self.bearings[site_id] = np.array(sv_data[:,1])
-        self.svID[site_id] = np.array(sv_data[:,0], dtype=int)
-        self.calID[site_id] = cal_id
-      else:
-        to_be_removed.append(site)
-    while len(to_be_removed) > 0:
-      self.sites.table.remove(to_be_removed.pop())
 
+    if db_con:
+      to_be_removed = []
+      self.cal_id = cal_id
+      cur = db_con.cursor()
+      for site_id in util.get_sites(db_con).keys():
+        cur.execute('''SELECT ID, Bearing,
+                              sv1r, sv1i, sv2r, sv2i,
+                              sv3r, sv3i, sv4r, sv4i
+                         FROM steering_vectors
+                        WHERE SiteID=%s and Cal_InfoID=%s
+                     ORDER BY Bearing''', (site_id, cal_id))
+        raw_data = cur.fetchall()
+        sv_data = np.array(raw_data,dtype=float)
+        if sv_data.shape[0] > 0:
+          self.steering_vectors[site_id] = np.array(sv_data[:,2::2] + np.complex(0,1) * sv_data[:,3::2])
+          self.bearings[site_id] = np.array(sv_data[:,1])
+          self.svID[site_id] = np.array(sv_data[:,0], dtype=int)
+        else:
+          to_be_removed.append(site)
+      while len(to_be_removed) > 0:
+        self.sites.table.remove(to_be_removed.pop())
 
+  
+  def write(self, suffix='sv'):
+    fn = '%s%s.%s' % (suffix, self.cal_id, self.suffix)
+    fd = open(fn, 'w')
+
+    header = ['site_id', 'id', 'bearing']
+    for i in range(num_ch): header.append('sv%d' % (i+1))
+    fd.write(self.delim.join(header) + '\n')
+    
+    for (site_id, sv) in self.steering_vectors.iteritems():
+      for i in range(sv.shape[0]):
+        line = [site_id, self.svID[site_id][i], self.bearings[site_id][i]] 
+        line += list(sv[i])
+        fd.write(self.delim.join(map(lambda x: str(x), line)) + '\n')
+   
+
+  @classmethod
+  def read(cls, cal_id, suffix='sv'):
+    sv = cls()
+    fn = '%s%s.%s' % (suffix, cal_id, sv.suffix)
+    fd = open(fn, 'r')
+
+    header = fd.readline()
+    for line in fd.readlines():
+      row = line.split(sv.delim)
+      site_id = int(row[0])
+      if sv.steering_vectors.get(site_id) is None:
+        sv.steering_vectors[site_id] = []
+        sv.bearings[site_id] = []
+        sv.svID[site_id] = []
+        
+      sv.svID[site_id].append(int(row[1]))
+      sv.bearings[site_id].append(float(row[2]))
+      sv.steering_vectors[site_id].append(map(lambda x: np.complex(x), row[3:]))
+    return sv
+  
+
+    
 
 
 ### class Signal. #############################################################
 
 class Signal:
 
-  def __init__(self, db_con, dep_id, t_start, t_end, score_threshold=0):
+  def __init__(self, db_con=None, dep_id=None, t_start=0, t_end=0, score_threshold=0):
    
     ''' Represent signals in the `qraat.est` table ($V$, $\Sigma$, $sigma$).
     
@@ -120,55 +162,59 @@ class Signal:
     '''
 
     self.table = {}
-    cur = db_con.cursor()
-    ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
-                               ed1r,  ed1i,  ed2r,  ed2i,  
-                               ed3r,  ed3i,  ed4r,  ed4i, tnp,
-                               nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
-                               nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
-                               nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
-                               nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i 
-                          FROM est
-                          JOIN estscore ON est.ID = estscore.estID
-                         WHERE deploymentID= %s
-                           AND timestamp >= %s 
-                           AND timestamp <= %s
-                           AND (score / theoretical_score) >= %s
-                         ORDER BY timestamp''', 
-              (dep_id, t_start, t_end, score_threshold))
- 
-    if ct:
-      raw_data = np.array(cur.fetchall(), dtype=float)
-      est_ids = np.array(raw_data[:,0], dtype=int)
-      self.max_est_id = np.max(est_ids)
-      site_ids = np.array(raw_data[:,1], dtype=int)
-      timestamps = raw_data[:,2]
-      edsp = raw_data[:,3]
-      signal_vector = np.zeros((raw_data.shape[0], num_ch),dtype=np.complex)
-      for j in range(num_ch):
-        signal_vector[:,j] = raw_data[:,2*j+4] + np.complex(0,-1)*raw_data[:,2*j+5]
+    self.t_start = float("+inf")
+    self.t_end =   float("-inf")
+    
+    if db_con: 
+      cur = db_con.cursor()
+      ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
+                                 ed1r,  ed1i,  ed2r,  ed2i,  
+                                 ed3r,  ed3i,  ed4r,  ed4i, tnp,
+                                 nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+                                 nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+                                 nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+                                 nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i 
+                            FROM est
+                            JOIN estscore ON est.ID = estscore.estID
+                           WHERE deploymentID= %s
+                             AND timestamp >= %s 
+                             AND timestamp <= %s
+                             AND (score / theoretical_score) >= %s
+                           ORDER BY timestamp''', 
+                (dep_id, t_start, t_end, score_threshold))
+   
+      if ct:
+        raw_data = np.array(cur.fetchall(), dtype=float)
+        est_ids = np.array(raw_data[:,0], dtype=int)
+        self.max_est_id = np.max(est_ids)
+        site_ids = np.array(raw_data[:,1], dtype=int)
+        timestamps = raw_data[:,2]
+        edsp = raw_data[:,3]
+        signal_vector = np.zeros((raw_data.shape[0], num_ch),dtype=np.complex)
+        for j in range(num_ch):
+          signal_vector[:,j] = raw_data[:,2*j+4] + np.complex(0,-1)*raw_data[:,2*j+5]
 
-      tnp = raw_data[:,12]
-      noise_cov = np.zeros((raw_data.shape[0],num_ch,num_ch),dtype=np.complex)
-      for t in range(raw_data.shape[0]):      
-        for i in range(num_ch):
-          for j in range(num_ch):
-            k = 13 + (i*num_ch*2) + (2*j)
-            noise_cov[t,i,j] = np.complex(raw_data[t,k], raw_data[t,k+1])
+        tnp = raw_data[:,12]
+        noise_cov = np.zeros((raw_data.shape[0],num_ch,num_ch),dtype=np.complex)
+        for t in range(raw_data.shape[0]):      
+          for i in range(num_ch):
+            for j in range(num_ch):
+              k = 13 + (i*num_ch*2) + (2*j)
+              noise_cov[t,i,j] = np.complex(raw_data[t,k], raw_data[t,k+1])
 
-      for site_id in set(site_ids):
-        site = _per_site_data(site_id)
-        site.est_ids = est_ids[site_ids == site_id]
-        site.t = timestamps[site_ids == site_id]
-        site.edsp = edsp[site_ids == site_id] # a.k.a. power
-        site.signal_vector = signal_vector[site_ids == site_id]
-        site.tnp = tnp[site_ids == site_id]
-        site.noise_cov = noise_cov[site_ids == site_id]
-        site.count = np.sum(site_ids == site_id)
-        self.table[site_id] = site
+        for site_id in set(site_ids):
+          site = _per_site_data(site_id)
+          site.est_ids = est_ids[site_ids == site_id]
+          site.t = timestamps[site_ids == site_id]
+          site.edsp = edsp[site_ids == site_id] # a.k.a. power
+          site.signal_vector = signal_vector[site_ids == site_id]
+          site.tnp = tnp[site_ids == site_id]
+          site.noise_cov = noise_cov[site_ids == site_id]
+          site.count = np.sum(site_ids == site_id)
+          self.table[site_id] = site
 
-      self.t_start = np.min(timestamps)
-      self.t_end = np.max(timestamps)
+        self.t_start = np.min(timestamps)
+        self.t_end = np.max(timestamps)
   
   def __getitem__(self, *index):
     if len(index) == 1: 
@@ -182,6 +228,22 @@ class Signal:
 
   def __len__(self):
     return len(self.table)
+
+  def write(self):
+    for (id, site) in self.table.iteritems():
+      site.write()
+
+  @classmethod
+  def read(cls, site_ids):
+    sig = cls()
+    for id in site_ids:  
+      sig.table[id] = _per_site_data(id)
+      sig.table[id].read()
+      sig.t_start = min(sig.t_start, 
+                        min(sig.table[id].t))
+      sig.t_end = max(sig.t_end, 
+                      max(sig.table[id].t))
+    return sig
 
   def get_site_ids(self):
     ''' Return a list of site ID's. ''' 
@@ -199,6 +261,9 @@ class Signal:
 
 
 class _per_site_data: 
+  
+  delim = '\t'
+  suffix = 'csv'
 
   def __init__(self, site_id):
   
@@ -222,6 +287,50 @@ class _per_site_data:
     
   def __len__(self):
     return self.count
+
+  def read(self, suffix='sig'):
+    fn = '%s%d.%s' % (suffix, self.site_id, self.suffix)
+    fd = open(fn, 'r')
+    
+    id = []; t = []; edsp = []
+    tnp = []; ed = []; nc = []
+    header = fd.readline()
+    for line in fd.readlines():
+      row = line.split(self.delim)
+      id.append(int(row[0]))
+      t.append(float(row[1]))
+      edsp.append(float(row[2]))
+      tnp.append(float(row[3]))
+      ed.append(map(lambda x : np.complex(x), row[4:4+num_ch]))
+      nc.append(map(lambda x : np.complex(x), row[4+num_ch:]))
+    self.count = len(id)
+    self.est_ids = np.array(id)
+    self.t = np.array(t)
+    self.edsp = np.array(edsp)
+    self.tnp = np.array(tnp)
+    self.signal_vector = np.array(ed)
+    self.noise_cov = np.array(nc).reshape((self.count, num_ch, num_ch))
+
+  def write(self, suffix='sig'):
+    fn = '%s%d.%s' % (suffix, self.site_id, self.suffix)
+    fd = open(fn, 'w')
+    
+    header = ['id', 't', 'edsp', 'tnp'] 
+    for i in range(num_ch): header.append('ed%d' % (i+1))
+    for i in range(num_ch): 
+      for j in range(num_ch): 
+        header.append('ed%d%d' % (i+1, j+1))
+    fd.write(self.delim.join(header) + '\n')
+
+    for (id, t, edsp, tnp, ed, nc) in zip(self.est_ids.tolist(), 
+                                          self.t.tolist(), 
+                                          self.edsp.tolist(),
+                                          self.tnp.tolist(),
+                                          self.signal_vector.tolist(),
+                                          list(self.noise_cov)):
+      row = [id, t, edsp, tnp] + ed + list(nc.flat)
+      fd.write(self.delim.join(map(lambda x: str(x), row)) + '\n')
+  
 
   def p(self, sv): 
     ''' Compute p(V | theta) in the signal model.  
