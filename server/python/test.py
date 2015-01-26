@@ -1,4 +1,7 @@
-# Test code for position estimation. 
+# Test code for position estimation. To run, you'll need the following
+# Python packages:
+#  utm, numdifftools (available through pip)
+#  numpy, scipy, matplotlib 
 
 import signal1, position1
 
