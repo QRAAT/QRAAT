@@ -29,7 +29,8 @@ sv = signal1.SteeringVectors.read(cal_id)
 # Read signal data, about an hour's worth.
 sig = signal1.Signal.read(sites.keys())
 
-# Estimate position using all data. 
+# Estimate position using all data. To use the MLE instead 
+# of Bartlet's, do `method=signal1.Signal.MLE`. 
 pos = position1.PositionEstimator(dep_id, sites, center, sig, sv,
                 method=signal1.Signal.Bartlet)
 
