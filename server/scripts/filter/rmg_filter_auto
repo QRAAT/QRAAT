@@ -114,7 +114,7 @@ try:
   print "filter_auto: updated processing_cursor to est.ID=%d." % max_id 
   ending_index = max_id
   duration = time.time() - start
-  cur.execute('INSERT INTO processing_statistics (timestamp, duration, process, beginning_index, ending_index, number_records_input, number_records_output) VALUES (%s, %s, \'filter_auto\', %s, %s, %s, %s, %s)', (int(start), duration, beginning_index, ending_index, total_input, total_output))
+  cur.execute('INSERT INTO processing_statistics (timestamp, duration, process, beginning_index, ending_index, number_records_input, number_records_output) VALUES (%s, %s, \'filter_auto\', %s, %s, %s, %s)', (int(start), duration, beginning_index, ending_index, total_input, total_output))
 
 #except mdb.Error, e:
 #  print >>sys.stderr, "filter_auto: error: [%d] %s" % (e.args[0], e.args[1])
