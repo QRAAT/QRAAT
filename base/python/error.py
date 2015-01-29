@@ -42,3 +42,6 @@ class ResolveIdError (QraatError):
     return "could not resolve foreign key(s) for table row with %s as %s from file %s" % (
       self.id_str, self.row_str, self.filename)
 
+class PLL_LockError (QraatError):
+  def __init__(self):
+    QraatError.__init__(self, "PLL not locked", 2)

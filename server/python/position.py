@@ -341,6 +341,122 @@ def handle_provenance_insertion(cur, depends_on, obj):
 
 
 
+def plot_search_space(_estimator, sv, pos_id, p_hat, p_ll, center, scale, half_span):
+  ''' Plot search space, return point of maximum likelihood. '''
+   
+  positions = _estimator.get_candidate_positions(center, scale, half_span)
+  pos_likelihood = _estimator.get_position_likelihood(positions)
+  
+  fig = pp.gcf()
+  
+  # Transform to plot's coordinate system.
+  e = lambda(x) : ((x - center.imag) / scale) + half_span
+  n = lambda(y) : ((y - center.real) / scale) + half_span 
+  
+  x_left =  center.imag - (half_span * scale)
+  x_right = center.imag + (half_span * scale)
+  
+  # Search space
+  p = pp.imshow(pos_likelihood.transpose(), 
+      origin='lower',
+      extent=(0, half_span * 2, 0, half_span * 2),
+      cmap='YlGnBu',
+      aspect='auto', interpolation='nearest')
+
+  # Sites
+  pp.scatter(
+    [e(float(s.easting)) for s in sv.sites],
+    [n(float(s.northing)) for s in sv.sites],
+     s=15, facecolor='0.5', label='sites', zorder=10)
+  
+  # Pos. estimate
+  pp.plot(e(p_hat.imag), n(p_hat.real), 'wo', label='position', zorder=11)
+
+  pp.clim()   # clamp the color limits
+  pp.legend()
+  pp.axis([0, half_span * 2, 0, half_span * 2])
+  
+  t = time.localtime((_estimator.t_start + _estimator.t_stop) / 2)
+  pp.title('%04d-%02d-%02d %02d%02d:%02d depID=%d' % (
+       t.tm_year, t.tm_mon, t.tm_mday,
+       t.tm_hour, t.tm_min, t.tm_sec,
+       deploymentID))
+  
+  #pp.savefig('pos%d.png' % pos_id)
+  pp.savefig('pos.png')
+  pp.clf()
+ 
+  # The gradient vector del_f of the search space
+  (d_e, d_n) = np.gradient(pos_likelihood)
+  v = p_hat - positions
+  u = v / np.abs(v)
+
+  # Second derivative with respect to vector along bearing to p_hat
+  deriv = np.zeros(shape=pos_likelihood.shape, dtype=np.float64)
+  for i in range(u.shape[0]):
+    for j in range(u.shape[1]):
+      deriv[i,j] = u[i,j].imag * d_e[i,j] + u[i,j].real * d_n[i,j]
+  (d_e, d_n) = np.gradient(deriv)
+  deriv = np.zeros(shape=pos_likelihood.shape, dtype=np.float64)
+  for i in range(u.shape[0]):
+    for j in range(u.shape[1]):
+      deriv[i,j] = u[i,j].imag * d_e[i,j] + u[i,j].real * d_n[i,j]
+      #if deriv[i,j] > 0: 
+      #  deriv[i,j] = 100
+      #else: deriv[i,j] = 0
+
+  #i = e(p_hat.imag)
+  #j = n(p_hat.real)
+  #deriv[i,j] = 0
+  #print deriv[i-2:i+3,j-2:j+3]
+  
+  p = pp.imshow(deriv.transpose(), 
+      origin='lower',
+      extent=(0, half_span * 2, 0, half_span * 2),
+      cmap = 'YlGnBu',
+      aspect='auto', interpolation='nearest')
+
+  # Sites
+  pp.scatter(
+    [e(float(s.easting)) for s in sv.sites],
+    [n(float(s.northing)) for s in sv.sites],
+     s=15, facecolor='0.5', label='sites', zorder=10)
+  
+  # Pos. estimate
+  pp.plot(e(p_hat.imag), n(p_hat.real), 'wo', label='position', zorder=11)
+
+  pp.clim()   # clamp the color limits
+  pp.legend()
+  pp.axis([0, half_span * 2, 0, half_span * 2])
+  
+  pp.title('%04d-%02d-%02d %02d%02d:%02d depID=%d' % (
+       t.tm_year, t.tm_mon, t.tm_mday,
+       t.tm_hour, t.tm_min, t.tm_sec,
+       deploymentID))
+
+  #pp.savefig('deriv%d.png' % pos_id)
+  pp.savefig('deriv.png')
+  pp.clf()
+
+  # Level sets
+  #  c_step = p_ll / 10
+  #  for (index, c) in enumerate(np.arange(0, p_ll, c_step)):
+  #    level = np.zeros(shape=pos_likelihood.shape, dtype=np.float64)
+  #    for i in range(level.shape[0]):
+  #      for j in range(level.shape[1]):
+  #        if c <= pos_likelihood[i,j] and pos_likelihood[i,j] < c + c_step:
+  #          level[i,j] = 100
+  #    p = pp.imshow(level.transpose(), 
+  #        origin='lower',
+  #        extent=(0, half_span * 2, 0, half_span * 2),
+  #        cmap = 'YlGnBu',
+  #        aspect='auto', interpolation='nearest')
+  #    pp.clim()
+  #    pp.savefig('lset%02d.png' % index)
+  #    pp.clf()
+    
+
+
 ##############################################
 # below this line is depricated, I think -Todd
 ##############################################
