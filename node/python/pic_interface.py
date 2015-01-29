@@ -79,107 +79,107 @@ class pic_interface:
     self.ser.write('s')
     time.sleep(.1)
 
-    def reset_pic(self):
-      """ Reset the PIC< wait a few seconds to come back up. """
-      self.ser.write('0')
-      time.sleep(1.5)
+  def reset_pic(self):
+    """ Reset the PIC< wait a few seconds to come back up. """
+    self.ser.write('0')
+    time.sleep(1.5)
 
-    def change_contrast(self, t):
-      """ Change the contrast of the LCD. """
-      if t > 0 and t < 10:
-        self.ser.write('t')
-        time.sleep(.05)
-        setting = '%d\r' % (t,)
-        self.ser.write(setting)
-      else:
-        raise ValueError
-
-    def lcd_print(self, string, row = 1, col = 1):
-      """ Print a string to the LCD. """
-      self.ser.write('p')
+  def change_contrast(self, t):
+    """ Change the contrast of the LCD. """
+    if t > 0 and t < 10:
+      self.ser.write('t')
       time.sleep(.05)
-      self.ser.write('%d\r' %(row, ))
-      self.ser.write('%d\r' %(col, ))
-      self.ser.write('%s\r' %(string, ))
+      setting = '%d\r' % (t,)
+      self.ser.write(setting)
+    else:
+      raise ValueError
 
-    def inc_freq(self):
-      """ Increment the PLL frequency by one step. """
-      self.ser.write('+')
-      time.sleep(.1)
+  def lcd_print(self, string, row = 1, col = 1):
+    """ Print a string to the LCD. """
+    self.ser.write('p')
+    time.sleep(.05)
+    self.ser.write('%d\r' %(row, ))
+    self.ser.write('%d\r' %(col, ))
+    self.ser.write('%s\r' %(string, ))
 
-    def dec_freq(self):
-      """ Decrement the PLL frequency by one step. """
-      self.ser.write('-')
-      time.sleep(.1)
+  def inc_freq(self):
+    """ Increment the PLL frequency by one step. """
+    self.ser.write('+')
+    time.sleep(.1)
 
-    def use_high_lo(self):
-      """ Set LCD to display frequency based on High LO. """ 
-      self._change_lo(1)
+  def dec_freq(self):
+    """ Decrement the PLL frequency by one step. """
+    self.ser.write('-')
+    time.sleep(.1)
 
-    def use_low_lo(self):
-      """ Set LCD to display frequency based on Low LO. """ 
-      self._change_lo(2)
+  def use_high_lo(self):
+    """ Set LCD to display frequency based on High LO. """ 
+    self._change_lo(1)
 
-    def use_no_lo(self):
-      """ Set LCD to display frequency of the PLL. """ 
-      self._change_lo(0)
+  def use_low_lo(self):
+    """ Set LCD to display frequency based on Low LO. """ 
+    self._change_lo(2)
 
-    def _change_lo(self, n):
-      """ Do the change in display frequency calculation """ 
-      self.ser.write('a')
-      time.sleep(.8)
-      self.ser.write('o')
-      time.sleep(.05)
-      self.ser.write('%d\r' %(n,))
-      time.sleep(.05)
-      self.ser.write('a')
-      time.sleep(.8)
-      self.lo = n
-      self._flush_buffer()
+  def use_no_lo(self):
+    """ Set LCD to display frequency of the PLL. """ 
+    self._change_lo(0)
 
-    def _flush_buffer(self):
-      """ Flush the read buffer of the serial connection. 
-               
-          This relies on the timeout argument. 
-          """
+  def _change_lo(self, n):
+    """ Do the change in display frequency calculation """ 
+    self.ser.write('a')
+    time.sleep(.8)
+    self.ser.write('o')
+    time.sleep(.05)
+    self.ser.write('%d\r' %(n,))
+    time.sleep(.05)
+    self.ser.write('a')
+    time.sleep(.8)
+    self.lo = n
+    self._flush_buffer()
+
+  def _flush_buffer(self):
+    """ Flush the read buffer of the serial connection. 
+             
+        This relies on the timeout argument. 
+        """
+    buff = self.ser.readline()
+    while not buff == '':
       buff = self.ser.readline()
-      while not buff == '':
+
+  def __del__(self):
+    """ Close the serial connection. """
+    self.ser.close()
+
+  def check(self, in_freq):
+    """ Verify the PLL frequency. 
+     
+        :param in_freq: Expected frequency in Hz. 
+        :type in_freq: int
+        :rtype: boolean
+    """
+    self._read()
+    out = (self.freq == in_freq) and self.w and self.lock
+    return out
+
+  def print_status(self):
+    """ Print frequency to the terminal. """ 
+    self._read()
+    print "Frequency: {0:d} Hz, Write: {1}, Lock: {2}".format(self.freq, self.w, self.lock)
+
+  def check_lo(self):
+    """ Get the current LO display setting. """ 
+    if self.lo == -1:
+      self._flush_buffer()
+      self.ser.write('a')
+      for j in range(12):
         buff = self.ser.readline()
-
-    def __del__(self):
-      """ Close the serial connection. """
-      self.ser.close()
-
-    def check(self, in_freq):
-      """ Verify the PLL frequency. 
-       
-          :param in_freq: Expected frequency in Hz. 
-          :type in_freq: int
-          :rtype: boolean
-      """
-      self._read()
-      out = (self.freq == in_freq) and self.w and self.lock
-      return out
-
-    def print_status(self):
-      """ Print frequency to the terminal. """ 
-      self._read()
-      print "Frequency: {0:d} Hz, Write: {1}, Lock: {2}".format(self.freq, self.w, self.lock)
-
-    def check_lo(self):
-      """ Get the current LO display setting. """ 
-      if self.lo == -1:
-        self._flush_buffer()
-        self.ser.write('a')
-        for j in range(12):
-          buff = self.ser.readline()
-        result = buff[28:].rstrip()
-        print result
-        self.lo = lo_str.index(result)
-        print self.lo
-        self.ser.write('a')
-        self._flush_buffer()
-      return self.lo
+      result = buff[28:].rstrip()
+      print result
+      self.lo = lo_str.index(result)
+      print self.lo
+      self.ser.write('a')
+      self._flush_buffer()
+    return self.lo
 
 #Test code for the module
 if __name__ == "__main__":
