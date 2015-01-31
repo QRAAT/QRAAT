@@ -134,14 +134,17 @@ class detector_array:
         if not self.sc is None:
             self.sc.tune(freq)
             if not self.sc.check(freq):
-                print "Pic frequency error"
-                print "Reseting PIC"
-                self.sc.reset_pic()
+                print "Pic frequency error, retry"
                 self.sc.tune(freq)
-                if self.sc.check(freq):
-                     print "Pic frequency error"
-                     self.sc.print_status()
-                     raise qraat.error.PLL_LockError()
+                if not self.sc.check(freq):
+                    print "Pic frequency error"
+                    print "Reseting PIC"
+                    self.sc.reset_pic()
+                    self.sc.tune(freq)
+                    if not self.sc.check(freq):
+                        print "Pic frequency error"
+                        self.sc.print_status()
+                        raise qraat.error.PLL_LockError()
 
      
     ## public runnables ##
