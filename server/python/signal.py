@@ -39,6 +39,7 @@ SCORE_ERROR = lambda(x) : 0.1255                             # const_high
 # from particularly noisy, but it may not be enough to trigger the burst 
 # filter.
 # Valid range is MIN_DRIFT_PRECENTAGE*Rate to (2-MIN_DRIFT_PRECENTAGE)*Rate
+#    or +/- (1-MIN_DRIFT_PERCENTAGE)
 MIN_DRIFT_PERCENTAGE = 0.33
 
 # Eliminate noisy intervals. 
@@ -99,12 +100,14 @@ def Filter(db_con, dep_id, t_start, t_end, param_filter=True):
     for site_id in sites: 
       data[site_id] = get_est_data(db_con, dep_id, site_id, augmented_interval)
         
-
+    no_data = True
     for site_id in sites:
       
       if data[site_id].shape[0] == 0: # Skip empty chunks.
         debug_output("siteID=%s: skipping empty chunk" % site_id)
         continue
+      else:
+        no_data = False
 
       debug_output("siteID=%s: processing %.2f to %.2f (%d pulses)" % (site_id,
                                                                        interval[0], 
@@ -117,23 +120,23 @@ def Filter(db_con, dep_id, t_start, t_end, param_filter=True):
       if data[site_id].shape[0] >= BURST_THRESHOLD: 
         burst_filter(data[site_id], augmented_interval)
 
-    (pulse_interval, pulse_variation) = expected_pulse_interval(data, tx_params['pulse_rate'])
+    if not no_data:
+      (pulse_interval, pulse_variation) = expected_pulse_interval(data, tx_params['pulse_rate'])
 
     for site_id in sites:
 
-      # Tbe only way to coroborate isolated points is with other sites. 
+      # The only way to coroborate isolated points is with other sites. 
       if data[site_id].shape[0] > 2 and pulse_interval > 0:
         time_filter(data[site_id], pulse_interval, pulse_variation)
+        interval_data[site_id].append((interval[0], float(pulse_interval) / TIMESTAMP_PRECISION, pulse_variation))
       
       # When inserting, exclude overlapping points.
-      (count, id) = update_estscore(db_con, 
-         data[site_id][(data[site_id][:,2] >= (interval[0] * TIMESTAMP_PRECISION)) & 
-                       (data[site_id][:,2] <  (interval[1] * TIMESTAMP_PRECISION))])
-
-      interval_data[site_id].append((interval[0], float(pulse_interval) / TIMESTAMP_PRECISION, pulse_variation))
-  
-      total += count
-      max_id = id if max_id < id else max_id
+      if data[site_id].shape[0] > 0:
+        (count, id) = update_estscore(db_con, 
+          data[site_id][(data[site_id][:,2] >= (interval[0] * TIMESTAMP_PRECISION)) * 
+                        (data[site_id][:,2] <  (interval[1] * TIMESTAMP_PRECISION))])
+        total += count
+        max_id = id if max_id < id else max_id
   
   for site_id in sites:
     update_intervals(db_con, dep_id, site_id, interval_data[site_id])
