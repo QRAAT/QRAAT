@@ -38,8 +38,8 @@ from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
 import numdifftools as nd
 import utm
 
-HALF_SPAN = 15         # Meters
-SCALE_LIMIT = 1        # Meters
+HALF_SPAN = 15         
+SCALE = 10             # Meters
 ELLIPSE_PLOT_SCALE = 5 # Scaling factor
 
 
@@ -154,7 +154,7 @@ class Position:
                                   P, signal, obj, t_start, t_end)
     
     if len(splines) > 1: # Need at least two site bearings. 
-      p_hat, likelihood = compute_position(sites, splines, center, obj, half_span=HALF_SPAN)
+      p_hat, likelihood = compute_position(sites, splines, center, obj)
     else: p_hat, likelihood = None, None
      
     # Return a position object. 
@@ -313,7 +313,7 @@ def compute_likelihood(sites, splines, center, scale, half_span):
   return (positions, likelihoods)
 
 
-def compute_position(sites, splines, center, obj, half_span=HALF_SPAN): 
+def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=1, delta=SCALE):
   ''' Maximize (resp. minimize) over position space. 
 
     A simple, speedy algorithm for finding the most likely source of a 
@@ -336,22 +336,20 @@ def compute_position(sites, splines, center, obj, half_span=HALF_SPAN):
     
       Returns UTM position estimate as a complex number. 
   '''
-  scale = 100.0
   p_hat = center
-  while scale >= SCALE_LIMIT:
-  
+  for i in reversed(range(-n, m)):
+    scale = pow(delta, i)
     (positions, likelihoods) = compute_likelihood(
-                           sites, splines, p_hat, scale, half_span)
+                           sites, splines, p_hat, scale, s)
     
     index = obj(likelihoods)
     p_hat = positions.flat[index]
     likelihood = likelihoods.flat[index]
-    scale /= 10
 
   return p_hat, likelihood
 
 
-def compute_covariance(p, sites, splines, half_span=HALF_SPAN * 10, scale=SCALE_LIMIT):
+def compute_covariance(p, sites, splines, half_span=HALF_SPAN * 10, scale=0.1):
   ''' Compute covariance matrix of position estimate `p`. 
 
     Assuming the estimate follows a bivariate normal distribution. 
@@ -375,7 +373,7 @@ def compute_covariance(p, sites, splines, half_span=HALF_SPAN * 10, scale=SCALE_
   return C
 
 
-def compute_conf(C, level=0.95, scale=SCALE_LIMIT):
+def compute_conf(C, level=0.95, scale=1):
   ''' Compute a confidence ellipse of a covariance matrix.
 
     Return a tuple (x, alpha), where x[0] gives the magnitude of the major 
