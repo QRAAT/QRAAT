@@ -40,7 +40,7 @@ import utm
 
 HALF_SPAN = 15         # Meters
 SCALE_LIMIT = 1        # Meters
-ELLIPSE_PLOT_SCALE = 3 # Scaling factor
+ELLIPSE_PLOT_SCALE = 5 # Scaling factor
 
 
 
@@ -209,6 +209,9 @@ class Position:
         cmap='YlGnBu',
         aspect='auto', interpolation='nearest')
 
+    cbar = fig.colorbar(p, ticks=[np.min(likelihoods), np.max(likelihoods)])
+    cbar.ax.set_yticklabels(['low', 'high'])# vertically oriented colorbar
+    
     # Sites
     pp.scatter(
       [e(float(s.imag)) for s in sites.values()],
@@ -227,8 +230,8 @@ class Position:
         ellipse.set_alpha(0.2)
         ellipse.set_facecolor([1.0,1.0,1.0])
       else: print "Skipping non-positive definite cov. matrix"
-      pp.plot(e(self.p.imag), n(self.p.real), 
-            'w.', markersize=2.0,  label='position', zorder=11)
+      pp.scatter([e(self.p.imag)], [n(self.p.real)], 
+            facecolor='1.0', label='position', zorder=11)
 
     pp.clim()   # clamp the color limits
     pp.legend()
