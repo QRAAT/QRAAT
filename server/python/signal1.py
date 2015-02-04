@@ -15,6 +15,10 @@
 #  [GJ06] Riccardo Gatto, Sreenivasa Rao Jammalamadaka. "The generalized 
 #         von Mises distribution." In Statistical Methodology, 2006. 
 #
+# TODO Faster mle() and approx_mle() via some sort of parallelized map? 
+#      Perhaps np.vectorize()?
+#
+# TODO Update SteeringVectors to handle arbitrary bearing sets. 
 #
 # Copyright (C) 2015 Chris Patton, Todd Borrowman
 # 
@@ -252,12 +256,17 @@ class Signal:
   @classmethod
   def MLE(self, per_site_data, sv):
     assert isinstance(per_site_data, _per_site_data)
-    return per_site_data.MLE(sv)
+    return (per_site_data.mle(sv), np.argmax)
+
+  @classmethod
+  def FastMLE(self, per_site_data, sv):
+    assert isinstance(per_site_data, _per_site_data)
+    return (per_site_data.approx_mle(sv), np.argmin)
   
   @classmethod
   def Bartlet(self, per_site_data, sv):
     assert isinstance(per_site_data, _per_site_data)
-    return per_site_data.Bartlet(sv)
+    return (per_site_data.bartlet(sv), np.argmax)
 
 
 class _per_site_data: 
@@ -332,11 +341,12 @@ class _per_site_data:
       fd.write(self.delim.join(map(lambda x: str(x), row)) + '\n')
   
 
-  def p(self, sv): 
-    ''' Compute p(V | theta) in the signal model.  
-    
-      The Hermation operator, as in $V^H$ or $G_i(\theta)^H in the equations, 
-      is written here as `np.conj(np.transpose())`. 
+  def mle(self, sv): 
+    ''' ML estimator for DOA given the model. Ue `argmax`. 
+      
+      Compute ln(f(V | theta)). The Hermation operator, as in $V^H$ or 
+      $G_i(\theta)^H in the equations, is written here as 
+      `np.conj(np.transpose())`. 
 
       Input: sv -- instance of `class SteeringVectors`.
     ''' 
@@ -351,11 +361,11 @@ class _per_site_data:
         R = np.linalg.inv(R)
         a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
                        np.dot(R, np.transpose(V[i])))
-        p[i,j] = np.exp(-np.abs(a.flat[0])) / (det * pi_n)
+        p[i,j] = -np.log(det * pi_n) - np.abs(a.flat[0])
     return p
 
-  def MLE(self, sv):
-    ''' ML estimator for DOA given the model. Use `argmin`. '''
+  def approx_mle(self, sv):
+    ''' Faster approximation of ML estimator. Use `argmin`. '''
     p = np.zeros((self.count, 360), dtype=np.float)
     V = np.matrix(self.signal_vector)
     for j in range(360):
@@ -363,14 +373,13 @@ class _per_site_data:
       G = np.dot(G, np.conj(np.transpose(G)))
       for i in range(self.count):
         R = G + (self.noise_cov[i] / self.edsp[i])
-        det = np.abs(np.linalg.det(R))
         R = np.linalg.inv(R)
         a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
                        np.dot(R, np.transpose(V[i])))
-        p[i,j] = np.abs(a.flat[0]) + np.log(det) 
+        p[i,j] = np.abs(a.flat[0])
     return p
 
-  def Bartlet(self, sv): 
+  def bartlet(self, sv): 
     ''' Bartlet's estimator for DOA. Use `argmax`. ''' 
     V = self.signal_vector 
     G = sv.steering_vectors[self.site_id] 

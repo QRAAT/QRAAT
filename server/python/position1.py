@@ -66,13 +66,9 @@ def PositionEstimator(dep_id, sites, center, signal, sv, method=signal1.Signal.B
 
     Returns UTM position estimate as a complex number. 
   ''' 
-  if method == signal1.Signal.Bartlet: obj = np.argmax
-  elif method == signal1.Signal.MLE:   obj = np.argmin
-  else: obj = np.argmax
-  
   P = {} # Compute bearing likelihood distributions.  
   for site_id in signal.get_site_ids():
-    P[site_id] = method(signal[site_id], sv)
+    (P[site_id], obj) = method(signal[site_id], sv)
 
   return Position.calc(dep_id, P, signal, obj, sites, center,
                                     signal.t_start, signal.t_end)
@@ -91,15 +87,11 @@ def WindowedPositionEstimator(dep_id, sites, center, signal, sv, t_step, t_win,
 
     Returns a sequence of UTM positions. 
   ''' 
-  if method == signal1.Signal.Bartlet: obj = np.argmax
-  elif method == signal1.Signal.MLE:   obj = np.argmin
-  else: obj = np.argmax
-  
   positions = []
 
   P = {} # Compute bearing likelihood distributions. 
   for site_id in signal.get_site_ids():
-    P[site_id] = method(signal[site_id], sv)
+    (P[site_id], obj) = method(signal[site_id], sv)
   
   for (t_start, t_end) in util.compute_time_windows(
                       signal.t_start, signal.t_end, t_step, t_win):
@@ -180,7 +172,9 @@ class Position:
   def get_likelihood(self):
     ''' Return normalized position likelihood. ''' 
     if self.likelihood and self.num_sites > 0:
-      return self.likelihood / self.num_sites
+      # NOTE if aggregate bearings are normalised, 
+      # divide by self.num_sites. See aggregate_spectrum()
+      return self.likelihood / self.num_est
     else: return None
   
   def get_activity(self): 
@@ -269,7 +263,7 @@ def aggregate_window(P, signal, obj, t_start, t_end):
     mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
     edsp = signal[id].edsp[mask]
     if edsp.shape[0] > 0:
-      l = aggregate_bearing(L[mask])
+      l = aggregate_spectrum(L[mask])
       splines[id] = compute_bearing_spline(l)
       activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
       theta = obj(l); bearing[id] = (theta, l[theta])
@@ -278,19 +272,18 @@ def aggregate_window(P, signal, obj, t_start, t_end):
   return (splines, bearing, activity, num_est)
 
 
-def aggregate_bearing(p):
+def aggregate_spectrum(p):
   ''' Sum a set of bearing likelihoods. '''
-  # Average the likelihoods of the pulses for each bearing. TODO The idea here 
-  # is that multiplie data may bias the result of the DOA or position estimator. 
-  # Is there anything wrong with this? 
-  return np.sum(p, 0) / p.shape[0]
+  # NOTE normalising by the number of pulses effectively
+  # reduces the sample size. 
+  return np.sum(p, 0)# / p.shape[0]
 
 
 def compute_bearing_spline(l): 
   ''' Interpolate a spline on a bearing likelihood distribuiton. 
     
     Input an aggregated bearing distribution, e.g. the output of 
-    `aggregate_bearing(p)` where p is the output of `_per_site_data.mle()` 
+    `aggregate_spectrum(p)` where p is the output of `_per_site_data.mle()` 
     or `_per_site_data.bartlet()`.
   '''
   bearing_domain = np.arange(-360,360)         
