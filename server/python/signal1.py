@@ -259,11 +259,6 @@ class Signal:
     return (per_site_data.mle(sv), np.argmax)
 
   @classmethod
-  def FastMLE(self, per_site_data, sv):
-    assert isinstance(per_site_data, _per_site_data)
-    return (per_site_data.approx_mle(sv), np.argmin)
-  
-  @classmethod
   def Bartlet(self, per_site_data, sv):
     assert isinstance(per_site_data, _per_site_data)
     return (per_site_data.bartlet(sv), np.argmax)
@@ -342,7 +337,7 @@ class _per_site_data:
   
 
   def mle(self, sv): 
-    ''' ML estimator for DOA given the model. Ue `argmax`. 
+    ''' ML estimator for DOA given the model. Use `argmax`. 
       
       Compute ln(f(V | theta)). The Hermation operator, as in $V^H$ or 
       $G_i(\theta)^H in the equations, is written here as 
@@ -362,21 +357,6 @@ class _per_site_data:
         a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
                        np.dot(R, np.transpose(V[i])))
         p[i,j] = -np.log(det * pi_n) - np.abs(a.flat[0])
-    return p
-
-  def approx_mle(self, sv):
-    ''' Faster approximation of ML estimator. Use `argmin`. '''
-    p = np.zeros((self.count, 360), dtype=np.float)
-    V = np.matrix(self.signal_vector)
-    for j in range(360):
-      G = np.matrix(sv.steering_vectors[self.site_id][j]).transpose()
-      G = np.dot(G, np.conj(np.transpose(G)))
-      for i in range(self.count):
-        R = G + (self.noise_cov[i] / self.edsp[i])
-        R = np.linalg.inv(R)
-        a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
-                       np.dot(R, np.transpose(V[i])))
-        p[i,j] = np.abs(a.flat[0])
     return p
 
   def bartlet(self, sv): 
