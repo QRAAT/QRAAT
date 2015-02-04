@@ -13,6 +13,9 @@
 #         Advances. Edited by Seyad A. Zekevat, R. Michael 
 #         Beuhrer.
 #
+# TODO Does aggregating the bearing spectra for the same site 
+#      and computing a spline over the sum *bad*? 
+#
 # Copyright (C) 2015 Todd, Borrowman, Chris Patton
 # 
 # This program is free software: you can redistribute it and/or modify
