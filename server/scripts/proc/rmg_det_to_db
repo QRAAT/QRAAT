@@ -27,7 +27,7 @@ import qraat.srv
 
 # Check for running instances of this program. 
 (status, output) = commands.getstatusoutput(
-  'pgrep -c `basename %s`' % (sys.argv[0]))
+  'pgrep -c `basename {}`'.format(sys.argv[0]))
 if int(output) > 1: 
   print >>sys.stderr, "det_to_db: error: attempted reentry, exiting"
   sys.exit(1)
@@ -54,9 +54,9 @@ db_con = qraat.srv.util.get_db('writer')
 try: 
   cur = db_con.cursor()
 except mdb.Error, e: 
-  print >>sys.stderr, "det_to_db: MySQLdb error: [%d] %s" % (e.args[0], e.args[1])
+  print >>sys.stderr, "det_to_db: MySQLdb error: [{0:d}] {1}".format(e.args[0], e.args[1])
   print >>sys.stderr, "det_to_db: Error while establishing DB connection"
-  print "det_to_db: finished with error in %.2f seconds." % (time.time() - start)
+  print "det_to_db: finished with error in {0:.2f} seconds.".format(time.time() - start)
   raise
 
 
@@ -64,9 +64,9 @@ try:
   cur.execute('SELECT name FROM site')
   db_sitelist = map(lambda row: row[0], cur.fetchall())
 except mdb.Error, e:
-  print >>sys.stderr, "det_to_db: MySQLdb error: [%d] %s" % (e.args[0], e.args[1])
+  print >>sys.stderr, "det_to_db: MySQLdb error: [{0:d}] {1}".format(e.args[0], e.args[1])
   print >>sys.stderr, "det_to_db: Error while selecting site names"
-  print "det_to_db: finished with error in %.2f seconds." % (time.time() - start)
+  print "det_to_db: finished with error in {0:.2f} seconds.".format(time.time() - start)
   raise
 
   
@@ -81,10 +81,10 @@ for d in sitedirs:
 for site in dir_sitelist:
 
   if site in db_sitelist:
-    site_dir = '%s/%s' % (det_dir, site)
+    site_dir = '{}/{}'.format(det_dir, site)
     
     # Don't process sites currently being fetched or that don't have files in them. 
-    if os.path.isdir(site_dir) and not os.path.isfile('%s/fetching.site' % (site_dir)):
+    if os.path.isdir(site_dir) and not os.path.isfile('{}/fetching.site'.format(site_dir)):
               
       directory_counter = 0
       for leaf_dir,sublist,filelist in os.walk(site_dir):
@@ -107,8 +107,8 @@ for site in dir_sitelist:
             if bad_list: #there are non-readable det files
             
               det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
-              q_dir = ("%s/%s_" % (det_q, site)) +\
-                       ("%s.%s.%s.%s.%s/" % date_tuple)
+              q_dir = ("{}/{}_".format(det_q, site)) +\
+                       ("{}.{}.{}.{}.{}/".format(*date_tuple))
               try:
                 os.makedirs(q_dir)
               except OSError:
@@ -116,7 +116,12 @@ for site in dir_sitelist:
                   raise
             
               for f in bad_list:
-                commands.getstatusoutput("mv {0} {1}".format(f,q_dir))
+                (status, output) = commands.getstatusoutput("mv {0} {1}".format(f,q_dir))
+                if status != 0:
+                  print >>sys.stderr, "det_to_db: error: moving {} to quarantine".format(f)
+                  print >>sys.stderr, output
+                else:
+                  print "det_to_db: quarantined {} to {}".format(f,q_dir)
           
             table = qraat.est.est(dets=det_list)
   
@@ -131,46 +136,74 @@ for site in dir_sitelist:
                 print >>sys.stderr, "det_to_db: warning: skipping est row corresponding to '{0}' due to error from qraat.est.est.write_db_row()".format(row.fn)
                 print >>sys.stderr, "det_to_db: error was: {0}".format(e)
                 det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
-                q_dir = ("%s/%s_" % (det_q, site)) +\
-                       ("%s.%s.%s.%s.%s/" % date_tuple)
+                q_dir = ("{}/{}_".format(det_q, site)) +\
+                       ("{}.{}.{}.{}.{}/".format(*date_tuple))
                 try:
                   os.makedirs(q_dir)
                 except OSError, e:            # Catch if directory exists;
                   if e.errno != errno.EEXIST: # otherwise, throw exception.  
                     raise e
-                commands.getstatusoutput("mv {0} {1}".format(row.fn,q_dir))
-          
+                (status, output) = commands.getstatusoutput("mv {0} {1}".format(row.fn,q_dir))
+                if status != 0:
+                  print >>sys.stderr, "det_to_db: error: moving {} to quarantine".format(row.fn)
+                  print >>sys.stderr, output
                   
             # Archive table as est file. 
-            table.write(("%s/%s/" % (est_arch, site)) +\
-                         ("%s/%s/%s/%s/%s/" % date_tuple))
+            table.write(("{}/{}/".format(est_arch, site)) +\
+                         ("{}/{}/{}/{}/{}/".format(*date_tuple)))
           
             # Archive processed det files.
-            arch_fn = ("%s/%s/" % (det_arch, site)) +\
-                     ("%s/%s/%s/%s/%s/" % date_tuple)
+            arch_fn = ("{}/{}/".format(det_arch, site)) +\
+                     ("{}/{}/{}/{}/{}/".format(*date_tuple))
             try:
               os.makedirs(arch_fn)
             except OSError, e:            # Catch if directory exists;
               if e.errno != errno.EEXIST: # otherwise, throw exception.  
                 raise e
 
-            arch_fn += site + (".%s.%s.%s.%s.%s.tar" % date_tuple)
+            arch_fn += site + (".{}.{}.{}.{}.{}.tar".format(*date_tuple))
             if os.path.isfile(arch_fn): 
               (status, output) = commands.getstatusoutput(
-                '/bin/tar -rf %s -C %s .' % (arch_fn, leaf_dir))
+                '/bin/tar -rf {} -C {} .'.format(arch_fn, leaf_dir))
             else: 
               (status, output) = commands.getstatusoutput(
-                '/bin/tar -cf %s -C %s .' % (arch_fn, leaf_dir))
+                '/bin/tar -cf {} -C {} .'.format(arch_fn, leaf_dir))
 
             # Delete processed det files. 
             if status != 0: 
-              print >>sys.stderr, "det_to_db: error: archiving %s: %s" % (
-                site, output)
+              print >>sys.stderr, "det_to_db: error: archiving {}: {}".format(site, output)
+              print >>sys.stderr, output
             else:  
-              commands.getstatusoutput('rm -fr %s' % leaf_dir)
-              total_directories+=1
-          else:#there are some type of file and directory doesn't pass regex
-            pass#quarantine weird thing
+              (status, output) = commands.getstatusoutput('rm -fr {}'.format(leaf_dir))
+              if status != 0:
+                print >>sys.stderr, "det_to_db: error: deleting {}".format(leaf_dir)
+                print >>sys.stderr, output
+              else:
+                total_directories+=1
+          else:#there are some type of file in directory and directory doesn't pass regex
+            #quarantine weird thing
+            det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
+            if leaf_dir.startswith(det_dir):
+              leaf = leaf_dir[len(det_dir)+1:]#remove det_dir and extra '/'
+              if leaf.startswith(site):
+                leaf = leaf[len(site)+1:]#remove site and extra '/'
+                q_dir = "{}/{}_".format(det_q, site) + '.'.join(leaf.split('/'))
+              else:
+                q_dir = det_q + '.'.join(leaf.split('/'))
+            else:
+              q_dir = det_q + '.'.join(leaf_dir.split('/'))
+            try:
+              os.makedirs(q_dir)
+            except OSError, e:            # Catch if directory exists;
+              if e.errno != errno.EEXIST: # otherwise, throw exception.  
+                raise e
+            (status, output) = commands.getstatusoutput("mv {0}/* {1}/".format(leaf_dir,q_dir))
+            if status != 0:
+              print >>sys.stderr, "det_to_db: error: moving {}/* to quarantine".format(leaf_dir)
+              print >>sys.stderr, output
+            else:
+              print "det_to_db: quarantined {} to {}".format(leaf_dir, q_dir)
+
         else:#no files or subdirectories, i.e. leaf_dir is empty
           #delete directory
           try:
