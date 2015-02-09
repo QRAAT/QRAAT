@@ -351,7 +351,7 @@ class _per_site_data:
       G = np.matrix(sv.steering_vectors[self.site_id][j]).transpose()
       G = np.dot(G, np.conj(np.transpose(G)))
       for i in range(self.count):
-        R = G + (self.noise_cov[i] / self.edsp[i])
+        R = (self.edsp[i] * G) + self.noise_cov[i] 
         det = np.abs(np.linalg.det(R))
         R = np.linalg.inv(R)
         a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
