@@ -15,6 +15,8 @@
 #
 # TODO Does aggregating the bearing spectra for the same site 
 #      and computing a spline over the sum *bad*? 
+# 
+# TODO Numerical computation of confidence region.
 #
 # Copyright (C) 2015 Todd, Borrowman, Chris Patton
 # 
@@ -384,6 +386,11 @@ def compute_conf(C, level=0.95, scale=1):
     angular orientation (relative to the x-axis) of the ellipse in degrees. 
     If C is not positive definite, then the distribution has no density: 
     return (None, None). 
+
+    Based on the blog post: http://www.visiondummy.com/2014/04/draw-error-
+    ellipse-representing-covariance-matrix/ by Vincent Spruyt. Note that
+    this only applies to *known* covariance, e.g. estimated from multiple
+    position estimates. 
   ''' 
   chi_squared = {0.90 : 4.605, 0.95 : 5.991, 0.99 : 9.210} 
   assert level in chi_squared.keys()
