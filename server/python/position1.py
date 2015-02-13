@@ -225,16 +225,16 @@ class Position:
     
     # Pos. estimate with confidence ellipse
     if self.p is not None: 
-      ax = fig.add_subplot(111)
-      (x, alpha) = compute_conf(compute_covariance(self.p, sites, self.splines))
-      if x is not None: 
-        ellipse = Ellipse(xy=f(self.p), width=x[0]*ELLIPSE_PLOT_SCALE, 
-                        height=x[1]*ELLIPSE_PLOT_SCALE, angle=alpha)
-        ax.add_artist(ellipse)
-        ellipse.set_clip_box(ax.bbox)
-        ellipse.set_alpha(0.2)
-        ellipse.set_facecolor([1.0,1.0,1.0])
-      else: print "Skipping non-positive definite cov. matrix"
+      #ax = fig.add_subplot(111)
+      #(x, alpha) = compute_conf(compute_covariance(self.p, sites, self.splines))
+      #if x is not None: 
+      #  ellipse = Ellipse(xy=f(self.p), width=x[0]*ELLIPSE_PLOT_SCALE, 
+      #                  height=x[1]*ELLIPSE_PLOT_SCALE, angle=alpha)
+      #  ax.add_artist(ellipse)
+      #  ellipse.set_clip_box(ax.bbox)
+      #  ellipse.set_alpha(0.2)
+      #  ellipse.set_facecolor([1.0,1.0,1.0])
+      #else: print "Skipping non-positive definite cov. matrix"
       pp.scatter([e(self.p.imag)], [n(self.p.real)], 
             facecolor='1.0', label='position', zorder=11)
 
@@ -418,13 +418,16 @@ def compute_conf(C, level=0.95, scale=1):
 
 
 def test1(): 
+
+  import time
+  start = time.time()
   
   cal_id = 3
   dep_id = 105
   t_start = 1407452400 
-  t_end = 1407455985 #- (50 * 60)
+  t_end = 1407455985 - (50 * 60)
 
-  db_con = util.get_db('writer')
+  db_con = util.get_db('reader')
   sv = signal1.SteeringVectors(db_con, cal_id)
   signal = signal1.Signal(db_con, dep_id, t_start, t_end)
 
@@ -432,16 +435,11 @@ def test1():
   (center, zone) = util.get_center(db_con)
   assert zone == util.get_utm_zone(db_con)
   
-  #positions = WindowedPositionEstimator(dep_id, sites, center, signal, sv, 120, 30,
-  #                                       method=signal1.Signal.Bartlet)
-
-  #InsertPositions(db_con, positions, zone)
-  #for i, pos in enumerate(positions):
-  #  pos.plot('pos%d.png' % (i), sites, center, 10, 150) 
-
   pos = PositionEstimator(dep_id, sites, center, signal, sv, 
     method=signal1.Signal.MLE)
   pos.plot('fella.png', sites, center, 10, 150)
+
+  print "Finished in {0:.2f} seconds.".format(time.time() - start)
 
 if __name__ == '__main__':
   

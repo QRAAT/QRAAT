@@ -36,10 +36,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import util
-
+import multiprocessing
+import functools
 import numpy as np
 from scipy.special import iv as I # Modified Bessel of the first kind.
 from scipy.optimize import fmin   # Downhill simplex minimization algorithm. 
+    
+
 
 num_ch = 4
 two_pi = 2 * np.pi
@@ -263,6 +266,23 @@ class Signal:
     assert isinstance(per_site_data, _per_site_data)
     return (per_site_data.bartlet(sv), np.argmax)
 
+  
+def _mle(V, G, edsp, noise_cov, ct, j): 
+  ''' Parallelizable MLE bearing spectrum computation. 
+    
+    See ``_per_site_data.mle()``. 
+  '''
+  p = np.zeros(ct, dtype=np.float)
+  G = np.matrix(G[j]).transpose()
+  G = np.dot(G, np.conj(np.transpose(G)))
+  for i in range(ct):
+    R = (edsp[i] * G) + noise_cov[i] 
+    det = np.abs(np.linalg.det(R))
+    R = np.linalg.inv(R)
+    a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
+                   np.dot(R, np.transpose(V[i])))
+    p[i] = -np.log(det * pi_n) - np.abs(a.flat[0])
+  return p
 
 class _per_site_data: 
   
@@ -335,7 +355,6 @@ class _per_site_data:
       row = [id, t, edsp, tnp] + ed + list(nc.flat)
       fd.write(self.delim.join(map(lambda x: str(x), row)) + '\n')
   
-
   def mle(self, sv): 
     ''' ML estimator for DOA given the model. Use `argmax`. 
       
@@ -345,19 +364,15 @@ class _per_site_data:
 
       Input: sv -- instance of `class SteeringVectors`.
     ''' 
-    p = np.zeros((self.count, 360), dtype=np.float)
-    V = np.matrix(self.signal_vector)
-    for j in range(360):
-      G = np.matrix(sv.steering_vectors[self.site_id][j]).transpose()
-      G = np.dot(G, np.conj(np.transpose(G)))
-      for i in range(self.count):
-        R = (self.edsp[i] * G) + self.noise_cov[i] 
-        det = np.abs(np.linalg.det(R))
-        R = np.linalg.inv(R)
-        a = np.dot(np.transpose(np.conj(np.transpose(V[i]))), 
-                       np.dot(R, np.transpose(V[i])))
-        p[i,j] = -np.log(det * pi_n) - np.abs(a.flat[0])
-    return p
+    pool = multiprocessing.Pool()
+    f = functools.partial(_mle, np.matrix(self.signal_vector), 
+                                sv.steering_vectors[self.site_id],
+                                self.edsp, self.noise_cov, self.count)
+    return np.array(pool.map(f, range(360))).transpose()
+    #p = np.zeros((self.count, 360), dtype=np.float)
+    #for j in range(360):
+    #  p[:,j] = f(j)
+    #return p
 
   def bartlet(self, sv): 
     ''' Bartlet's estimator for DOA. Use `argmax`. ''' 
