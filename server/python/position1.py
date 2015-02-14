@@ -40,6 +40,7 @@ import numpy as np
 import matplotlib.pyplot as pp
 from matplotlib.patches import Ellipse
 from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
+import scipy.stats
 import numdifftools as nd
 import utm
 
@@ -178,8 +179,9 @@ class Position:
     ''' Return normalized position likelihood. ''' 
     if self.likelihood and self.num_sites > 0:
       # NOTE if aggregate bearings are normalised, 
-      # divide by self.num_sites. See aggregate_spectrum()
-      return self.likelihood / self.num_est
+      # divide by self.num_sites; otherwise, divide
+      # by self.num_est. See aggregate_spectrum().
+      return self.likelihood / self.num_sites
     else: return None
   
   def get_activity(self): 
@@ -284,7 +286,7 @@ def aggregate_spectrum(p):
   ''' Sum a set of bearing likelihoods. '''
   # NOTE normalising by the number of pulses effectively
   # reduces the sample size. 
-  return np.sum(p, 0)# / p.shape[0]
+  return np.sum(p, 0) / p.shape[0]
 
 
 def compute_bearing_spline(l): 
@@ -318,7 +320,7 @@ def compute_likelihood(sites, splines, center, scale, half_span):
   return (positions, likelihoods)
 
 
-def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=1, delta=SCALE):
+def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=2, delta=SCALE):
   ''' Maximize (resp. minimize) over position space. 
 
     A simple, speedy algorithm for finding the most likely source of a 
@@ -354,8 +356,47 @@ def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=1, delta=S
   return p_hat, likelihood
 
 
-def compute_covariance(p, sites, splines, half_span=HALF_SPAN * 10, scale=0.1):
-  ''' Compute covariance matrix of position estimate `p`. 
+
+
+def compute_conf(p_hat, K, sites, splines, significance_level=0.95, half_span=HALF_SPAN*100, scale=1):
+  Qt = scipy.stats.chi2.ppf(significance_level, 2)
+  print "Qt", Qt
+
+  e = lambda(x0) : int((x0 - p_hat.imag) / scale) + half_span
+  n = lambda(x1) : int((x1 - p_hat.real) / scale) + half_span
+  f = lambda(p) : np.array([e(p.imag), n(p.real)])
+
+  (positions, likelihoods) = compute_likelihood(
+                               sites, splines, p_hat, scale, half_span)
+    
+  J = lambda (x) : likelihoods[x[0], x[1]]
+  H = nd.Hessian(J)
+  Del = nd.Gradient(J)
+
+  x_hat = f(p_hat)
+
+  fella = 20
+  for i in range(-fella,fella+1):
+    for j in range(-fella,fella+1):
+      x = x_hat + np.array([i,j])
+      a = Del(x)
+      b = np.linalg.inv(H(x))
+      C = np.dot(np.dot(b, np.dot(a, np.transpose(a))), b)
+      y = x_hat - x
+      # Not sure if we should mutiply by K. 
+      Q = np.dot(np.dot(np.transpose(y), K * np.linalg.inv(C)), y)
+      #print '%7s' % ("%0.2f" % Q), 
+      print '*' if Q < Qt else ' ',
+    print 
+
+      
+
+
+
+
+
+def compute_covariance0(p, sites, splines, half_span=HALF_SPAN * 10, scale=1):
+  ''' Compute covariance matrix of position estimater w.r.t true location `p`. 
 
     Assuming the estimate follows a bivariate normal distribution. 
     This follows [ZB11] equation 2.169. 
@@ -377,8 +418,7 @@ def compute_covariance(p, sites, splines, half_span=HALF_SPAN * 10, scale=0.1):
   C = np.dot(np.dot(b, np.dot(a, np.transpose(a))), b)
   return C
 
-
-def compute_conf(C, level=0.95, scale=1):
+def compute_conf0(C, level=0.95, scale=1):
   ''' Compute a confidence ellipse of a covariance matrix.
 
     Return a tuple (x, alpha), where x[0] gives the magnitude of the major 
@@ -420,12 +460,11 @@ def compute_conf(C, level=0.95, scale=1):
 def test1(): 
 
   import time
-  start = time.time()
   
   cal_id = 3
   dep_id = 105
   t_start = 1407452400 
-  t_end = 1407455985 - (50 * 60)
+  t_end = 1407455985 - (59 * 60) 
 
   db_con = util.get_db('reader')
   sv = signal1.SteeringVectors(db_con, cal_id)
@@ -435,11 +474,15 @@ def test1():
   (center, zone) = util.get_center(db_con)
   assert zone == util.get_utm_zone(db_con)
   
+  start = time.time()
   pos = PositionEstimator(dep_id, sites, center, signal, sv, 
     method=signal1.Signal.MLE)
+  print "Finished in {0:.2f} seconds.".format(time.time() - start)
+ 
+  print compute_conf(pos.p, pos.num_sites, sites, pos.splines)
+  
   pos.plot('fella.png', sites, center, 10, 150)
 
-  print "Finished in {0:.2f} seconds.".format(time.time() - start)
 
 if __name__ == '__main__':
   

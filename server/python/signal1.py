@@ -15,9 +15,6 @@
 #  [GJ06] Riccardo Gatto, Sreenivasa Rao Jammalamadaka. "The generalized 
 #         von Mises distribution." In Statistical Methodology, 2006. 
 #
-# TODO Faster mle() and approx_mle() via some sort of parallelized map? 
-#      Perhaps np.vectorize()?
-#
 # TODO Update SteeringVectors to handle arbitrary bearing sets. 
 #
 # Copyright (C) 2015 Chris Patton, Todd Borrowman
@@ -36,14 +33,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import util
+
 import multiprocessing
 import functools
 import numpy as np
 from scipy.special import iv as I # Modified Bessel of the first kind.
 from scipy.optimize import fmin   # Downhill simplex minimization algorithm. 
     
-
-
 num_ch = 4
 two_pi = 2 * np.pi
 pi_n = np.pi ** num_ch
