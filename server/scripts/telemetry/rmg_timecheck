@@ -30,6 +30,7 @@ use DBI ;
 #use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
 
 my $Debug = 0 ;
+my $ConnectTimeout = 10 ;
 
 my $TableNameTimeCheck = "timecheck" ;		# The name of the db table
 my $TableNameSitelist = "site" ;		# The name of the db table
@@ -115,7 +116,7 @@ sub get_time_offset($$)
 	my $command = "" ;
 	if( defined $sitename and $sitename ne "" )		# sitename is "" for localhost
 	{
-		$command = "ssh $sitename " ;
+		$command = "ssh -o ConnectTimeout=$ConnectTimeout $sitename " ;
 	}
 	$command .= "ntpq -p" ;
 	if( $Debug ) { print "debug: get_time_offset: command=$command\n" ; }
