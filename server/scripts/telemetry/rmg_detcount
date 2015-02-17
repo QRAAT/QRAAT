@@ -29,6 +29,7 @@ use DBI ;
 #use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
 
 my $Debug = 0 ;
+my $ConnectTimeout = 10 ;
 
 my $TableNameDetCount = "detcount" ;		# The name of the db table
 my $TableNameSitelist = "site" ;		# The name of the db table
@@ -115,7 +116,7 @@ sub get_det_count($)
 	# Site
 	my $site_det_count = "" ;
 	my $site_detdir = $ENV{$ENV_NAME_RMG_SITE_DET_DIR} ;
-	$command = "ssh $sitename 'find $site_detdir -type f -iname \"*.det\" | wc -l'" ;
+	$command = "ssh -o ConnectTimeout=$ConnectTimeout $sitename 'find $site_detdir -type f -iname \"*.det\" | wc -l'" ;
 	if( $Debug ) { print "debug: get_det_count: site command=$command\n" ; }
 	$result = `$command` ;
 	chomp($result) ;
