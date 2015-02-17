@@ -77,6 +77,9 @@
 #
 #
 
+# ssh timeout in seconds
+ConnectTimeout=10
+
 function help() {
   cat <<!EOF!
 usage: rmg task [-options] {sites}/all  
@@ -146,7 +149,7 @@ function get_status() {
   if [ $? -eq 0 ]
     then
       ping_computer="success"
-      read site_goal timestamp site_status <<< `ssh $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+      read site_goal timestamp site_status <<< `ssh -o ConnectTimeout=$ConnectTimeout $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
     else
       ping_computer="failure"
       site_goal="unknown"
@@ -169,7 +172,7 @@ function get_status() {
               if [ $? -eq 0 ]
                 then
                   ping_computer="success"
-                  read site_goal timestamp site_status <<< `ssh $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+                  read site_goal timestamp site_status <<< `ssh -o ConnectTimeout=$ConnectTimeout $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
                 else
                   if [[ $serv_state == "down" ]]
                     then
@@ -197,7 +200,7 @@ function do_update() {
 # and run rmg-node check. 
   SITE=$1
   rmg_csv --row $SITE <$SITELIST | \
-  ssh $SITE "cat > site.csv; rmg-node check"  
+  ssh -o ConnectTimeout=$ConnectTimeout $SITE "cat > site.csv; rmg-node check"  
 
 }
   
@@ -422,7 +425,7 @@ do
           touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
           rsync -az $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
           rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
-          ssh $SITE "rmg-node down -d 0; sleep 1; rmg-node check"
+          ssh -o ConnectTimeout=$ConnectTimeout $SITE "rmg-node down -d 0; sleep 1; rmg-node check"
         else
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
      fi
@@ -467,7 +470,7 @@ do
       then
         if [[ ! -e $RMG_SERVER_DET_DIR/$SITE/fetching.site ]]
         then
-          DIRECTORIES_TO_COPY=$(ssh $SITE "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch)
+          DIRECTORIES_TO_COPY=$(ssh -o ConnectTimeout=$ConnectTimeout $SITE "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch)
           if [[ $DIRECTORIES_TO_COPY ]]
           then
             mkdir -p $RMG_SERVER_DET_DIR/$SITE 
@@ -480,7 +483,7 @@ do
               if [ $? -ne 0 ]; then
                 echo "rsync error copying $DIR from $SITE"
               fi
-              ssh $SITE "find $RMG_SITE_DET_DIR -mindepth 1 -depth -empty -delete"
+              ssh -o ConnectTimeout=$ConnectTimeout $SITE "find $RMG_SITE_DET_DIR -mindepth 1 -depth -empty -delete"
               let ct=ct+1
             done
             rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
