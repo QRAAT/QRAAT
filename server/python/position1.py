@@ -365,7 +365,7 @@ def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=2, delta=S
 
 # FIXME What's the deal with scaling?
 #  Try scale=0.1 vs. 1. 
-def compute_conf(p_hat, K, sites, splines, significance_level=0.95, half_span=HALF_SPAN*100, scale=1):
+def compute_conf(p_hat, K, sites, splines, significance_level=0.90, half_span=HALF_SPAN*100, scale=1):
   Qt = scipy.stats.chi2.ppf(significance_level, 2)
   print "Qt", Qt
 
@@ -382,7 +382,7 @@ def compute_conf(p_hat, K, sites, splines, significance_level=0.95, half_span=HA
 
   x_hat = f(p_hat)
 
-  fella = 50
+  fella = 20
   for i in range(-fella,fella+1):
     for j in range(-fella,fella+1):
       x = x_hat + np.array([i,j])
