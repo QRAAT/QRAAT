@@ -48,7 +48,7 @@ pi_n = np.pi ** num_ch
 ### Simulation. ###############################################################
 
 def Simulator(p, sites, sv, sig_n, sig_t, exclude=[]):
-  
+ 
   # Elements of noise vector are modelled as independent, identically
   # distributed, circularly-symmetric complex normal random varibles. 
   mu_n =  np.complex(0,0)
@@ -57,14 +57,14 @@ def Simulator(p, sites, sv, sig_n, sig_t, exclude=[]):
   cov = 0.5 * np.array([[sig_n.real, sig_n.imag],
                         [sig_n.imag, sig_n.real]])
     
-  # Genrate transmission coefficient.
+  # Generate transmission coefficient, modelled the same way.
   mu_t = np.complex(1,0)
  
   T = (lambda(x) : np.complex(x[0], x[1]))(
         np.random.multivariate_normal(
           np.array([mu_t.real, mu_t.imag]),
           0.5 * np.array([[sig_t.real, sig_t.imag],
-                    [sig_t.imag, sig_t.real]]), 1)[0])
+                          [sig_t.imag, sig_t.real]]), 1)[0])
 
   # Noise covariance matrix. 
   Sigma = np.matrix(np.zeros((4,4), dtype=np.complex))
@@ -133,7 +133,7 @@ def compute_bearing_splines(sv):
 class SteeringVectors:
   
   suffix = 'csv'
-  delim = '\t'
+  delim = ','
 
   def __init__(self, db_con=None, cal_id=None):
 
@@ -365,8 +365,8 @@ def _mle(V, G, edsp, noise_cov, ct, j):
 
 class _per_site_data: 
   
-  delim = '\t'
   suffix = 'csv'
+  delim = ','
 
   def __init__(self, site_id):
   
@@ -422,7 +422,7 @@ class _per_site_data:
     for i in range(num_ch): header.append('ed%d' % (i+1))
     for i in range(num_ch): 
       for j in range(num_ch): 
-        header.append('ed%d%d' % (i+1, j+1))
+        header.append('nc%d%d' % (i+1, j+1))
     fd.write(self.delim.join(header) + '\n')
 
     for (id, t, edsp, tnp, ed, nc) in zip(self.est_ids.tolist(), 

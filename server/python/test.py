@@ -50,10 +50,10 @@ def sim_data():
   p = center + complex(500,-200)
 
   # Noise paramters.
-  sig_t = complex(0.01, 0.01)
-  sig_n = complex(0.004, 0.004)
+  sig_t = complex(0.02, 0.00)
+  sig_n = complex(0.02, 0.00)
   
-  sig = signal1.Simulator(p, sites, sv, sig_t, sig_n, exclude=[3,8,5])
+  sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, exclude=[3,8,5])
 
   pos = position1.PositionEstimator(999, sites, center, 
                                sig, sv, method=signal1.Signal.Bartlet)
