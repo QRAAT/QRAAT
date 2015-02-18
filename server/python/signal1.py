@@ -47,12 +47,14 @@ pi_n = np.pi ** num_ch
 
 ### Simulation. ###############################################################
 
-def Simulate(p, sites, sv):
+def Simulate(p, sites, sv, exclude=[]):
  
   splines = compute_bearing_splines(sv)
   sig = Signal()
 
   for id in sites.keys():
+    if id in exclude: 
+      continue
     bearing = np.angle(p - sites[id]) * 180 / np.pi
     G = np.zeros(num_ch, dtype=np.complex)
     for i in range(num_ch):

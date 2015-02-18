@@ -45,9 +45,12 @@ def real_data():
 
 
 def sim_data():
-  
-  p = center + complex(400,-100)
-  sig = signal1.Simulate(p, sites, sv)
+
+  # Simpulate signal given known position p.  
+  p = center + complex(500,-200)
+  sig = signal1.Simulate(p, sites, sv, exclude=[3,8,5])
+
+
   pos = position1.PositionEstimator(999, sites, center, 
                                sig, sv, method=signal1.Signal.Bartlet)
   pos.plot('fella.png', sites, center, 10, 150, p)
