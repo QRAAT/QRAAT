@@ -47,22 +47,55 @@ pi_n = np.pi ** num_ch
 
 ### Simulation. ###############################################################
 
-def Simulate(p, sites, sv, exclude=[]):
+def Simulator(p, sites, sv, sig_n, sig_t, exclude=[]):
+  
+  # Elements of noise vector are modelled as independent, identically
+  # distributed, circularly-symmetric complex normal random varibles. 
+  mu_n =  np.complex(0,0)
+  
+  mean = np.array([mu_n.real, mu_n.imag])
+  cov = 0.5 * np.array([[sig_n.real, sig_n.imag],
+                        [sig_n.imag, sig_n.real]])
+    
+  # Genrate transmission coefficient.
+  mu_t = np.complex(1,0)
  
+  T = (lambda(x) : np.complex(x[0], x[1]))(
+        np.random.multivariate_normal(
+          np.array([mu_t.real, mu_t.imag]),
+          0.5 * np.array([[sig_t.real, sig_t.imag],
+                    [sig_t.imag, sig_t.real]]), 1)[0])
+
+  # Noise covariance matrix. 
+  Sigma = np.matrix(np.zeros((4,4), dtype=np.complex))
+  np.fill_diagonal(Sigma, sig_n)
+  
+  # Signal power.
+  edsp = sig_t + np.trace(Sigma) 
+  tnp = edsp - sig_t
+
+  # Interpolate splines to steering vectors. 
   splines = compute_bearing_splines(sv)
   sig = Signal()
 
+  # Generate a (V, \rho, \Sigma) triple for each site. 
   for id in sites.keys():
     if id in exclude: 
       continue
     bearing = np.angle(p - sites[id]) * 180 / np.pi
+    
+    # Compute modelled steering vector for DOA. 
     G = np.zeros(num_ch, dtype=np.complex)
     for i in range(num_ch):
       (I, Q) = splines[id][i]
       G[i] = np.complex(I(bearing), Q(bearing))
-    V = G
-    edsp = 0.01
-    nc = np.matrix(np.zeros((4,4), dtype=np.complex))
+
+    # Generate noise vector. 
+    N = np.array(map(lambda(x) : np.complex(x[0], x[1]), 
+          np.random.multivariate_normal(mean, cov, num_ch)))
+
+    # Modelled signal. 
+    V = (T * G) + N
     
     sig.t_start = 0
     sig.t_end = 2
@@ -70,10 +103,10 @@ def Simulate(p, sites, sv, exclude=[]):
     sig.table[id].count = 1
     sig.table[id].est_ids = np.array([0])
     sig.table[id].t = np.array([1])
-    sig.table[id].tnp = np.array([float('+inf')])
+    sig.table[id].tnp = np.array([tnp])
     sig.table[id].signal_vector = np.array([V])
     sig.table[id].edsp = np.array([edsp])
-    sig.table[id].noise_cov = np.array([nc])
+    sig.table[id].noise_cov = np.array([Sigma])
   
   return sig
 
