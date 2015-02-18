@@ -162,7 +162,7 @@ class Position:
     if len(splines) > 1: # Need at least two site bearings. 
       p_hat, likelihood = compute_position(sites, splines, center, obj)
     else: p_hat, likelihood = None, None
-     
+    
     # Return a position object. 
     num_sites = len(bearing)
     t = (t_end + t_start) / 2
@@ -190,10 +190,11 @@ class Position:
       return np.mean(self.activity.values())
     else: return None
 
-  def plot(self, fn, sites, center, scale, half_span):
+  def plot(self, fn, sites, center, scale, half_span, p_known=None):
     ''' Plot search space. '''
 
     if self.num_sites == 0:
+      print 'yes'
       return 
 
     (positions, likelihoods) = compute_likelihood(
@@ -210,13 +211,13 @@ class Position:
     x_right = center.imag + (half_span * scale)
     
     # Search space
-    p = pp.imshow(likelihoods.transpose(), 
+    P = pp.imshow(likelihoods.transpose(), 
         origin='lower',
         extent=(0, half_span * 2, 0, half_span * 2),
         cmap='YlGnBu',
         aspect='auto', interpolation='nearest')
 
-    cbar = fig.colorbar(p, ticks=[np.min(likelihoods), np.max(likelihoods)])
+    cbar = fig.colorbar(P, ticks=[np.min(likelihoods), np.max(likelihoods)])
     cbar.ax.set_yticklabels(['low', 'high'])# vertically oriented colorbar
     
     # Sites
@@ -224,7 +225,12 @@ class Position:
       [e(float(s.imag)) for s in sites.values()],
       [n(float(s.real)) for s in sites.values()],
        s=HALF_SPAN, facecolor='0.5', label='sites', zorder=10)
-    
+   
+    # True position (if known).
+    if p_known: 
+      pp.scatter([e(p_known.imag)], [n(p_known.real)], 
+              facecolor='0.0', label='position', zorder=11)
+
     # Pos. estimate with confidence ellipse
     if self.p is not None: 
       #ax = fig.add_subplot(111)
@@ -238,7 +244,7 @@ class Position:
       #  ellipse.set_facecolor([1.0,1.0,1.0])
       #else: print "Skipping non-positive definite cov. matrix"
       pp.scatter([e(self.p.imag)], [n(self.p.real)], 
-            facecolor='1.0', label='position', zorder=11)
+            facecolor='1.0', label='pos. est', zorder=11)
 
     pp.clim()   # clamp the color limits
     pp.legend()
@@ -359,7 +365,7 @@ def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=2, delta=S
 
 # FIXME What's the deal with scaling?
 #  Try scale=0.1 vs. 1. 
-def compute_conf(p_hat, K, sites, splines, significance_level=0.95, half_span=HALF_SPAN*100, scale=0.1):
+def compute_conf(p_hat, K, sites, splines, significance_level=0.95, half_span=HALF_SPAN*100, scale=1):
   Qt = scipy.stats.chi2.ppf(significance_level, 2)
   print "Qt", Qt
 
@@ -376,7 +382,7 @@ def compute_conf(p_hat, K, sites, splines, significance_level=0.95, half_span=HA
 
   x_hat = f(p_hat)
 
-  fella = 20
+  fella = 50
   for i in range(-fella,fella+1):
     for j in range(-fella,fella+1):
       x = x_hat + np.array([i,j])

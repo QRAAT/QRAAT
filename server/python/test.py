@@ -26,16 +26,32 @@ zone = (10, 'S') # UTM zone.
 # Read steering vectors from file.
 sv = signal1.SteeringVectors.read(cal_id)
 
-# Read signal data, about an hour's worth.
-sig = signal1.Signal.read(sites.keys())
 
-# Estimate position using all data. To use the MLE instead 
-# of Bartlet's, do `method=signal1.Signal.MLE`. 
-#pos = position1.PositionEstimator(dep_id, sites, center, sig, sv,
-#                method=signal1.Signal.Bartlet)
-positions = position1.WindowedPositionEstimator(dep_id, sites, center, sig, sv, 
-                60 * 5, 30, method=signal1.Signal.Bartlet)
+def real_data():
 
-# Plot position and search space. 
-for i, pos in enumerate(positions): 
-  pos.plot('%d.png' % (i), sites, center, 10, 150)
+  # Read signal data, about an hour's worth.
+  sig = signal1.Signal.read(sites.keys())
+
+  # Estimate position using all data. To use the MLE instead 
+  # of Bartlet's, do `method=signal1.Signal.MLE`. 
+  #pos = position1.PositionEstimator(dep_id, sites, center, sig, sv,
+  #                method=signal1.Signal.Bartlet)
+  positions = position1.WindowedPositionEstimator(dep_id, sites, center, sig, sv, 
+                  60 * 5, 30, method=signal1.Signal.Bartlet)
+
+  # Plot position and search space. 
+  for i, pos in enumerate(positions): 
+    pos.plot('%d.png' % (i), sites, center, 10, 150)
+
+
+def sim_data():
+  
+  p = center + complex(400,-100)
+  sig = signal1.Simulate(p, sites, sv)
+  pos = position1.PositionEstimator(999, sites, center, 
+                               sig, sv, method=signal1.Signal.Bartlet)
+  pos.plot('fella.png', sites, center, 10, 150, p)
+
+
+# Testing, testing .... 
+sim_data()

@@ -39,10 +39,59 @@ import functools
 import numpy as np
 from scipy.special import iv as I # Modified Bessel of the first kind.
 from scipy.optimize import fmin   # Downhill simplex minimization algorithm. 
+from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
     
 num_ch = 4
 two_pi = 2 * np.pi
 pi_n = np.pi ** num_ch
+
+### Simulation. ###############################################################
+
+def Simulate(p, sites, sv):
+ 
+  splines = compute_bearing_splines(sv)
+  sig = Signal()
+
+  for id in sites.keys():
+    bearing = np.angle(p - sites[id]) * 180 / np.pi
+    G = np.zeros(num_ch, dtype=np.complex)
+    for i in range(num_ch):
+      (I, Q) = splines[id][i]
+      G[i] = np.complex(I(bearing), Q(bearing))
+    V = G
+    edsp = 0.01
+    nc = np.matrix(np.zeros((4,4), dtype=np.complex))
+    
+    sig.t_start = 0
+    sig.t_end = 2
+    sig.table[id] = _per_site_data(id)
+    sig.table[id].count = 1
+    sig.table[id].est_ids = np.array([0])
+    sig.table[id].t = np.array([1])
+    sig.table[id].tnp = np.array([float('+inf')])
+    sig.table[id].signal_vector = np.array([V])
+    sig.table[id].edsp = np.array([edsp])
+    sig.table[id].noise_cov = np.array([nc])
+  
+  return sig
+
+
+
+
+
+def compute_bearing_splines(sv): 
+  x = np.arange(-360,360)
+  splines = {}
+  for (id, G) in sv.steering_vectors.iteritems():
+    splines[id] = []
+    for i in range(num_ch):
+      y = np.array(G)[:,i]; y = np.hstack((y,y))
+      I = spline1d(x, np.real(y)) # In-phase
+      Q = spline1d(x, np.imag(y)) # Quadrature
+      splines[id].append((I, Q)) 
+  return splines
+      
+
 
 ### class SteeringVectors. ####################################################
 
@@ -97,7 +146,7 @@ class SteeringVectors:
       while len(to_be_removed) > 0:
         self.sites.table.remove(to_be_removed.pop())
 
-  
+
   def write(self, suffix='sv'):
     fn = '%s%s.%s' % (suffix, self.cal_id, self.suffix)
     fd = open(fn, 'w')
@@ -134,8 +183,6 @@ class SteeringVectors:
     return sv
   
 
-    
-
 
 ### class Signal. #############################################################
 
@@ -145,7 +192,7 @@ class Signal:
    
     ''' Represent signals in the `qraat.est` table ($V$, $\Sigma$, $sigma$).
     
-      Store data in a dictionary mapping sites to time-indexed signal data. 
+     Store data in a dictionary mapping sites to time-indexed signal data. 
       The relevant data are the eigenvalue decomposition of the signal (ed1r, 
       ed1i, ... ed4r, ed4i), the noise covariance matrix (nc11r, nc11i, ... 
       nc44r, nc44i), and the signal power (edsp). Each pulse is assigned
@@ -280,6 +327,7 @@ def _mle(V, G, edsp, noise_cov, ct, j):
     p[i] = -np.log(det * pi_n) - np.abs(a.flat[0])
   return p
 
+
 class _per_site_data: 
   
   delim = '\t'
@@ -377,6 +425,7 @@ class _per_site_data:
     self.bearing = sv.bearings[self.site_id]
     left_half = np.dot(V, np.conj(np.transpose(G))) 
     return np.real(left_half * np.conj(left_half)) 
+
 
 
 ### class GeneralizedVonMises. ################################################
