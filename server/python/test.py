@@ -47,16 +47,16 @@ def real_data():
 def sim_data():
 
   # Simpulate signal given known position p.  
-  p = center + complex(400,-300)
+  p = center + complex(650,0)
 
   # Noise paramters.
-  sig_t = complex(0.007, 0.00)
-  sig_n = complex(0.0008, 0.00)
+  sig_t = complex(0.002, 0.00)
+  sig_n = complex(0.001, 0.00)
   
-  sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, 10)#, exclude=[3,5,8])
+  sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, 4)#, exclude=[3,5])
 
   pos = position1.PositionEstimator(999, sites, center, 
-                               sig, sv, method=signal1.Signal.MLE)
+                               sig, sv, method=signal1.Signal.Bartlet)
   pos.plot('fella.png', sites, center, 10, 150, p)
   
   print position1.compute_conf(pos.p, p, pos.num_sites, sites, pos.splines)

@@ -363,8 +363,15 @@ def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=1, delta=S
 
 
 
-# FIXME What's the deal with scaling?
-#  Try scale=0.1 vs. 1. 
+def compute_cov(x, H, Del):
+  a = Del(x)
+  b = np.linalg.inv(H(x))
+  C = np.dot(b, np.dot(a, np.dot(np.transpose(a), b)))
+  return C
+
+
+
+
 def compute_conf(p_hat, p_known, K, sites, splines, significance_level=0.68, half_span=HALF_SPAN*50, scale=1):
   Qt = scipy.stats.chi2.ppf(significance_level, 2)
   print "Qt", round(Qt, 2)
@@ -383,24 +390,19 @@ def compute_conf(p_hat, p_known, K, sites, splines, significance_level=0.68, hal
   x_hat = f(p_hat)
 
   x_known = f(p_known)
-  a = Del(x_known)
-  b = np.linalg.inv(H(x_known))
-  C = np.dot(np.dot(b, np.dot(a, np.transpose(a))), b)
+  C = compute_cov(x_known, H, Del)
   print "Variance %0.4f, %0.4f" % (C[0,0], C[1,1])
 
   fella = 20
   for i in range(-fella,fella+1):
     for j in range(-fella,fella+1):
-      x = x_hat + np.array([i,j])
-      a = Del(x)
-      b = np.linalg.inv(H(x))
-      C = np.dot(np.dot(b, np.dot(a, np.transpose(a))), b)
-      y = x_hat - x
-      # Not sure if we should mutiply by K. 
-      Q = np.dot(np.dot(np.transpose(y), np.linalg.inv(C)), y)
-      #print '%7s' % ("%0.2f" % Q),
-      if x[0] == x_known[0] and x[1] == x_known[1]: print 'M', 
-      elif Q < Qt: print '*',
+      y = np.array([i,j])
+      x = x_hat + y
+      C = compute_cov(x, H, Del)
+      Q = np.dot(np.transpose(y), np.dot(np.linalg.inv(C), y))
+      if x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
+      elif x[0] == x_hat[0] and x[1] == x_hat[1]: print 'P', 
+      elif Q < Qt: print '.',
       else: print ' ',
     print 
 
