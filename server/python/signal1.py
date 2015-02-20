@@ -57,11 +57,15 @@ def Simulator(p, sites, sv, sig_n, sig_t, trials, exclude=[]):
                         [sig_n.imag, sig_n.real]])
     
   # Generate transmission coefficient, modelled the same way.
-  mu_t = np.complex(1,0)
+  mu_t = np.complex(0,0)
   mean_t = np.array([mu_t.real, mu_t.imag])
   cov_t = 0.5 * np.array([[sig_t.real, sig_t.imag],
                           [sig_t.imag, sig_t.real]])
 
+  # If transmission coefficient is too low, then 
+  # the pulse detector wouldn't trigger. To model the situation
+  # more ralistically, we'd want to throw out "signals" for which
+  # T is too small. However, this changes the statistics! 
   T = map(lambda(x) : np.complex(x[0], x[1]), 
     np.random.multivariate_normal(mean_t, cov_t, trials))
 

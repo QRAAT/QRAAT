@@ -49,9 +49,10 @@ def sim_data():
   # Simpulate signal given known position p.  
   p = center + complex(650,0)
 
-  # Noise paramters.
-  sig_t = complex(0.02, 0.00)
-  sig_n = complex(0.01, 0.00)
+  # Noise paramters. 
+  # TODO Signal to noise ratio? 
+  sig_t = complex(0.008, 0.00)
+  sig_n = complex(0.0003, 0.00)
   
   sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, 4)#, exclude=[3,5])
 
@@ -64,6 +65,15 @@ def sim_data():
     level_set = set()
   position1.print_conf(level_set, pos.p, p)
 
+'''
+
+  Notes:
+
+  Intuitively, the size of the confidence interval should scale with 
+  the SNR. 
+
+
+'''
 
 # Testing, testing .... 
 sim_data()
