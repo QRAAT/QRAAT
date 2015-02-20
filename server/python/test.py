@@ -60,6 +60,8 @@ def sim_data():
   pos.plot('fella.png', sites, center, 10, 150, p)
   
   level_set = position1.compute_conf(pos.p, sites, pos.splines)
+  if level_set is None: 
+    level_set = set()
   position1.print_conf(level_set, pos.p, p)
 
 

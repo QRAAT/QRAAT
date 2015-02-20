@@ -376,7 +376,6 @@ def compute_cov(x, H, Del):
   C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
   return C
 
-
 def compute_conf(p_hat, sites, splines, significance_level=0.68, half_span=HALF_SPAN*50, scale=1):
   ''' Find the points that fall within confidence region of the estimate. ''' 
   Qt = scipy.stats.chi2.ppf(significance_level, 2)
@@ -390,9 +389,10 @@ def compute_conf(p_hat, sites, splines, significance_level=0.68, half_span=HALF_
 
   S = set(); S.add((half_span, half_span))
   level_set = S.copy()
+  max_size = 1000 # Computational stop gap. 
 
   x_hat = np.array([half_span, half_span])
-  while len(S) > 0:
+  while len(S) > 0 and len(level_set) < max_size: 
     R = set()
     for x in S:
       y = x_hat - np.array(x)
@@ -405,6 +405,8 @@ def compute_conf(p_hat, sites, splines, significance_level=0.68, half_span=HALF_
         R.add((x[0]-1, x[1]-1)); R.add((x[0]-1, x[1])); R.add((x[0]-1, x[1]+1)) 
     S = R.difference(level_set)
 
+  if len(level_set) == max_size: 
+    return None # Unbounded confidence region
   return level_set
 
 
