@@ -59,7 +59,8 @@ def sim_data():
                                sig, sv, method=signal1.Signal.Bartlet)
   pos.plot('fella.png', sites, center, 10, 150, p)
   
-  print position1.compute_conf(pos.p, p, pos.num_sites, sites, pos.splines)
+  level_set = position1.compute_conf(pos.p, sites, pos.splines)
+  position1.print_conf(level_set, pos.p, p)
 
 
 # Testing, testing .... 

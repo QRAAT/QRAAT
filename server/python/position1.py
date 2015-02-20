@@ -15,8 +15,6 @@
 #
 # TODO Does aggregating the bearing spectra for the same site 
 #      and computing a spline over the sum *bad*? 
-# 
-# TODO Numerical computation of confidence region.
 #
 # Copyright (C) 2015 Todd, Borrowman, Chris Patton
 # 
@@ -363,22 +361,25 @@ def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=1, delta=S
 
 
 
+
+
+
+
+def transform_coord(p, center, half_span, scale):
+  x = [int((p.imag - center.imag) / scale) + half_span,
+       int((p.real - center.real) / scale) + half_span]
+  return np.array(x)
+  
 def compute_cov(x, H, Del):
   a = Del(x)
   b = np.linalg.inv(H(x))
-  C = np.dot(b, np.dot(a, np.dot(np.transpose(a), b)))
+  C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
   return C
 
 
-
-
-def compute_conf(p_hat, p_known, K, sites, splines, significance_level=0.68, half_span=HALF_SPAN*50, scale=1):
+def compute_conf(p_hat, sites, splines, significance_level=0.68, half_span=HALF_SPAN*50, scale=1):
+  ''' Find the points that fall within confidence region of the estimate. ''' 
   Qt = scipy.stats.chi2.ppf(significance_level, 2)
-  print "Qt", round(Qt, 2)
-
-  e = lambda(x0) : int((x0 - p_hat.imag) / scale) + half_span
-  n = lambda(x1) : int((x1 - p_hat.real) / scale) + half_span
-  f = lambda(p) : np.array([e(p.imag), n(p.real)])
 
   (positions, likelihoods) = compute_likelihood(
                                sites, splines, p_hat, scale, half_span)
@@ -387,25 +388,40 @@ def compute_conf(p_hat, p_known, K, sites, splines, significance_level=0.68, hal
   H = nd.Hessian(J)
   Del = nd.Gradient(J)
 
-  x_hat = f(p_hat)
+  S = set(); S.add((half_span, half_span))
+  level_set = S.copy()
 
-  x_known = f(p_known)
-  C = compute_cov(x_known, H, Del)
-  print "Variance %0.4f, %0.4f" % (C[0,0], C[1,1])
-
-  fella = 20
-  for i in range(-fella,fella+1):
-    for j in range(-fella,fella+1):
-      y = np.array([i,j])
-      x = x_hat + y
-      C = compute_cov(x, H, Del)
+  x_hat = np.array([half_span, half_span])
+  while len(S) > 0:
+    R = set()
+    for x in S:
+      y = x_hat - np.array(x)
+      C = compute_cov(np.array(x), H, Del)
       Q = np.dot(np.transpose(y), np.dot(np.linalg.inv(C), y))
+      if Q < Qt: 
+        level_set.add(x)
+        R.add((x[0]+1, x[1]-1)); R.add((x[0]+1, x[1])); R.add((x[0]+1, x[1]+1))
+        R.add((x[0],   x[1]-1));                        R.add((x[0] ,  x[1]+1))
+        R.add((x[0]-1, x[1]-1)); R.add((x[0]-1, x[1])); R.add((x[0]-1, x[1]+1)) 
+    S = R.difference(level_set)
+
+  return level_set
+
+
+def print_conf(level_set, p_hat, p_known, half_span=HALF_SPAN*50, scale=1):
+  
+  x_hat = np.array([half_span, half_span])
+  x_known = transform_coord(p_known, p_hat, half_span, scale)
+  
+  fella = 20
+  for i in range(-fella, fella+1):
+    for j in range(-fella, fella+1):
+      x = x_hat + np.array([i,j])
       if x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
       elif x[0] == x_hat[0] and x[1] == x_hat[1]: print 'P', 
-      elif Q < Qt: print '.',
+      elif tuple(x) in level_set: print '.',
       else: print ' ',
     print 
-
       
 
 
