@@ -51,8 +51,8 @@ def sim_data():
 
   # Noise paramters. 
   # TODO Signal to noise ratio? 
-  sig_t = complex(0.008, 0.00)
-  sig_n = complex(0.0003, 0.00)
+  sig_t = complex(1, 0.00)
+  sig_n = complex(0.003, 0.00)
   
   sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, 4)#, exclude=[3,5])
 
