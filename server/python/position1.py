@@ -410,11 +410,24 @@ def compute_conf(p_hat, sites, splines, significance_level=0.68, half_span=HALF_
   return level_set
 
 
+
+
+
+
 def print_conf(level_set, p_hat, p_known, half_span=HALF_SPAN*50, scale=1):
   
   x_hat = np.array([half_span, half_span])
   x_known = transform_coord(p_known, p_hat, half_span, scale)
   
+  # TODO Is this ok?
+  x_centroid = np.array([0,0])
+  for (e,n) in level_set:
+    x_centroid[0] += e
+    x_centroid[1] += n
+  x_centroid[0] /= len(level_set)
+  x_centroid[1] /= len(level_set)
+  level_set = map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set) 
+
   fella = 20
   for i in range(-fella, fella+1):
     for j in range(-fella, fella+1):
