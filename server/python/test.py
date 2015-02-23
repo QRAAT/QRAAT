@@ -39,9 +39,22 @@ def real_data():
   positions = position1.WindowedPositionEstimator(dep_id, sites, center, sig, sv, 
                   60 * 5, 30, method=signal1.Signal.Bartlet)
 
+  
   # Plot position and search space. 
   for i, pos in enumerate(positions): 
     pos.plot('%d.png' % (i), sites, center, 10, 150)
+
+
+def est_params():
+  
+  sig = signal1.Signal.read(sites.keys())
+  (sig_n, sig_t) = sig.estimate_var()
+  print "sig_n"
+  for (id, (a, b)) in sig_n.iteritems():
+    print id, a, b
+  print "sig_t"
+  for (id, (a, b)) in sig_t.iteritems():
+    print id, a, b
 
 
 def sim_data():
@@ -51,16 +64,16 @@ def sim_data():
 
   # Noise paramters. 
   # TODO Signal to noise ratio? 
-  sig_t = complex(1, 0.00)
-  sig_n = complex(0.003, 0.00)
+  sig_t = complex(0.01, 0.00)
+  sig_n = complex(0.0006, 0.00)
   
-  sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, 4)#, exclude=[3,5])
+  sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, 40)#, exclude=[3,5])
 
   pos = position1.PositionEstimator(999, sites, center, 
                                sig, sv, method=signal1.Signal.Bartlet)
   pos.plot('fella.png', sites, center, 10, 150, p)
   
-  level_set = position1.compute_conf(pos.p, sites, pos.splines)
+  level_set = position1.compute_conf(pos.p, sites, pos.splines, 0.68)
   if level_set is None: 
     level_set = set()
   position1.print_conf(level_set, pos.p, p)

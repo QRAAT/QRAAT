@@ -340,6 +340,18 @@ class Signal:
                       max(sig.table[id].t))
     return sig
 
+  def estimate_var(self): 
+    sig_t = {}; sig_n = {}
+    for (site_id, site) in self.table.iteritems():
+      A = []; B = []
+      for (id, t, edsp, ed, nc) in site:
+        tr = np.trace(nc) #np.real(np.trace(nc))
+        A.append(edsp - tr)   # sig_t 
+        B.append(tr / num_ch) # sig_n
+      sig_t[site_id] = (np.mean(A), np.std(A))
+      sig_n[site_id] = (np.mean(B), np.std(B))
+    return (sig_n, sig_t)
+
   def get_site_ids(self):
     ''' Return a list of site ID's. ''' 
     return self.table.keys()
@@ -400,6 +412,11 @@ class _per_site_data:
     
   def __len__(self):
     return self.count
+
+  def __iter__(self): 
+    for i in range(self.count):
+      yield (self.est_ids[i], self.t[i], self.edsp[i],
+             self.signal_vector[i], self.noise_cov[i])
 
   def read(self, suffix='sig'):
     fn = '%s%d.%s' % (suffix, self.site_id, self.suffix)
