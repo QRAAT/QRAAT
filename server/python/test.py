@@ -45,29 +45,24 @@ def real_data():
     pos.plot('%d.png' % (i), sites, center, 10, 150)
 
 
-def est_params():
-  
-  sig = signal1.Signal.read(sites.keys())
-  (sig_n, sig_t) = sig.estimate_var()
-  print "sig_n"
-  for (id, (a, b)) in sig_n.iteritems():
-    print id, a, b
-  print "sig_t"
-  for (id, (a, b)) in sig_t.iteritems():
-    print id, a, b
-
-
 def sim_data():
 
   # Simpulate signal given known position p.  
   p = center + complex(650,0)
 
   # Noise paramters. 
-  # TODO Signal to noise ratio? 
+  # Signal to noise ratio 
   sig_t = complex(0.01, 0.00)
   sig_n = complex(0.0006, 0.00)
   
   sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, 40)#, exclude=[3,5])
+  (sig_n, sig_t) = sig.estimate_var()
+  print "sig_n"
+  for (id, (a, b)) in sig_n.iteritems():
+    print id, '%0.5f %0.5f' % (a.real, b)
+  print "sig_t"
+  for (id, (a, b)) in sig_t.iteritems():
+    print id, '%0.5f %0.5f' % (a.real, b)
 
   pos = position1.PositionEstimator(999, sites, center, 
                                sig, sv, method=signal1.Signal.Bartlet)
