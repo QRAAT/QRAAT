@@ -67,12 +67,12 @@ def sim_data():
   pos = position1.PositionEstimator(999, sites, center, 
                                sig, sv, method=signal1.Signal.Bartlet)
   pos.plot('fella.png', sites, center, 10, 150, p)
+ 
+  conf = position1.ConfidenceRegion(pos, sites, 0.68) 
+  conf.display(p)  
+  if p in conf: print 'Yes!' 
+  else: print 'no.'
   
-  level_set = position1.compute_conf(pos.p, sites, pos.splines, 0.68)
-  if level_set is None: 
-    level_set = set()
-  position1.print_conf(level_set, pos.p, p)
-
 '''
 
   Notes:

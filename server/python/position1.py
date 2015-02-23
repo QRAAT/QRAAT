@@ -259,6 +259,51 @@ class Position:
 
 
 
+### class ConfidenceRegion. ###################################################
+
+class ConfidenceRegion: 
+
+  def __init__(self, pos, sites, significance_level=0.68, half_span=HALF_SPAN*50, scale=1):
+    self.p_hat = pos.p
+    self.signficance_level = significance_level
+    self.half_span = half_span
+    self.scale = scale
+    level_set = compute_conf(pos.p, sites, pos.splines, 
+                               significance_level, half_span, scale)
+    if level_set is None:
+      level_set = set()
+    
+    # TODO Is this ok?
+    x_hat = np.array([half_span, half_span])
+    x_centroid = np.array([0,0])
+    for (e,n) in level_set:
+      x_centroid[0] += e
+      x_centroid[1] += n
+    x_centroid[0] /= len(level_set)
+    x_centroid[1] /= len(level_set)
+    self.level_set = map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set) 
+
+  def display(self, p_known):
+    x_hat = np.array([self.half_span, self.half_span])
+    x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
+    fella = 20
+    for i in range(-fella, fella+1):
+      for j in range(-fella, fella+1):
+        x = x_hat + np.array([i,j])
+        if x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
+        elif x[0] == x_hat[0] and x[1] == x_hat[1]: print 'P', 
+        elif tuple(x) in self.level_set: print '.',
+        else: print ' ',
+      print 
+
+  def __contains__(self, p):
+    x = transform_coord(p, self.p_hat, self.half_span, self.scale)
+    return tuple(x) in self.level_set
+
+  def __len__(self):
+    return len(self.level_set)
+
+
 ### Low level calls. ##########################################################
 
 def aggregate_window(P, signal, obj, t_start, t_end):
@@ -360,17 +405,14 @@ def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=1, delta=S
   return p_hat, likelihood
 
 
-
-
-
-
-
 def transform_coord(p, center, half_span, scale):
+  ''' Transform position as a complex number to some coordinate system. ''' 
   x = [int((p.imag - center.imag) / scale) + half_span,
        int((p.real - center.real) / scale) + half_span]
   return np.array(x)
   
 def compute_cov(x, H, Del):
+  ''' Compute covariance matrix of estimate, given x the true position. ''' 
   a = Del(x)
   b = np.linalg.inv(H(x))
   C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
@@ -414,29 +456,6 @@ def compute_conf(p_hat, sites, splines, significance_level=0.68, half_span=HALF_
 
 
 
-def print_conf(level_set, p_hat, p_known, half_span=HALF_SPAN*50, scale=1):
-  
-  x_hat = np.array([half_span, half_span])
-  x_known = transform_coord(p_known, p_hat, half_span, scale)
-  
-  # TODO Is this ok?
-  x_centroid = np.array([0,0])
-  for (e,n) in level_set:
-    x_centroid[0] += e
-    x_centroid[1] += n
-  x_centroid[0] /= len(level_set)
-  x_centroid[1] /= len(level_set)
-  level_set = map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set) 
-
-  fella = 20
-  for i in range(-fella, fella+1):
-    for j in range(-fella, fella+1):
-      x = x_hat + np.array([i,j])
-      if x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
-      elif x[0] == x_hat[0] and x[1] == x_hat[1]: print 'P', 
-      elif tuple(x) in level_set: print '.',
-      else: print ' ',
-    print 
       
 
 
