@@ -245,7 +245,7 @@ class Position:
             facecolor='1.0', label='pos. est', zorder=11)
 
     pp.clim()   # clamp the color limits
-    pp.legend()
+    #pp.legend()
     pp.axis([0, half_span * 2, 0, half_span * 2])
     
     t = time.localtime(self.t)
