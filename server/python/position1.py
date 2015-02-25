@@ -299,8 +299,14 @@ class ConfidenceRegion:
     if self.level_set is None:
       return False
     else:
-      x = transform_coord(p, self.p_hat, self.half_span, self.scale)
-      return (tuple(x) in self.level_set)
+      x = tuple(transform_coord(p, self.p_hat, self.half_span, self.scale))
+      res = False
+      for i in range(-1,2):
+        for j in range(-1,2):
+          y = (x[0]+i, x[1]+j)
+          res = res | (y in self.level_set)
+      return res
+      #return x in self.level_set
 
   def __len__(self):
     return len(self.level_set)

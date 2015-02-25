@@ -52,10 +52,9 @@ def sim_data():
 
   # Noise paramters. 
   # Signal to noise ratio 
-  sig_t = complex(0.01, 0.00)
-  sig_n = complex(0.0006, 0.00)
-  
-  sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, 40)#, exclude=[3,5])
+  sig_t = 10
+  sig_n = 0.0006  
+  sig = signal1.Simulator1(p, sites, sv, sig_n, sig_t, 40)#, exclude=[3,5])
   (sig_n, sig_t) = sig.estimate_var()
   print "sig_n"
   for (id, (a, b)) in sig_n.iteritems():

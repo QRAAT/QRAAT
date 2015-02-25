@@ -157,16 +157,17 @@ def Simulator1(p, sites, sv, sig_n, sig_t, trials, exclude=[]):
       G[i] = np.complex(I(bearing), Q(bearing))
     
     sig.table[id] = _per_site_data(id)
-    sig.table[id].count = len(T)
+    sig.table[id].count = trials
 
+    sig_T = np.sqrt(np.real(sig_t) / (np.abs(p - sites[id]) ** 2))
     V = []; edsp = []; tnp = []
     timestamps = []; est_ids = []
     for i in range(trials):
   
       # Generate transmission coefficient. 
       mean_t = np.array([mu_t.real, mu_t.imag])
-      cov_t = 0.5 * np.array([[sig_t.real, sig_t.imag],
-                              [sig_t.imag, sig_t.real]])
+      cov_t = 0.5 * np.array([[sig_T.real, sig_T.imag],
+                              [sig_T.imag, sig_T.real]])
       T = map(lambda(x) : np.complex(x[0], x[1]), 
             np.random.multivariate_normal(mean_t, cov_t, 1))[0]
 
@@ -177,18 +178,17 @@ def Simulator1(p, sites, sv, sig_n, sig_t, trials, exclude=[]):
       # Modelled signal. 
       V.append((T * G) + N)
       
-      edsp.append(sig_t + tr)
-      tnp.append(edsp[-1] - sig_t)
+      edsp.append(sig_T + tr)
+      tnp.append(edsp[-1] - sig_T)
       timestamps.append(i)
       est_ids.append(i)
     
     sig.table[id].est_ids = np.array(est_ids)
     sig.table[id].t = np.array(timestamps)
     sig.table[id].signal_vector = np.array(V)
-    sig.table[id].tnp = np.array(tn0)
+    sig.table[id].tnp = np.array(tnp)
     sig.table[id].edsp = np.array(edsp)
-    sig.table[id].noise_cov = np.array([Sigma] * len(T))
-  
+    sig.table[id].noise_cov = np.array([Sigma] * trials)  
   return sig
 
 
