@@ -271,17 +271,16 @@ class ConfidenceRegion:
     level_set = compute_conf(pos.p, sites, pos.splines, 
                                significance_level, half_span, scale)
     if level_set is None:
-      level_set = set()
-    
-    # TODO Is this ok?
-    x_hat = np.array([half_span, half_span])
-    x_centroid = np.array([0,0])
-    for (e,n) in level_set:
-      x_centroid[0] += e
-      x_centroid[1] += n
-    x_centroid[0] /= len(level_set)
-    x_centroid[1] /= len(level_set)
-    self.level_set = map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set) 
+      self.level_set = None
+    else: # TODO Is this ok?
+      x_hat = np.array([half_span, half_span])
+      x_centroid = np.array([0,0])
+      for (e,n) in level_set:
+        x_centroid[0] += e
+        x_centroid[1] += n
+      x_centroid[0] /= len(level_set)
+      x_centroid[1] /= len(level_set)
+      self.level_set = map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set) 
 
   def display(self, p_known):
     x_hat = np.array([self.half_span, self.half_span])
@@ -297,8 +296,11 @@ class ConfidenceRegion:
       print 
 
   def __contains__(self, p):
-    x = transform_coord(p, self.p_hat, self.half_span, self.scale)
-    return tuple(x) in self.level_set
+    if self.level_set is None:
+      return False
+    else:
+      x = transform_coord(p, self.p_hat, self.half_span, self.scale)
+      return (tuple(x) in self.level_set)
 
   def __len__(self):
     return len(self.level_set)

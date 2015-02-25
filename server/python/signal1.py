@@ -121,6 +121,76 @@ def Simulator(p, sites, sv, sig_n, sig_t, trials, exclude=[]):
   return sig
 
 
+def Simulator1(p, sites, sv, sig_n, sig_t, trials, exclude=[]):
+ 
+  # Elements of noise vector are modelled as independent, identically
+  # distributed, circularly-symmetric complex normal random varibles. 
+  mu_n =  np.complex(0,0)
+  mean_n = np.array([mu_n.real, mu_n.imag])
+  cov_n = 0.5 * np.array([[sig_n.real, sig_n.imag],
+                        [sig_n.imag, sig_n.real]])
+    
+  mu_t = np.complex(0,0)
+
+  # Noise covariance matrix. 
+  Sigma = np.matrix(np.zeros((4,4), dtype=np.complex))
+  np.fill_diagonal(Sigma, sig_n)
+  tr = np.trace(Sigma)
+  
+  # Interpolate splines to steering vectors. 
+  splines = compute_bearing_splines(sv)
+  sig = Signal()
+    
+  sig.t_start = 0
+  sig.t_end = trials - 1
+
+  # Generate a (V, \rho, \Sigma) triple for each site. 
+  for id in sites.keys():
+    if id in exclude: 
+      continue
+    bearing = np.angle(p - sites[id]) * 180 / np.pi
+    
+    # Compute modelled steering vector for DOA. 
+    G = np.zeros(num_ch, dtype=np.complex)
+    for i in range(num_ch):
+      (I, Q) = splines[id][i]
+      G[i] = np.complex(I(bearing), Q(bearing))
+    
+    sig.table[id] = _per_site_data(id)
+    sig.table[id].count = len(T)
+
+    V = []; edsp = []; tnp = []
+    timestamps = []; est_ids = []
+    for i in range(trials):
+  
+      # Generate transmission coefficient. 
+      mean_t = np.array([mu_t.real, mu_t.imag])
+      cov_t = 0.5 * np.array([[sig_t.real, sig_t.imag],
+                              [sig_t.imag, sig_t.real]])
+      T = map(lambda(x) : np.complex(x[0], x[1]), 
+            np.random.multivariate_normal(mean_t, cov_t, 1))[0]
+
+      # Generate noise vector. 
+      N = np.array(map(lambda(x) : np.complex(x[0], x[1]), 
+            np.random.multivariate_normal(mean_n, cov_n, num_ch)))
+
+      # Modelled signal. 
+      V.append((T * G) + N)
+      
+      edsp.append(sig_t + tr)
+      tnp.append(edsp[-1] - sig_t)
+      timestamps.append(i)
+      est_ids.append(i)
+    
+    sig.table[id].est_ids = np.array(est_ids)
+    sig.table[id].t = np.array(timestamps)
+    sig.table[id].signal_vector = np.array(V)
+    sig.table[id].tnp = np.array(tn0)
+    sig.table[id].edsp = np.array(edsp)
+    sig.table[id].noise_cov = np.array([Sigma] * len(T))
+  
+  return sig
+
 
 
 

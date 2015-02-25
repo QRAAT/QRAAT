@@ -53,6 +53,6 @@ if __name__ == '__main__':
   (center, zone) = util.get_center(db_con)
 
   p = center + np.complex(650, 0)
-  res = sim(100, 40, sv, sites, p, 2, 10)
+  res = sim(100, 40, sv, sites, p, 0, 10)
   report(res)
 
