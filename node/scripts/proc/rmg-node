@@ -138,7 +138,7 @@ RX_OUTLET=$(rmg_csv --column rx_outlet <$SITE)
 
 RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
 if [ $? -ne "0" ]
-  then echo "error: foreground pipeline exited unsuccessful"; exit 1; fi 
+  then echo "error $?: foreground pipeline exited unsuccessful"; exit 1; fi 
 
 SDR_PID=$(pgrep rmg_runretry)
 

@@ -22,6 +22,7 @@
 import blocks, params
 from pic_interface import pic_interface
 import os, time
+import qraat.error
 
 FPGA_FREQ = 10.7e6
 CHANNELS = 4
@@ -91,21 +92,10 @@ class detector_array:
         self.__create_backend()
         
         for j in range(CHANNELS):
-	        self.frontend.connect((self.frontend.u,j), (self.backend,j))
+            self.frontend.connect((self.frontend.u,j), (self.backend,j))
 
-        if not self.sc is None:
-            self.sc.tune(self.backend_param.tunings[self.connected_be].lo1)
-            check_tuple = self.sc.check(self.backend_param.tunings[self.connected_be].lo1)
-            if not (check_tuple[0] and check_tuple[1] and check_tuple[2]):
-                print "Pic frequency error"
-                print "Reseting PIC"
-                self.sc.reset_pic()
-                self.sc.tune(self.backend_param[self.connected_be].lo1)
-                check_tuple = self.sc.check(self.backend_param.tunings[self.connected_be].lo1)
-                if not (check_tuple[0] and check_tuple[1] and check_tuple[2]):
-                     print "Pic frequency error"
-                     self.sc.freq_check()
-                     raise ValueError, "Error setting frequency on RMG"
+
+        self.__tune_pll(self.backend_param.tunings[self.connected_be].lo1)
 
     def __load_param(self):
     #
@@ -139,6 +129,23 @@ class detector_array:
     def __create_backend(self):
 
         self.backend = blocks.software_backend(CHANNELS, self.backend_param, self.directory)
+
+    def __tune_pll(self, freq):
+        if not self.sc is None:
+            self.sc.tune(freq)
+            if not self.sc.check(freq):
+                print "Pic frequency error, retry"
+                self.sc.tune(freq)
+                if not self.sc.check(freq):
+                    print "Pic frequency error"
+                    print "Reseting PIC"
+                    self.sc.reset_pic()
+                    self.sc.tune(freq)
+                    if not self.sc.check(freq):
+                        print "Pic frequency error"
+                        self.sc.print_status()
+                        raise qraat.error.PLL_LockError()
+
      
     ## public runnables ##
 
@@ -148,8 +155,7 @@ class detector_array:
         self.connected_be += 1
         if self.connected_be == self.num_be:
             self.connected_be = 0
-        if self.sc != None:
-            self.sc.tune(self.backend_param.tunings[self.connected_be].lo1)
+        self.__tune_pll(self.backend_param.tunings[self.connected_be].lo1)
         self.backend.enable(self.backend_param.tunings[self.connected_be].bands)
     
     def start(self):
@@ -196,7 +202,12 @@ class detector_array:
                     if self.sc != None:
                         del self.sc
 
-
+                except:
+                    timestr = "Stopping RMG for Exception at {0}\n\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
+                    with open(self.directory + '/status.txt','a') as status_file:
+                        status_file.write(timestr)
+                    print "Exception "
+                    raise
 
 
 if __name__ == '__main__':

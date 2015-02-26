@@ -28,8 +28,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+# Check for attempted reentry
+name=`basename $0`
+count=`pgrep -c $name`
+if [ "$count" -gt "1" ]
+then
+        echo $name already running, `date`
+        exit 1
+fi
+
 source rmg_env
-echo Started at `date`
+
+echo Starting `date`
 echo
 echo rmg_schedule
 rmg_schedule $RMG_SERVER_SITELIST $RMG_SERVER_TXLIST
@@ -51,6 +62,6 @@ rmg_dbstats $RMG_SERVER_METADATA_DIR/authfile_readest
 echo
 echo rmg_plotstatus
 rmg_plotstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
-echo Finished at `date`
+echo `date`
 echo
 #END

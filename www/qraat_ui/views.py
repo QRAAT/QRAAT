@@ -6,7 +6,8 @@
 
 from django.template import Context, loader, RequestContext
 from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.shortcuts import render, render_to_response, get_object_or_404
+from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
+from django.shortcuts import render, render_to_response, get_object_or_404, redirect
 from django.core.urlresolvers import reverse
 from django.db.models import Q, Max, Min
 from django.contrib.auth.decorators import login_required
@@ -121,7 +122,6 @@ def get_context(request, deps=[], req_deps=[]):
     view_type = "deployment"
   print "len deps", len(deps)
   print "len req_deps", len(req_deps)
- 
 
   if flot_index == None and lat_clicked==None and lng_clicked==None:
     if len(req_deps) > 0:
@@ -180,17 +180,7 @@ def get_context(request, deps=[], req_deps=[]):
         index_form.fields['activity_low'].initial = activity_low_initial
         index_form.fields['activity_high'].initial = activity_high_initial
 
-        for q in queried_objects:
-          #(lat, lon) = utm.to_latlon(float(q.easting), float(q.northing), 
-          #  q.utm_zone_number, q.utm_zone_letter)
-          date_string = time.strftime('%Y-%m-%d %H:%M:%S', 
-                  time.localtime(float(q.timestamp-7*60*60))) #FIXME: Hardcode timestamp conversion 
-
-          queried_data.append((q.ID, q.deploymentID, float(q.timestamp), 
-            float(q.easting), float(q.northing), q.utm_zone_number, 
-            float(q.likelihood), float(q.activity), 
-            (float(q.latitude), float(q.longitude)), 
-            q.utm_zone_letter, date_string))
+        queried_data = sort_query_results(queried_objects)
 
         # Note: To pass strings to js using json, use |safe in template.
     
@@ -236,17 +226,16 @@ def get_context(request, deps=[], req_deps=[]):
         args = args | each_args
   
       # Query data. 
-      if int(data_type) == 1: 
+      if int(data_type) == 1: #raw positions
         queried_objects = Position.objects.filter(*(args,), **kwargs)
-      elif int(data_type) == 2: 
+      elif int(data_type) == 2: #track
         queried_objects = Position.objects.raw(
            '''SELECT * FROM position
                 JOIN track_pos ON track_pos.positionID = position.ID
                WHERE position.deploymentID = %s
                  AND position.timestamp >= %s AND position.timestamp <= %s
                  AND likelihood >= %s AND likelihood <= %s
-                 AND activity >= %s AND activity <= %s
-               ORDER BY position.timestamp''', (req_deps[0].ID, 
+                 AND activity >= %s AND activity <= %s''', (req_deps[0].ID, 
             float( time.mktime (datetime.datetime.strptime(datetime_from, '%Y-%m-%d %H:%M:%S').timetuple()) ) + 7*60*60, # FIXME
             float( time.mktime (datetime.datetime.strptime(datetime_to, '%Y-%m-%d %H:%M:%S').timetuple()) ) + 7*60*60, # FIXME
             #qraat.util.datetime_to_timestamp(datetime_from),
@@ -257,30 +246,7 @@ def get_context(request, deps=[], req_deps=[]):
       else: 
         raise Exception("Something is wrong.")
    
-      for row in queried_objects:
-        #(lat, lon) = utm.to_latlon(float(row.easting), 
-        #    float(row.northing), row.utm_zone_number,
-        #    row.utm_zone_letter)
-        date_string = time.strftime('%Y-%m-%d %H:%M:%S', #FIXME
-            time.localtime(float(row.timestamp-7*60*60)))
-
-        queried_data.append((row.ID, row.deploymentID,
-          float(row.timestamp), float(row.easting), 
-          float(row.northing), row.utm_zone_number, 
-          float(row.likelihood), float(row.activity), 
-          (float(row.latitude), float(row.longitude)), 
-          row.utm_zone_letter, date_string))
-       
-     
-      ''' For reference, the obsolete hardcoded query:
-      pos_query = Position.objects.filter(
-                          deploymentID = req_deps[0].ID,
-                          timestamp__gte = datetime_start,
-                          timestamp__lte = datetime_end,
-                          likelihood__gte = likelihood_low,
-                          likelihood__lte = likelihood_high,
-                          activity__gte = activity_low,
-                          activity__lte = activity_high) '''
+      queried_data = sort_query_results(queried_objects)
   
   context = {
             #public, deployment, project, etc.
@@ -325,6 +291,48 @@ def get_context(request, deps=[], req_deps=[]):
 
   return context
 
+def sort_query_results(queried_objects):
+  ''' Choose highest likelihood position for each timestamp 
+      and sort query data by timestamp. ''' 
+	
+  #use dictionary to remove duplicates (positions with same timestamp)
+  query_dictionary = {} #key=timestamp, value=query_row
+  for row in queried_objects:
+    if row.timestamp not in query_dictionary:
+      query_dictionary[row.timestamp] = row
+    elif row.likelihood > ((query_dictionary[row.timestamp]).likelihood):
+      query_dictionary[row.timestamp] = row #replaces existing value if new likelihood is greater
+    else:
+      pass #existing likelihood is greater
+	
+  timestamps = sorted(query_dictionary.keys())
+
+  queried_data=[] #data ordered by timestamp
+
+  for timestamp in timestamps:
+    row = query_dictionary[timestamp]			
+    date_string = time.strftime('%Y-%m-%d %H:%M:%S', #FIXME
+				time.localtime(float(row.timestamp-7*60*60)))
+
+    queried_data.append((row.ID, row.deploymentID,
+			float(row.timestamp), float(row.easting), 
+			float(row.northing), row.utm_zone_number, 
+			float(row.likelihood), float(row.activity), 
+			(float(row.latitude), float(row.longitude)), 
+			row.utm_zone_letter, date_string))
+
+  ''' For reference, the obsolete hardcoded query:
+      pos_query = Position.objects.filter(
+											deploymentID = req_deps[0].ID,
+											timestamp__gte = datetime_start,
+											timestamp__lte = datetime_end,
+											likelihood__gte = likelihood_low,
+											likelihood__lte = likelihood_high,
+											activity__gte = activity_low,
+											activity__lte = activity_high) '''
+
+  return queried_data
+
 def index(request):
   ''' Compile a list of public deployments, make this available. 
       Don't initially display anything. ''' 
@@ -350,10 +358,11 @@ def index(request):
 
 def view_by_dep(request, project_id, dep_id):
   ''' Compile a list of deployments associated with `dep_id`. ''' 
+  
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
-    return HttpResponse("We didn't find this project") 
+    raise Http404
  
   if not project.is_public:
     if request.user.is_authenticated():
@@ -365,19 +374,25 @@ def view_by_dep(request, project_id, dep_id):
         pass
         
       else:
-        return HttpResponse("You're not allowed to view this.")
+        raise PermissionDenied #403
     
     else:
-      return HttpResponse("You're not allowed to visualize this")
+			return redirect("/auth/login/?next=%s" % request.get_full_path())
 
-  else: pass
+  else: pass #public project
     
   deps = project.get_deployments().filter(ID=dep_id)
+
   print "-----------------------------------------------------"
   print request.GET
   print request.POST
   print "-----------------------------------------------------"
-  deployment = Deployment.objects.get(ID=dep_id)
+  
+  try:
+    deployment = Deployment.objects.get(ID=dep_id)
+  except ObjectDoesNotExist:
+    raise Http404
+ 
   target = deployment.targetID
   target_name = target.name
 
@@ -399,8 +414,8 @@ def download_by_dep(request, project_id, dep_id):
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
-    return HttpResponse("We didn't find this project") 
-  
+		raise Http404
+      
   if not project.is_public:
     if request.user.is_authenticated():
       user = request.user
@@ -411,10 +426,11 @@ def download_by_dep(request, project_id, dep_id):
 
         deps = project.get_deployments().filter(ID=dep_id)
       else:
-        return HttpResponse("You're not allowed to view this.")
-    
+        raise PermissionDenied #403
+
     else:
-      return HttpResponse("You're not allowed to visualize this")
+			return redirect("/auth/login/?next=%s" % request.get_full_path())
+
 
   else:
     deps = project.get_deployments().filter(ID=dep_id)
@@ -435,12 +451,12 @@ def download_by_dep(request, project_id, dep_id):
 
 def view_by_target(request, target_id): 
   ''' Compile a list of deployments associated with `target_id`. ''' 
-  return HttpResponse('Not implemneted yet. (targetID=%s)' % target_id)
+  return HttpResponse('Not implemented yet. (targetID=%s)' % target_id)
 
 
 def view_by_tx(request, tx_id): 
   ''' Compile a list of deployments associated with `tx_id`. ''' 
-  return HttpResponse('Not implemneted yet. (txID=%s)' % tx_id)
+  return HttpResponse('Not implemented yet. (txID=%s)' % tx_id)
 
 
 @login_required(login_url="auth/login")

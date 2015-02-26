@@ -5,13 +5,6 @@
 # useful extension to this work will be to coroborate points between
 # sites. 
 
-# NOTE It would be nice if np.where() would return a shallow
-#      copy. Then we could do 
-#       time_filter(burst_filter(parametric_filter(data, _), _), _)
-
-# NOTE The larger the score window, the more accurate we calculate 
-#      the expected pulse interval.
-
 # NOTE We don't yet account for the percentage of time the system is 
 #      listening for the transmitter. This should be encorpoerated 
 #      into the theoretical score over the pulse's neighborhood. 
@@ -24,24 +17,29 @@ import numpy as np
 #### Constants and parameters for per site/transmitter pulse filtering. #######
 
 # Burst filter parameters. 
-BURST_INTERVAL = 10         # seconds
-BURST_THRESHOLD = 20        # pulses/second
+BURST_INTERVAL = 10     # seconds
+BURST_THRESHOLD = 20    # pulses/second
 
-# Time filter paramters. 
-SCORE_INTERVAL = 60 * 3     # seconds
-SCORE_NEIGHBORHOOD = 20     # seconds
+# Time filter paramters. These defaults may be overwritten by the calling script.
+SCORE_INTERVAL = 60     # seconds
+SCORE_NEIGHBORHOOD = 20 # seconds
 
 # Score error for pulse corroboration, as a function of the variation over 
 # the interval. (Second moment of the mode pulse interval). These curves were 
 # fit to a particular false negative / positive trade-off over a partitioned
-# data set. See server/scripts/filter/test-data for details. 
-SCORE_ERROR = lambda(x) : (-0.6324 / (x + 7.7640)) + 0.1255 # thresh = 0.2
-#SCORE_ERROR = lambda(x) : 0.1956                           # thresh = 0.2
+# data set. See github.com/qraat/time-filter for details. 
+
+# Results for SCORE_THRESHOLD=0.2. 
+#SCORE_ERROR = lambda(x) : (-0.6324 / (x + 7.7640)) + 0.1255 # hyper
+#SCORE_ERROR = lambda(x) : 0.02                              # const_low
+SCORE_ERROR = lambda(x) : 0.1255                             # const_high
 
 # Minumum percentage of transmitter's nominal pulse interval that the expected
 # pulse_interval is allowed to drift. Tiny pulse intervals frequently result 
 # from particularly noisy, but it may not be enough to trigger the burst 
 # filter.
+# Valid range is MIN_DRIFT_PRECENTAGE*Rate to (2-MIN_DRIFT_PRECENTAGE)*Rate
+#    or +/- (1-MIN_DRIFT_PERCENTAGE)
 MIN_DRIFT_PERCENTAGE = 0.33
 
 # Eliminate noisy intervals. 
@@ -71,71 +69,8 @@ def debug_output(msg):
   if VERBOSE: 
     print "signal: %s" % msg
 
-def Filter0(db_con, dep_id, site_id, t_start, t_end): 
-  ''' Score points per site and transmitter, insert into database. 
-  
-    Return the number of pulses that were scored and the last id
-    processed into the database.  
-  '''   
 
-  total = 0; max_id = 0
-  tx_params = get_tx_params(db_con, dep_id)
-  debug_output("depID=%d parameters: band3=%s, band10=%s, pulse_rate=%s" 
-     % (dep_id, 'nil' if tx_params['band3'] == sys.maxint else tx_params['band3'],
-                'nil' if tx_params['band10'] == sys.maxint else tx_params['band10'], 
-                tx_params['pulse_rate']))
-          
-  interval_data = [] # Keep track of pulse rate of each window. 
-
-  for interval in get_score_intervals(t_start, t_end):
-
-    # Using overlapping windows in order to mitigate 
-    # score bias on points at the end of the windows. 
-    augmented_interval = (interval[0] - (SCORE_NEIGHBORHOOD / 2), 
-                          interval[1] + (SCORE_NEIGHBORHOOD / 2))
-
-    data = get_interval_data(db_con, dep_id, site_id, augmented_interval)
-  
-    if data.shape[0] == 0: # Skip empty chunks.
-      debug_output("skipping empty chunk")
-      continue
-
-    debug_output("processing %.2f to %.2f (%d pulses)" % (interval[0], 
-                                                          interval[1], 
-                                                          data.shape[0]))
-    
-    parametric_filter(data, tx_params)
-      
-    if data.shape[0] >= BURST_THRESHOLD: 
-      burst_filter(data, augmented_interval)
-
-    # Tbe only way to coroborate isolated points is with other sites. 
-    if data.shape[0] > 2:
-      (pulse_interval, pulse_variation) = expected_pulse_interval({site_id : data}, tx_params['pulse_rate'])
-      if pulse_interval > 0 and pulse_variation < MAX_VARIATION:
-        time_filter(data, pulse_interval, pulse_variation)
-        pulse_interval = float(pulse_interval) / TIMESTAMP_PRECISION
-      else: pulse_interval = pulse_variation = None 
-
-    else: pulse_interval = pulse_variation = None
-    
-    # When inserting, exclude overlapping points.
-    (count, id) = update_data(db_con, 
-       data[(data[:,2] >= (interval[0] * TIMESTAMP_PRECISION)) & 
-            (data[:,2] <  (interval[1] * TIMESTAMP_PRECISION))])
-
-    interval_data.append((interval[0], pulse_interval, pulse_variation))
-  
-    total += count
-    max_id = id if max_id < id else max_id
-  
-  update_intervals(db_con, dep_id, site_id, interval_data)
-  
-  return (total, max_id)
-
-
-
-def Filter(db_con, dep_id, t_start, t_end): 
+def Filter(db_con, dep_id, t_start, t_end, param_filter=True): 
   
   total = 0; max_id = 0
   tx_params = get_tx_params(db_con, dep_id)
@@ -163,39 +98,45 @@ def Filter(db_con, dep_id, t_start, t_end):
 
     data = {}
     for site_id in sites: 
-      data[site_id] = get_interval_data(db_con, dep_id, site_id, augmented_interval)
+      data[site_id] = get_est_data(db_con, dep_id, site_id, augmented_interval)
         
-    (pulse_interval, pulse_variation) = expected_pulse_interval(data, tx_params['pulse_rate'])
-
+    no_data = True
     for site_id in sites:
       
       if data[site_id].shape[0] == 0: # Skip empty chunks.
         debug_output("siteID=%s: skipping empty chunk" % site_id)
         continue
+      else:
+        no_data = False
 
       debug_output("siteID=%s: processing %.2f to %.2f (%d pulses)" % (site_id,
                                                                        interval[0], 
                                                                        interval[1], 
                                                                        data[site_id].shape[0]))
       
-      parametric_filter(data[site_id], tx_params)
+      if param_filter:
+        parametric_filter(data[site_id], tx_params)
         
       if data[site_id].shape[0] >= BURST_THRESHOLD: 
         burst_filter(data[site_id], augmented_interval)
 
-      # Tbe only way to coroborate isolated points is with other sites. 
+    if not no_data:
+      (pulse_interval, pulse_variation) = expected_pulse_interval(data, tx_params['pulse_rate'])
+
+    for site_id in sites:
+
+      # The only way to coroborate isolated points is with other sites. 
       if data[site_id].shape[0] > 2 and pulse_interval > 0:
         time_filter(data[site_id], pulse_interval, pulse_variation)
+        interval_data[site_id].append((interval[0], float(pulse_interval) / TIMESTAMP_PRECISION, pulse_variation))
       
       # When inserting, exclude overlapping points.
-      (count, id) = update_data(db_con, 
-         data[site_id][(data[site_id][:,2] >= (interval[0] * TIMESTAMP_PRECISION)) & 
-                       (data[site_id][:,2] <  (interval[1] * TIMESTAMP_PRECISION))])
-
-      interval_data[site_id].append((interval[0], float(pulse_interval) / TIMESTAMP_PRECISION, pulse_variation))
-  
-      total += count
-      max_id = id if max_id < id else max_id
+      if data[site_id].shape[0] > 0:
+        (count, id) = update_estscore(db_con, 
+          data[site_id][(data[site_id][:,2] >= (interval[0] * TIMESTAMP_PRECISION)) * 
+                        (data[site_id][:,2] <  (interval[1] * TIMESTAMP_PRECISION))])
+        total += count
+        max_id = id if max_id < id else max_id
   
   for site_id in sites:
     update_intervals(db_con, dep_id, site_id, interval_data[site_id])
@@ -211,14 +152,14 @@ def Filter(db_con, dep_id, t_start, t_end):
 def get_score_intervals(t_start, t_end): 
   ''' Return a list of scoring windows given arbitrary start and finish. '''  
  
-  t_start = int(t_start); t_end = int(t_end)
+  t_start = int(t_start); t_end = int(t_end)+1
   for i in range(t_start - (t_start % SCORE_INTERVAL), 
-                 t_end   + (t_end   % SCORE_INTERVAL),
+                 t_end,
                  SCORE_INTERVAL):
     yield (i, i + SCORE_INTERVAL)
 
 
-def get_interval_data(db_con, dep_id, site_id, interval):
+def get_est_data(db_con, dep_id, site_id, interval):
   ''' Get pulse data for interval. 
   
     Last columns are for the score and theoretically best score of the
@@ -243,7 +184,7 @@ def get_interval_data(db_con, dep_id, site_id, interval):
   return np.array(data, dtype=np.int64)
 
 
-def update_data(db_con, data): 
+def update_estscore(db_con, data): 
   ''' Insert scored data, updating existng records. 
   
     Return the number of inserted scores and the maximum estID. 
@@ -334,7 +275,7 @@ def expected_pulse_interval(data_dict, pulse_rate):
   ''' Compute expected pulse rate over data.
   
     Data is assumed to be sorted by timestamp and timestamps should be
-    multiplied by `TIMESTAMP_PRECISION`. (See `get_interval_data()`.)  
+    multiplied by `TIMESTAMP_PRECISION`. (See `get_est_data()`.)  
 
     :param pulse_rate: Transmitter's nominal pulse rate in pulses / minute. 
   ''' 
@@ -345,12 +286,13 @@ def expected_pulse_interval(data_dict, pulse_rate):
 
   # Compute pairwise time differentials. 
   diffs = []
-  for (_, data) in data_dict.iteritems():
+  for data in data_dict.itervalues():
     if data.shape[0] > 0:
-      (rows, cols) = data.shape
+      filtered_data = data[(data[:,5] >= 0),2]#remove already determined "bad" points
+      rows = filtered_data.shape[0]
       for i in range(rows):
         for j in range(i+1, rows): 
-          diff = data[j,2] - data[i,2]
+          diff = filtered_data[j] - filtered_data[i]
           if min_interval < diff and diff < max_interval: 
             diffs.append(diff)
 
@@ -387,8 +329,6 @@ def parametric_filter(data, tx_params):
     if data[i,3] > tx_params['band3'] or data[i,4] > tx_params['band10']:
       data[i,5] = PARAM_BAD
 
-  #return data[data[:,5] != PARAM_BAD]
-
 
 def burst_filter(data, interval): 
   ''' Burst filter. Set score to `BURST_BAD`.
@@ -401,7 +341,8 @@ def burst_filter(data, interval):
   ''' 
 
   # Create histogram of pulses with `BURST_INTERVAL` second bins. 
-  (hist, bins) = np.histogram(data[:,2], 
+  #remove already determined "bad" points
+  (hist, bins) = np.histogram(data[(data[:,5] >= 0), 2], 
                               range = (interval[0] * TIMESTAMP_PRECISION, 
                                        interval[1] * TIMESTAMP_PRECISION),
                               bins = SCORE_INTERVAL / BURST_INTERVAL)
@@ -424,8 +365,6 @@ def burst_filter(data, interval):
     for (t0, t1) in bad_intervals:
       if t0 <= data[i,2] and data[i,2] <= t1:
         data[i,5] = BURST_BAD
-
-  #return data[data[:,5] != BURST_BAD]
 
 
 def time_filter(data, pulse_interval, pulse_variation, thresh=None):
@@ -453,7 +392,7 @@ def time_filter(data, pulse_interval, pulse_variation, thresh=None):
     else: bins[t] = [i]
 
   # Score pulses in bins with exactly one pulse. 
-  for (_, points) in bins.iteritems():
+  for points in bins.itervalues():
     if len(points) > 1: 
       data[i,5] = 0
 
@@ -470,48 +409,6 @@ def time_filter(data, pulse_interval, pulse_variation, thresh=None):
   
   data[:,6] = theoretical_count
   data[:,7] = np.max(data[:,5]) # Max count. 
-
-
-# TODO Deprecate
-def time_filter0(data, pulse_interval, pulse_variation, thresh=None):
-  ''' Time filter. Calculate absolute score and normalize. 
-    
-    `thresh` is either None or in [0 .. 1]. If `thresh` is not none,
-    it returns data with relative score of at least this value. 
-  ''' 
-
-  pulse_error = int(SCORE_ERROR(pulse_variation) * TIMESTAMP_PRECISION)
-  delta = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION / 2 
-    
-  # Best score theoretically possible for this interval. 
-  theoretical_count = SCORE_NEIGHBORHOOD * TIMESTAMP_PRECISION / pulse_interval
-
-  # For each pulse, count the number of coroborating points, i.e., 
-  # points that are a pulse interval away within paramterized error.
-  for i in range(data.shape[0]):
-    data[i,6] = theoretical_count
-    if data[i,5] < 0: # Skip if pulse didn't pass a previous filter. 
-      continue
-    
-    # Compute neighborhood window. 
-    low = data[i,2] - delta
-    high = data[i,2] + delta
-    neighborhood = data[(low <= data[:,2]) & (data[:,2] <= high)] 
-    
-    count = 0
-    for j in range(neighborhood.shape[0]): 
-      offset = abs(data[i,2] - neighborhood[j,2]) % pulse_interval
-      if offset <= pulse_error or offset >= pulse_interval - pulse_error:
-        count += 1
-    
-    data[i,5] = count - 1 # Counted myself.
-  
-  data[:,7] = np.max(data[:,5]) # Max count. 
-
-  #if thresh:
-  #  return data[data[:,5].astype(np.float) / data[:,6] > thresh]
-  #else:
-  #  return data
 
 
 

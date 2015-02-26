@@ -11,8 +11,11 @@ if int(output) > 1:
   print >>sys.stderr, "position_auto: error: attempted reentry, exiting"
   sys.exit(1)
 
+#processing stats
 runtime_start = time.time()
 print "position_auto: start time: {}".format(time.asctime(time.localtime(runtime_start)))
+total_input = 0
+total_output = 0
 
 db_con = qraat.srv.util.get_db('writer')#will throw missing environment error here
 cursor = db_con.cursor()
@@ -29,12 +32,23 @@ else:
   last_processed = last_processed[0]
 print "Last EST record processed: {}".format(last_processed)
 
+# Get id of last processed est record. 
+cursor.execute("SELECT value FROM qraat.processing_cursor WHERE name='estscore'")
+last_processed_est = cursor.fetchone()
+if last_processed_est == None:
+  print >>sys.stderr,  "position_auto: error: No cursor found for estscore"
+  last_processed_est = sys.maxint
+else: 
+  last_processed_est = last_processed_est[0]
+print "Last EST record scored: {}".format(last_processed_est)
+
 # Get deployments that have been scored but not processed. 
 cursor.execute('''SELECT DISTINCT deploymentID 
                     FROM est JOIN estscore 
                       ON est.ID = estscore.estID
                    WHERE ID > %s
-                     AND (score/theoretical_score) > %s;''', (last_processed,EST_SCORE_THRESHOLD))
+                     AND ID <= %s
+                     AND (score/theoretical_score) >= %s;''', (last_processed,last_processed_est,EST_SCORE_THRESHOLD))
 deployment_list = cursor.fetchall()
 print "{} transmitters found in new records".format(len(deployment_list))
 print deployment_list
@@ -54,8 +68,8 @@ for deployment in deployment_list:
   cursor.execute('''SELECT ID, timestamp 
                       FROM est JOIN estscore
                         ON est.ID = estscore.estID
-                     WHERE ID > %s AND deploymentID = %s 
-                     ORDER BY timestamp ASC;''', (last_processed,deployment_id))
+                     WHERE ID > %s AND ID <= %s AND deploymentID = %s 
+                     ORDER BY timestamp ASC;''', (last_processed,last_processed_est,deployment_id))
   times = np.array(cursor.fetchall(),dtype=float)
   print "Found {} records".format(times.shape[0])
   print "Calculating time range"
@@ -81,10 +95,13 @@ for deployment in deployment_list:
     estimator = qraat.srv.position.estimator(deployment_id, time_range[0], time_range[1], time_window, time_delta)
     num_est = estimator.get_est_data(db_con, EST_SCORE_THRESHOLD)
     if num_est > 0:
+      total_input += num_est
       estimator.get_bearing_likelihood(sv)
       for new_estimator in estimator.windowed():
         new_estimator.insert_bearings(db_con)
-        new_estimator.insert_positions(db_con, center)
+        num_output = new_estimator.insert_positions(db_con, center)
+        if num_output is not None:
+          total_output += num_output
     else:
       print "Skipping empty chunk"
       continue 
@@ -93,6 +110,10 @@ for deployment in deployment_list:
   if temp_max_id > max_id:
     max_id = temp_max_id
 
+#don't move position cursor past estscore cursor due to chunking bug
+if max_id > last_processed_est:
+  max_id = last_processed_est
+
 #store id of last processed record
 if max_id > last_processed:
   cursor.execute("UPDATE qraat.processing_cursor SET value=%s WHERE name='position'", (max_id,))
@@ -100,4 +121,7 @@ if max_id > last_processed:
 else:
   print "no new records processed (max_id={0})".format(max_id)
 
-print "position_auto: finished in {0:.2f} seconds.".format(time.time() - runtime_start)
+duration = time.time() - runtime_start
+print "position_auto: finished in {0:.2f} seconds.".format(duration)
+cursor.execute('INSERT INTO processing_statistics (timestamp, duration, process, beginning_index, ending_index, number_records_input, number_records_output) VALUES (%s, %s, \'position_auto\', %s, %s, %s, %s)', (int(runtime_start), duration, last_processed+1, max_id, total_input, total_output))
+

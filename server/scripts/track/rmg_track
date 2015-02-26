@@ -53,13 +53,10 @@ try:
   print "track: start time:", time.asctime(time.localtime(start))
 
   db_con = qraat.srv.util.get_db('writer')
-  
-  print "track: fetching positions."
-  pos_ids = qraat.srv.track.get_pos_ids(db_con, options.dep_id, options.t_start, options.t_end)
-  pos = qraat.srv.position.Position(db_con, pos_ids)
 
   print "track: calculating."
-  track = qraat.srv.track.calc_tracks(db_con, pos, options.dep_id, C=0)
+  (t_start, t_end) = qraat.srv.track.get_interval(db_con, options.dep_id, options.t_start, options.t_end)
+  track = qraat.srv.track.calc_tracks(db_con, options.dep_id, t_start, t_end, C=0)
 
   print "track: updating tracks."
   track.insert_db(db_con)

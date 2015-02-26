@@ -145,7 +145,7 @@ class per_site_data:
   def get_activity(self):
     a = None
     if self.num_est > 0:
-      a = np.std(self.power) / np.mean(self.power)
+      a = (np.sum((self.power-np.mean(self.power))**2)**0.5)/np.sum(self.power)
     return a
 
   def bearing_estimate(self):
@@ -178,7 +178,7 @@ class estimator:
                   WHERE deploymentID={0:d}
                     AND timestamp >= {1:f} 
                     AND timestamp <= {2:f}
-                    AND (score / theoretical_score) > {3:f}'''.format(
+                    AND (score / theoretical_score) >= {3:f}'''.format(
                          self.deploymentID, self.t_start-self.t_window,
                          self.t_stop+self.t_window, score_threshold))
     if self.num_est:
@@ -247,21 +247,24 @@ class estimator:
       time_center += self.t_delta
 
 
-  def insert_bearings(self, db_con):
+  def insert_bearings(self, db_con, dep_id=None):
+    if dep_id is None: 
+      dep_id = self.deploymentID
     timestamp = (self.t_start + self.t_stop) / 2.0
+    num_inserts = 0
     cur = db_con.cursor()
     for site, data in self.per_site.iteritems():
       if data.num_bearing > 0 and data.num_est > 0:
         theta_hat, norm_max_likelihood = data.bearing_estimate()
         activity = data.get_activity()
-        cur.execute('''INSERT INTO bearing 
-                   (deploymentID, siteID, timestamp, bearing, likelihood, activity)
-                   VALUES (%s, %s, %s, %s, %s, %s)''',
-                   (self.deploymentID, site, timestamp,
-                    theta_hat, norm_max_likelihood, activity))
+        num_inserts += cur.execute('''INSERT INTO bearing 
+                   (deploymentID, siteID, timestamp, bearing, likelihood, activity, number_est_used)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)''',
+                   (dep_id, site, timestamp,
+                    theta_hat, norm_max_likelihood, activity, data.num_est))
         data.bearingID = cur.lastrowid
         handle_provenance_insertion(cur, {'est':tuple(data.estID), 'calibration_information':(data.calID,)}, {'bearing':(data.bearingID,)})
-    
+    return num_inserts
                     
   def get_position_likelihood(self, positions):
     likelihoods = np.zeros(positions.shape, dtype=float)
@@ -295,28 +298,33 @@ class estimator:
   def get_activity(self):
     return np.mean([ s.get_activity() for s in self.per_site.itervalues() ])
 
-  def insert_positions(self, db_con, center=None):
+  def insert_positions(self, db_con, center=None, dep_id=None):
+    num_inserts = 0
     if len(self.per_site) > 1:
       if center is None:
         (center_position, utm_number, utm_letter) = get_center(db_con)
       else:
         (center_position, utm_number, utm_letter) = center
+      if dep_id is None: dep_id = self.deploymentID
       timestamp = (self.t_start + self.t_stop) / 2.0
       position_hat, likelihood = self.position_estimate(center_position)
+      norm_likelihood = likelihood / float(self.num_est)
       activity = self.get_activity()
       lat, lon = utm.to_latlon(position_hat.imag, position_hat.real, utm_number, utm_letter)
       cur = db_con.cursor()
-      cur.execute('''INSERT INTO position
-                         (deploymentID, timestamp, easting, northing, 
+      num_inserts = cur.execute('''INSERT INTO position
+                         (deploymentID, timestamp, latitude, longitude, easting, northing, 
                           utm_zone_number, utm_zone_letter, likelihood, 
-                          activity, latitude, longitude)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                     (self.deploymentID, timestamp, position_hat.imag, position_hat.real,
-                      utm_number, utm_letter, likelihood,
-                      activity, round(lat,6), round(lon,6)))
+                          activity, number_est_used)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                     (dep_id, timestamp, round(lat,6), round(lon,6),
+                      position_hat.imag, position_hat.real,
+                      utm_number, utm_letter, norm_likelihood,
+                      activity, self.num_est))
       self.positionID = cur.lastrowid
       bearingID = [ data.bearingID for data in self.per_site.itervalues() ]
       handle_provenance_insertion(cur, {'bearing':bearingID}, {'position':(self.positionID,)})
+      return num_inserts
 
 
 def handle_provenance_insertion(cur, depends_on, obj):
@@ -332,182 +340,126 @@ def handle_provenance_insertion(cur, depends_on, obj):
   cur.executemany(query, prov_args) 
 
 
+
+def plot_search_space(_estimator, sv, pos_id, p_hat, p_ll, center, scale, half_span):
+  ''' Plot search space, return point of maximum likelihood. '''
+   
+  positions = _estimator.get_candidate_positions(center, scale, half_span)
+  pos_likelihood = _estimator.get_position_likelihood(positions)
+  
+  fig = pp.gcf()
+  
+  # Transform to plot's coordinate system.
+  e = lambda(x) : ((x - center.imag) / scale) + half_span
+  n = lambda(y) : ((y - center.real) / scale) + half_span 
+  
+  x_left =  center.imag - (half_span * scale)
+  x_right = center.imag + (half_span * scale)
+  
+  # Search space
+  p = pp.imshow(pos_likelihood.transpose(), 
+      origin='lower',
+      extent=(0, half_span * 2, 0, half_span * 2),
+      cmap='YlGnBu',
+      aspect='auto', interpolation='nearest')
+
+  # Sites
+  pp.scatter(
+    [e(float(s.easting)) for s in sv.sites],
+    [n(float(s.northing)) for s in sv.sites],
+     s=15, facecolor='0.5', label='sites', zorder=10)
+  
+  # Pos. estimate
+  pp.plot(e(p_hat.imag), n(p_hat.real), 'wo', label='position', zorder=11)
+
+  pp.clim()   # clamp the color limits
+  pp.legend()
+  pp.axis([0, half_span * 2, 0, half_span * 2])
+  
+  t = time.localtime((_estimator.t_start + _estimator.t_stop) / 2)
+  pp.title('%04d-%02d-%02d %02d%02d:%02d depID=%d' % (
+       t.tm_year, t.tm_mon, t.tm_mday,
+       t.tm_hour, t.tm_min, t.tm_sec,
+       deploymentID))
+  
+  #pp.savefig('pos%d.png' % pos_id)
+  pp.savefig('pos.png')
+  pp.clf()
+ 
+  # The gradient vector del_f of the search space
+  (d_e, d_n) = np.gradient(pos_likelihood)
+  v = p_hat - positions
+  u = v / np.abs(v)
+
+  # Second derivative with respect to vector along bearing to p_hat
+  deriv = np.zeros(shape=pos_likelihood.shape, dtype=np.float64)
+  for i in range(u.shape[0]):
+    for j in range(u.shape[1]):
+      deriv[i,j] = u[i,j].imag * d_e[i,j] + u[i,j].real * d_n[i,j]
+  (d_e, d_n) = np.gradient(deriv)
+  deriv = np.zeros(shape=pos_likelihood.shape, dtype=np.float64)
+  for i in range(u.shape[0]):
+    for j in range(u.shape[1]):
+      deriv[i,j] = u[i,j].imag * d_e[i,j] + u[i,j].real * d_n[i,j]
+      #if deriv[i,j] > 0: 
+      #  deriv[i,j] = 100
+      #else: deriv[i,j] = 0
+
+  #i = e(p_hat.imag)
+  #j = n(p_hat.real)
+  #deriv[i,j] = 0
+  #print deriv[i-2:i+3,j-2:j+3]
+  
+  p = pp.imshow(deriv.transpose(), 
+      origin='lower',
+      extent=(0, half_span * 2, 0, half_span * 2),
+      cmap = 'YlGnBu',
+      aspect='auto', interpolation='nearest')
+
+  # Sites
+  pp.scatter(
+    [e(float(s.easting)) for s in sv.sites],
+    [n(float(s.northing)) for s in sv.sites],
+     s=15, facecolor='0.5', label='sites', zorder=10)
+  
+  # Pos. estimate
+  pp.plot(e(p_hat.imag), n(p_hat.real), 'wo', label='position', zorder=11)
+
+  pp.clim()   # clamp the color limits
+  pp.legend()
+  pp.axis([0, half_span * 2, 0, half_span * 2])
+  
+  pp.title('%04d-%02d-%02d %02d%02d:%02d depID=%d' % (
+       t.tm_year, t.tm_mon, t.tm_mday,
+       t.tm_hour, t.tm_min, t.tm_sec,
+       deploymentID))
+
+  #pp.savefig('deriv%d.png' % pos_id)
+  pp.savefig('deriv.png')
+  pp.clf()
+
+  # Level sets
+  #  c_step = p_ll / 10
+  #  for (index, c) in enumerate(np.arange(0, p_ll, c_step)):
+  #    level = np.zeros(shape=pos_likelihood.shape, dtype=np.float64)
+  #    for i in range(level.shape[0]):
+  #      for j in range(level.shape[1]):
+  #        if c <= pos_likelihood[i,j] and pos_likelihood[i,j] < c + c_step:
+  #          level[i,j] = 100
+  #    p = pp.imshow(level.transpose(), 
+  #        origin='lower',
+  #        extent=(0, half_span * 2, 0, half_span * 2),
+  #        cmap = 'YlGnBu',
+  #        aspect='auto', interpolation='nearest')
+  #    pp.clim()
+  #    pp.savefig('lset%02d.png' % index)
+  #    pp.clf()
+    
+
+
 ##############################################
 # below this line is depricated, I think -Todd
 ##############################################
-
-
-
-
-
-
-
-
-
-
-
-
-
-import random
-
-# Get est's from the database, applying a filter. Return a set of
-# estID's which are fed to the class signal. 
-
-def get_est_ids_timefilter(db_con, dep_id, t_start, t_end, thresh):
-  cur = db_con.cursor()
-  cur.execute('''SELECT ID, siteID, deploymentID, timestamp, edsp, 
-                            ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
-                   FROM est
-                   JOIN estscore ON est.ID = estscore.estID
-                  WHERE deploymentID=%d
-                    AND timestamp >= %f 
-                    AND timestamp <= %f
-                    AND (score / theoretical_score) > %f''' % (
-                                      dep_id, t_start, t_end, thresh))
-  raw_db = cur.fetchall()
-  estID = [ int(row[0]) for row in raw_db ]
-  signal_dict = get_signal_dict(raw_db, dep_id) 
-  return estID, signal_dict
-
-def get_est_ids_bandfilter(db_con, dep_id, t_start, t_end, band3 = 150, band10 = 900):
-  cur = db_con.cursor()
-  cur.execute('''SELECT ID, siteID, timestamp, edsp, 
-                            ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
-                   FROM est
-                  WHERE deploymentID=%d
-                    AND timestamp >= %f 
-                    AND timestamp <= %f 
-                    AND band3 < %f 
-                    AND band10 < %f''' % (dep_id, t_start, t_end, band3, band10))
-  raw_db = cur.fetchall()
-  estID = [ int(row[0]) for row in raw_db ]
-  signal_dict = get_signal_dict(raw_db, dep_id) 
-  return estID, signal_dict
-
-def get_est_ids(db_con, dep_id, t_start, t_end):
-  cur = db_con.cursor()
-  cur.execute('''SELECT ID, siteID, timestamp, edsp, 
-                            ed1r,  ed1i,  ed2r,  ed2i,  ed3r,  ed3i,  ed4r,  ed4i, 
-                   FROM est
-                  WHERE deploymentID=%d
-                    AND timestamp >= %f 
-                    AND timestamp <= %f''' % (dep_id, t_start, t_end))
-  raw_db = cur.fetchall()
-  estID = [ int(row[0]) for row in raw_db ]
-  signal_dict = get_signal_dict(raw_db, dep_id) 
-  return estID, signal_dict
-
-
-
-
-
-
-
-
-
-
-class Position:
-  
-  def __init__(self, db_con=None, pos_ids=[]): 
-    self.table = []
-    if len(pos_ids) > 0:
-      cur = db_con.cursor()
-      cur.execute('''SELECT ID, deploymentID, timestamp, easting, northing, 
-                            utm_zone_number, utm_zone_letter, likelihood,
-                            activity
-                       FROM position
-                      WHERE ID in (%s)
-                      ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), pos_ids)))
-      for row in cur.fetchall():
-        self.table.append(row)
-
-  def __len__(self):
-    return len(self.table)
-
-  def __getitem__(self, i):
-    return self.table[i]
-
-  def insert_db(self, db_con):
-    cur = db_con.cursor()
-    for (id, dep_id, timestamp, easting, northing, 
-         utm_zone_number, utm_zone_letter, likelihood, 
-         activity, pos_dependancies) in self.table: 
-      cur.execute(query_insert_pos, (dep_id, 
-                                     timestamp, 
-                                     easting,  # pos.imag
-                                     northing, # pos.real
-                                     utm_zone_number,
-                                     utm_zone_letter,
-                                     likelihood, 
-                                     activity))
-      pos_id = cur.lastrowid                               
-      handle_provenance_insertion(cur, pos_dependancies, {'position':(pos_id,)})
-
-  def export_kml(self, name, dep_id):
-
-    fd = open('%s_pos.kml' % name, 'w')
-    fd.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-    fd.write('<kml xmlns="http://www.opengis.net/kml/2.2"\n')
-    fd.write(' xmlns:gx="http://www.google.com/kml/ext/2.2">\n')
-    fd.write('<Folder>\n')
-    fd.write('  <Placemark>\n')
-    fd.write('  <MultiGeometry>\n')
-    fd.write('    <name>%s (deploymentID=%d) position cloud</name>\n' % (name, dep_id))
-    for row in self.table:
-      (P, t, ll, pos_id) = (np.complex(row[0], row[1]), 
-                            float(row[2]), 
-                            float(row[3]), 
-                            int(row[4]))
-      tm = time.gmtime(t)
-      t = '%04d-%02d-%02d %02d:%02d:%02d' % (tm.tm_year, tm.tm_mon, tm.tm_mday,
-                                              tm.tm_hour, tm.tm_min, tm.tm_sec)
-      (lat, lon) = utm.to_latlon(P.imag, P.real, self.zone, self.letter) 
-      fd.write('    <Point id="%d">\n' % pos_id)
-      fd.write('      <coordinates>%f,%f,0</coordinates>\n' % (lon, lat))
-      fd.write('    </Point>\n')
-    fd.write('  </MultiGeometry>\n')
-    fd.write('  </Placemark>\n')
-    fd.write('</Folder>\n')
-    fd.write('</kml>')
-    fd.close() 
-
-
-
-class Bearing: 
-  
-  def __init__(self, db_con=None, bearing_ids=[]):
-    self.table = []
-    if len(bearing_ids) > 0:
-      cur = db_con.cursor()
-      cur.execute('''SELECT ID, deploymentID, siteID, timestamp, bearing,
-                            likelihood, activity
-                       FROM bearing
-                      WHERE ID in (%s)
-                      ORDER BY timestamp ASC''' % ','.join(map(lambda(x) : str(x), bearing_ids)))
-      for row in cur.fetchall():
-        self.table.append(row)
-
-  def __len__(self):
-    return len(self.table)
-
-  def __getitem__(self, i):
-    return self.table[i]
-
-  def insert_db(self, db_con):
-    cur = db_con.cursor()
-    for (id, dep_id, site_id, timestamp, bearing, 
-         likelihood, activity) in self.table: 
-      cur.execute(query_insert_bearing, (dep_id,
-                                         site_id, 
-                                         timestamp, 
-                                         bearing, 
-                                         likelihood, 
-                                         activity))
-    
-  def export_kml(self, name, dep_id, site_id):
-    pass # TODO 
-
-
 
 
 class position_estimator: 

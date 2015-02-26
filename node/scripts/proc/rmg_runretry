@@ -43,6 +43,7 @@ do
   let RETRY_CT=RETRY_CT+1
   echo "$(date -u +%s),err_retry($RETRY_CT)" | cat >> $STATUS_LOG
   rmg_powerswitch $TYPE $IP $RX_OUTLET CYCLE $invert
+  echo "$(date -u +%s),Site started" | cat >> $STATUS_LOG
 done
 
 rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
