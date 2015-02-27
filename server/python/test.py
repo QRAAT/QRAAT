@@ -11,12 +11,13 @@ dep_id = 105 # Deployment ID, specifies a transmitter.
 # siteID -> UTM position, known positions of sites for source
 # localization. The real component is northing, the imaginary
 # component is easting. 
-sites = {2 : (4261604.51+574239.47j), 
-         3 : (4261569.32+575013.86j), 
-         4 : (4260706.17+573882.15j), 
-         5 : (4260749.75+575321.92j), 
-         6 : (4260856.82+574794.06j), 
-         8 : (4261100.56+574000.17j)} 
+sites = {2 : (4261604.51+574239.47j), # site2
+         3 : (4261569.32+575013.86j), # site10
+         4 : (4260706.17+573882.15j), # site13
+         5 : (4260749.75+575321.92j), # site20
+         6 : (4260856.82+574794.06j), # site21
+         8 : (4261100.56+574000.17j)  # site39
+         }
          
 # UTM position, initial guess of position.
 center = (4260500+574500j) 
@@ -52,9 +53,9 @@ def sim_data():
 
   # Noise paramters. 
   # Signal to noise ratio 
-  sig_t = 10
-  sig_n = 0.0006  
-  sig = signal1.Simulator1(p, sites, sv, sig_n, sig_t, 40)#, exclude=[3,5])
+  sig_t = 0.1
+  sig_n = 0.01
+  sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, 10)
   (sig_n, sig_t) = sig.estimate_var()
   print "sig_n"
   for (id, (a, b)) in sig_n.iteritems():
@@ -64,7 +65,7 @@ def sim_data():
     print id, '%0.5f %0.5f' % (a.real, b)
 
   pos = position1.PositionEstimator(999, sites, center, 
-                               sig, sv, method=signal1.Signal.Bartlet)
+                               sig, sv, method=signal1.Signal.MLE)
   pos.plot('fella.png', sites, center, 10, 150, p)
  
   conf = position1.ConfidenceRegion(pos, sites, 0.68) 
