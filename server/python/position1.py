@@ -426,7 +426,7 @@ def compute_cov(x, H, Del):
   C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
   return C
 
-def compute_conf(p_hat, sites, splines, significance_level=0.68, half_span=HALF_SPAN*50, scale=1):
+def compute_conf(p_hat, sites, splines, significance_level, half_span, scale):
   ''' Find the points that fall within confidence region of the estimate. ''' 
   Qt = scipy.stats.chi2.ppf(significance_level, 2)
 

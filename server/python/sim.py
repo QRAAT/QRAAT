@@ -14,7 +14,7 @@ cal_id = 3   # Calibration ID, specifies steering vectors to use.
 sig_t = 1 
 
 # Background noise of the signal.  
-sig_n = 0.001
+sig_n = 0.003
 
 def sim(trials, pulses, sv, sites, p, center, half_span, scale):
   res = {}
@@ -42,20 +42,22 @@ def sim2(trials, pulses, sig_t, sig_n, sv, sites, p, center):
       sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, pulses)
       pos = position1.PositionEstimator(999, sites, center, 
                        sig, sv, method=signal1.Signal.Bartlet)
-      conf = position1.ConfidenceRegion(pos, sites, 0.68)
+      conf = position1.ConfidenceRegion(pos, sites, 0.683)
       if p in conf:
         ct += 1
     print float(ct) / trials
 
 
 def sim3(trials, pulses, sv, sites, p, center):
-    for sig_n in [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]:
+    sig_t = 1
+    guy = [0.001, 0.002, 0.005, 0.008, 0.01, .03]
+    for sig_n in guy: 
       ct = 0
       for n in range(trials):
-        sig = signal1.Simulator(p, sites, sv, sig_n, 1, pulses)
+        sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, pulses)
         pos = position1.PositionEstimator(999, sites, center, 
-                         sig, sv, method=signal1.Signal.MLE)
-        conf = position1.ConfidenceRegion(pos, sites, 0.68)
+                         sig, sv, method=signal1.Signal.Bartlet)
+        conf = position1.ConfidenceRegion(pos, sites, 0.683)
         if p in conf:
           ct += 1
       print sig_n, float(ct) / trials

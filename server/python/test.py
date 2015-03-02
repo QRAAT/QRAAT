@@ -53,7 +53,7 @@ def sim_data():
 
   # Noise paramters. 
   # Signal to noise ratio 
-  sig_t = 0.1
+  sig_t = 1
   sig_n = 0.01
   sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, 10)
   (sig_n, sig_t) = sig.estimate_var()
@@ -65,10 +65,10 @@ def sim_data():
     print id, '%0.5f %0.5f' % (a.real, b)
 
   pos = position1.PositionEstimator(999, sites, center, 
-                               sig, sv, method=signal1.Signal.MLE)
+                               sig, sv, method=signal1.Signal.Bartlet)
   pos.plot('fella.png', sites, center, 10, 150, p)
  
-  conf = position1.ConfidenceRegion(pos, sites, 0.68) 
+  conf = position1.ConfidenceRegion(pos, sites, 0.683) 
   conf.display(p)  
   if p in conf: print 'Yes!' 
   else: print 'no.'
