@@ -30,7 +30,7 @@ def sim(trials, pulses, sv, sites, p, center, half_span, scale):
         pos = position1.PositionEstimator(999, sites, center, 
                 sig, sv, method=signal1.Signal.Bartlet)
         # 68%-confidence of estimate. 
-        conf = position1.ConfidenceRegion(pos, sites, 0.68)
+        conf = position1.ConfidenceRegion(pos, sites, 0.683)
         res[p].append((pos.p, conf))
     print ' '
   return res
@@ -50,11 +50,11 @@ def sim2(trials, pulses, sig_t, sig_n, sv, sites, p, center):
 
 def sim3(trials, pulses, sv, sites, p, center):
     sig_t = 1
-    guy = [0.001, 0.002, 0.005, 0.008, 0.01, .03]
+    guy = [0.002, 0.005, 0.008, 0.01, .03]
     for sig_n in guy: 
       ct = 0
       for n in range(trials):
-        sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, pulses)
+        sig = signal1.IdealSimulator(p, sites, sv, sig_n, sig_t, pulses)
         pos = position1.PositionEstimator(999, sites, center, 
                          sig, sv, method=signal1.Signal.Bartlet)
         conf = position1.ConfidenceRegion(pos, sites, 0.683)

@@ -283,17 +283,20 @@ class ConfidenceRegion:
       self.level_set = map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set) 
 
   def display(self, p_known):
-    x_hat = np.array([self.half_span, self.half_span])
-    x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
-    fella = 20
-    for i in range(-fella, fella+1):
-      for j in range(-fella, fella+1):
-        x = x_hat + np.array([i,j])
-        if x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
-        elif x[0] == x_hat[0] and x[1] == x_hat[1]: print 'P', 
-        elif tuple(x) in self.level_set: print '.',
-        else: print ' ',
-      print 
+    if self.level_set is not None:
+      x_hat = np.array([self.half_span, self.half_span])
+      x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
+      fella = 20
+      for i in range(-fella, fella+1):
+        for j in range(-fella, fella+1):
+          x = x_hat + np.array([i,j])
+          if x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
+          elif x[0] == x_hat[0] and x[1] == x_hat[1]: print 'P', 
+          elif tuple(x) in self.level_set: print '.',
+          else: print ' ',
+        print 
+    else: 
+      print 'Unbounded!'
 
   def __contains__(self, p):
     if self.level_set is None:
@@ -343,7 +346,7 @@ def aggregate_spectrum(p):
   ''' Sum a set of bearing likelihoods. '''
   # NOTE normalising by the number of pulses effectively
   # reduces the sample size. 
-  return np.sum(p, 0)# / p.shape[0]
+  return np.sum(p, 0) / p.shape[0]
 
 
 def compute_bearing_spline(l): 
@@ -442,7 +445,7 @@ def compute_conf(p_hat, sites, splines, significance_level, half_span, scale):
   max_size = 1000 # Computational stop gap. 
 
   x_hat = np.array([half_span, half_span])
-  while len(S) > 0 and len(level_set) < max_size: 
+  while len(S) > 0 and len(S) < max_size and len(level_set) < max_size: 
     R = set()
     for x in S:
       y = x_hat - np.array(x)
@@ -455,7 +458,7 @@ def compute_conf(p_hat, sites, splines, significance_level, half_span, scale):
         R.add((x[0]-1, x[1]-1)); R.add((x[0]-1, x[1])); R.add((x[0]-1, x[1]+1)) 
     S = R.difference(level_set)
 
-  if len(level_set) == max_size: 
+  if len(S) == max_size or len(level_set) == max_size: 
     return None # Unbounded confidence region
   return level_set
 
