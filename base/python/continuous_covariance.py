@@ -84,12 +84,10 @@ class continuous_covariance:
       self.num_samples = 0
       self.raw_data = np.zeros((0,))
       self.cc_data = np.zeros((0,))
-      self.eigenvectors = np.zeros((0,))
-      self.eigenvalues = np.zeros((0,))
+
       
   def eig(self):
     self.eigenvectors = np.zeros((self.num_blocks,self.num_ch),dtype=np.complex)
-    #self.eigenvalues = np.zeros((self.num_blocks,self.num_ch),dtype=float)
     self.sample_time = np.zeros((self.num_blocks,),dtype=float)
     self.edsp = np.zeros((self.num_blocks,),dtype=float)
     self.ec = np.zeros((self.num_blocks,),dtype=float)
@@ -100,7 +98,6 @@ class continuous_covariance:
       index = np.argmax(values)
       max_value = values[index]
       self.eigenvectors[j,:] = vectors[:,index]
-      #self.eigenvalues[j,:] = np.abs(values)
       if not max_value == 0:
         self.edsp[j] = max_value/self.rate#comparable to det.eig()
         self.ec[j] = max_value/np.sum(values)
@@ -110,14 +107,12 @@ class continuous_covariance:
         self.ec[j] = 0
         self.edsnr[j] = 0
 
-  def write_to_db(self, db_con, siteID = None):
+  def write_to_db(self, db_con, siteID = 'NULL'):
 
     if not hasattr(self, 'eigenvectors'):
       self.eig()
     if self.num_ch == 4:
       cur = db_con.cursor()
-      #TODO change table name in two places
-      if siteID:
-        cur.executemany("INSERT INTO todd_test_est (deploymentID, siteID, timestamp, center, edsp, ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, ec, edsnr) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", [(self.tag_name, siteID, self.sample_time[j], self.center_freq, self.edsp[j], self.eigenvectors[j,0].real, self.eigenvectors[j,0].imag, self.eigenvectors[j,1].real, self.eigenvectors[j,1].imag, self.eigenvectors[j,2].real, self.eigenvectors[j,2].imag, self.eigenvectors[j,3].real, self.eigenvectors[j,3].imag, self.ec[j], self.edsnr[j]) for j in range(self.num_blocks)])
-      else:
-        cur.executemany("INSERT INTO todd_test_est (deploymentID, timestamp, center, edsp, ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, ec, edsnr) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", [(self.tag_name, self.sample_time[j], self.center_freq, edsp[j], self.eigenvectors[j,0].real, self.eigenvectors[j,0].imag, self.eigenvectors[j,1].real, self.eigenvectors[j,1].imag, self.eigenvectors[j,2].real, self.eigenvectors[j,2].imag, self.eigenvectors[j,3].real, self.eigenvectors[j,3].imag, self.ec[j], self.edsnr[j]) for j in range(self.num_blocks)])
+      #TODO change table name
+      cur.executemany("INSERT INTO todd_test_est (deploymentID, siteID, timestamp, center, edsp, ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, ec, edsnr) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", [(self.tag_name, siteID, self.sample_time[j], self.center_freq, self.edsp[j], self.eigenvectors[j,0].real, self.eigenvectors[j,0].imag, self.eigenvectors[j,1].real, self.eigenvectors[j,1].imag, self.eigenvectors[j,2].real, self.eigenvectors[j,2].imag, self.eigenvectors[j,3].real, self.eigenvectors[j,3].imag, self.ec[j], self.edsnr[j]) for j in range(self.num_blocks)])
+

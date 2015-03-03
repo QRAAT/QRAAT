@@ -6,6 +6,7 @@ INSTALL(PROGRAMS
   rmg_det_to_db
   rmg_fetch
   rmg_filterest
+  rmg_insert_into_db
   rmg_process
   rmg_schedule
   rmg_txlist
