@@ -22,6 +22,8 @@ import sys, os, commands, errno
 import re, time
 import MySQLdb as mdb
 import qraat #needs base classes
+import qraat.afsk
+import qraat.continuous_covariance
 import qraat.srv
 
 

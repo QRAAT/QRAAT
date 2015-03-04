@@ -22,7 +22,7 @@
 import sys, os, commands, errno
 import re, time
 import MySQLdb as mdb
-import qraat #needs qraat.afsk, qraat.continuous_covariance
+import qraat.afsk, qraat.continuous_covariance
 import qraat.srv
 
 
@@ -84,18 +84,20 @@ for leaf_dir,sublist,filelist in os.walk(afsk_dir):
       for fn in filelist:
         if fn[-5:] == '.afsk':
           try:
-            afsk = qraat.afsk.afsk(fn)
+            afsk = qraat.afsk.afsk(os.path.join(leaf_dir,fn))
             afsk.write_to_db(db_con, siteID)
           except:
             bad_counter += 1
+            raise
           else:
             afsk_counter += 1
         elif fn[-4:] == '.cov':
           try:
-            cov = qraat.continuous_covariance.continuous_covariance(fn)
+            cov = qraat.continuous_covariance.continuous_covariance(os.path.join(leaf_dir,fn))
             cov.write_to_db(db_con, siteID)
           except:
             bad_counter += 1
+            raise
           else:
             cov_counter += 1
         else:
