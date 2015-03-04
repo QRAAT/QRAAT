@@ -53,19 +53,12 @@ def sim_data():
 
   # Noise paramters. 
   # Signal to noise ratio 
-  sig_t = 1
-  sig_n = 1 
-  sig = signal1.IdealSimulator(p, sites, sv, sig_n, sig_t, 10)
+  sig_n = 0.1
+  sig = signal1.IdealSimulator(p, sites, sv, sig_n, 1)
   (sig_n, sig_t) = sig.estimate_var()
-  print "sig_n"
-  for (id, (a, b)) in sig_n.iteritems():
-    print id, '%0.5f %0.5f' % (a.real, b)
-  print "sig_t"
-  for (id, (a, b)) in sig_t.iteritems():
-    print id, '%0.5f %0.5f' % (a.real, b)
 
   pos = position1.PositionEstimator(999, sites, center, 
-                               sig, sv, method=signal1.Signal.MLE)
+                               sig, sv, method=signal1.Signal.Bartlet)
   pos.plot('fella.png', sites, center, 10, 150, p)
  
   conf = position1.ConfidenceRegion(pos, sites, 0.683) 

@@ -268,10 +268,11 @@ class ConfidenceRegion:
     self.signficance_level = significance_level
     self.half_span = half_span
     self.scale = scale
-    level_set = compute_conf(pos.p, sites, pos.splines, 
-                               significance_level, half_span, scale)
+    (level_set, contour) = compute_conf(pos.p, sites, pos.splines, 
+                                       significance_level, half_span, scale)
     if level_set is None:
       self.level_set = None
+      self.contour = None
     else: # TODO Is this ok?
       x_hat = np.array([half_span, half_span])
       x_centroid = np.array([0,0])
@@ -281,6 +282,7 @@ class ConfidenceRegion:
       x_centroid[0] /= len(level_set)
       x_centroid[1] /= len(level_set)
       self.level_set = map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set) 
+      self.contour = map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), contour) 
 
   def display(self, p_known):
     if self.level_set is not None:
@@ -292,7 +294,7 @@ class ConfidenceRegion:
           x = x_hat + np.array([i,j])
           if x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
           elif x[0] == x_hat[0] and x[1] == x_hat[1]: print 'P', 
-          elif tuple(x) in self.level_set: print '.',
+          elif tuple(x) in self.contour: print '.',
           else: print ' ',
         print 
     else: 
@@ -303,13 +305,7 @@ class ConfidenceRegion:
       return False
     else:
       x = tuple(transform_coord(p, self.p_hat, self.half_span, self.scale))
-      res = False
-      for i in range(-1,2):
-        for j in range(-1,2):
-          y = (x[0]+i, x[1]+j)
-          res = res | (y in self.level_set)
-      return res
-      #return x in self.level_set
+      return x in self.level_set or x in self.contour
 
   def __len__(self):
     return len(self.level_set)
@@ -442,6 +438,7 @@ def compute_conf(p_hat, sites, splines, significance_level, half_span, scale):
 
   S = set(); S.add((half_span, half_span))
   level_set = S.copy()
+  contour = set()
   max_size = 1000 # Computational stop gap. 
 
   x_hat = np.array([half_span, half_span])
@@ -456,11 +453,13 @@ def compute_conf(p_hat, sites, splines, significance_level, half_span, scale):
         R.add((x[0]+1, x[1]-1)); R.add((x[0]+1, x[1])); R.add((x[0]+1, x[1]+1))
         R.add((x[0],   x[1]-1));                        R.add((x[0] ,  x[1]+1))
         R.add((x[0]-1, x[1]-1)); R.add((x[0]-1, x[1])); R.add((x[0]-1, x[1]+1)) 
+      else: 
+        contour.add(x)
     S = R.difference(level_set)
 
   if len(S) == max_size or len(level_set) == max_size: 
     return None # Unbounded confidence region
-  return level_set
+  return (level_set, contour)
 
 
 
