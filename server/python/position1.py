@@ -401,7 +401,7 @@ def compute_likelihood(sites, splines, center, scale, half_span):
   return (positions, likelihoods)
 
 
-def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=1, delta=SCALE):
+def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=-1, delta=SCALE):
   ''' Maximize (resp. minimize) over position space. 
 
     A simple, speedy algorithm for finding the most likely source of a 
@@ -425,7 +425,7 @@ def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=1, delta=S
       Returns UTM position estimate as a complex number. 
   '''
   p_hat = center
-  for i in reversed(range(-n, m)):
+  for i in reversed(range(n, m)):
     scale = pow(delta, i)
     (positions, likelihoods) = compute_likelihood(
                            sites, splines, p_hat, scale, s)
