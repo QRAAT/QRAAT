@@ -292,7 +292,7 @@ class ConfidenceRegion:
 
   def plot(self, fn, p_known):
     fig = pp.gcf()
-
+    x_hat = [self.half_span, self.half_span]
     x = np.array(map(lambda x: x[0], self.contour))
     y = np.array(map(lambda x: x[1], self.contour))
    
@@ -309,31 +309,31 @@ class ConfidenceRegion:
     distances = np.hstack(([distances[-1]], distances, [distances[0]]))
 
     f = spline1d(angles, distances)
-    angles_uniform = scipy.linspace(-np.pi, np.pi, num=1000000, endpoint=False) 
-    distances_uniform = f(angles_uniform)
+    theta = scipy.linspace(-np.pi, np.pi, num=1000000, endpoint=False) 
+    distances_uniform = f(theta)
 
     fft_coeffs = np.fft.rfft(distances_uniform)
-    fft_coeffs[11:] = 0 
-    distances_fit = np.fft.irfft(fft_coeffs)
+    fft_coeffs[5:] = 0 
+    r = np.fft.irfft(fft_coeffs)
    
-    #pp.polar(angles, distances)
-    #pp.polar(angles_uniform, distances_uniform)
-    pp.polar(angles_uniform, distances_fit)
-#
-#    pp.scatter(x, y)
-#    
-#    # x_hat
-#    x_hat = [self.half_span, self.half_span]
-#    pp.plot(x_hat[0], x_hat[1], marker='x')
-#    pp.text(x_hat[0]+0.4, x_hat[1]-0.25, '$\hat{\mathbf{x}}$', fontsize=18)
-#      
-#    # x_known
-#    if p_known:
-#      x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
-#      pp.plot([x_known[0]], [x_known[1]],  
-#              marker='^', color='b', fillstyle='none')
-#      pp.text(x_known[0]+0.4, x_known[1]-0.25, '$\mathbf{x}^*$', fontsize=18)
-#    
+    #pp.polar(theta, r)
+    x_fit = x_hat[0] + r * np.cos(theta)
+    y_fit = x_hat[1] + r * np.sin(theta)
+    pp.plot(x_fit, y_fit, color='k')
+
+    pp.scatter(x, y, marker='x', color='b', alpha=0.5)
+    
+    # x_hat
+    pp.plot(x_hat[0], x_hat[1], color='k', marker='o')
+    pp.text(x_hat[0]+0.4, x_hat[1]-0.25, '$\hat{\mathbf{x}}$', fontsize=24)
+      
+    # x_known
+    if p_known:
+      x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
+      pp.plot([x_known[0]], [x_known[1]],  
+              marker='o', color='k', fillstyle='none')
+      pp.text(x_known[0]+0.4, x_known[1]-0.25, '$\mathbf{x}^*$', fontsize=24)
+    
     pp.savefig(fn)
     pp.clf()
       
