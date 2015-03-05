@@ -274,15 +274,18 @@ class ConfidenceRegion:
       self.level_set = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set))
       self.contour = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), contour))
 
-  def display(self, p_known):
+  def display(self, p_known=None):
     if self.level_set is not None:
       x_hat = np.array([self.half_span, self.half_span])
-      x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
+      if p_known is not None:
+        x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
+      else:
+        x_known = None
       fella = 20
       for i in range(-fella, fella+1):
         for j in range(-fella, fella+1):
           x = x_hat + np.array([i,j])
-          if x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
+          if x_known is not None and x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
           elif x[0] == x_hat[0] and x[1] == x_hat[1]: print 'P', 
           elif tuple(x) in self.contour: print '.',
           else: print ' ',
@@ -290,35 +293,13 @@ class ConfidenceRegion:
     else: 
       print 'Unbounded!'
 
-  def plot(self, fn, p_known):
+  def plot(self, fn, p_known=None):
     fig = pp.gcf()
     x_hat = [self.half_span, self.half_span]
     x = np.array(map(lambda x: x[0], self.contour))
     y = np.array(map(lambda x: x[1], self.contour))
-   
-    # Conf. region, due to 
-    # http://stackoverflow.com/questions/13604611/how-to-fit-a-closed-contour
-    x0, y0 = np.mean(x), np.mean(y)
-    C = (x - x0) + 1j * (y - y0)
-    angles = np.angle(C)
-    distances = np.abs(C)
-    sort_index = np.argsort(angles)
-    angles = angles[sort_index]
-    distances = distances[sort_index]
-    angles = np.hstack(([ angles[-1] - 2*np.pi ], angles, [ angles[0] + 2*np.pi ]))
-    distances = np.hstack(([distances[-1]], distances, [distances[0]]))
-
-    f = spline1d(angles, distances)
-    theta = scipy.linspace(-np.pi, np.pi, num=1000000, endpoint=False) 
-    distances_uniform = f(theta)
-
-    fft_coeffs = np.fft.rfft(distances_uniform)
-    fft_coeffs[5:] = 0 
-    r = np.fft.irfft(fft_coeffs)
-   
-    #pp.polar(theta, r)
-    x_fit = x_hat[0] + r * np.cos(theta)
-    y_fit = x_hat[1] + r * np.sin(theta)
+  
+    (x_fit, y_fit) = fit_contour(x, y, N=10000)
     pp.plot(x_fit, y_fit, color='k')
 
     pp.scatter(x, y, marker='x', color='b', alpha=0.5)
@@ -500,9 +481,39 @@ def compute_conf(p_hat, sites, splines, significance_level, half_span, scale):
   return (level_set, contour)
 
 
+def fit_contour(x, y, N):
+  ''' Fit closed countour to a set of points in R^2. 
+  
+    Convert the Cartesian coordinates (x, y) to polar coordinates (theta, r)
+    and fit a spline. Sample uniform angles from this spline and compute the
+    Fourier transform of their distancxe to the centroid of the contour. 
+    `N` is the number of samples. 
+  
+    http://stackoverflow.com/questions/13604611/how-to-fit-a-closed-contour
 
+  '''
+  x0, y0 = np.mean(x), np.mean(y)
+  C = (x - x0) + 1j * (y - y0)
+  angles = np.angle(C)
+  distances = np.abs(C)
+  sort_index = np.argsort(angles)
+  angles = angles[sort_index]
+  distances = distances[sort_index]
+  angles = np.hstack(([ angles[-1] - 2*np.pi ], angles, [ angles[0] + 2*np.pi ]))
+  distances = np.hstack(([distances[-1]], distances, [distances[0]]))
 
+  f = spline1d(angles, distances)
+  theta = scipy.linspace(-np.pi, np.pi, num=N, endpoint=False) 
+  distances_uniform = f(theta)
 
+  fft_coeffs = np.fft.rfft(distances_uniform)
+  fft_coeffs[5:] = 0 
+  r = np.fft.irfft(fft_coeffs)
+ 
+  x_fit = x0 + r * np.cos(theta)
+  y_fit = y0 + r * np.sin(theta)
+
+  return (x_fit, y_fit)
 
       
 
