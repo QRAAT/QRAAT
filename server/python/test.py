@@ -53,8 +53,8 @@ def sim_data():
 
   # Noise paramters. 
   # Signal to noise ratio 
-  sig_n = 0.1
-  sig = signal1.IdealSimulator(p, sites, sv, sig_n, 1)
+  sig_n = 0.5
+  sig = signal1.IdealSimulator(p, sites, sv, sig_n, 10)
   (sig_n, sig_t) = sig.estimate_var()
 
   pos = position1.PositionEstimator(999, sites, center, 
@@ -65,7 +65,8 @@ def sim_data():
   conf.display(p)  
   if p in conf: print 'Yes!' 
   else: print 'no.'
-  
+ 
+  conf.plot('guy.png', p)
 '''
 
   Notes:

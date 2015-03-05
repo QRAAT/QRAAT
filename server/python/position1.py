@@ -38,7 +38,7 @@ import numpy as np
 import matplotlib.pyplot as pp
 from matplotlib.patches import Ellipse
 from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
-import scipy.stats
+import scipy, scipy.stats
 import numdifftools as nd
 import utm
 
@@ -231,16 +231,6 @@ class Position:
 
     # Pos. estimate with confidence ellipse
     if self.p is not None: 
-      #ax = fig.add_subplot(111)
-      #(x, alpha) = compute_conf(compute_covariance(self.p, sites, self.splines))
-      #if x is not None: 
-      #  ellipse = Ellipse(xy=f(self.p), width=x[0]*ELLIPSE_PLOT_SCALE, 
-      #                  height=x[1]*ELLIPSE_PLOT_SCALE, angle=alpha)
-      #  ax.add_artist(ellipse)
-      #  ellipse.set_clip_box(ax.bbox)
-      #  ellipse.set_alpha(0.2)
-      #  ellipse.set_facecolor([1.0,1.0,1.0])
-      #else: print "Skipping non-positive definite cov. matrix"
       pp.scatter([e(self.p.imag)], [n(self.p.real)], 
             facecolor='1.0', label='pos. est', zorder=11)
 
@@ -281,8 +271,8 @@ class ConfidenceRegion:
         x_centroid[1] += n
       x_centroid[0] /= len(level_set)
       x_centroid[1] /= len(level_set)
-      self.level_set = map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set) 
-      self.contour = map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), contour) 
+      self.level_set = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set))
+      self.contour = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), contour))
 
   def display(self, p_known):
     if self.level_set is not None:
@@ -300,6 +290,54 @@ class ConfidenceRegion:
     else: 
       print 'Unbounded!'
 
+  def plot(self, fn, p_known):
+    fig = pp.gcf()
+
+    x = np.array(map(lambda x: x[0], self.contour))
+    y = np.array(map(lambda x: x[1], self.contour))
+   
+    # Conf. region, due to 
+    # http://stackoverflow.com/questions/13604611/how-to-fit-a-closed-contour
+    x0, y0 = np.mean(x), np.mean(y)
+    C = (x - x0) + 1j * (y - y0)
+    angles = np.angle(C)
+    distances = np.abs(C)
+    sort_index = np.argsort(angles)
+    angles = angles[sort_index]
+    distances = distances[sort_index]
+    angles = np.hstack(([ angles[-1] - 2*np.pi ], angles, [ angles[0] + 2*np.pi ]))
+    distances = np.hstack(([distances[-1]], distances, [distances[0]]))
+
+    f = spline1d(angles, distances)
+    angles_uniform = scipy.linspace(-np.pi, np.pi, num=1000000, endpoint=False) 
+    distances_uniform = f(angles_uniform)
+
+    fft_coeffs = np.fft.rfft(distances_uniform)
+    fft_coeffs[11:] = 0 
+    distances_fit = np.fft.irfft(fft_coeffs)
+   
+    #pp.polar(angles, distances)
+    #pp.polar(angles_uniform, distances_uniform)
+    pp.polar(angles_uniform, distances_fit)
+#
+#    pp.scatter(x, y)
+#    
+#    # x_hat
+#    x_hat = [self.half_span, self.half_span]
+#    pp.plot(x_hat[0], x_hat[1], marker='x')
+#    pp.text(x_hat[0]+0.4, x_hat[1]-0.25, '$\hat{\mathbf{x}}$', fontsize=18)
+#      
+#    # x_known
+#    if p_known:
+#      x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
+#      pp.plot([x_known[0]], [x_known[1]],  
+#              marker='^', color='b', fillstyle='none')
+#      pp.text(x_known[0]+0.4, x_known[1]-0.25, '$\mathbf{x}^*$', fontsize=18)
+#    
+    pp.savefig(fn)
+    pp.clf()
+      
+  
   def __contains__(self, p):
     if self.level_set is None:
       return False
