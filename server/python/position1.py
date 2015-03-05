@@ -299,8 +299,14 @@ class ConfidenceRegion:
     x = np.array(map(lambda x: x[0], self.contour))
     y = np.array(map(lambda x: x[1], self.contour))
   
-    (x_fit, y_fit) = fit_contour(x, y, N=10000)
-    pp.plot(x_fit, y_fit, color='k')
+    #(x_fit, y_fit) = fit_contour(x, y, N=10000)
+    (x_center, alpha, axes) = fit_ellipse(x, y)
+    theta = np.linspace(0,2*np.pi)
+    x_fit = x_center[0] + axes[0]*np.cos(theta)*np.cos(alpha) - \
+                          axes[1]*np.sin(theta)*np.sin(alpha)
+    y_fit = x_center[1] + axes[0]*np.cos(theta)*np.sin(alpha) + \
+                          axes[1]*np.sin(theta)*np.cos(alpha)
+    pp.plot(x_fit, y_fit, color='k', alpha=0.5)
 
     pp.scatter(x, y, marker='x', color='b', alpha=0.5)
     
@@ -490,7 +496,6 @@ def fit_contour(x, y, N):
     `N` is the number of samples. 
   
     http://stackoverflow.com/questions/13604611/how-to-fit-a-closed-contour
-
   '''
   x0, y0 = np.mean(x), np.mean(y)
   C = (x - x0) + 1j * (y - y0)
@@ -515,7 +520,42 @@ def fit_contour(x, y, N):
 
   return (x_fit, y_fit)
 
-      
+
+def fit_ellipse(x, y):
+  ''' Fit ellipse to a set of points in R^2.
+
+    http://nicky.vanforeest.com/misc/fitEllipse/fitEllipse.html
+  '''
+  x = x[:,np.newaxis]
+  y = y[:,np.newaxis]
+  D =  np.hstack((x*x, x*y, y*y, x, y, np.ones_like(x)))
+  S = np.dot(D.T,D)
+  C = np.zeros([6,6])
+  C[0,2] = C[2,0] = 2; C[1,1] = -1
+  E, V =  np.linalg.eig(np.dot(np.linalg.inv(S), C))
+  n = np.argmax(np.abs(E))
+  A = V[:,n]
+     
+  # Center of ellipse
+  b,c,d,f,g,a = A[1]/2, A[2], A[3]/2, A[4]/2, A[5], A[0]
+  num = b*b-a*c
+  x0=(c*d-b*f)/num
+  y0=(a*f-b*d)/num
+  x = np.array([x0,y0])
+
+  # Angle of rotation
+  alpha = 0.5*np.arctan(2*b/(a-c))
+
+  # Length of Axes
+  up = 2*(a*f*f+c*d*d+g*b*b-2*b*d*f-a*c*g)
+  down1=(b*b-a*c)*( (c-a)*np.sqrt(1+4*b*b/((a-c)*(a-c)))-(c+a))
+  down2=(b*b-a*c)*( (a-c)*np.sqrt(1+4*b*b/((a-c)*(a-c)))-(c+a))
+  res1=np.sqrt(up/down1)
+  res2=np.sqrt(up/down2)
+  axes = np.array([res1, res2])
+
+  return (x, alpha, axes)
+
 
 
 
