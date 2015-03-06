@@ -48,7 +48,7 @@ pi_n = np.pi ** num_ch
 ### Simulation. ###############################################################
 
 
-def IdealSimulator(p, sites, sv, sig_n, trials, include=[]): 
+def IdealSimulator(p, sites, sv, rho, sig_n, trials, include=[]): 
   ''' Constant SNR for all sites. ''' 
  
   # Elements of noise vector are modelled as independent, identically
@@ -63,9 +63,8 @@ def IdealSimulator(p, sites, sv, sig_n, trials, include=[]):
   np.fill_diagonal(Sigma, sig_n)
   
   # Signal power.
-  sp = 10 
-  edsp = sp + np.trace(Sigma) 
-  tnp = edsp - sp 
+  edsp = rho**2 
+  tnp = np.trace(Sigma)
 
   # Interpolate splines to steering vectors. 
   splines = compute_bearing_splines(sv)
@@ -100,7 +99,7 @@ def IdealSimulator(p, sites, sv, sig_n, trials, include=[]):
             np.random.multivariate_normal(mean_n, cov_n, num_ch)))
 
       # Modelled signal. 
-      V.append((sp * G) + N) 
+      V.append((rho * G) + N) 
     
     sig.table[id].est_ids = np.array(est_ids)
     sig.table[id].t = np.array(timestamps)

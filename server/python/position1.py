@@ -301,11 +301,8 @@ class ConfidenceRegion:
   
     #(x_fit, y_fit) = fit_contour(x, y, N=10000)
     (x_center, alpha, axes) = fit_ellipse(x, y)
-    theta = np.linspace(0,2*np.pi)
-    x_fit = x_center[0] + axes[0]*np.cos(theta)*np.cos(alpha) - \
-                          axes[1]*np.sin(theta)*np.sin(alpha)
-    y_fit = x_center[1] + axes[0]*np.cos(theta)*np.sin(alpha) + \
-                          axes[1]*np.sin(theta)*np.cos(alpha)
+    e = Ellipse(x_center, alpha, axes) 
+    (x_fit, y_fit) = e.cartesian()  
     pp.plot(x_fit, y_fit, color='k', alpha=0.5)
 
     pp.scatter(x, y, marker='x', color='b', alpha=0.5)
@@ -323,7 +320,15 @@ class ConfidenceRegion:
     
     pp.savefig(fn)
     pp.clf()
-      
+
+  def ellipse(self):
+    x = np.array(map(lambda x: x[0], self.contour))
+    y = np.array(map(lambda x: x[1], self.contour))
+    (x_center, angle, axes) = fit_ellipse(x, y)
+    print Ellipse(x_center, angle, axes).area()
+    p_center = transform_coord_inv(x_center, self.p_hat, self.half_span, self.scale)
+    axes /= self.scale
+    return Ellipse(p_center, angle, axes)
   
   def __contains__(self, p):
     if self.level_set is None:
@@ -334,6 +339,27 @@ class ConfidenceRegion:
 
   def __len__(self):
     return len(self.level_set)
+
+
+
+class Ellipse:
+
+  def __init__(self, x, angle, axes): 
+    self.x = x
+    self.angle = angle
+    self.axes = axes
+
+  def area(self):
+    return np.pi * self.axes[0] * self.axes[1]
+
+  def cartesian(self): 
+    theta = np.linspace(0,2*np.pi)
+    X = self.x[0] + self.axes[0]*np.cos(theta)*np.cos(self.angle) - \
+                    self.axes[1]*np.sin(theta)*np.sin(self.angle)
+    Y = self.x[1] + self.axes[0]*np.cos(theta)*np.sin(self.angle) + \
+                    self.axes[1]*np.sin(theta)*np.cos(self.angle)
+    return (X, Y)
+
 
 
 ### Low level calls. ##########################################################
@@ -442,6 +468,12 @@ def transform_coord(p, center, half_span, scale):
   x = [int((p.imag - center.imag) / scale) + half_span,
        int((p.real - center.real) / scale) + half_span]
   return np.array(x)
+
+def transform_coord_inv(x, center, half_span, scale):
+  ''' Transform position as a complex number to some coordinate system (inverse) ''' 
+  p = np.complex( (((x[1] - half_span) * scale) + center.real), 
+                  (((x[0] - half_span) * scale) + center.imag) )
+  return p
   
 def compute_cov(x, H, Del):
   ''' Compute covariance matrix of estimate, given x the true position. ''' 

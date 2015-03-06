@@ -51,10 +51,9 @@ def sim_data():
   # Simpulate signal given known position p.  
   p = center + complex(650,0)
 
-  # Noise paramters. 
-  # Signal to noise ratio 
-  sig_n = 0.5
-  sig = signal1.IdealSimulator(p, sites, sv, sig_n, 10)
+  rho = 1     # signal
+  sig_n = 0.01 # noise
+  sig = signal1.IdealSimulator(p, sites, sv, rho, sig_n, 10)
   (sig_n, sig_t) = sig.estimate_var()
 
   pos = position1.PositionEstimator(999, sites, center, 
@@ -65,8 +64,12 @@ def sim_data():
   conf.display(p)  
   if p in conf: print 'Yes!' 
   else: print 'no.'
- 
+  e = conf.ellipse()
+  print 'Area,', e.area()
+
+  print p, e.x
   conf.plot('guy.png', p)
+
 '''
 
   Notes:
