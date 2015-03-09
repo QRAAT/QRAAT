@@ -304,10 +304,19 @@ class gps_afsk(gr.hier_block2):
 
     self.connect(self.cc, self.cc_out)
 
+    #continuous record
+    self.tdat_out = file_sink(gr.sizeof_gr_complex, dirname, txname, ".tdat", "", 0)
+    interleaver = gr.interleave(gr.sizeof_gr_complex)
+    for j in range(num_ch):
+      self.connect((self,j), (interleaver,j))
+    self.connect(interleaver, self.tdat_out)
+
   def enable(self):
     self.cc_out.enable()
+    self.tdat_out.enable()
 
   def disable(self):
     self.cc_out.disable()
+    self.tdat_out.disable()
 
 

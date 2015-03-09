@@ -67,7 +67,7 @@ class record_broadband_graph():
     self.pic.tune(self.pll_freq)
     if not self.pic.check(self.pll_freq):
       print "Couldn't set PLL to {}".format(self.pll_freq)
-      #raise error or quit
+      raise SystemExit
 
   def start(self):
 
@@ -75,30 +75,6 @@ class record_broadband_graph():
     time.sleep(0.1)
     self.afsk.enable()
     print "Running"
-
-#sets gain on all receiver channels
-  def set_gain(self, gain):
-    for i in range(self.nchan):
-      self.tb.u.set_gain(gain,i)
-
-#sets usrp frequency of all receiver channels
-  def set_freq(self, target_freq):
-      ok = True
-      for j in range(self.nchan):
-          r = self.tb.u.set_center_freq(target_freq,j)
-          if not r:
-              ok = False
-              print "set_freq: failed to set subdev[%d] freq to %f" % (
-                  i, target_freq)
-      return ok
-
-  def pic_up(self):
-    self.pic.inc_freq()
-    self.pic.freq = self.pic.freq + 100000
-
-  def pic_down(self):
-    self.pic.dec_freq()
-    self.pic.freq = self.pic.freq - 100000
 
 if __name__ == '__main__':
 

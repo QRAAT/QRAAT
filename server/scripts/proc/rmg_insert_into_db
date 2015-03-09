@@ -127,6 +127,7 @@ for site in dir_sitelist:
                   bad_list.append(full_path)
                 else:
                   det_list.append(det)
+              #TODO tdat files
               else:
                 bad_list.append(full_path)
 

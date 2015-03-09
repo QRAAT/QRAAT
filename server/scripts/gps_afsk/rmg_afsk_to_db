@@ -67,6 +67,7 @@ except mdb.Error, e:
 directory_counter = 0
 afsk_counter = 0
 cov_counter = 0
+tdat_counter = 0
 bad_counter = 0
 for leaf_dir,sublist,filelist in os.walk(afsk_dir):
   if sublist:
@@ -100,6 +101,8 @@ for leaf_dir,sublist,filelist in os.walk(afsk_dir):
             raise
           else:
             cov_counter += 1
+        elif fn[-5:] == '.tdat':
+          tdat_counter += 1
         else:
           bad_counter += 1
 
@@ -107,4 +110,5 @@ print afsk_dir
 print "{} directories read".format(directory_counter)
 print "{} afsk files read".format(afsk_counter)
 print "{} cov files read".format(cov_counter)
+print "{} tdat files found".format(tdat_counter)
 print "{} bad files".format(bad_counter)
