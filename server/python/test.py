@@ -25,25 +25,29 @@ center = (4260500+574500j)
 zone = (10, 'S') # UTM zone.
 
 # Read steering vectors from file.
-sv = signal1.SteeringVectors.read(cal_id)
+sv = signal1.SteeringVectors.read(cal_id, 'sample/sv')
 
 
 def real_data():
 
   # Read signal data, about an hour's worth.
-  sig = signal1.Signal.read(sites.keys())
+  sig = signal1.Signal.read(sites.keys(), 'sample/sig')
 
   # Estimate position using all data. To use the MLE instead 
   # of Bartlet's, do `method=signal1.Signal.MLE`. 
   #pos = position1.PositionEstimator(dep_id, sites, center, sig, sv,
   #                method=signal1.Signal.Bartlet)
-  positions = position1.WindowedPositionEstimator(dep_id, sites, center, sig, sv, 
-                  60 * 5, 30, method=signal1.Signal.Bartlet)
+  #positions = position1.WindowedPositionEstimator(dep_id, sites, center, sig, sv, 
+  #                60 * 5, 30, method=signal1.Signal.Bartlet)
 
+  pos = position1.PositionEstimator(dep_id, sites, center, sig, sv,
+                  method=signal1.Signal.Bartlet)
+  print pos.p
+  pos.plot('yeah.png', sites, center, 10, 150)
   
   # Plot position and search space. 
-  for i, pos in enumerate(positions): 
-    pos.plot('%d.png' % (i), sites, center, 10, 150)
+  #for i, pos in enumerate(positions): 
+  #  pos.plot('%d.png' % (i), sites, center, 10, 150)
 
 
 def sim_data():
@@ -52,15 +56,15 @@ def sim_data():
   p = center + complex(650,0)
 
   rho = 1     # signal
-  sig_n = 0.01 # noise
-  sig = signal1.IdealSimulator(p, sites, sv, rho, sig_n, 10)
+  sig_n = 0.1 # noise
+  sig = signal1.IdealSimulator(p, sites, sv, rho, sig_n, 100)
   (sig_n, sig_t) = sig.estimate_var()
 
   pos = position1.PositionEstimator(999, sites, center, 
                                sig, sv, method=signal1.Signal.Bartlet)
   pos.plot('fella.png', sites, center, 10, 150, p)
  
-  conf = position1.ConfidenceRegion(pos, sites, 0.683) 
+  conf = position1.ConfidenceRegion(pos, sites, 0.95) 
   conf.display(p)  
   if p in conf: print 'Yes!' 
   else: print 'no.'

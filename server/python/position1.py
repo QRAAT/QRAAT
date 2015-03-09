@@ -253,7 +253,7 @@ class Position:
 
 class ConfidenceRegion: 
 
-  def __init__(self, pos, sites, significance_level=0.68, half_span=HALF_SPAN*50, scale=1):
+  def __init__(self, pos, sites, significance_level=0.68, half_span=HALF_SPAN*40, scale=1):
     self.p_hat = pos.p
     self.signficance_level = significance_level
     self.half_span = half_span
@@ -576,7 +576,7 @@ def fit_ellipse(x, y):
   x = np.array([x0,y0])
 
   # Angle of rotation
-  alpha = 0.5*np.arctan(2*b/(a-c))
+  angle = 0.5*np.arctan(2*b/(a-c))
 
   # Length of Axes
   up = 2*(a*f*f+c*d*d+g*b*b-2*b*d*f-a*c*g)
@@ -586,7 +586,7 @@ def fit_ellipse(x, y):
   res2=np.sqrt(up/down2)
   axes = np.array([res1, res2])
 
-  return (x, alpha, axes)
+  return (x, angle, axes)
 
 
 

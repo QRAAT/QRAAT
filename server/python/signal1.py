@@ -112,9 +112,8 @@ def IdealSimulator(p, sites, sv, rho, sig_n, trials, include=[]):
 
 
 
-
-def Simulator(p, sites, sv, sig_n, sig_t, trials, exclude=[]): 
-  ''' Transmission power degrades following the inverse square law. ''' 
+def Simulator(p, sites, sv, rho, sig_n, trials, include=[]): 
+  ''' Constant SNR for all sites. ''' 
  
   # Elements of noise vector are modelled as independent, identically
   # distributed, circularly-symmetric complex normal random varibles. 
@@ -123,38 +122,26 @@ def Simulator(p, sites, sv, sig_n, sig_t, trials, exclude=[]):
   cov_n = 0.5 * np.array([[sig_n.real, sig_n.imag],
                         [sig_n.imag, sig_n.real]])
     
-  # Generate transmission coefficient, modelled the same way.
-  mu_t = np.complex(0,0)
-  mean_t = np.array([mu_t.real, mu_t.imag])
-  cov_t = 0.5 * np.array([[sig_t.real, sig_t.imag],
-                          [sig_t.imag, sig_t.real]])
-
-  # If transmission coefficient is too low, then 
-  # the pulse detector wouldn't trigger. To model the situation
-  # more ralistically, we'd want to throw out "signals" for which
-  # T is too small. However, this changes the statistics! 
-  T = map(lambda(x) : np.complex(x[0], x[1]), 
-    np.random.multivariate_normal(mean_t, cov_t, trials))
-
   # Noise covariance matrix. 
   Sigma = np.matrix(np.zeros((4,4), dtype=np.complex))
   np.fill_diagonal(Sigma, sig_n)
   
   # Signal power.
-  edsp = sig_t + np.trace(Sigma) 
-  tnp = edsp - sig_t
+  edsp = rho**2 
+  tnp = np.trace(Sigma)
 
   # Interpolate splines to steering vectors. 
   splines = compute_bearing_splines(sv)
   sig = Signal()
     
   sig.t_start = 0
-  sig.t_end = len(T)
+  sig.t_end = trials
+
+  if include == []: 
+    include = sites.keys()
 
   # Generate a (V, \rho, \Sigma) triple for each site. 
-  for id in sites.keys():
-    if id in exclude: 
-      continue
+  for id in include:
     bearing = np.angle(p - sites[id]) * 180 / np.pi
     
     # Compute modelled steering vector for DOA. 
@@ -164,10 +151,10 @@ def Simulator(p, sites, sv, sig_n, sig_t, trials, exclude=[]):
       G[i] = np.complex(I(bearing), Q(bearing))
     
     sig.table[id] = _per_site_data(id)
-    sig.table[id].count = len(T)
+    sig.table[id].count = trials
 
     V = []; timestamps = []; est_ids = []
-    for (i, t) in enumerate(T):
+    for i in range(trials):
       timestamps.append(i)
       est_ids.append(i)
 
@@ -176,19 +163,17 @@ def Simulator(p, sites, sv, sig_n, sig_t, trials, exclude=[]):
             np.random.multivariate_normal(mean_n, cov_n, num_ch)))
 
       # Modelled signal. 
-      # rx_pwr = np.sqrt(tx_pwr / (dist(x, x_i)**2))
-      t = np.sqrt(t / (np.abs(p - sites[id]) ** 2))
+      t = np.sqrt(rho / (np.abs(p - sites[id]) ** 2))
       V.append((t * G) + N) 
     
     sig.table[id].est_ids = np.array(est_ids)
     sig.table[id].t = np.array(timestamps)
     sig.table[id].signal_vector = np.array(V)
-    sig.table[id].tnp = np.array([tnp] * len(T))
-    sig.table[id].edsp = np.array([edsp] * len(T))
-    sig.table[id].noise_cov = np.array([Sigma] * len(T))
+    sig.table[id].tnp = np.array([tnp] * trials)
+    sig.table[id].edsp = np.array([edsp] * trials)
+    sig.table[id].noise_cov = np.array([Sigma] * trials)
   
   return sig
-
 
 
 def IdealSimulator0(p, sites, sv, sig_n, sig_t, trials, exclude=[]): 
@@ -429,9 +414,9 @@ class SteeringVectors:
    
 
   @classmethod
-  def read(cls, cal_id, suffix='sv'):
+  def read(cls, cal_id, prefix='sv'):
     sv = cls()
-    fn = '%s%s.%s' % (suffix, cal_id, sv.suffix)
+    fn = '%s%s.%s' % (prefix, cal_id, sv.suffix)
     fd = open(fn, 'r')
 
     header = fd.readline()
@@ -550,11 +535,11 @@ class Signal:
       site.write()
 
   @classmethod
-  def read(cls, site_ids):
+  def read(cls, site_ids, prefix='sig'):
     sig = cls()
     for id in site_ids:  
       sig.table[id] = _per_site_data(id)
-      sig.table[id].read()
+      sig.table[id].read(prefix)
       sig.t_start = min(sig.t_start, 
                         min(sig.table[id].t))
       sig.t_end = max(sig.t_end, 
@@ -639,8 +624,8 @@ class _per_site_data:
       yield (self.est_ids[i], self.t[i], self.edsp[i],
              self.signal_vector[i], self.noise_cov[i])
 
-  def read(self, suffix='sig'):
-    fn = '%s%d.%s' % (suffix, self.site_id, self.suffix)
+  def read(self, prefix):
+    fn = '%s%d.%s' % (prefix, self.site_id, self.suffix)
     fd = open(fn, 'r')
     
     id = []; t = []; edsp = []
