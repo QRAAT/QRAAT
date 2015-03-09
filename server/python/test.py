@@ -56,7 +56,7 @@ def sim_data():
   p = center + complex(650,0)
 
   rho = 1   # signal
-  sig_n = 0.1 # noise
+  sig_n = 0.001 # noise
   sig = signal1.IdealSimulator(p, sites, sv, rho, sig_n, 10)
   (sig_n, sig_t) = sig.estimate_var()
 
@@ -64,15 +64,12 @@ def sim_data():
                                sig, sv, method=signal1.Signal.Bartlet)
   pos.plot('fella.png', sites, center, 10, 150, p)
  
-  conf = position1.ConfidenceRegion(pos, sites, 0.95) 
+  conf = position1.ConfidenceRegion(pos, sites, 0.99) 
   conf.display(p)  
   if p in conf: print 'Yes!' 
   else: print 'no.'
-  e = conf.ellipse()
-  print 'Area,', e.area()
 
-  print p, e.x
-  #conf.plot('guy.png', p)
+  conf.plot('guy.png', p)
 
 '''
 

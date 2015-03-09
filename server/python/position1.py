@@ -251,41 +251,28 @@ class Position:
 
 ### class ConfidenceRegion. ###################################################
 
-class ConfidenceRegion: 
+class ConfidenceRegion0: 
 
   def __init__(self, pos, sites, significance_level=0.68, half_span=HALF_SPAN*40, scale=1):
     self.p_hat = pos.p
     self.signficance_level = significance_level
     self.half_span = half_span
     self.scale = scale
-    C = compute_covariance0(pos.p, sites, pos.splines, half_span, scale)
-    x_hat = transform_coord(pos.p, pos.p, half_span, scale)
-    (axes, angle) = compute_conf0(C, significance_level, scale)
-    e = Ellipse(x_hat, angle, axes)
-    X, Y = e.cartesian()
-    X = map(lambda x: int(x), X)
-    Y = map(lambda y: int(y), Y)
-    self.contour = set(zip(list(X), list(Y)))
-    print self.contour
-
-    self.level_set = 2
-
-    
-#    (level_set, contour) = compute_conf(pos.p, sites, pos.splines, 
-#                                       significance_level, half_span, scale)
-#    if level_set is None:
-#      self.level_set = None
-#      self.contour = None
-#    else: # TODO Is this ok?
-#      x_hat = np.array([half_span, half_span])
-#      x_centroid = np.array([0,0])
-#      for (e,n) in level_set:
-#        x_centroid[0] += e
-#        x_centroid[1] += n
-#      x_centroid[0] /= len(level_set)
-#      x_centroid[1] /= len(level_set)
-#      self.level_set = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set))
-#      self.contour = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), contour))
+    (level_set, contour) = compute_conf(pos.p, sites, pos.splines, 
+                                       significance_level, half_span, scale)
+    if level_set is None:
+      self.level_set = None
+      self.contour = None
+    else: # TODO Is this ok?
+      x_hat = np.array([half_span, half_span])
+      x_centroid = np.array([0,0])
+      for (e,n) in level_set:
+        x_centroid[0] += e
+        x_centroid[1] += n
+      x_centroid[0] /= len(level_set)
+      x_centroid[1] /= len(level_set)
+      self.level_set = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set))
+      self.contour = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), contour))
 
   def display(self, p_known=None):
     if self.level_set is not None:
@@ -344,12 +331,124 @@ class ConfidenceRegion:
     return Ellipse(p_center, angle, axes)
   
   def __contains__(self, p):
-    return False
     if self.level_set is None:
       return False
     else:
       x = tuple(transform_coord(p, self.p_hat, self.half_span, self.scale))
       return x in self.level_set or x in self.contour
+
+  def __len__(self):
+    return len(self.level_set)
+
+
+
+class ConfidenceRegion: 
+
+  def __init__(self, pos, sites, significance_level=0.68, half_span=HALF_SPAN*40, scale=1, p_known=None):
+    ''' Compute covariance matrix of position estimater w.r.t true location `p`. 
+
+      Assuming the estimate follows a bivariate normal distribution. 
+      This follows [ZB11] equation 2.169. 
+
+      Return a tuple (x, alpha), where x[0] gives the magnitude of the major 
+      axis, x[1]s give the magnitude of the minor axis, and alpha gives the 
+      angular orientation (relative to the x-axis) of the ellipse in degrees. 
+      If C is not positive definite, then the distribution has no density: 
+      return (None, None). 
+
+      Based on the blog post: http://www.visiondummy.com/2014/04/draw-error-
+      ellipse-representing-covariance-matrix/ by Vincent Spruyt. Note that
+      this only applies to *known* covariance, e.g. estimated from multiple
+      position estimates. 
+
+    '''
+    self.p_hat = pos.p
+    self.signficance_level = significance_level
+    self.half_span = half_span
+    self.scale = scale
+  
+    if p_known: 
+      x = transform_coord(p_known, self.p_hat, half_span, scale)
+    else: 
+      x = transform_coord(self.p_hat, self.p_hat, half_span, scale)
+  
+    (positions, likelihoods) = compute_likelihood(
+                             sites, pos.splines, self.p_hat, scale, half_span)
+    
+    # Obj function, Hessian matrix, and gradient vector. 
+    J = lambda (x) : likelihoods[x[0], x[1]]
+    H = nd.Hessian(J)
+    Del = nd.Gradient(J)
+   
+    # Covariance of p_hat.  
+    a = Del(x)
+    b = np.linalg.inv(H(x))
+    C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
+    
+    # Confidence interval. 
+    Qt = scipy.stats.chi2.ppf(significance_level, 2)
+
+    w, v = np.linalg.eig(C)
+    if w[0] > 0 and w[1] > 0: # Positive definite. 
+
+      i = np.argmax(w) # Major w[i], v[:,i]
+      j = np.argmin(w) # Minor w[i], v[:,j]
+
+      angle = np.arctan2(v[:,i][1], v[:,i][0]) * 180 / np.pi
+      x = np.array([2 * np.sqrt(Qt * w[i]), 
+                    2 * np.sqrt(Qt * w[j])])
+      axes = x * scale
+
+    else: raise Exception("Positive definite matrix!")
+    
+    x_hat = transform_coord(pos.p, pos.p, half_span, scale)
+    self.e = Ellipse(x_hat, angle, axes)
+
+  def display(self, p_known=None):
+    X, Y = self.e.cartesian()
+    X = map(lambda x: int(x), X)
+    Y = map(lambda y: int(y), Y)
+    self.contour = set(zip(list(X), list(Y)))
+    if p_known is not None:
+      x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
+    else:
+      x_known = None
+    fella = 20
+    for i in range(-fella, fella+1):
+      for j in range(-fella, fella+1):
+        x = self.e.x + np.array([i,j])
+        if x_known is not None and x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
+        elif x[0] == self.e.x[0] and x[1] == self.e.x[1]: print 'P', 
+        elif tuple(x) in self.contour: print '.',
+        else: print ' ',
+      print 
+
+  def plot(self, fn, p_known=None):
+    fig = pp.gcf()
+    x_hat = self.e.x
+  
+    #(x_fit, y_fit) = fit_contour(x, y, N=10000)
+    (x_fit, y_fit) = self.e.cartesian()  
+    pp.plot(x_fit, y_fit, color='k', alpha=0.5)
+
+    # x_hat
+    pp.plot(x_hat[0], x_hat[1], color='k', marker='o')
+    pp.text(x_hat[0]+0.25, x_hat[1]-0.25, '$\hat{\mathbf{x}}$', fontsize=24)
+      
+    # x_known
+    if p_known:
+      x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
+      pp.plot([x_known[0]], [x_known[1]],  
+              marker='o', color='k', fillstyle='none')
+      pp.text(x_known[0]+0.25, x_known[1]-0.25, '$\mathbf{x}^*$', fontsize=24)
+    
+    pp.savefig(fn)
+    pp.clf()
+
+  
+  def __contains__(self, p):
+    x = transform_coord(p, self.p_hat, self.half_span, self.scale) - self.e.x
+    return ((x[0] / self.e.axes[0])**2 + (x[1] / self.e.axes[1])**2) <= 1
 
   def __len__(self):
     return len(self.level_set)
@@ -607,55 +706,6 @@ def fit_ellipse(x, y):
 
 
 
-def compute_covariance0(p, sites, splines, half_span=HALF_SPAN * 10, scale=1):
-  ''' Compute covariance matrix of position estimater w.r.t true location `p`. 
-
-    Assuming the estimate follows a bivariate normal distribution. 
-    This follows [ZB11] equation 2.169. 
-  '''
-
-  x = transform_coord(p, p, half_span, scale)
-    
-  (positions, likelihoods) = compute_likelihood(
-                           sites, splines, p, scale, half_span)
-    
-  J = lambda (x) : likelihoods[x[0], x[1]]
-  H = nd.Hessian(J)
-  Del = nd.Gradient(J)
- 
-  a = Del(x)
-  b = np.linalg.inv(H(x))
-  C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
-  return C
-
-def compute_conf0(C, level=0.95, scale=1):
-  ''' Compute a confidence ellipse of a covariance matrix.
-
-    Return a tuple (x, alpha), where x[0] gives the magnitude of the major 
-    axis, x[1]s give the magnitude of the minor axis, and alpha gives the 
-    angular orientation (relative to the x-axis) of the ellipse in degrees. 
-    If C is not positive definite, then the distribution has no density: 
-    return (None, None). 
-
-    Based on the blog post: http://www.visiondummy.com/2014/04/draw-error-
-    ellipse-representing-covariance-matrix/ by Vincent Spruyt. Note that
-    this only applies to *known* covariance, e.g. estimated from multiple
-    position estimates. 
-  ''' 
-  Qt = scipy.stats.chi2.ppf(level, 2)
-
-  w, v = np.linalg.eig(C)
-  if w[0] > 0 and w[1] > 0: # Positive definite. 
-
-    i = np.argmax(w) # Major w[i], v[:,i]
-    j = np.argmin(w) # Minor w[i], v[:,j]
-
-    alpha = np.arctan2(v[:,i][1], v[:,i][0]) * 180 / np.pi
-    x = np.array([2 * np.sqrt(Qt * w[i]), 
-                  2 * np.sqrt(Qt * w[j])])
-    return (x * scale, alpha) 
-
-  else: return (None, None)
 
   
 
