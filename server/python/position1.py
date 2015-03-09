@@ -258,21 +258,34 @@ class ConfidenceRegion:
     self.signficance_level = significance_level
     self.half_span = half_span
     self.scale = scale
-    (level_set, contour) = compute_conf(pos.p, sites, pos.splines, 
-                                       significance_level, half_span, scale)
-    if level_set is None:
-      self.level_set = None
-      self.contour = None
-    else: # TODO Is this ok?
-      x_hat = np.array([half_span, half_span])
-      x_centroid = np.array([0,0])
-      for (e,n) in level_set:
-        x_centroid[0] += e
-        x_centroid[1] += n
-      x_centroid[0] /= len(level_set)
-      x_centroid[1] /= len(level_set)
-      self.level_set = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set))
-      self.contour = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), contour))
+    C = compute_covariance0(pos.p, sites, pos.splines, half_span, scale)
+    x_hat = transform_coord(pos.p, pos.p, half_span, scale)
+    (axes, angle) = compute_conf0(C, significance_level, scale)
+    e = Ellipse(x_hat, angle, axes)
+    X, Y = e.cartesian()
+    X = map(lambda x: int(x), X)
+    Y = map(lambda y: int(y), Y)
+    self.contour = set(zip(list(X), list(Y)))
+    print self.contour
+
+    self.level_set = 2
+
+    
+#    (level_set, contour) = compute_conf(pos.p, sites, pos.splines, 
+#                                       significance_level, half_span, scale)
+#    if level_set is None:
+#      self.level_set = None
+#      self.contour = None
+#    else: # TODO Is this ok?
+#      x_hat = np.array([half_span, half_span])
+#      x_centroid = np.array([0,0])
+#      for (e,n) in level_set:
+#        x_centroid[0] += e
+#        x_centroid[1] += n
+#      x_centroid[0] /= len(level_set)
+#      x_centroid[1] /= len(level_set)
+#      self.level_set = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set))
+#      self.contour = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), contour))
 
   def display(self, p_known=None):
     if self.level_set is not None:
@@ -331,6 +344,7 @@ class ConfidenceRegion:
     return Ellipse(p_center, angle, axes)
   
   def __contains__(self, p):
+    return False
     if self.level_set is None:
       return False
     else:
@@ -600,9 +614,7 @@ def compute_covariance0(p, sites, splines, half_span=HALF_SPAN * 10, scale=1):
     This follows [ZB11] equation 2.169. 
   '''
 
-  e = lambda(x0) : int((x0 - p.imag) / scale) + half_span
-  n = lambda(x1) : int((x1 - p.real) / scale) + half_span
-  f = lambda(p) : [e(p.imag), n(p.real)]
+  x = transform_coord(p, p, half_span, scale)
     
   (positions, likelihoods) = compute_likelihood(
                            sites, splines, p, scale, half_span)
@@ -611,9 +623,9 @@ def compute_covariance0(p, sites, splines, half_span=HALF_SPAN * 10, scale=1):
   H = nd.Hessian(J)
   Del = nd.Gradient(J)
  
-  a = Del(f(p))
-  b = np.linalg.inv(H(f(p)))
-  C = np.dot(np.dot(b, np.dot(a, np.transpose(a))), b)
+  a = Del(x)
+  b = np.linalg.inv(H(x))
+  C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
   return C
 
 def compute_conf0(C, level=0.95, scale=1):
@@ -630,8 +642,7 @@ def compute_conf0(C, level=0.95, scale=1):
     this only applies to *known* covariance, e.g. estimated from multiple
     position estimates. 
   ''' 
-  chi_squared = {0.90 : 4.605, 0.95 : 5.991, 0.99 : 9.210} 
-  assert level in chi_squared.keys()
+  Qt = scipy.stats.chi2.ppf(level, 2)
 
   w, v = np.linalg.eig(C)
   if w[0] > 0 and w[1] > 0: # Positive definite. 
@@ -640,8 +651,8 @@ def compute_conf0(C, level=0.95, scale=1):
     j = np.argmin(w) # Minor w[i], v[:,j]
 
     alpha = np.arctan2(v[:,i][1], v[:,i][0]) * 180 / np.pi
-    x = np.array([2 * np.sqrt(chi_squared[level] * w[i]), 
-                  2 * np.sqrt(chi_squared[level] * w[j])])
+    x = np.array([2 * np.sqrt(Qt * w[i]), 
+                  2 * np.sqrt(Qt * w[j])])
     return (x * scale, alpha) 
 
   else: return (None, None)
