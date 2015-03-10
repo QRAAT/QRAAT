@@ -173,7 +173,7 @@ def conf_test(prefix, center, sites, sv):
   exp_params = { 'simulator' : 'ideal',
                  'rho'       : 1,
                  'sig_n'     : np.arange(0.001, 0.011, 0.001),
-                 'pulse_ct'  : [1,2,5,10], #[1,10,100]
+                 'pulse_ct'  : [1,10,100],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
@@ -191,7 +191,7 @@ def conf_test(prefix, center, sites, sv):
   pos, conf, exp_params, sys_params = load(prefix, conf_level)
   report(pos, conf, exp_params, sys_params, conf_level)
 
-     
+
 
 
 if __name__ == '__main__':
