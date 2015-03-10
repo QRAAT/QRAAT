@@ -4,9 +4,11 @@ import util
 import signal1
 import position1
 
+import pickle
 import numpy as np
 
 cal_id = 3   # Calibration ID, specifies steering vectors to use. 
+
 
 def sim(trials, pulses, rho, noise, sv, sites, center, half_span, scale, method, simulator, include=[]):
   s = 2 * half_span + 1
@@ -28,86 +30,108 @@ def sim(trials, pulses, rho, noise, sv, sites, center, half_span, scale, method,
       print ' '
   return res
 
-def report(res, rho, noise, center, half_span, scale):
-  s = 2 * half_span + 1
-  for (e, sig_n) in enumerate(noise):
-    print 'sig_n=%f' % sig_n
-    for i in range(s):
-      for j in range(s):
-        p = center + np.complex((i - half_span) * scale, 
-                                (j - half_span) * scale)
-        p_hat = res[e,i,j,:]
-        mean = np.mean(p_hat)
-        mean = [mean.imag, mean.real]
-        print mean
-
-        rmse = np.sqrt(np.mean(np.abs(p_hat - p) ** 2))# / res.shape[3])
-        print rmse, np.std(p_hat)
-        #rmse = [ 
-        #  np.sqrt(np.mean((np.imag(p_hat) - p.imag) ** 2)), # / res.shape[3]),
-        #  np.sqrt(np.mean((np.real(p_hat) - p.real) ** 2))] # / res.shape[3])]
-        #print rmse, np.std(np.imag(p_hat)), np.std(np.real(p_hat))
-        
-        cov = np.cov(np.imag(p_hat), np.real(p_hat))
-        print cov
 
 
+def montecarlo(exp_params, sys_params, sv, conf_level=None):
+  s = 2 * exp_params['half_span'] + 1
+  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s, exp_params['trials'])
+  pos = np.zeros(shape, dtype=np.complex)
+  if conf_level: # conf[i,j,e,n,k,:] = (axes[0], axes[1], angle)
+    conf = np.zeros(shape + (3,), dtype=np.float)
+  else: conf = None
+  
+  if sys_params['method'] == 'bartlet': 
+    method = signal1.Signal.Bartlet
+  elif sys_params['method'] == 'MLE': 
+    method = signal1.Signal.MLE
+  else: raise Exception('Unknown method')
 
-def save(fn, res, trials, pulses, rho, noise, center, half_span, scale, sites):
-  np.savez(fn, 
-           exp=np.array([trials, pulses, half_span, scale]), 
-           params=np.array([rho] + noise), 
-           center=np.array([center]),
-           sites=np.array(sites), 
-           res=res)
+  if exp_params['simulator'] == 'ideal':
+    simulator = signal1.IdealSimulator
+  elif exp_params['simulator'] == 'real':
+    simulator = signal1.Simulator
+  else: raise Exception('Unknown simulator')
 
-def load(fn): 
-  data = np.load(fn)
-  trials, pulses, half_span, scale = tuple(data['exp'])
-  rho = data['params'][0]
-  noise = data['params'][1:]
-  sites = data['sites']
-  center = data['center'][0]
-  res = data['res']
-  return (res, trials, pulses, rho, noise, center, half_span, scale, sites)
+  sites = sys_params['sites']
+  for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
+    print 'pulse_ct=%d' % pulse_ct
+    for j, sig_n in enumerate(exp_params['sig_n']): 
+      print '  sig_n=%f' % sig_n
+      for e in range(s): #easting 
+        for n in range(s): #northing
+          P = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                                 (e - exp_params['half_span']) * exp_params['scale'])
+          for k in range(exp_params['trials']): 
+            # Run simulation. 
+            sig = simulator(P, sites, sv, exp_params['rho'], sig_n, pulse_ct, sys_params['include'])
+          
+            # Estimate position.
+            P_hat = position1.PositionEstimator(999, sites, sys_params['center'], sig, sv, method)
+            pos[i,j,e,n,k] = P_hat.p
 
-
-def sim2(trials, pulses, sig_t, sig_n, sv, sites, p, center):
-    ct = 0
-    for n in range(trials):
-      sig = signal1.Simulator(p, sites, sv, sig_n, sig_t, pulses)
-      pos = position1.PositionEstimator(999, sites, center, 
-                       sig, sv, method=signal1.Signal.Bartlet)
-      conf = position1.ConfidenceRegion(pos, sites, 0.683)
-      if p in conf:
-        ct += 1
-    print float(ct) / trials
-
-
-def sim3(trials, pulses, sv, sites, p, center):
-    guy = [0.002, 0.004, 0.006, 0.008, 0.01, 0.02, 0.03]
-    for sig_n in guy: 
-      ct = 0
-      for n in range(trials):
-        sig = signal1.IdealSimulator(p, sites, sv, sig_n, pulses)
-        pos = position1.PositionEstimator(999, sites, center, 
-                         sig, sv, method=signal1.Signal.Bartlet)
-        conf = position1.ConfidenceRegion(pos, sites, 0.683)
-        if p in conf:
-          ct += 1
-      print sig_n, float(ct) / trials
-
+            # Estimate confidence region. 
+            if conf_level:
+              C = position1.ConfidenceRegion(P_hat, sites, conf_level, 
+                      sys_params['conf_half_span'], sys_params['conf_scale']) 
+              conf[i,j,e,n,k,:] = np.array([C.e.axes[0], C.e.axes[1], C.e.angle])
+  return (pos, conf)
 
 
-     
+def save(prefix, pos, conf, exp_params, sys_params, conf_level=None):
+  np.savez(prefix + '-pos', pos)
+  if conf_level:
+    np.savez(prefix + '-%0.2fconf' % conf_level, conf)
+  pickle.dump((exp_params, sys_params), open(prefix + '-params', 'w'))
+
+def load(prefix, conf_level=None):
+  pos = np.load(prefix + '-pos.npz')['arr_0']
+  if conf_level:
+    conf = np.load(prefix + '-%0.2fconf.npz' % conf_level)['arr_0']
+  else: conf = None
+  (exp_params, sys_params) = pickle.load(open(prefix + '-params'))
+  return (pos, conf, exp_params, sys_params)
+    
+def report(pos, conf, exp_params, sys_params, conf_level):
+  s = 2 * exp_params['half_span'] + 1
+  for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
+    print 'pulse_ct=%d' % pulse_ct
+    for j, sig_n in enumerate(exp_params['sig_n']): 
+      print '  sig_n=%f' % sig_n
+      for e in range(s): #easting 
+        for n in range(s): #northing
+          p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                                 (e - exp_params['half_span']) * exp_params['scale'])
+          p_hat = pos[i,j,e,n,:]
+          mean = np.mean(p_hat)
+          mean = [mean.imag, mean.real]
+
+          rmse = np.sqrt(np.mean(np.abs(p_hat - p) ** 2))# / res.shape[3])
+          #rmse = [ 
+          #  np.sqrt(np.mean((np.imag(p_hat) - p.imag) ** 2)), # / res.shape[3]),
+          #  np.sqrt(np.mean((np.real(p_hat) - p.real) ** 2))] # / res.shape[3])]
+          #print rmse, np.std(np.imag(p_hat)), np.std(np.real(p_hat))
+          
+          cov = np.cov(np.imag(p_hat), np.real(p_hat))
+  
+          print '   [%0.2f, %0.2f] -> [%0.2f, %0.2f] %0.5f' % (p.imag, p.real, mean[0], mean[1], rmse), 
+          if conf_level:
+            ct = 0
+            for k in range(exp_params['trials']):
+              x_hat = np.array([sys_params['conf_half_span'], sys_params['conf_half_span']])
+              axes = np.array([conf[i,j,e,n,k,0], conf[i,j,e,n,k,1]])
+              angle = conf[i,j,e,n,k,2]
+              x = position1.transform_coord(p, p_hat[k], sys_params['conf_half_span'], 
+                                                         sys_params['conf_scale']) - x_hat
+              good = ((x[0] / axes[0])**2 + (x[1] / axes[1])**2) <= 1
+              if good: 
+                ct += 1
+            print '%0.2f' % (float(ct) / exp_params['trials'])
+          else: print 
 
 
-if __name__ == '__main__':
 
-  db_con = util.get_db('reader')
-  sv = signal1.SteeringVectors(db_con, cal_id)
-  sites = util.get_sites(db_con)
-  (center, zone) = util.get_center(db_con)
+
+def grid_test(): 
   
   rho = 1 
   noise = np.arange(0.001, 0.011, 0.001)
@@ -117,7 +141,7 @@ if __name__ == '__main__':
   trials = 10000
   pulses = 1
   include = []
- 
+
   # Ideal Bartlet
   res = sim(trials, pulses, rho, noise, sv, sites, center, half_span, scale, 
               signal1.Signal.Bartlet, signal1.IdealSimulator, [4, 8, 6])
@@ -139,3 +163,43 @@ if __name__ == '__main__':
 
   #(res, trials, pulses, rho, noise, center, half_span, scale, _sites) = load('ideal.npz')
   #report(res, rho, noise, center, half_span, scale)
+
+
+
+def conf_test(prefix, center, sites, sv): 
+  
+  conf_level = 0.95
+
+  exp_params = { 'simulator' : 'ideal',
+                 'rho'       : 1,
+                 'sig_n'     : np.arange(0.001, 0.011, 0.001),
+                 'pulse_ct'  : [1,2,5,10], #[1,10,100]
+                 'center'    : (4260838.3+574049j), 
+                 'half_span' : 0,
+                 'scale'     : 1,
+                 'trials'    : 1000 }
+
+  sys_params = { 'method'         : 'bartlet', 
+                 'include'        : [4, 8, 6],
+                 'center'         : center,
+                 'sites'          : sites,
+                 'conf_half_span' : position1.HALF_SPAN*10, 
+                 'conf_scale'     : 1 }
+
+  (pos, conf) = montecarlo(exp_params, sys_params, sv, conf_level)
+  save(prefix, pos, conf, exp_params, sys_params, conf_level)
+  pos, conf, exp_params, sys_params = load(prefix, conf_level)
+  report(pos, conf, exp_params, sys_params, conf_level)
+
+     
+
+
+if __name__ == '__main__':
+
+  db_con = util.get_db('reader')
+  sv = signal1.SteeringVectors(db_con, cal_id)
+  sites = util.get_sites(db_con)
+  (center, zone) = util.get_center(db_con)
+ 
+  conf_test('fella', center, sites, sv)
+ 
