@@ -170,14 +170,14 @@ def conf_test(prefix, center, sites, sv):
   
   conf_level = 0.95
 
-  exp_params = { 'simulator' : 'ideal',
+  exp_params = { 'simulator' : 'real',
                  'rho'       : 1,
-                 'sig_n'     : np.arange(0.001, 0.011, 0.001),
-                 'pulse_ct'  : [1,10,100],
+                 'sig_n'     : np.arange(0.000, 0.012, 0.002),
+                 'pulse_ct'  : [1,2,5,10,100],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 1000 }
+                 'trials'    : 10000 }
 
   sys_params = { 'method'         : 'bartlet', 
                  'include'        : [4, 8, 6],
@@ -201,5 +201,5 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
  
-  conf_test('fella', center, sites, sv)
+  conf_test('exp/real', center, sites, sv)
  
