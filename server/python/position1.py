@@ -432,9 +432,6 @@ class ConfidenceRegion:
   def __contains__(self, p):
     return p in self.e
 
-  def __len__(self):
-    return len(self.level_set)
-
 
 
 class Ellipse:
@@ -585,7 +582,7 @@ def compute_cov(x, H, Del):
   return C
 
 
-def compute_conf(p_hat, C, significance_level, half_span, scale):
+def compute_conf(p_hat, C, significance_level, half_span=0, scale=1):
   Qt = scipy.stats.chi2.ppf(significance_level, 2)
 
   w, v = np.linalg.eig(C)

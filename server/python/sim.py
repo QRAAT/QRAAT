@@ -111,20 +111,22 @@ def report(pos, conf, exp_params, sys_params, conf_level):
           #  np.sqrt(np.mean((np.imag(p_hat) - p.imag) ** 2)), # / res.shape[3]),
           #  np.sqrt(np.mean((np.real(p_hat) - p.real) ** 2))] # / res.shape[3])]
           #print rmse, np.std(np.imag(p_hat)), np.std(np.real(p_hat))
-          
-          cov = np.cov(np.imag(p_hat), np.real(p_hat))
+         
+          try: 
+            C = np.cov(np.imag(p_hat), np.real(p_hat))
+            E = position1.compute_conf(p, C, conf_level)
+          except: 
+            print "skippiong positive definite"
   
           print '   [%0.2f, %0.2f] -> [%0.2f, %0.2f] %0.5f' % (p.imag, p.real, mean[0], mean[1], rmse), 
           if conf_level:
             ct = 0
             for k in range(exp_params['trials']):
-              x_hat = np.array([sys_params['conf_half_span'], sys_params['conf_half_span']])
               axes = np.array([conf[i,j,e,n,k,0], conf[i,j,e,n,k,1]])
               angle = conf[i,j,e,n,k,2]
-              x = position1.transform_coord(p, p_hat[k], sys_params['conf_half_span'], 
-                                                         sys_params['conf_scale']) - x_hat
-              good = ((x[0] / axes[0])**2 + (x[1] / axes[1])**2) <= 1
-              if good: 
+              E_hat = position1.Ellipse(p_hat[k], angle, axes, 
+                                sys_params['conf_half_span'], sys_params['conf_scale'])
+              if p in E_hat: 
                 ct += 1
             print '%0.2f' % (float(ct) / exp_params['trials'])
           else: print 
