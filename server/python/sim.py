@@ -141,8 +141,6 @@ def plot(pos, conf, exp_params, sys_params):
           f = lambda p : [p.imag, p.real]
           P = f(exp_params['center'])
           X = np.array(map(f, pos[i,j,e,n,:])) 
-          print X[:,0]
-          print X[:,1]
           fig = pp.gcf()
       
           pp.xlim([P[0]-100, P[0]+100])
@@ -194,10 +192,8 @@ def grid_test():
 
 
 
-def conf_test(prefix, center, sites, sv): 
+def conf_test(prefix, center, sites, sv, conf_level): 
   
-  conf_level = 0.95
-
   exp_params = { 'simulator' : 'real',
                  'rho'       : 1,
                  'sig_n'     : np.arange(0.000, 0.012, 0.002),
@@ -228,10 +224,11 @@ if __name__ == '__main__':
   sv = signal1.SteeringVectors(db_con, cal_id)
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
- 
-  #conf_test('exp/real', center, sites, sv)
   
-  res = load('exp/ideal')
-  plot(*res)
+  gamma=0.95
+  #conf_test('exp/real', center, sites, sv, gamma)
+  res = load('exp/ideal', gamma)
+  #plot(*res)
+  report(*res, conf_level=gamma)
 
  

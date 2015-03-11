@@ -36,7 +36,6 @@ import util, signal1
 import sys, time
 import numpy as np
 import matplotlib.pyplot as pp
-from matplotlib.patches import Ellipse
 from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
 import scipy, scipy.stats
 import numdifftools as nd
@@ -258,8 +257,8 @@ class ConfidenceRegion0:
     self.signficance_level = significance_level
     self.half_span = half_span
     self.scale = scale
-    (level_set, contour) = compute_conf(pos.p, sites, pos.splines, 
-                                       significance_level, half_span, scale)
+    (level_set, contour) = compute_conf0(pos.p, sites, pos.splines, 
+                                         significance_level, half_span, scale)
     if level_set is None:
       self.level_set = None
       self.contour = None
@@ -301,7 +300,8 @@ class ConfidenceRegion0:
   
     #(x_fit, y_fit) = fit_contour(x, y, N=10000)
     (x_center, alpha, axes) = fit_ellipse(x, y)
-    e = Ellipse(x_center, alpha, axes) 
+    p_center = transform_coord_inv(x_center, self.p_hat, self.half_span, self.scale)
+    e = Ellipse(p_center, alpha, axes, self.half_span, self.scale) 
     (x_fit, y_fit) = e.cartesian()  
     pp.plot(x_fit, y_fit, color='k', alpha=0.5)
 
@@ -325,10 +325,9 @@ class ConfidenceRegion0:
     x = np.array(map(lambda x: x[0], self.contour))
     y = np.array(map(lambda x: x[1], self.contour))
     (x_center, angle, axes) = fit_ellipse(x, y)
-    print Ellipse(x_center, angle, axes).area()
     p_center = transform_coord_inv(x_center, self.p_hat, self.half_span, self.scale)
     axes /= self.scale
-    return Ellipse(p_center, angle, axes)
+    return Ellipse(p_center, angle, axes, self.half_span, self.scale)
   
   def __contains__(self, p):
     if self.level_set is None:
@@ -384,26 +383,10 @@ class ConfidenceRegion:
     a = Del(x)
     b = np.linalg.inv(H(x))
     C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
-    
+  
     # Confidence interval. 
-    Qt = scipy.stats.chi2.ppf(significance_level, 2)
-
-    w, v = np.linalg.eig(C)
-    if w[0] > 0 and w[1] > 0: # Positive definite. 
-
-      i = np.argmax(w) # Major w[i], v[:,i]
-      j = np.argmin(w) # Minor w[i], v[:,j]
-
-      angle = np.arctan2(v[:,i][1], v[:,i][0]) * 180 / np.pi
-      x = np.array([2 * np.sqrt(Qt * w[i]), 
-                    2 * np.sqrt(Qt * w[j])])
-      axes = x * scale
-
-    else: raise Exception("Positive definite matrix!")
-    
-    x_hat = transform_coord(pos.p, pos.p, half_span, scale)
-    self.e = Ellipse(x_hat, angle, axes)
-
+    self.e = compute_conf(self.p_hat, C, significance_level, half_span, scale) 
+  
   def display(self, p_known=None):
     X, Y = self.e.cartesian()
     X = map(lambda x: int(x), X)
@@ -447,8 +430,7 @@ class ConfidenceRegion:
 
   
   def __contains__(self, p):
-    x = transform_coord(p, self.p_hat, self.half_span, self.scale) - self.e.x
-    return ((x[0] / self.e.axes[0])**2 + (x[1] / self.e.axes[1])**2) <= 1
+    return p in self.e
 
   def __len__(self):
     return len(self.level_set)
@@ -457,10 +439,13 @@ class ConfidenceRegion:
 
 class Ellipse:
 
-  def __init__(self, x, angle, axes): 
-    self.x = x
+  def __init__(self, p_hat, angle, axes, half_span, scale): 
+    self.p_hat = p_hat
     self.angle = angle
     self.axes = axes
+    self.half_span = half_span
+    self.scale = scale
+    self.x = np.array([half_span, half_span])
 
   def area(self):
     return np.pi * self.axes[0] * self.axes[1]
@@ -473,6 +458,10 @@ class Ellipse:
                     self.axes[1]*np.sin(theta)*np.cos(self.angle)
     return (X, Y)
 
+  def __contains__(self, p):
+    x = transform_coord(p, self.p_hat, self.half_span, self.scale) - self.x
+    return ((x[0] / self.axes[0])**2 + (x[1] / self.axes[1])**2) <= 1 # TODO double check
+    
 
 
 ### Low level calls. ##########################################################
@@ -595,7 +584,28 @@ def compute_cov(x, H, Del):
   C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
   return C
 
-def compute_conf(p_hat, sites, splines, significance_level, half_span, scale):
+
+def compute_conf(p_hat, C, significance_level, half_span, scale):
+  Qt = scipy.stats.chi2.ppf(significance_level, 2)
+
+  w, v = np.linalg.eig(C)
+  if w[0] > 0 and w[1] > 0: # Positive definite. 
+
+    i = np.argmax(w) # Major w[i], v[:,i]
+    j = np.argmin(w) # Minor w[i], v[:,j]
+
+    angle = np.arctan2(v[:,i][1], v[:,i][0]) * 180 / np.pi
+    x = np.array([2 * np.sqrt(Qt * w[i]), 
+                  2 * np.sqrt(Qt * w[j])])
+    axes = x * scale
+
+  else: raise Exception("Positive definite matrix!")
+  
+  x_hat = transform_coord(p_hat, p_hat, half_span, scale)
+  return Ellipse(p_hat, angle, axes, half_span, scale)
+
+
+def compute_conf0(p_hat, sites, splines, significance_level, half_span, scale):
   ''' Find the points that fall within confidence region of the estimate. ''' 
   Qt = scipy.stats.chi2.ppf(significance_level, 2)
 
