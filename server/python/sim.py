@@ -6,6 +6,7 @@ import position1
 
 import pickle
 import numpy as np
+import matplotlib.pyplot as pp
 
 cal_id = 3   # Calibration ID, specifies steering vectors to use. 
 
@@ -129,6 +130,33 @@ def report(pos, conf, exp_params, sys_params, conf_level):
           else: print 
 
 
+def plot(pos, conf, exp_params, sys_params):
+  s = 2 * exp_params['half_span'] + 1
+  for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
+    print 'pulse_ct=%d' % pulse_ct
+    for j, sig_n in enumerate(exp_params['sig_n']): 
+      print '  sig_n=%f' % sig_n
+      for e in range(s): #easting 
+        for n in range(s): #northing
+          f = lambda p : [p.imag, p.real]
+          P = f(exp_params['center'])
+          X = np.array(map(f, pos[i,j,e,n,:])) 
+          print X[:,0]
+          print X[:,1]
+          fig = pp.gcf()
+      
+          pp.xlim([P[0]-100, P[0]+100])
+          pp.ylim([P[1]-100, P[1]+100])
+          
+          # x_hat's 
+          pp.scatter(X[:,0], X[:,1], alpha=0.1, edgecolor='none')
+          
+          # x
+          pp.scatter(P[0], P[1], color='r', zorder=11)
+          
+          pp.title('$\sigma_n^2$=%0.4f, sample_ct=%d' % (sig_n, pulse_ct))
+          pp.show()
+          pp.clf()
 
 
 def grid_test(): 
@@ -201,5 +229,9 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
  
-  conf_test('exp/real', center, sites, sv)
+  #conf_test('exp/real', center, sites, sv)
+  
+  res = load('exp/ideal')
+  plot(*res)
+
  
