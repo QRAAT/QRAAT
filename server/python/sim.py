@@ -11,6 +11,7 @@ import matplotlib.pyplot as pp
 cal_id = 3   # Calibration ID, specifies steering vectors to use. 
 
 
+
 def sim(trials, pulses, rho, noise, sv, sites, center, half_span, scale, method, simulator, include=[]):
   s = 2 * half_span + 1
   res = np.zeros((len(noise), s, s, trials), dtype=np.complex)
@@ -94,6 +95,7 @@ def load(prefix, conf_level=None):
     
 def report(pos, conf, exp_params, sys_params, conf_level):
   s = 2 * exp_params['half_span'] + 1
+  num_sites = len(sys_params['include'])
   for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
     print 'pulse_ct=%d' % pulse_ct
     for j, sig_n in enumerate(exp_params['sig_n']): 
@@ -114,25 +116,28 @@ def report(pos, conf, exp_params, sys_params, conf_level):
          
           try: 
             C = np.cov(np.imag(p_hat), np.real(p_hat))
-            E = position1.compute_conf(p, C, conf_level)
-          except: 
+            E = position1.compute_conf(p, C, 0.95, k=num_sites)
+          except position1.PosDefError:
+            E = None
             print "skippiong positive definite"
   
           print '   [%0.2f, %0.2f] -> [%0.2f, %0.2f] %0.5f' % (p.imag, p.real, mean[0], mean[1], rmse), 
           if conf_level:
-            ct = 0
+            a = b = 0
             for k in range(exp_params['trials']):
               axes = np.array([conf[i,j,e,n,k,0], conf[i,j,e,n,k,1]])
               angle = conf[i,j,e,n,k,2]
               E_hat = position1.Ellipse(p_hat[k], angle, axes, 
                                 sys_params['conf_half_span'], sys_params['conf_scale'])
-              if p in E_hat: 
-                ct += 1
-            print '%0.2f' % (float(ct) / exp_params['trials'])
+              if p in E_hat:    a += 1
+              if not E or p_hat[k] in E: b += 1
+            print '%0.2f %0.2f' % (float(a) / exp_params['trials'],
+                                   float(b) / exp_params['trials'])
           else: print 
 
 
-def plot(pos, conf, exp_params, sys_params):
+def plot(pos, conf, exp_params, sys_params, conf_level):
+  num_sites = len(sys_params['include'])
   s = 2 * exp_params['half_span'] + 1
   for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
     print 'pulse_ct=%d' % pulse_ct
@@ -140,9 +145,13 @@ def plot(pos, conf, exp_params, sys_params):
       print '  sig_n=%f' % sig_n
       for e in range(s): #easting 
         for n in range(s): #northing
+          p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                                 (e - exp_params['half_span']) * exp_params['scale'])
+          p_hat = pos[i,j,e,n,:]
           f = lambda p : [p.imag, p.real]
           P = f(exp_params['center'])
-          X = np.array(map(f, pos[i,j,e,n,:])) 
+          X = np.array(map(f, p_hat)) 
+          
           fig = pp.gcf()
       
           pp.xlim([P[0]-100, P[0]+100])
@@ -151,13 +160,22 @@ def plot(pos, conf, exp_params, sys_params):
           # x_hat's 
           pp.scatter(X[:,0], X[:,1], alpha=0.1, edgecolor='none')
           
+          # Confidence interval
+          try:
+            C = np.cov(np.imag(p_hat), np.real(p_hat))
+            E = position1.compute_conf(p, C, conf_level, k=num_sites)
+            (E_x, E_y) = E.cartesian()
+            pp.plot(E_x + p.imag, E_y + p.real, color='k', zorder=11)
+          except position1.PosDefError: 
+            print '    skipping pos. def. covariance'
+
           # x
           pp.scatter(P[0], P[1], color='r', zorder=11)
           
           pp.title('$\sigma_n^2$=%0.4f, sample_ct=%d' % (sig_n, pulse_ct))
           pp.show()
           pp.clf()
-
+    assert False
 
 def grid_test(): 
   
@@ -230,7 +248,7 @@ if __name__ == '__main__':
   gamma=0.95
   #conf_test('exp/real', center, sites, sv, gamma)
   res = load('exp/ideal', gamma)
-  #plot(*res)
+  #plot(*res, conf_level=gamma)
   report(*res, conf_level=gamma)
 
  

@@ -56,8 +56,8 @@ def sim_data():
   p = center + complex(650,0)
 
   rho = 1   # signal
-  sig_n = 0.001 # noise
-  sig = signal1.IdealSimulator(p, sites, sv, rho, sig_n, 10)
+  sig_n = 0.01 # noise
+  sig = signal1.IdealSimulator(p, sites, sv, rho, sig_n, 100)
   (sig_n, sig_t) = sig.estimate_var()
 
   pos = position1.PositionEstimator(999, sites, center, 

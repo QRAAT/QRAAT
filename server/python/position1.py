@@ -46,6 +46,7 @@ SCALE = 10             # Meters
 ELLIPSE_PLOT_SCALE = 5 # Scaling factor
 
 
+class PosDefError (Exception): pass
 
 ### Position estimation. ######################################################
 
@@ -385,7 +386,8 @@ class ConfidenceRegion:
     C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
   
     # Confidence interval. 
-    self.e = compute_conf(self.p_hat, C, significance_level, half_span, scale) 
+    self.e = compute_conf(self.p_hat, C, significance_level, 
+                          half_span, scale, k=1.0/pos.num_sites) # TODO what to put for k?
   
   def display(self, p_known=None):
     X, Y = self.e.cartesian()
@@ -457,7 +459,7 @@ class Ellipse:
 
   def __contains__(self, p):
     x = transform_coord(p, self.p_hat, self.half_span, self.scale) - self.x
-    return ((x[0] / self.axes[0])**2 + (x[1] / self.axes[1])**2) <= 1 # TODO double check
+    return ((x[0] / self.axes[0])**2 + (x[1] / self.axes[1])**2) <= 1 
     
 
 
@@ -582,23 +584,24 @@ def compute_cov(x, H, Del):
   return C
 
 
-def compute_conf(p_hat, C, significance_level, half_span=0, scale=1):
+def compute_conf(p_hat, C, significance_level, half_span=0, scale=1, k=1):
   Qt = scipy.stats.chi2.ppf(significance_level, 2)
 
-  w, v = np.linalg.eig(C)
+  # k - the number of samples (sites)
+  w, v = np.linalg.eig(C / k)
   if w[0] > 0 and w[1] > 0: # Positive definite. 
 
     i = np.argmax(w) # Major w[i], v[:,i]
     j = np.argmin(w) # Minor w[i], v[:,j]
 
-    angle = np.arctan2(v[:,i][1], v[:,i][0]) * 180 / np.pi
+    angle = np.arctan2(v[:,i][1], v[:,i][0]) 
     x = np.array([2 * np.sqrt(Qt * w[i]), 
                   2 * np.sqrt(Qt * w[j])])
+
     axes = x * scale
 
-  else: raise Exception("Positive definite matrix!")
+  else: raise PosDefError
   
-  x_hat = transform_coord(p_hat, p_hat, half_span, scale)
   return Ellipse(p_hat, angle, axes, half_span, scale)
 
 
