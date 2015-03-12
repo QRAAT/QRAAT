@@ -253,13 +253,13 @@ class Position:
 
 class ConfidenceRegion0: 
 
-  def __init__(self, pos, sites, significance_level=0.68, half_span=HALF_SPAN*40, scale=1):
+  def __init__(self, pos, sites, level=0.68, half_span=HALF_SPAN*40, scale=1):
     self.p_hat = pos.p
-    self.signficance_level = significance_level
+    self.level = level
     self.half_span = half_span
     self.scale = scale
     (level_set, contour) = compute_conf0(pos.p, sites, pos.splines, 
-                                         significance_level, half_span, scale)
+                                         level, half_span, scale)
     if level_set is None:
       self.level_set = None
       self.contour = None
@@ -273,6 +273,14 @@ class ConfidenceRegion0:
       x_centroid[1] /= len(level_set)
       self.level_set = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set))
       self.contour = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), contour))
+    
+    x = np.array(map(lambda x: x[0], self.contour))
+    y = np.array(map(lambda x: x[1], self.contour))
+    (x_center, alpha, axes) = fit_ellipse(x, y)
+    p_center = transform_coord_inv(x_center, self.p_hat, self.half_span, self.scale)
+    self.e = Ellipse(self.p_hat, alpha, axes, self.half_span, self.scale) 
+
+
 
   def display(self, p_known=None):
     if self.level_set is not None:
@@ -300,10 +308,7 @@ class ConfidenceRegion0:
     y = np.array(map(lambda x: x[1], self.contour))
   
     #(x_fit, y_fit) = fit_contour(x, y, N=10000)
-    (x_center, alpha, axes) = fit_ellipse(x, y)
-    p_center = transform_coord_inv(x_center, self.p_hat, self.half_span, self.scale)
-    e = Ellipse(p_center, alpha, axes, self.half_span, self.scale) 
-    (x_fit, y_fit) = e.cartesian()  
+    (x_fit, y_fit) = self.e.cartesian()  
     pp.plot(x_fit, y_fit, color='k', alpha=0.5)
 
     pp.scatter(x, y, marker='x', color='b', alpha=0.5)
@@ -363,7 +368,7 @@ class ConfidenceRegion:
 
     '''
     self.p_hat = pos.p
-    self.signficance_level = significance_level
+    self.level = significance_level
     self.half_span = half_span
     self.scale = scale
   
@@ -387,7 +392,7 @@ class ConfidenceRegion:
   
     # Confidence interval. 
     self.e = compute_conf(self.p_hat, C, significance_level, 
-                          half_span, scale, k=1.0/pos.num_sites) # TODO what to put for k?
+                          half_span, scale, k=1) 
   
   def display(self, p_known=None):
     X, Y = self.e.cartesian()
@@ -584,8 +589,8 @@ def compute_cov(x, H, Del):
   return C
 
 
-def compute_conf(p_hat, C, significance_level, half_span=0, scale=1, k=1):
-  Qt = scipy.stats.chi2.ppf(significance_level, 2)
+def compute_conf(p_hat, C, conf_level, half_span=0, scale=1, k=1):
+  Qt = scipy.stats.chi2.ppf(conf_level, 2)
 
   # k - the number of samples (sites)
   w, v = np.linalg.eig(C / k)
@@ -605,9 +610,9 @@ def compute_conf(p_hat, C, significance_level, half_span=0, scale=1, k=1):
   return Ellipse(p_hat, angle, axes, half_span, scale)
 
 
-def compute_conf0(p_hat, sites, splines, significance_level, half_span, scale):
+def compute_conf0(p_hat, sites, splines, conf_level, half_span, scale):
   ''' Find the points that fall within confidence region of the estimate. ''' 
-  Qt = scipy.stats.chi2.ppf(significance_level, 2)
+  Qt = scipy.stats.chi2.ppf(conf_level, 2)
 
   (positions, likelihoods) = compute_likelihood(
                                sites, splines, p_hat, scale, half_span)

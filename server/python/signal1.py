@@ -139,6 +139,17 @@ def Simulator(p, sites, sv, rho, sig_n, trials, include=[]):
 
   if include == []: 
     include = sites.keys()
+ 
+  # Fix the closest point's transmission coefficient = rho. 
+  # Scale the others relative to this value. 
+  T = {}
+  nearest_id = include[0]
+  for id in include: 
+    if np.abs(p - sites[id]) < np.abs(p - sites[nearest_id]): 
+      nearest_id = id
+  scaled_rho = (rho * np.abs(p - sites[nearest_id]))**2
+  for id in include:
+    T[id] = np.sqrt(scaled_rho / (np.abs(p - sites[id]) ** 2))
 
   # Generate a (V, \rho, \Sigma) triple for each site. 
   for id in include:
@@ -163,8 +174,7 @@ def Simulator(p, sites, sv, rho, sig_n, trials, include=[]):
             np.random.multivariate_normal(mean_n, cov_n, num_ch)))
 
       # Modelled signal. 
-      t = np.sqrt(rho / (np.abs(p - sites[id]) ** 2))
-      V.append((t * G) + N) 
+      V.append((T[id] * G) + N) 
     
     sig.table[id].est_ids = np.array(est_ids)
     sig.table[id].t = np.array(timestamps)

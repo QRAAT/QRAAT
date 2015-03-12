@@ -124,15 +124,18 @@ def report(pos, conf, exp_params, sys_params, conf_level):
           print '   [%0.2f, %0.2f] -> [%0.2f, %0.2f] %0.5f' % (p.imag, p.real, mean[0], mean[1], rmse), 
           if conf_level:
             a = b = 0
+            area = 0
             for k in range(exp_params['trials']):
               axes = np.array([conf[i,j,e,n,k,0], conf[i,j,e,n,k,1]])
               angle = conf[i,j,e,n,k,2]
               E_hat = position1.Ellipse(p_hat[k], angle, axes, 
                                 sys_params['conf_half_span'], sys_params['conf_scale'])
+              area += E_hat.area()
               if p in E_hat:    a += 1
               if not E or p_hat[k] in E: b += 1
-            print '%0.2f %0.2f' % (float(a) / exp_params['trials'],
-                                   float(b) / exp_params['trials'])
+            print '%0.2f %0.2f, %f %f' % (float(a) / exp_params['trials'],
+                                          float(b) / exp_params['trials'],
+                                          area / exp_params['trials'], E.area() if E else 0)
           else: print 
 
 
@@ -154,8 +157,9 @@ def plot(pos, conf, exp_params, sys_params, conf_level):
           
           fig = pp.gcf()
       
-          pp.xlim([P[0]-100, P[0]+100])
-          pp.ylim([P[1]-100, P[1]+100])
+          extent = 50
+          pp.xlim([P[0]-extent, P[0]+extent])
+          pp.ylim([P[1]-extent, P[1]+extent])
           
           # x_hat's 
           pp.scatter(X[:,0], X[:,1], alpha=0.1, edgecolor='none')
@@ -175,7 +179,6 @@ def plot(pos, conf, exp_params, sys_params, conf_level):
           pp.title('$\sigma_n^2$=%0.4f, sample_ct=%d' % (sig_n, pulse_ct))
           pp.show()
           pp.clf()
-    assert False
 
 def grid_test(): 
   
@@ -214,26 +217,27 @@ def grid_test():
 
 def conf_test(prefix, center, sites, sv, conf_level): 
   
-  exp_params = { 'simulator' : 'real',
+  exp_params = { 'simulator' : 'ideal',
                  'rho'       : 1,
-                 'sig_n'     : np.arange(0.000, 0.012, 0.002),
+                 'sig_n'     : np.arange(0.002, 0.012, 0.002),
                  'pulse_ct'  : [1,2,5,10,100],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 10000 }
+                 'trials'    : 1000 }
 
   sys_params = { 'method'         : 'bartlet', 
                  'include'        : [4, 8, 6],
                  'center'         : center,
                  'sites'          : sites,
-                 'conf_half_span' : position1.HALF_SPAN*10, 
+                 'conf_half_span' : position1.HALF_SPAN*30, # 10 
                  'conf_scale'     : 1 }
 
   (pos, conf) = montecarlo(exp_params, sys_params, sv, conf_level)
   save(prefix, pos, conf, exp_params, sys_params, conf_level)
   pos, conf, exp_params, sys_params = load(prefix, conf_level)
   report(pos, conf, exp_params, sys_params, conf_level)
+
 
 
 
@@ -245,10 +249,15 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  gamma=0.95
-  #conf_test('exp/real', center, sites, sv, gamma)
-  res = load('exp/ideal', gamma)
-  #plot(*res, conf_level=gamma)
+  gamma=0.90
+  conf_test('exp/test5', center, sites, sv, gamma)
+  
+  #res = load('exp/test', gamma)
   report(*res, conf_level=gamma)
+  
+  #gamma=0.95
+  #res = load('exp/ideal', gamma)
+  #plot(*res, conf_level=gamma)
+  #report(*res, conf_level=gamma)
 
  
