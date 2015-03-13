@@ -139,6 +139,53 @@ def report(pos, conf, exp_params, sys_params, conf_level):
           else: print 
 
 
+def pretty_report(pos, conf, exp_params, sys_params, conf_level):
+  fmt = lambda x : '%9s' % ('%0.2f' % x)
+  s = 2 * exp_params['half_span'] + 1
+  num_sites = len(sys_params['include'])
+  print 'SITES =', sys_params['include'], 'TRIALS = %d' % exp_params['trials']
+  for e in range(s): #easting 
+    for n in range(s): #northing
+      p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                             (e - exp_params['half_span']) * exp_params['scale'])
+      print 'TRUE POSITION = (%.2f, %.2f)\n' % (p.imag, p.real)
+      for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
+        print 'pulse_ct=%d' % pulse_ct
+        for j, sig_n in enumerate(exp_params['sig_n']): 
+          print '  sig_n=%.3f' % sig_n,
+          p_hat = pos[i,j,e,n,:]
+          mean = np.mean(p_hat)
+          mean = [mean.imag, mean.real]
+          rmse = np.sqrt(np.mean(np.abs(p_hat - p) ** 2))# / res.shape[3])
+          #rmse = [ 
+          #  np.sqrt(np.mean((np.imag(p_hat) - p.imag) ** 2)), # / res.shape[3]),
+          #  np.sqrt(np.mean((np.real(p_hat) - p.real) ** 2))] # / res.shape[3])]
+          #print rmse, np.std(np.imag(p_hat)), np.std(np.real(p_hat))
+          try: 
+            C = np.cov(np.imag(p_hat), np.real(p_hat))
+            E = position1.compute_conf(p, C, 0.95, k=num_sites)
+          except position1.PosDefError:
+            E = None
+            print "skippiong positive definite"
+  
+          print '  (%s, %s)' % (fmt(mean[0]), fmt(mean[1])), fmt(rmse), 
+          if conf_level:
+            a = b = 0
+            area = 0
+            for k in range(exp_params['trials']):
+              axes = np.array([conf[i,j,e,n,k,0], conf[i,j,e,n,k,1]])
+              angle = conf[i,j,e,n,k,2]
+              E_hat = position1.Ellipse(p_hat[k], angle, axes, 
+                                sys_params['conf_half_span'], sys_params['conf_scale'])
+              area += E_hat.area()
+              if p in E_hat:    a += 1
+              if not E or p_hat[k] in E: b += 1
+            print fmt(float(a) / exp_params['trials']), \
+                  fmt(float(b) / exp_params['trials']), \
+                  fmt((area / exp_params['trials']) / (E.area() if E else 1))
+          else: print 
+
+
 def plot(pos, conf, exp_params, sys_params, conf_level):
   num_sites = len(sys_params['include'])
   s = 2 * exp_params['half_span'] + 1
@@ -215,22 +262,22 @@ def grid_test():
 
 
 
-def conf_test(prefix, center, sites, sv, conf_level): 
+def conf_test(prefix, center, sites, sv, conf_level, X): 
   
-  exp_params = { 'simulator' : 'ideal',
+  exp_params = { 'simulator' : X,
                  'rho'       : 1,
-                 'sig_n'     : np.arange(0.002, 0.012, 0.002),
+                 'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
                  'pulse_ct'  : [1,2,5,10,100],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 1000 }
+                 'trials'    : 10000 }
 
   sys_params = { 'method'         : 'bartlet', 
                  'include'        : [4, 8, 6],
                  'center'         : center,
                  'sites'          : sites,
-                 'conf_half_span' : position1.HALF_SPAN*30, # 10 
+                 'conf_half_span' : position1.HALF_SPAN*10, 
                  'conf_scale'     : 1 }
 
   (pos, conf) = montecarlo(exp_params, sys_params, sv, conf_level)
@@ -250,14 +297,23 @@ if __name__ == '__main__':
   (center, zone) = util.get_center(db_con)
   
   gamma=0.90
-  conf_test('exp/test5', center, sites, sv, gamma)
+  #conf_test('exp/test5', center, sites, sv, gamma)
   
   #res = load('exp/test', gamma)
-  report(*res, conf_level=gamma)
+  #report(*res, conf_level=gamma)
   
   #gamma=0.95
   #res = load('exp/ideal', gamma)
   #plot(*res, conf_level=gamma)
   #report(*res, conf_level=gamma)
 
+  #conf_test('exp/ideal1', center, sites, sv, gamma, 'ideal')
+  #conf_test('exp/real1', center, sites, sv, gamma, 'real')
  
+  res = load('exp/ideal1', gamma)
+  pretty_report(*res, conf_level=gamma)
+
+  #res = load('exp/real1', gamma)
+  #pretty_report(*res, conf_level=gamma)
+  
+  #plot(*res, conf_level=gamma)

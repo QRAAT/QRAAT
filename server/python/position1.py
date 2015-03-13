@@ -40,6 +40,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
 import scipy, scipy.stats
 import numdifftools as nd
 import utm
+import itertools
 
 HALF_SPAN = 15         
 SCALE = 10             # Meters
@@ -347,6 +348,7 @@ class ConfidenceRegion0:
 
 
 
+
 class ConfidenceRegion: 
 
   def __init__(self, pos, sites, significance_level=0.68, half_span=HALF_SPAN*40, scale=1, p_known=None):
@@ -440,7 +442,6 @@ class ConfidenceRegion:
     return p in self.e
 
 
-
 class Ellipse:
 
   def __init__(self, p_hat, angle, axes, half_span, scale): 
@@ -466,6 +467,7 @@ class Ellipse:
     x = transform_coord(p, self.p_hat, self.half_span, self.scale) - self.x
     return ((x[0] / self.axes[0])**2 + (x[1] / self.axes[1])**2) <= 1 
     
+
 
 
 ### Low level calls. ##########################################################

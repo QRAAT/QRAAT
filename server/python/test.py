@@ -62,10 +62,11 @@ def sim_data():
 
   pos = position1.PositionEstimator(999, sites, center, 
                                sig, sv, method=signal1.Signal.Bartlet)
-  pos.plot('fella.png', sites, center, 10, 150, p)
+  #pos.plot('fella.png', sites, center, 10, 150, p)
  
   #conf = position1.ConfidenceRegion0(pos, sites, 0.68) 
   conf = position1.ConfidenceRegion(pos, sites, 0.95) 
+  
   conf.display(p)  
   if p in conf: print 'Yes!' 
   else: print 'no.'
