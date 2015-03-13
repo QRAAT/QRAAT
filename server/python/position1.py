@@ -180,7 +180,7 @@ class Position:
       # NOTE if aggregate bearings are normalised, 
       # divide by self.num_sites; otherwise, divide
       # by self.num_est. See aggregate_spectrum().
-      return self.likelihood / self.num_sites
+      return self.likelihood / self.num_est
     else: return None
   
   def get_activity(self): 
@@ -501,7 +501,9 @@ def aggregate_spectrum(p):
   ''' Sum a set of bearing likelihoods. '''
   # NOTE normalising by the number of pulses effectively
   # reduces the sample size. 
-  return np.sum(p, 0) / p.shape[0]
+  print p, p.shape
+  assert False 
+  return np.sum(p, 0) #/ p.shape[0]
 
 
 def compute_bearing_spline(l): 

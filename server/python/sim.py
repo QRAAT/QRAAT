@@ -8,32 +8,6 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as pp
 
-cal_id = 3   # Calibration ID, specifies steering vectors to use. 
-
-
-
-def sim(trials, pulses, rho, noise, sv, sites, center, half_span, scale, method, simulator, include=[]):
-  s = 2 * half_span + 1
-  res = np.zeros((len(noise), s, s, trials), dtype=np.complex)
-  for (e, sig_n) in enumerate(noise): 
-    print 'sig_n=%f' % sig_n
-    for i in range(s):
-      for j in range(s):
-        p = center + np.complex((i - half_span) * scale, 
-                                (j - half_span) * scale)
-        print '.',
-        for n in range(trials):
-          # Run simulation. 
-          sig = simulator(p, sites, sv, rho, sig_n, pulses, include)
-          # Estimate position.
-          pos = position1.PositionEstimator(999, sites, center, 
-                  sig, sv, method=method)
-          res[e,i,j,n] = pos.p
-      print ' '
-  return res
-
-
-
 def montecarlo(exp_params, sys_params, sv, conf_level=None):
   s = 2 * exp_params['half_span'] + 1
   shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s, exp_params['trials'])
@@ -182,7 +156,7 @@ def pretty_report(pos, conf, exp_params, sys_params, conf_level):
               if not E or p_hat[k] in E: b += 1
             print fmt(float(a) / exp_params['trials']), \
                   fmt(float(b) / exp_params['trials']), \
-                  fmt((area / exp_params['trials']) / (E.area() if E else 1))
+                  fmt((area / exp_params['trials'])), fmt((E.area() if E else 1))
           else: print 
 
 
@@ -262,16 +236,16 @@ def grid_test():
 
 
 
-def conf_test(prefix, center, sites, sv, conf_level, X): 
+def conf_test(prefix, center, sites, sv, conf_level, sim): 
   
-  exp_params = { 'simulator' : X,
+  exp_params = { 'simulator' : sim,
                  'rho'       : 1,
-                 'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
+                 'sig_n'     : np.arange(0.002, 0.012, 0.002),#[0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
                  'pulse_ct'  : [1,2,5,10,100],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 10000 }
+                 'trials'    : 1000 }
 
   sys_params = { 'method'         : 'bartlet', 
                  'include'        : [4, 8, 6],
@@ -282,25 +256,43 @@ def conf_test(prefix, center, sites, sv, conf_level, X):
 
   (pos, conf) = montecarlo(exp_params, sys_params, sv, conf_level)
   save(prefix, pos, conf, exp_params, sys_params, conf_level)
-  pos, conf, exp_params, sys_params = load(prefix, conf_level)
-  report(pos, conf, exp_params, sys_params, conf_level)
+  report_pretty(pos, conf, exp_params, sys_params, conf_level)
 
 
+def quick_test(prefix, center, sites, sv, conf_level, sim): 
 
+  exp_params = { 'simulator' : sim,
+                 'rho'       : 1,
+                 'sig_n'     : [0.001, 0.01, 0.1],
+                 'pulse_ct'  : [1,10,100],
+                 'center'    : (4260838.3+574049j), 
+                 'half_span' : 0,
+                 'scale'     : 1,
+                 'trials'    : 1 }
+
+  sys_params = { 'method'         : 'bartlet', 
+                 'include'        : [4, 8, 6],
+                 'center'         : center,
+                 'sites'          : sites,
+                 'conf_half_span' : position1.HALF_SPAN*10, 
+                 'conf_scale'     : 1 }
+
+  (pos, conf) = montecarlo(exp_params, sys_params, sv, conf_level)
+  report_pretty(pos, conf, exp_params, sys_params, conf_level)
 
 
 if __name__ == '__main__':
 
+  cal_id = 3   
   db_con = util.get_db('reader')
   sv = signal1.SteeringVectors(db_con, cal_id)
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
   gamma=0.90
-  #conf_test('exp/test5', center, sites, sv, gamma)
-  
-  #res = load('exp/test', gamma)
-  #report(*res, conf_level=gamma)
+  #conf_test('exp/test6', center, sites, sv, gamma, 'real')
+  res = load('exp/test6', gamma)
+  pretty_report(*res, conf_level=gamma)
   
   #gamma=0.95
   #res = load('exp/ideal', gamma)
@@ -310,8 +302,8 @@ if __name__ == '__main__':
   #conf_test('exp/ideal1', center, sites, sv, gamma, 'ideal')
   #conf_test('exp/real1', center, sites, sv, gamma, 'real')
  
-  res = load('exp/ideal1', gamma)
-  pretty_report(*res, conf_level=gamma)
+  #res = load('exp/ideal1', gamma)
+  #pretty_report(*res, conf_level=gamma)
 
   #res = load('exp/real1', gamma)
   #pretty_report(*res, conf_level=gamma)
