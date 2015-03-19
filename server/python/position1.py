@@ -137,7 +137,7 @@ def InsertPositions(db_con, positions, zone):
 
 class Position:
   
-  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines):
+  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines, fella):
     
     assert len(bearing) == len(activity) and len(bearing) == len(splines)
     self.dep_id = dep_id
@@ -149,13 +149,14 @@ class Position:
     self.bearing = bearing
     self.activity = activity
     self.splines = splines
+    self.fella = fella
 
   @classmethod
   def calc(cls, dep_id, P, signal, obj, sites, center, t_start, t_end):
     ''' Compute a position given bearing likelihood data. ''' 
     
     # Aggregate site data. 
-    (splines, bearing, activity, num_est) = aggregate_window(
+    (splines, fella, bearing, activity, num_est) = aggregate_window(
                                   P, signal, obj, t_start, t_end)
     
     if len(splines) > 1: # Need at least two site bearings. 
@@ -172,7 +173,8 @@ class Position:
                num_est,     # total pulses used in calculation
                bearing,     # siteID -> (theta, likelihood)
                activity,    # siteID -> activity
-               splines)     # siteID -> bearing likelihood spline
+               splines,     # siteID -> bearing likelihood spline
+               fella)       # TODO 
 
   def get_likelihood(self):
     ''' Return normalized position likelihood. ''' 
@@ -252,106 +254,9 @@ class Position:
 
 ### class ConfidenceRegion. ###################################################
 
-class ConfidenceRegion0: 
-
-  def __init__(self, pos, sites, level=0.68, half_span=HALF_SPAN*40, scale=1):
-    self.p_hat = pos.p
-    self.level = level
-    self.half_span = half_span
-    self.scale = scale
-    (level_set, contour) = compute_conf0(pos.p, sites, pos.splines, 
-                                         level, half_span, scale)
-    if level_set is None:
-      self.level_set = None
-      self.contour = None
-    else: # TODO Is this ok?
-      x_hat = np.array([half_span, half_span])
-      x_centroid = np.array([0,0])
-      for (e,n) in level_set:
-        x_centroid[0] += e
-        x_centroid[1] += n
-      x_centroid[0] /= len(level_set)
-      x_centroid[1] /= len(level_set)
-      self.level_set = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), level_set))
-      self.contour = set(map(lambda x : tuple(np.array(x) + (x_hat - x_centroid)), contour))
-    
-    x = np.array(map(lambda x: x[0], self.contour))
-    y = np.array(map(lambda x: x[1], self.contour))
-    (x_center, alpha, axes) = fit_ellipse(x, y)
-    p_center = transform_coord_inv(x_center, self.p_hat, self.half_span, self.scale)
-    self.e = Ellipse(self.p_hat, alpha, axes, self.half_span, self.scale) 
-
-
-
-  def display(self, p_known=None):
-    if self.level_set is not None:
-      x_hat = np.array([self.half_span, self.half_span])
-      if p_known is not None:
-        x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
-      else:
-        x_known = None
-      fella = 20
-      for i in range(-fella, fella+1):
-        for j in range(-fella, fella+1):
-          x = x_hat + np.array([i,j])
-          if x_known is not None and x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
-          elif x[0] == x_hat[0] and x[1] == x_hat[1]: print 'P', 
-          elif tuple(x) in self.contour: print '.',
-          else: print ' ',
-        print 
-    else: 
-      print 'Unbounded!'
-
-  def plot(self, fn, p_known=None):
-    fig = pp.gcf()
-    x_hat = [self.half_span, self.half_span]
-    x = np.array(map(lambda x: x[0], self.contour))
-    y = np.array(map(lambda x: x[1], self.contour))
-  
-    #(x_fit, y_fit) = fit_contour(x, y, N=10000)
-    (x_fit, y_fit) = self.e.cartesian()  
-    pp.plot(x_fit, y_fit, color='k', alpha=0.5)
-
-    pp.scatter(x, y, marker='x', color='b', alpha=0.5)
-    
-    # x_hat
-    pp.plot(x_hat[0], x_hat[1], color='k', marker='o')
-    pp.text(x_hat[0]+0.4, x_hat[1]-0.25, '$\hat{\mathbf{x}}$', fontsize=24)
-      
-    # x_known
-    if p_known:
-      x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
-      pp.plot([x_known[0]], [x_known[1]],  
-              marker='o', color='k', fillstyle='none')
-      pp.text(x_known[0]+0.4, x_known[1]-0.25, '$\mathbf{x}^*$', fontsize=24)
-    
-    pp.savefig(fn)
-    pp.clf()
-
-  def ellipse(self):
-    x = np.array(map(lambda x: x[0], self.contour))
-    y = np.array(map(lambda x: x[1], self.contour))
-    (x_center, angle, axes) = fit_ellipse(x, y)
-    p_center = transform_coord_inv(x_center, self.p_hat, self.half_span, self.scale)
-    axes /= self.scale
-    return Ellipse(p_center, angle, axes, self.half_span, self.scale)
-  
-  def __contains__(self, p):
-    if self.level_set is None:
-      return False
-    else:
-      x = tuple(transform_coord(p, self.p_hat, self.half_span, self.scale))
-      return x in self.level_set or x in self.contour
-
-  def __len__(self):
-    return len(self.level_set)
-
-
-
-
 class ConfidenceRegion: 
 
-  def __init__(self, pos, sites, significance_level=0.68, half_span=HALF_SPAN*40, scale=1, p_known=None):
+  def __init__(self, pos, sites, significance_level=0.90, half_span=HALF_SPAN*10, scale=1, p_known=None):
     ''' Compute covariance matrix of position estimater w.r.t true location `p`. 
 
       Assuming the estimate follows a bivariate normal distribution. 
@@ -386,16 +291,30 @@ class ConfidenceRegion:
     J = lambda (x) : likelihoods[x[0], x[1]]
     H = nd.Hessian(J)
     Del = nd.Gradient(J)
-   
-    # Covariance of p_hat.  
-    a = Del(x)
-    b = np.linalg.inv(H(x))
-    C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
   
+    C = []
+    for i in range(len(pos.fella.values()[0])): # FIXME Not all lists will be the sam elength
+      splines = {}
+      for id in pos.fella.keys():
+        splines[id] = pos.fella[id][i]
+      (p, _) = compute_position(sites, splines, self.p_hat, np.argmax, half_span, 3, 0, SCALE) # FIXME obj=np.argmax
+      x = transform_coord(p, self.p_hat, half_span, scale)
+   
+      # Covariance of p_hat.  
+      a = Del(x)
+      b = np.linalg.inv(H(x))
+      C.append(np.dot(b, np.dot(np.dot(a, np.transpose(a)), b)))
+  
+    C =  np.mean(C, 0)
+
     # Confidence interval. 
     self.e = compute_conf(self.p_hat, C, significance_level, 
                           half_span, scale, k=1) 
-  
+ 
+
+
+
+
   def display(self, p_known=None):
     X, Y = self.e.cartesian()
     X = map(lambda x: int(x), X)
@@ -484,25 +403,28 @@ def aggregate_window(P, signal, obj, t_start, t_end):
   splines = {}  
   activity = {}
   bearing = {}
+  fella = {}
   for (id, L) in P.iteritems():
     mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
     edsp = signal[id].edsp[mask]
     if edsp.shape[0] > 0:
-      l = aggregate_spectrum(L[mask])
-      splines[id] = compute_bearing_spline(l)
+      l = L[mask]
+      p = aggregate_spectrum(l)
+      splines[id] = compute_bearing_spline(p)
+      fella[id] = []
+      for i in range(len(l)): 
+        fella[id].append(compute_bearing_spline(l[i]))
       activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
-      theta = obj(l); bearing[id] = (theta, l[theta])
+      theta = obj(p); bearing[id] = (theta, p[theta])
       num_est += edsp.shape[0]
   
-  return (splines, bearing, activity, num_est)
+  return (splines, fella, bearing, activity, num_est)
 
 
 def aggregate_spectrum(p):
   ''' Sum a set of bearing likelihoods. '''
   # NOTE normalising by the number of pulses effectively
   # reduces the sample size. 
-  print p, p.shape
-  assert False 
   return np.sum(p, 0) #/ p.shape[0]
 
 
@@ -612,6 +534,11 @@ def compute_conf(p_hat, C, conf_level, half_span=0, scale=1, k=1):
   else: raise PosDefError
   
   return Ellipse(p_hat, angle, axes, half_span, scale)
+
+
+
+
+
 
 
 def compute_conf0(p_hat, sites, splines, conf_level, half_span, scale):

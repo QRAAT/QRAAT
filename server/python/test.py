@@ -57,7 +57,7 @@ def sim_data():
 
   rho = 1   # signal
   sig_n = 0.01 # noise
-  sig = signal1.Simulator(p, sites, sv, rho, sig_n, 10)
+  sig = signal1.Simulator(p, sites, sv, rho, sig_n, 2)
   (sig_n, sig_t) = sig.estimate_var()
 
   pos = position1.PositionEstimator(999, sites, center, 
