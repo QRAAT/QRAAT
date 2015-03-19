@@ -47,7 +47,7 @@ def montecarlo(exp_params, sys_params, sv, conf_level=None):
 
             # Estimate confidence region. 
             if conf_level:
-              C = position1.ConfidenceRegion(P_hat, sites, conf_level, 
+              C = position1.ConfidenceRegion1(P_hat, sites, conf_level, 
                       sys_params['conf_half_span'], sys_params['conf_scale']) 
               conf[i,j,e,n,k,:] = np.array([C.e.axes[0], C.e.axes[1], C.e.angle])
   return (pos, conf)
@@ -241,7 +241,7 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
                  'sig_n'     : np.arange(0.002, 0.012, 0.002),#[0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [1,2,5,10,100],
+                 'pulse_ct'  : [1,2,5,10],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
@@ -290,22 +290,6 @@ if __name__ == '__main__':
   (center, zone) = util.get_center(db_con)
   
   gamma=0.90
-  #conf_test('exp/test6', center, sites, sv, gamma, 'real')
-  res = load('exp/test6', gamma)
+  conf_test('exp/conf1', center, sites, sv, gamma, 'real')
+  res = load('exp/conf1', gamma)
   pretty_report(*res, conf_level=gamma)
-  
-  #gamma=0.95
-  #res = load('exp/ideal', gamma)
-  #plot(*res, conf_level=gamma)
-  #report(*res, conf_level=gamma)
-
-  #conf_test('exp/ideal1', center, sites, sv, gamma, 'ideal')
-  #conf_test('exp/real1', center, sites, sv, gamma, 'real')
- 
-  #res = load('exp/ideal1', gamma)
-  #pretty_report(*res, conf_level=gamma)
-
-  #res = load('exp/real1', gamma)
-  #pretty_report(*res, conf_level=gamma)
-  
-  #plot(*res, conf_level=gamma)

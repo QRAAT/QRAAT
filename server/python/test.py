@@ -56,7 +56,7 @@ def sim_data():
   p = center + complex(650,0)
 
   rho = 1   # signal
-  sig_n = 0.01 # noise
+  sig_n = 0.003 # noise
   sig = signal1.Simulator(p, sites, sv, rho, sig_n, 2)
   (sig_n, sig_t) = sig.estimate_var()
 
@@ -65,7 +65,7 @@ def sim_data():
   #pos.plot('fella.png', sites, center, 10, 150, p)
  
   #conf = position1.ConfidenceRegion0(pos, sites, 0.68) 
-  conf = position1.ConfidenceRegion(pos, sites, 0.95) 
+  conf = position1.ConfidenceRegion1(pos, sites, 0.50) 
   
   conf.display(p)  
   if p in conf: print 'Yes!' 
