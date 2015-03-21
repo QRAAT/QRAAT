@@ -47,9 +47,12 @@ def montecarlo(exp_params, sys_params, sv, conf_level=None):
 
             # Estimate confidence region. 
             if conf_level:
-              C = position1.ConfidenceRegion1(P_hat, sites, conf_level, 
-                      sys_params['conf_half_span'], sys_params['conf_scale']) 
-              conf[i,j,e,n,k,:] = np.array([C.e.axes[0], C.e.axes[1], C.e.angle])
+              try: 
+                C = position1.ConfidenceRegion0(P_hat, sites, conf_level, 
+                      sys_params['conf_half_span'], sys_params['conf_scale'], p_known=P) 
+                conf[i,j,e,n,k,:] = np.array([C.e.axes[0], C.e.axes[1], C.e.angle])
+              except IndexError: # Hessian matrix computation
+                print "Warning!" 
   return (pos, conf)
 
 
@@ -241,11 +244,11 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
                  'sig_n'     : np.arange(0.002, 0.012, 0.002),#[0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [1,2,5,10],
+                 'pulse_ct'  : [1,2,5,10,100],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 1000 }
+                 'trials'    : 10000 }
 
   sys_params = { 'method'         : 'bartlet', 
                  'include'        : [4, 8, 6],
@@ -256,7 +259,7 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
 
   (pos, conf) = montecarlo(exp_params, sys_params, sv, conf_level)
   save(prefix, pos, conf, exp_params, sys_params, conf_level)
-  report_pretty(pos, conf, exp_params, sys_params, conf_level)
+  pretty_report(pos, conf, exp_params, sys_params, conf_level)
 
 
 def quick_test(prefix, center, sites, sv, conf_level, sim): 
@@ -278,7 +281,7 @@ def quick_test(prefix, center, sites, sv, conf_level, sim):
                  'conf_scale'     : 1 }
 
   (pos, conf) = montecarlo(exp_params, sys_params, sv, conf_level)
-  report_pretty(pos, conf, exp_params, sys_params, conf_level)
+  pretty_report(pos, conf, exp_params, sys_params, conf_level)
 
 
 if __name__ == '__main__':
@@ -290,6 +293,6 @@ if __name__ == '__main__':
   (center, zone) = util.get_center(db_con)
   
   gamma=0.90
-  conf_test('exp/conf1', center, sites, sv, gamma, 'real')
-  res = load('exp/conf1', gamma)
-  pretty_report(*res, conf_level=gamma)
+  conf_test('exp/conf2', center, sites, sv, gamma, 'real')
+  #res = load('exp/conf1', gamma)
+  #pretty_report(*res, conf_level=gamma)

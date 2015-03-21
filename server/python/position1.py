@@ -40,7 +40,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
 import scipy, scipy.stats
 import numdifftools as nd
 import utm
-import itertools
+import itertools, random
 
 HALF_SPAN = 15         
 SCALE = 10             # Meters
@@ -257,23 +257,6 @@ class Position:
 class ConfidenceRegion0: 
 
   def __init__(self, pos, sites, significance_level=0.90, half_span=HALF_SPAN*10, scale=1, p_known=None):
-    ''' Compute covariance matrix of position estimater w.r.t true location `p`. 
-
-      Assuming the estimate follows a bivariate normal distribution. 
-      This follows [ZB11] equation 2.169. 
-
-      Return a tuple (x, alpha), where x[0] gives the magnitude of the major 
-      axis, x[1]s give the magnitude of the minor axis, and alpha gives the 
-      angular orientation (relative to the x-axis) of the ellipse in degrees. 
-      If C is not positive definite, then the distribution has no density: 
-      return (None, None). 
-
-      Based on the blog post: http://www.visiondummy.com/2014/04/draw-error-
-      ellipse-representing-covariance-matrix/ by Vincent Spruyt. Note that
-      this only applies to *known* covariance, e.g. estimated from multiple
-      position estimates. 
-
-    '''
     self.p_hat = pos.p
     self.level = significance_level
     self.half_span = half_span
@@ -292,7 +275,7 @@ class ConfidenceRegion0:
     H = nd.Hessian(J)
     Del = nd.Gradient(J)
    
-    # Covariance of p_hat.  
+    # Covariance.  
     a = Del(x)
     b = np.linalg.inv(H(x))
     C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
@@ -348,7 +331,7 @@ class ConfidenceRegion0:
 
 
 
-class ConfidenceRegion1: 
+class ConfidenceRegion1 (ConfidenceRegion0): 
 
   def __init__(self, pos, sites, significance_level=0.90, half_span=HALF_SPAN*10, scale=1, p_known=None):
     ''' Compute covariance matrix of position estimater w.r.t true location `p`. 
@@ -391,7 +374,7 @@ class ConfidenceRegion1:
       splines = {}
       for id in pos.fella.keys():
         splines[id] = pos.fella[id][i]
-      (p, _) = compute_position(sites, splines, self.p_hat, np.argmax, half_span, 3, 0, SCALE) # FIXME obj=np.argmax
+      (p, _) = compute_position(sites, splines, self.p_hat, np.argmax, HALF_SPAN, 3, 0, SCALE) # FIXME obj=np.argmax
       x = transform_coord(p, self.p_hat, half_span, scale)
    
       # Covariance of p_hat.  
@@ -406,60 +389,70 @@ class ConfidenceRegion1:
     # Confidence interval. 
     self.e = compute_conf(self.p_hat, C, significance_level, 
                           half_span, scale, k=1) 
- 
 
 
+class BootstrapConfidenceRegion (ConfidenceRegion0): 
 
-
+  def __init__(self, pos, sites, conf_level=0.90, half_span=HALF_SPAN, scale=1):
+    self.p_hat = pos.p
+    self.level = conf_level
+    self.half_span = half_span
+    self.scale = scale
+    
+    P = []; k = len(pos.splines)
+    for subsample in itertools.combinations(pos.splines.keys(), 3):
+      splines = {}
+      for id in subsample:
+        splines[id] = pos.splines[id]
+      (p, _) = compute_position(sites, splines, self.p_hat, np.argmax, HALF_SPAN, 3, 0, SCALE) # FIXME obj=np.argmax
+      P.append(transform_coord(p, self.p_hat, half_span, scale))
+    
+    random.shuffle(P) # Estimates of sub samples. 
+    A = np.array(P[len(P)/2:])
+    B = np.array(P[:len(P)/2])
+    C = np.cov(A[:,0], A[:,1])
+    D = np.linalg.inv(C)
+    x_bar = np.array([np.mean(B[:,0]), np.mean(B[:,1])])
+    x_hat = transform_coord(self.p_hat, self.p_hat, half_span, scale)
+    
+    w = []
+    for x in iter(B): 
+      y = x - x_bar
+      w.append(np.dot(np.transpose(y), np.dot(D, y)))
+    Q = sorted(w)[int(len(w) * (1-conf_level))-1] 
+    f = lambda(x) : np.dot(np.transpose(x_hat - x), np.dot(D, np.transpose(x_hat - x)))
+    (level_set, contour) = compute_contour(x_hat, f, Q)
+    #self.contour = contour
+    X = np.array(map(lambda x : x[0], contour))
+    Y = np.array(map(lambda x : x[1], contour))
+    (x_center, angle, axes) = fit_ellipse(X, Y)
+    p_center = transform_coord_inv(x_center, self.p_hat, half_span, scale)
+    self.e = Ellipse(self.p_hat, angle, axes, half_span, scale)
+  
   def display(self, p_known=None):
     X, Y = self.e.cartesian()
     X = map(lambda x: int(x), X)
     Y = map(lambda y: int(y), Y)
-    self.contour = set(zip(list(X), list(Y)))
+    contour = set(zip(list(X), list(Y)))
     if p_known is not None:
       x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
     else:
       x_known = None
     fella = 20
+    x_hat = np.array([self.half_span, self.half_span])
     for i in range(-fella, fella+1):
       for j in range(-fella, fella+1):
-        x = self.e.x + np.array([i,j])
+        x = x_hat + np.array([i,j])
+        x = np.array([int(x[0]), int(x[1])])
         if x_known is not None and x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
-        elif x[0] == self.e.x[0] and x[1] == self.e.x[1]: print 'P', 
-        elif tuple(x) in self.contour: print '.',
+        elif x[0] == x_hat[0] and x[1] == x_hat[1]: print 'P', 
+        elif tuple(x) in contour: print '.',
         else: print ' ',
       print 
 
-  def plot(self, fn, p_known=None):
-    fig = pp.gcf()
-    x_hat = self.e.x
-  
-    #(x_fit, y_fit) = fit_contour(x, y, N=10000)
-    (x_fit, y_fit) = self.e.cartesian()  
-    pp.plot(x_fit, y_fit, color='k', alpha=0.5)
-
-    # x_hat
-    pp.plot(x_hat[0], x_hat[1], color='k', marker='o')
-    pp.text(x_hat[0]+0.25, x_hat[1]-0.25, '$\hat{\mathbf{x}}$', fontsize=24)
-      
-    # x_known
-    if p_known:
-      x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
-      pp.plot([x_known[0]], [x_known[1]],  
-              marker='o', color='k', fillstyle='none')
-      pp.text(x_known[0]+0.25, x_known[1]-0.25, '$\mathbf{x}^*$', fontsize=24)
-    
-    pp.savefig(fn)
-    pp.clf()
-
-  
-  def __contains__(self, p):
-    return p in self.e
-
-
 class Ellipse:
 
-  def __init__(self, p_hat, angle, axes, half_span, scale): 
+  def __init__(self, p_hat, angle, axes, half_span, scale, x=None): 
     self.p_hat = p_hat
     self.angle = angle
     self.axes = axes
@@ -634,33 +627,17 @@ def compute_conf(p_hat, C, conf_level, half_span=0, scale=1, k=1):
 
 
 
-
-
-
-def compute_conf0(p_hat, sites, splines, conf_level, half_span, scale):
+def compute_contour(x_hat, f, Q):
   ''' Find the points that fall within confidence region of the estimate. ''' 
-  Qt = scipy.stats.chi2.ppf(conf_level, 2)
-
-  (positions, likelihoods) = compute_likelihood(
-                               sites, splines, p_hat, scale, half_span)
-    
-  J = lambda (x) : likelihoods[x[0], x[1]]
-  H = nd.Hessian(J)
-  Del = nd.Gradient(J)
-
-  S = set(); S.add((half_span, half_span))
+  S = set(); S.add((x_hat[0], x_hat[1]))
   level_set = S.copy()
   contour = set()
-  max_size = 1000 # Computational stop gap. 
+  max_size = float("+inf") # FIXME Computational stop gap. 
 
-  x_hat = np.array([half_span, half_span])
   while len(S) > 0 and len(S) < max_size and len(level_set) < max_size: 
     R = set()
     for x in S:
-      y = x_hat - np.array(x)
-      C = compute_cov(np.array(x), H, Del)
-      Q = np.dot(np.transpose(y), np.dot(np.linalg.inv(C), y))
-      if Q < Qt: 
+      if f(x) < Q: 
         level_set.add(x)
         R.add((x[0]+1, x[1]-1)); R.add((x[0]+1, x[1])); R.add((x[0]+1, x[1]+1))
         R.add((x[0],   x[1]-1));                        R.add((x[0] ,  x[1]+1))
@@ -708,7 +685,7 @@ def fit_contour(x, y, N):
   return (x_fit, y_fit)
 
 
-def fit_ellipse(x, y):
+def fit_noisy_ellipse(x, y):
   ''' Fit ellipse to a set of points in R^2.
 
     http://nicky.vanforeest.com/misc/fitEllipse/fitEllipse.html
@@ -744,14 +721,28 @@ def fit_ellipse(x, y):
   return (x, angle, axes)
 
 
-
-
-
+def fit_ellipse(x, y): 
+  
+  x_lim = np.array([np.min(x), np.max(x)])
+  y_lim = np.array([np.min(y), np.max(y)])
+  
+  x_center = np.array([np.mean(x_lim), np.mean(y_lim)])
+ 
+  X = np.vstack((x,y))
+  D = (lambda d: np.sqrt(
+          (d[0] - x_center[0])**2 + (d[1] - x_center[1])**2))(X)
+  x_major = x_center - X[:,np.argmax(D)] 
+  angle = np.arctan2(x_major[1], x_major[0])
+  axes = np.array([np.max(D), np.min(D)])
+  return (x_center, angle, axes)
 
 
   
 
 
+  
+
+ 
 
 
 
