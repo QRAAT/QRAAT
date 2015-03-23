@@ -161,6 +161,7 @@ detectmod_afsk_sink::work (int noutput_items,
       if (enable_record > 0){
         if (below_count > threshold_timeout){
           close();//close file
+          total_count = 0;
           enable_record = 0;
         }
         else{
