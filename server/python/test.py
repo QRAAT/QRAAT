@@ -56,7 +56,7 @@ def sim_data():
   p = center + complex(650,0)
 
   rho = 1   # signal
-  sig_n = 0.001 # noise
+  sig_n = 0.002 # noise
   sig = signal1.Simulator(p, sites, sv, rho, sig_n, 2)
   (sig_n, sig_t) = sig.estimate_var()
 

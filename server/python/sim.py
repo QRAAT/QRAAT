@@ -48,11 +48,16 @@ def montecarlo(exp_params, sys_params, sv, conf_level=None):
             # Estimate confidence region. 
             if conf_level:
               try: 
-                C = position1.ConfidenceRegion0(P_hat, sites, conf_level, 
-                      sys_params['conf_half_span'], sys_params['conf_scale'], p_known=P) 
+                C = position1.BootstrapConfidenceRegion(P_hat, sites, conf_level, 
+                      sys_params['conf_half_span'], sys_params['conf_scale']) 
                 conf[i,j,e,n,k,:] = np.array([C.e.axes[0], C.e.axes[1], C.e.angle])
               except IndexError: # Hessian matrix computation
-                print "Warning!" 
+                print "Warning!"
+              except np.linalg.linalg.LinAlgError:
+                print "Singular matrix!"
+              except position1.UnboundedConfRegionError:
+                print "Unbounded!"
+
   return (pos, conf)
 
 
@@ -70,52 +75,6 @@ def load(prefix, conf_level=None):
   (exp_params, sys_params) = pickle.load(open(prefix + '-params'))
   return (pos, conf, exp_params, sys_params)
     
-def report(pos, conf, exp_params, sys_params, conf_level):
-  s = 2 * exp_params['half_span'] + 1
-  num_sites = len(sys_params['include'])
-  for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
-    print 'pulse_ct=%d' % pulse_ct
-    for j, sig_n in enumerate(exp_params['sig_n']): 
-      print '  sig_n=%f' % sig_n
-      for e in range(s): #easting 
-        for n in range(s): #northing
-          p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
-                                                 (e - exp_params['half_span']) * exp_params['scale'])
-          p_hat = pos[i,j,e,n,:]
-          mean = np.mean(p_hat)
-          mean = [mean.imag, mean.real]
-
-          rmse = np.sqrt(np.mean(np.abs(p_hat - p) ** 2))# / res.shape[3])
-          #rmse = [ 
-          #  np.sqrt(np.mean((np.imag(p_hat) - p.imag) ** 2)), # / res.shape[3]),
-          #  np.sqrt(np.mean((np.real(p_hat) - p.real) ** 2))] # / res.shape[3])]
-          #print rmse, np.std(np.imag(p_hat)), np.std(np.real(p_hat))
-         
-          try: 
-            C = np.cov(np.imag(p_hat), np.real(p_hat))
-            E = position1.compute_conf(p, C, 0.95, k=num_sites)
-          except position1.PosDefError:
-            E = None
-            print "skippiong positive definite"
-  
-          print '   [%0.2f, %0.2f] -> [%0.2f, %0.2f] %0.5f' % (p.imag, p.real, mean[0], mean[1], rmse), 
-          if conf_level:
-            a = b = 0
-            area = 0
-            for k in range(exp_params['trials']):
-              axes = np.array([conf[i,j,e,n,k,0], conf[i,j,e,n,k,1]])
-              angle = conf[i,j,e,n,k,2]
-              E_hat = position1.Ellipse(p_hat[k], angle, axes, 
-                                sys_params['conf_half_span'], sys_params['conf_scale'])
-              area += E_hat.area()
-              if p in E_hat:    a += 1
-              if not E or p_hat[k] in E: b += 1
-            print '%0.2f %0.2f, %f %f' % (float(a) / exp_params['trials'],
-                                          float(b) / exp_params['trials'],
-                                          area / exp_params['trials'], E.area() if E else 0)
-          else: print 
-
-
 def pretty_report(pos, conf, exp_params, sys_params, conf_level):
   fmt = lambda x : '%9s' % ('%0.2f' % x)
   s = 2 * exp_params['half_span'] + 1
@@ -140,7 +99,7 @@ def pretty_report(pos, conf, exp_params, sys_params, conf_level):
           #print rmse, np.std(np.imag(p_hat)), np.std(np.real(p_hat))
           try: 
             C = np.cov(np.imag(p_hat), np.real(p_hat))
-            E = position1.compute_conf(p, C, 0.95, k=num_sites)
+            E = position1.compute_conf(p, C, conf_level, k=num_sites)
           except position1.PosDefError:
             E = None
             print "skippiong positive definite"
@@ -243,15 +202,15 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
-                 'sig_n'     : np.arange(0.002, 0.012, 0.002),#[0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [1,2,5,10,100],
+                 'sig_n'     : [0.002],#np.arange(0.002, 0.012, 0.002),#[0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
+                 'pulse_ct'  : [1],#[1,2,5,10,100],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 10000 }
+                 'trials'    : 100 }
 
   sys_params = { 'method'         : 'bartlet', 
-                 'include'        : [4, 8, 6],
+                 'include'        : [2, 3, 4, 5, 6, 8],
                  'center'         : center,
                  'sites'          : sites,
                  'conf_half_span' : position1.HALF_SPAN*10, 
@@ -292,7 +251,9 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  gamma=0.90
-  conf_test('exp/conf2', center, sites, sv, gamma, 'real')
-  #res = load('exp/conf1', gamma)
-  #pretty_report(*res, conf_level=gamma)
+  gamma=0.50
+  conf_test('exp/conf4', center, sites, sv, gamma, 'real')
+  #res = load('exp/conf2', 0.90)
+  #pretty_report(*res, conf_level=0.90)
+  #res = load('exp/conf3', 0.68)
+  #pretty_report(*res, conf_level=0.68)

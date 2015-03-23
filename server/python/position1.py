@@ -46,8 +46,9 @@ HALF_SPAN = 15
 SCALE = 10             # Meters
 ELLIPSE_PLOT_SCALE = 5 # Scaling factor
 
-
-class PosDefError (Exception): pass
+class PositionError (Exception): pass
+class PosDefError (PositionError): pass
+class UnboundedConfRegionError (PositionError): pass
 
 ### Position estimation. ######################################################
 
@@ -137,7 +138,7 @@ def InsertPositions(db_con, positions, zone):
 
 class Position:
   
-  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines, fella):
+  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines, all_splines):
     
     assert len(bearing) == len(activity) and len(bearing) == len(splines)
     self.dep_id = dep_id
@@ -149,14 +150,14 @@ class Position:
     self.bearing = bearing
     self.activity = activity
     self.splines = splines
-    self.fella = fella
+    self.all_splines = all_splines
 
   @classmethod
   def calc(cls, dep_id, P, signal, obj, sites, center, t_start, t_end):
     ''' Compute a position given bearing likelihood data. ''' 
     
     # Aggregate site data. 
-    (splines, fella, bearing, activity, num_est) = aggregate_window(
+    (splines, all_splines, bearing, activity, num_est) = aggregate_window(
                                   P, signal, obj, t_start, t_end)
     
     if len(splines) > 1: # Need at least two site bearings. 
@@ -174,7 +175,7 @@ class Position:
                bearing,     # siteID -> (theta, likelihood)
                activity,    # siteID -> activity
                splines,     # siteID -> bearing likelihood spline
-               fella)       # TODO 
+               all_splines)       # TODO 
 
   def get_likelihood(self):
     ''' Return normalized position likelihood. ''' 
@@ -293,9 +294,9 @@ class ConfidenceRegion0:
       x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
     else:
       x_known = None
-    fella = 20
-    for i in range(-fella, fella+1):
-      for j in range(-fella, fella+1):
+    dim = 20
+    for i in range(-dim, dim+1):
+      for j in range(-dim, dim+1):
         x = self.e.x + np.array([i,j])
         if x_known is not None and x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
         elif x[0] == self.e.x[0] and x[1] == self.e.x[1]: print 'P', 
@@ -370,10 +371,10 @@ class ConfidenceRegion1 (ConfidenceRegion0):
     Del = nd.Gradient(J)
   
     A = []; B = []
-    for i in range(len(pos.fella.values()[0])): # FIXME Not all lists will be the sam elength
+    for i in range(len(pos.all_splines.values()[0])): # FIXME Not all lists will be the sam elength
       splines = {}
-      for id in pos.fella.keys():
-        splines[id] = pos.fella[id][i]
+      for id in pos.all_splines.keys():
+        splines[id] = pos.all_splines[id][i]
       (p, _) = compute_position(sites, splines, self.p_hat, np.argmax, HALF_SPAN, 3, 0, SCALE) # FIXME obj=np.argmax
       x = transform_coord(p, self.p_hat, half_span, scale)
    
@@ -419,16 +420,19 @@ class BootstrapConfidenceRegion (ConfidenceRegion0):
     for x in iter(B): 
       y = x - x_bar
       w.append(np.dot(np.transpose(y), np.dot(D, y)))
-    Q = sorted(w)[int(len(w) * (1-conf_level))-1] 
+    Q = sorted(w)[int(len(w) * (conf_level))] 
     f = lambda(x) : np.dot(np.transpose(x_hat - x), np.dot(D, np.transpose(x_hat - x)))
     (level_set, contour) = compute_contour(x_hat, f, Q)
-    #self.contour = contour
+    if contour is None:
+      raise UnboundedConfRegionError 
     X = np.array(map(lambda x : x[0], contour))
     Y = np.array(map(lambda x : x[1], contour))
     (x_center, angle, axes) = fit_ellipse(X, Y)
     p_center = transform_coord_inv(x_center, self.p_hat, half_span, scale)
     self.e = Ellipse(self.p_hat, angle, axes, half_span, scale)
-  
+    #self.e = compute_conf2(self.p_hat, C, Q, 
+    #                      half_span, scale, k=1) 
+
   def display(self, p_known=None):
     X, Y = self.e.cartesian()
     X = map(lambda x: int(x), X)
@@ -438,10 +442,10 @@ class BootstrapConfidenceRegion (ConfidenceRegion0):
       x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
     else:
       x_known = None
-    fella = 20
+    dim = 20
     x_hat = np.array([self.half_span, self.half_span])
-    for i in range(-fella, fella+1):
-      for j in range(-fella, fella+1):
+    for i in range(-dim, dim+1):
+      for j in range(-dim, dim+1):
         x = x_hat + np.array([i,j])
         x = np.array([int(x[0]), int(x[1])])
         if x_known is not None and x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
@@ -492,7 +496,7 @@ def aggregate_window(P, signal, obj, t_start, t_end):
   splines = {}  
   activity = {}
   bearing = {}
-  fella = {}
+  all_splines = {}
   for (id, L) in P.iteritems():
     mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
     edsp = signal[id].edsp[mask]
@@ -500,14 +504,14 @@ def aggregate_window(P, signal, obj, t_start, t_end):
       l = L[mask]
       p = aggregate_spectrum(l)
       splines[id] = compute_bearing_spline(p)
-      fella[id] = []
+      all_splines[id] = []
       for i in range(len(l)): 
-        fella[id].append(compute_bearing_spline(l[i]))
+        all_splines[id].append(compute_bearing_spline(l[i]))
       activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
       theta = obj(p); bearing[id] = (theta, p[theta])
       num_est += edsp.shape[0]
   
-  return (splines, fella, bearing, activity, num_est)
+  return (splines, all_splines, bearing, activity, num_est)
 
 
 def aggregate_spectrum(p):
@@ -625,6 +629,24 @@ def compute_conf(p_hat, C, conf_level, half_span=0, scale=1, k=1):
   return Ellipse(p_hat, angle, axes, half_span, scale)
 
 
+def compute_conf2(p_hat, C, Qt, half_span=0, scale=1, k=1):
+
+  # k - the number of samples (sites)
+  w, v = np.linalg.eig(C / k)
+  if w[0] > 0 and w[1] > 0: # Positive definite. 
+
+    i = np.argmax(w) # Major w[i], v[:,i]
+    j = np.argmin(w) # Minor w[i], v[:,j]
+
+    angle = np.arctan2(v[:,i][1], v[:,i][0]) 
+    x = np.array([2 * np.sqrt(Qt * w[i]), 
+                  2 * np.sqrt(Qt * w[j])])
+
+    axes = x * scale
+
+  else: raise PosDefError
+  
+  return Ellipse(p_hat, angle, axes, half_span, scale)
 
 
 def compute_contour(x_hat, f, Q):
@@ -632,7 +654,7 @@ def compute_contour(x_hat, f, Q):
   S = set(); S.add((x_hat[0], x_hat[1]))
   level_set = S.copy()
   contour = set()
-  max_size = float("+inf") # FIXME Computational stop gap. 
+  max_size = 1000000 # FIXME Computational stop gap. 
 
   while len(S) > 0 and len(S) < max_size and len(level_set) < max_size: 
     R = set()
@@ -646,8 +668,8 @@ def compute_contour(x_hat, f, Q):
         contour.add(x)
     S = R.difference(level_set)
 
-  if len(S) == max_size or len(level_set) == max_size: 
-    return None # Unbounded confidence region
+  if len(S) >= max_size or len(level_set) >= max_size: 
+    return (None, None) # Unbounded confidence region
   return (level_set, contour)
 
 
@@ -773,7 +795,6 @@ def test1():
  
   print compute_conf(pos.p, pos.num_sites, sites, pos.splines)
   
-  pos.plot('fella.png', sites, center, 10, 150)
 
 
 if __name__ == '__main__':

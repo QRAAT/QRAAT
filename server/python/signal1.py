@@ -686,6 +686,7 @@ class _per_site_data:
 
       Input: sv -- instance of `class SteeringVectors`.
     ''' 
+    # FIXME I think the parallel code is causing a bug. 
     pool = multiprocessing.Pool()
     f = functools.partial(_mle, np.matrix(self.signal_vector), 
                                 sv.steering_vectors[self.site_id],
