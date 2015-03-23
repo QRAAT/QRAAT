@@ -236,7 +236,9 @@ detectmod_file_sink::close()
 void detectmod_file_sink::enable()
 {
   //enable detector
-  staged_close = 1;
+  if (enable_record > 0){
+    staged_close = 1;
+  }
   enable_record = 1;
   return;
 }

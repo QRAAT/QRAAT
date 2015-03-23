@@ -39,7 +39,8 @@ class record_broadband_graph():
     #self.pic_lo = 0
 
     # setup USRP
-    self.tb = qraat.rmg.blocks.usrp_top_block(fpga_frequency = options.ddc_freq, decim_factor = options.decim, channels = self.num_chan)
+    #self.tb = qraat.rmg.blocks.usrp_top_block(fpga_frequency = options.ddc_freq, decim_factor = options.decim, channels = self.num_chan)
+    self.tb = qraat.rmg.blocks.no_usrp_top_block(fpga_frequency = options.ddc_freq, decim_factor = options.decim, channels = self.num_chan, variance = 1.0)
 
     self.directory = options.file_output_directory
     self.tx_name = options.tx_name
@@ -56,7 +57,7 @@ class record_broadband_graph():
     self.afsk = qraat.rmg.blocks.gps_afsk(self.num_chan, self.af_sample_rate, options.mark_freq, options.space_freq, self.directory, self.tx_name)
     for j in range(self.num_chan):
       xlate.append(gr.freq_xlating_fir_filter_ccf (fir_decim, xlate_taps, self.tune_offset, self.usb_rate ))
-      self.tb.connect((self.tb.u,j), xlate[j], (self.afsk,j))
+      self.tb.connect(self.tb.multipliers[j], xlate[j], (self.afsk,j))
 
     # create pic_control
     self.pic = qraat.rmg.pic_interface.pic_interface(options.serial_port)

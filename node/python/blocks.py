@@ -79,11 +79,16 @@ class no_usrp_top_block(gr.top_block):
 
         # Throttle signal to the same sampling rate as the USRP. 
         throttle  = gr.throttle(gr.sizeof_gr_complex, 
-                                params.usrp_sampling_rate / float(decim_factor) * channels)
+                                params.usrp_sampling_rate / float(decim_factor))
                 
         #: Gaussian distributed signal source, deinterleaved to the number of channels. 
-        self.u = gr.deinterleave(gr.sizeof_gr_complex)
-        self.connect(noise_src,throttle,self.u)
+        self.multipliers = []
+        for j in range(channels):
+          self.multipliers.append(gr.multiply_const_cc(j))
+          self.connect(throttle, self.multipliers[j])
+
+        #self.u = gr.deinterleave(gr.sizeof_gr_complex)
+        self.connect(noise_src,throttle)
 
 
 class software_backend(gr.hier_block2):
