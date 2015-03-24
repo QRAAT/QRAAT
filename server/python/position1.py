@@ -474,8 +474,11 @@ class Ellipse:
     return (X, Y)
 
   def __contains__(self, p):
-    x = transform_coord(p, self.p_hat, self.half_span, self.scale) - self.x
-    return ((x[0] / self.axes[0])**2 + (x[1] / self.axes[1])**2) <= 1 
+    x = transform_coord(p, self.p_hat, self.half_span, self.scale)
+    R = np.array([[ np.cos(self.angle), np.sin(self.angle) ],
+                  [-np.sin(self.angle), np.cos(self.angle) ]])   
+    y = np.dot(R, x - self.x)
+    return ((y[0] / self.axes[0])**2 + (y[1] / self.axes[1])**2) <= 1 
     
 
 
@@ -610,15 +613,26 @@ def bootstrap_cov(pos, sites, k, half_span, scale):
   assert len(pos.splines) >= k
 
   P = []
-  for subsites in itertools.combinations(pos.splines.keys(), k):
-    splines = {}
-    for id in subsites:
-      splines[id] = pos.splines[id]
+  #for subsites in itertools.combinations(pos.splines.keys(), k): # Combinations of sites
+  #  splines = {}
+  #  for id in subsites:
+  #    splines[id] = pos.splines[id]
+  #  (p, _) = compute_position(sites, splines, pos.p, np.argmax, HALF_SPAN, 3, 0, SCALE) # FIXME obj=np.argmax
+  #  P.append(transform_coord(p, pos.p, half_span, scale))
+  
+  X = zip(*pos.all_splines.iteritems())
+  site_id = list(X[0])
+  site_splines = list(X[1])
+
+  P = []
+  for S in itertools.product(*site_splines):  # Combinations of pulses
+    splines = { id : s for (id, s) in zip(site_id, S) }
     (p, _) = compute_position(sites, splines, pos.p, np.argmax, HALF_SPAN, 3, 0, SCALE) # FIXME obj=np.argmax
     P.append(transform_coord(p, pos.p, half_span, scale))
   
   random.shuffle(P) 
   return P
+
 
 
 def compute_conf(p_hat, C, conf_level, half_span=0, scale=1, k=1):
