@@ -382,7 +382,6 @@ class ConfidenceRegion1 (ConfidenceRegion0):
       a = Del(x); A.append(np.dot(a, np.transpose(a)))
       b = H(x);   B.append(b)
       
-    
     A = np.mean(A, 0)
     B = np.linalg.inv(np.mean(B, 0))
     C = np.dot(B, np.dot(A, B))
@@ -400,15 +399,7 @@ class BootstrapConfidenceRegion (ConfidenceRegion0):
     self.half_span = half_span
     self.scale = scale
     
-    P = []; k = len(pos.splines)
-    for subsample in itertools.combinations(pos.splines.keys(), 3):
-      splines = {}
-      for id in subsample:
-        splines[id] = pos.splines[id]
-      (p, _) = compute_position(sites, splines, self.p_hat, np.argmax, HALF_SPAN, 3, 0, SCALE) # FIXME obj=np.argmax
-      P.append(transform_coord(p, self.p_hat, half_span, scale))
-    
-    random.shuffle(P) # Estimates of sub samples. 
+    P = bootstrap_cov(pos, sites, 3, half_span, scale)
     A = np.array(P[len(P)/2:])
     B = np.array(P[:len(P)/2])
     C = np.cov(A[:,0], A[:,1])
@@ -420,7 +411,7 @@ class BootstrapConfidenceRegion (ConfidenceRegion0):
     for x in iter(B): 
       y = x - x_bar
       w.append(np.dot(np.transpose(y), np.dot(D, y)))
-    Q = sorted(w)[int(len(w) * (conf_level))] 
+    Q = sorted(w)[int(len(w) * (conf_level))-1] 
     f = lambda(x) : np.dot(np.transpose(x_hat - x), np.dot(D, np.transpose(x_hat - x)))
     (level_set, contour) = compute_contour(x_hat, f, Q)
     if contour is None:
@@ -606,6 +597,21 @@ def compute_cov(x, H, Del):
   b = np.linalg.inv(H(x))
   C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
   return C
+
+
+def bootstrap_cov(pos, sites, k, half_span, scale):
+  assert len(pos.splines) >= k
+
+  P = []
+  for subsites in itertools.combinations(pos.splines.keys(), k):
+    splines = {}
+    for id in subsites:
+      splines[id] = pos.splines[id]
+    (p, _) = compute_position(sites, splines, pos.p, np.argmax, HALF_SPAN, 3, 0, SCALE) # FIXME obj=np.argmax
+    P.append(transform_coord(p, pos.p, half_span, scale))
+  
+  random.shuffle(P) 
+  return P
 
 
 def compute_conf(p_hat, C, conf_level, half_span=0, scale=1, k=1):
