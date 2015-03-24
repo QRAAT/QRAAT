@@ -370,21 +370,28 @@ class ConfidenceRegion1 (ConfidenceRegion0):
     H = nd.Hessian(J)
     Del = nd.Gradient(J)
   
-    A = []; B = []
+    Cs = []
     for i in range(len(pos.all_splines.values()[0])): # FIXME Not all lists will be the sam elength
       splines = {}
       for id in pos.all_splines.keys():
         splines[id] = pos.all_splines[id][i]
-      (p, _) = compute_position(sites, splines, self.p_hat, np.argmax, HALF_SPAN, 3, 0, SCALE) # FIXME obj=np.argmax
-      x = transform_coord(p, self.p_hat, half_span, scale)
-   
-      # Covariance of p_hat.  
-      a = Del(x); A.append(np.dot(a, np.transpose(a)))
-      b = H(x);   B.append(b)
+    
+      (positions, likelihoods) = compute_likelihood(
+                               sites, splines, self.p_hat, scale, half_span)
+      x = transform_coord(self.p_hat, self.p_hat, half_span, scale)
       
-    A = np.mean(A, 0)
-    B = np.linalg.inv(np.mean(B, 0))
-    C = np.dot(B, np.dot(A, B))
+      # Obj function, Hessian matrix, and gradient vector. 
+      J = lambda (x) : likelihoods[x[0], x[1]]
+      H = nd.Hessian(J)
+      Del = nd.Gradient(J)
+      
+      # Covariance.  
+      b = Del(x)
+      A = np.linalg.inv(H(x))
+      C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
+      Cs.append(C)
+  
+    C = np.mean(Cs, 0) / pos.num_sites
 
     # Confidence interval. 
     self.e = compute_conf(self.p_hat, C, significance_level, 
