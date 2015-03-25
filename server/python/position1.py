@@ -253,6 +253,46 @@ class Position:
 
 
 
+def plot_conf_contour(pos, sites, conf_level, p_known, half_span=HALF_SPAN*15, scale=1):
+    
+  (positions, likelihoods) = compute_likelihood(
+                           sites, pos.splines, pos.p, scale, half_span)
+    
+  # Obj function, Hessian matrix, and gradient vector. 
+  J = lambda (x) : likelihoods[x[0], x[1]]
+  H = nd.Hessian(J)
+  Del = nd.Gradient(J)
+  
+  s = 40
+  x_hat = transform_coord(pos.p, pos.p, half_span, scale)
+  x_known = transform_coord(p_known, pos.p, half_span, scale)
+  grid = np.zeros((2*s, 2*s), dtype=float)
+  for i in range(-s,s):
+    for j in range(-s,s):
+      x = x_hat + np.array([i,j])
+      b = Del(x)
+      A = np.linalg.inv(H(x))
+      C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
+      e = compute_conf(pos.p, C, conf_level, 
+                          half_span, scale, k=1) 
+      grid[i+s,j+s] = e.area()
+  
+  P = pp.imshow(grid.transpose(), 
+        origin='lower',
+        extent=(0, s * 2, 0, s * 2),
+        cmap='YlGnBu',
+        aspect='auto', interpolation='nearest')
+     
+  x_hat = transform_coord(pos.p, pos.p, s, scale)
+  x_known = transform_coord(p_known, pos.p, s, scale)
+  pp.plot(x_hat[0], x_hat[1], "^", fillstyle='none')
+  pp.plot(x_known[0], x_known[1], "h", fillstyle='none')
+
+  pp.show()
+
+
+
+
 ### class ConfidenceRegion. ###################################################
 
 class ConfidenceRegion0: 
@@ -277,9 +317,9 @@ class ConfidenceRegion0:
     Del = nd.Gradient(J)
    
     # Covariance.  
-    a = Del(x)
-    b = np.linalg.inv(H(x))
-    C = np.dot(b, np.dot(np.dot(a, np.transpose(a)), b))
+    b = Del(x)
+    A = np.linalg.inv(H(x))
+    C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
   
     # Confidence interval. 
     self.e = compute_conf(self.p_hat, C, significance_level, 
@@ -418,7 +458,7 @@ class BootstrapConfidenceRegion (ConfidenceRegion0):
     for x in iter(B): 
       y = x - x_bar
       w.append(np.dot(np.transpose(y), np.dot(D, y)))
-    Q = sorted(w)[int(len(w) * (conf_level))-1] 
+    Q = sorted(w)[int(len(w) * (conf_level))] 
     f = lambda(x) : np.dot(np.transpose(x_hat - x), np.dot(D, np.transpose(x_hat - x)))
     (level_set, contour) = compute_contour(x_hat, f, Q)
     if contour is None:
@@ -681,7 +721,7 @@ def compute_contour(x_hat, f, Q):
   S = set(); S.add((x_hat[0], x_hat[1]))
   level_set = S.copy()
   contour = set()
-  max_size = 1000000 # FIXME Computational stop gap. 
+  max_size = 10000 # FIXME Computational stop gap. 
 
   while len(S) > 0 and len(S) < max_size and len(level_set) < max_size: 
     R = set()
