@@ -7,6 +7,7 @@ import position1
 import pickle
 import numpy as np
 import matplotlib.pyplot as pp
+import scipy
 
 def montecarlo(exp_params, sys_params, sv, conf_level=None):
   s = 2 * exp_params['half_span'] + 1
@@ -48,11 +49,11 @@ def montecarlo(exp_params, sys_params, sv, conf_level=None):
             # Estimate confidence region. 
             if conf_level:
               try: 
-                C = position1.ConfidenceRegion1(P_hat, sites, conf_level, 
+                C = position1.BootstrapConfidenceRegion(P_hat, sites, conf_level, 
                       sys_params['conf_half_span'], sys_params['conf_scale']) 
                 conf[i,j,e,n,k,:] = np.array([C.e.axes[0], C.e.axes[1], C.e.angle])
-              except IndexError: # Hessian matrix computation
-                print "Warning!"
+              #except IndexError: # Hessian matrix computation
+              #  print "Warning!"
               except np.linalg.linalg.LinAlgError:
                 print "Singular matrix!"
               except position1.UnboundedConfRegionError:
@@ -76,6 +77,7 @@ def load(prefix, conf_level=None):
   return (pos, conf, exp_params, sys_params)
     
 def pretty_report(pos, conf, exp_params, sys_params, conf_level):
+  Qt = scipy.stats.chi2.ppf(conf_level, 2)
   fmt = lambda x : '%9s' % ('%0.2f' % x)
   s = 2 * exp_params['half_span'] + 1
   num_sites = len(sys_params['include'])
@@ -99,7 +101,7 @@ def pretty_report(pos, conf, exp_params, sys_params, conf_level):
           #print rmse, np.std(np.imag(p_hat)), np.std(np.real(p_hat))
           try: 
             C = np.cov(np.imag(p_hat), np.real(p_hat))
-            E = position1.compute_conf(p, C, conf_level, k=num_sites)
+            E = position1.compute_conf(p, C, Qt)
           except position1.PosDefError:
             E = None
             print "skippiong positive definite"
@@ -118,7 +120,8 @@ def pretty_report(pos, conf, exp_params, sys_params, conf_level):
               if not E or p_hat[k] in E: b += 1
             print fmt(float(a) / exp_params['trials']), \
                   fmt(float(b) / exp_params['trials']), \
-                  fmt((area / exp_params['trials'])), fmt((E.area() if E else 1))
+                  fmt((area / exp_params['trials'])), fmt((E.area() if E else 1)), \
+                  fmt((area / exp_params['trials']) / (E.area() if E else 1))
           else: print 
 
 
@@ -163,38 +166,37 @@ def plot(pos, conf, exp_params, sys_params, conf_level):
           pp.show()
           pp.clf()
 
-def grid_test(): 
-  
-  rho = 1 
-  noise = np.arange(0.001, 0.011, 0.001)
-  center = (4260838.3+574049j)
-  half_span = 3 
-  scale = 50
-  trials = 10000
-  pulses = 1
-  include = []
 
-  # Ideal Bartlet
-  res = sim(trials, pulses, rho, noise, sv, sites, center, half_span, scale, 
-              signal1.Signal.Bartlet, signal1.IdealSimulator, [4, 8, 6])
-  _sites = sites.keys() if include == [] else include
-  save('ideal-bartlet', res, trials, pulses, rho, noise, center, half_span, scale, _sites)
-  
-  # Ideal MLE
-  #res = sim(trials, pulses, rho, noise, sv, sites, center, half_span, scale, 
-  #            signal1.Signal.MLE, signal1.IdealSimulator, [4, 8, 6])
-  #_sites = sites.keys() if include == [] else include
-  #save('ideal-mle', res, trials, pulses, rho, noise, center, half_span, scale, _sites)
-  
-  # Real Bartlet
-  res = sim(trials, pulses, rho, noise, sv, sites, center, half_span, scale, 
-              signal1.Signal.Bartlet, signal1.Simulator, [4, 8, 6])
-  _sites = sites.keys() if include == [] else include
-  save('real-bartlet', res, trials, pulses, rho, noise, center, half_span, scale, _sites)
-  
+def plot_hist(pos, conf, exp_params, sys_params, conf_level):
+  num_sites = len(sys_params['include'])
+  s = 2 * exp_params['half_span'] + 1
+  for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
+    print 'pulse_ct=%d' % pulse_ct
+    for j, sig_n in enumerate(exp_params['sig_n']): 
+      print '  sig_n=%f' % sig_n
+      for e in range(s): #easting 
+        for n in range(s): #northing
+          fig = pp.gcf()
+          
+          p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                                 (e - exp_params['half_span']) * exp_params['scale'])
+          p_hat = pos[i,j,e,n,:]
+          
+          area = []; dist = []
+          for k in range(exp_params['trials']):
+            axes = np.array([conf[i,j,e,n,k,0], conf[i,j,e,n,k,1]])
+            angle = conf[i,j,e,n,k,2]
+            E_hat = position1.Ellipse(p_hat[k], angle, axes, 
+                              sys_params['conf_half_span'], sys_params['conf_scale'])
+            dist.append(np.abs(p - p_hat[k]))
+            area.append(E_hat.area()) 
+     
+          print "Correlation: (%0.4f, %0.4f)" % scipy.stats.stats.pearsonr(area, dist)
 
-  #(res, trials, pulses, rho, noise, center, half_span, scale, _sites) = load('ideal.npz')
-  #report(res, rho, noise, center, half_span, scale)
+          n, bins, patches = pp.hist(area, 50, normed=1, facecolor='green', alpha=0.75)
+          pp.title('$\sigma_n^2$=%0.4f, sample_ct=%d' % (sig_n, pulse_ct))
+          pp.show()
+          pp.clf()
 
 
 
@@ -202,12 +204,12 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
-                 'sig_n'     : np.arange(0.002, 0.012, 0.002),#[0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [1,2,5,10,100],
+                 'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05],#np.arange(0.002, 0.012, 0.002),
+                 'pulse_ct'  : [3,4,5],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 100 }
+                 'trials'    : 10 }
 
   sys_params = { 'method'         : 'bartlet', 
                  'include'        : [4,6,8],#[2, 3, 4, 5, 6, 8],
@@ -221,28 +223,6 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   pretty_report(pos, conf, exp_params, sys_params, conf_level)
 
 
-def quick_test(prefix, center, sites, sv, conf_level, sim): 
-
-  exp_params = { 'simulator' : sim,
-                 'rho'       : 1,
-                 'sig_n'     : [0.001, 0.01, 0.1],
-                 'pulse_ct'  : [1,10,100],
-                 'center'    : (4260838.3+574049j), 
-                 'half_span' : 0,
-                 'scale'     : 1,
-                 'trials'    : 1 }
-
-  sys_params = { 'method'         : 'bartlet', 
-                 'include'        : [4, 8, 6],
-                 'center'         : center,
-                 'sites'          : sites,
-                 'conf_half_span' : position1.HALF_SPAN*10, 
-                 'conf_scale'     : 1 }
-
-  (pos, conf) = montecarlo(exp_params, sys_params, sv, conf_level)
-  pretty_report(pos, conf, exp_params, sys_params, conf_level)
-
-
 if __name__ == '__main__':
 
   cal_id = 3   
@@ -251,9 +231,8 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  gamma=0.90
-  conf_test('exp/conf1', center, sites, sv, gamma, 'real')
-  #res = load('exp/conf2', 0.90)
+  #conf_test('exp/conf4', center, sites, sv, 0.90, 'real')
+  conf_test('exp/conf5', center, sites, sv, 0.68, 'real')
+  #res = load('exp/conf5', 0.68); pretty_report(*res, conf_level=0.68); plot_hist(*res, conf_level=0.68)
+  #res = load('exp/conf6', 0.90)
   #pretty_report(*res, conf_level=0.90)
-  #res = load('exp/conf3', 0.68)
-  #pretty_report(*res, conf_level=0.68)
