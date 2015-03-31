@@ -49,8 +49,7 @@ def montecarlo(exp_params, sys_params, sv, conf_level=None):
             # Estimate confidence region. 
             if conf_level:
               try: 
-                C = position1.BootstrapConfidenceRegion(P_hat, sites, conf_level, 
-                      sys_params['conf_half_span'], sys_params['conf_scale']) 
+                C = position1.ConfidenceRegion2(P_hat, sites, conf_level, p_known=P)
                 conf[i,j,e,n,k,:] = np.array([C.e.axes[0], C.e.axes[1], C.e.angle])
               #except IndexError: # Hessian matrix computation
               #  print "Warning!"
@@ -58,6 +57,8 @@ def montecarlo(exp_params, sys_params, sv, conf_level=None):
                 print "Singular matrix!"
               except position1.UnboundedConfRegionError:
                 print "Unbounded!"
+              except position1.PosDefError:
+                print "Positive definite!"
 
   return (pos, conf)
 
@@ -204,12 +205,12 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
-                 'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05],#np.arange(0.002, 0.012, 0.002),
-                 'pulse_ct'  : [3,4,5],
+                 'sig_n'     : [0.01, 0.02, 0.05],#, 0.01, 0.02, 0.05],#np.arange(0.002, 0.012, 0.002),
+                 'pulse_ct'  : [3,4,5],#,6,7,8,9,10],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 10 }
+                 'trials'    : 1000 }
 
   sys_params = { 'method'         : 'bartlet', 
                  'include'        : [4,6,8],#[2, 3, 4, 5, 6, 8],
@@ -231,8 +232,7 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  #conf_test('exp/conf4', center, sites, sv, 0.90, 'real')
-  conf_test('exp/conf5', center, sites, sv, 0.68, 'real')
-  #res = load('exp/conf5', 0.68); pretty_report(*res, conf_level=0.68); plot_hist(*res, conf_level=0.68)
-  #res = load('exp/conf6', 0.90)
-  #pretty_report(*res, conf_level=0.90)
+  conf_test('exp/conf3', center, sites, sv, 0.90, 'real')
+  #res = load('exp/conf2', 0.90); pretty_report(*res, conf_level=0.90)
+  #res = load('exp/conf5', 0.68); pretty_report(*res, conf_level=0.68)
+  

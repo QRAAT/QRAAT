@@ -133,7 +133,7 @@ def InsertPositions(db_con, positions, zone):
 
 class Position:
   
-  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines, all_splines, obj):
+  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines, sub_splines, obj):
     
     assert len(bearing) == len(activity) and len(bearing) == len(splines)
     self.dep_id = dep_id
@@ -145,7 +145,7 @@ class Position:
     self.bearing = bearing
     self.activity = activity
     self.splines = splines
-    self.all_splines = all_splines
+    self.sub_splines = sub_splines
     self.obj = obj
 
   @classmethod
@@ -153,7 +153,7 @@ class Position:
     ''' Compute a position given bearing likelihood data. ''' 
     
     # Aggregate site data. 
-    (splines, all_splines, bearing, activity, num_est) = aggregate_window(
+    (splines, sub_splines, bearing, activity, num_est) = aggregate_window(
                                   P, signal, obj, t_start, t_end)
     
     if len(splines) > 1: # Need at least two site bearings. 
@@ -171,7 +171,7 @@ class Position:
                bearing,     # siteID -> (theta, likelihood)
                activity,    # siteID -> activity
                splines,     # siteID -> aggregated bearing likelihood spline
-               all_splines, # siteID -> spline for each pulse
+               sub_splines, # siteID -> spline for each pulse
                obj)         # Objective function
 
   def get_likelihood(self):
@@ -255,20 +255,21 @@ class Position:
 
 class ConfidenceRegion: 
 
-  def __init__(self, pos, sites, conf_level, half_span=HALF_SPAN*10, scale=1, p_known=None):
+  def __init__(self, pos, sites, conf_level, half_span=150, scale=1, p_known=None):
     ''' Confidence region from asymptotic covariance. ''' 
     self.p_hat = pos.p
     self.level = conf_level
     self.half_span = half_span
-    self.scale = scale
+    self.scale = 1
   
-    if p_known: 
-      x = transform_coord(p_known, self.p_hat, half_span, scale)
+    if p_known:
+      p = p_known
     else: 
-      x = transform_coord(self.p_hat, self.p_hat, half_span, scale)
-  
+      p = self.p_hat
+    x = np.array([half_span, half_span])
+
     (positions, likelihoods) = compute_likelihood(
-                             sites, pos.splines, self.p_hat, scale, half_span)
+                             sites, pos.splines, p, scale, half_span)
     
     # Obj function, Hessian matrix, and gradient vector. 
     J = lambda (x) : likelihoods[x[0], x[1]]
@@ -279,7 +280,7 @@ class ConfidenceRegion:
     b = Del(x)
     A = np.linalg.inv(H(x))
     C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
-  
+
     # Confidence interval. 
     Qt = scipy.stats.chi2.ppf(conf_level, 2)
     self.e = compute_conf(self.p_hat, C, Qt, half_span, scale) 
@@ -331,6 +332,51 @@ class ConfidenceRegion:
     return p in self.e
 
 
+class ConfidenceRegion2 (ConfidenceRegion): 
+
+  def __init__(self, pos, sites, conf_level, half_span=10, scale=0.5, p_known=None):
+    ''' Confidence region from asymptotic covariance. ''' 
+    self.p_hat = pos.p
+    self.level = conf_level
+    self.half_span = half_span
+    self.scale = 1
+  
+    if p_known: 
+      p = p_known
+    else: 
+      p = self.p_hat
+    x = np.array([half_span, half_span])
+
+    (positions, likelihoods) = compute_likelihood(
+                             sites, pos.splines, p, scale, half_span)
+    
+    # Obj function, Hessian matrix, and gradient vector. 
+    J = lambda (x) : likelihoods[x[0], x[1]]
+
+    f = np.zeros((3,3), dtype=np.float64)
+    for i in range(-1,2):
+      for j in range(-1,2): 
+        f[i,j] = J(x + np.array([i,j])) 
+    
+    del_x = (f[1,0] - f[0,0]) / scale
+    del_y = (f[0,1] - f[0,0]) / scale
+    b = np.array([del_x, del_y])
+
+    H = np.zeros((2,2), dtype=np.float64)
+    H[0,0] = (-f[-1,0] + 2*f[0,0] - f[1,0]) / (scale**2) # f_xx
+    H[1,1] = (-f[0,-1] + 2*f[0,0] - f[0,1]) / (scale**2) # f_yy
+    H[0,1] = (f[-1,1] - f[-1,-1] - f[1,1] + f[1,-1]) / (4 * (scale**2)) # f_xy
+    H[1,0] = (f[-1,1] - f[-1,-1] - f[1,1] + f[1,-1]) / (4 * (scale**2)) # f_yx
+
+    # Covariance.  
+    A = np.linalg.inv(H)
+    C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
+
+    # Confidence interval. 
+    Qt = scipy.stats.chi2.ppf(conf_level, 2) 
+    self.e = compute_conf(self.p_hat, C, Qt, half_span, scale) 
+
+
 class BootstrapConfidenceRegion (ConfidenceRegion): 
 
   def __init__(self, pos, sites, conf_level, max_resamples=100):
@@ -353,24 +399,26 @@ class BootstrapConfidenceRegion (ConfidenceRegion):
     x_hat = np.array([self.p_hat.imag, self.p_hat.real])
     
     W = []
-    N = sum(map(lambda l : len(l), pos.all_splines.values())) 
+    N = sum(map(lambda l : len(l), pos.sub_splines.values())) 
     k = N / pos.num_sites
     for x in iter(B): 
       y = x - x_bar
       w = np.dot(np.transpose(y), np.dot(D, y))
       W.append(w)
-    Qt = np.sqrt(sorted(W)[int(len(W) * (conf_level))] / (k - 2))
-    f = lambda(x) : np.dot(np.transpose(x_hat - x), np.dot(D, np.transpose(x_hat - x)))
-    #(level_set, contour) = compute_contour(x_hat, f, Q)
+    Qt = sorted(W)[int(len(W) * (conf_level))] * k  
+    self.e = compute_conf(self.p_hat, C, Qt, self.half_span, self.scale) 
+
+
+
+    #f = lambda(x) : np.dot(np.transpose(x_hat - x), np.dot(D, np.transpose(x_hat - x)))
+    #(level_set, contour) = compute_contour(x_hat, f, Qt)
     #if contour is None:
     #  raise UnboundedConfRegionError 
     #X = np.array(map(lambda x : x[0], contour))
     #Y = np.array(map(lambda x : x[1], contour))
     #(x_center, angle, axes) = fit_ellipse(X, Y)
-    #p_center = transform_coord_inv(x_center, self.p_hat, half_span, scale)
-    #self.e = Ellipse(self.p_hat, angle, axes, half_span, scale)
-    self.e = compute_conf(self.p_hat, C, Qt, self.half_span, self.scale) 
-
+    #p_center = transform_coord_inv(x_center, self.p_hat, self.half_span, self.scale)
+    #self.e = Ellipse(self.p_hat, angle, axes, self.half_span, self.scale)
 
 
 class Ellipse:
@@ -419,7 +467,7 @@ def aggregate_window(P, signal, obj, t_start, t_end):
   splines = {}  
   activity = {}
   bearing = {}
-  all_splines = {}
+  sub_splines = {}
   for (id, L) in P.iteritems():
     mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
     edsp = signal[id].edsp[mask]
@@ -428,16 +476,20 @@ def aggregate_window(P, signal, obj, t_start, t_end):
       # Aggregated bearing spectrum spline per site.
       p = aggregate_spectrum(l)
       splines[id] = compute_bearing_spline(p) 
-      # Spline per pulse. 
-      all_splines[id] = []
-      for i in range(len(l)): 
-        all_splines[id].append(compute_bearing_spline(l[i]))
+      # Sub sample splines. 
+      sub_splines[id] = []
+      if len(l) == 1: 
+        sub_splines[id].append(compute_bearing_spline(l[0]))
+      else:
+        for index in itertools.combinations(range(len(l)), len(l)-1):
+          p = aggregate_spectrum(l[np.array(index)])
+          sub_splines[id].append(compute_bearing_spline(p)) 
       # Aggregated activity measurement per site. 
       activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
       theta = obj(p); bearing[id] = (theta, p[theta])
       num_est += edsp.shape[0]
   
-  return (splines, all_splines, bearing, activity, num_est)
+  return (splines, sub_splines, bearing, activity, num_est)
 
 
 def aggregate_spectrum(p):
@@ -531,13 +583,13 @@ def bootstrap_resample(pos, sites, max_samples, obj):
     Construct an objective function from a subset of the pulses (one pulse per site)
     and optimize over the search space. Repeat this at most `max_samples` times.
   '''
-  N = reduce(int.__mul__, map(lambda S : len(S), pos.all_splines.values()))
+  N = reduce(int.__mul__, map(lambda S : len(S), pos.sub_splines.values()))
   if N < 2: # Number of pulse combinations
     raise BootstrapError 
 
   P = []
   
-  X = zip(*pos.all_splines.iteritems())
+  X = zip(*pos.sub_splines.iteritems())
   site_id = list(X[0])
   site_splines = list(X[1])
 
@@ -551,6 +603,13 @@ def bootstrap_resample(pos, sites, max_samples, obj):
   
   return P
 
+def bootstrap_resample2(pos, sites, max_samples, obj):
+  P = []
+  for site_ids in itertools.combinations(pos.splines.keys(), 2):
+    splines = { id : pos.splines[id] for id in site_ids }
+    (p, _) = compute_position(sites, splines, pos.p, obj) 
+    P.append(transform_coord(p, pos.p, 0, 1))
+  return P
 
 def compute_conf(p_hat, C, Qt, half_span=0, scale=1):
   ''' Compute confidence region from covariance matrix.
