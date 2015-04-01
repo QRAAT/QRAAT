@@ -40,10 +40,22 @@ HALF_SPAN = 15
 SCALE = 10             # Meters
 ELLIPSE_PLOT_SCALE = 5 # Scaling factor
 
-class PositionError (Exception): pass
-class PosDefError (PositionError): pass
-class BootstrapError (PositionError): pass
-class UnboundedConfRegionError (PositionError): pass
+class PositionError (Exception): 
+  value = 0; msg = ''
+  def __str__(self): return '%s (%d)' % (self.msg, self.value)
+  
+class PosDefError (PositionError): 
+  value = 1
+  msg = 'covariance matrix is positive definite.'
+
+class BootstrapError (PositionError): 
+  value = 2
+  msg = 'not enough samples to perform boostrap.'
+
+class UnboundedContourError (PositionError): 
+  value = 3
+  msg = 'exceeded maximum size of level set.'
+
 
 ### Position estimation. ######################################################
 
@@ -171,7 +183,7 @@ class Position:
                bearing,     # siteID -> (theta, likelihood)
                activity,    # siteID -> activity
                splines,     # siteID -> aggregated bearing likelihood spline
-               sub_splines, # siteID -> spline for each pulse
+               sub_splines, # siteID -> spline of sub samples for bootstrapping
                obj)         # Objective function
 
   def get_likelihood(self):
@@ -189,7 +201,7 @@ class Position:
       return np.mean(self.activity.values())
     else: return None
 
-  def plot(self, fn, sites, center, scale, half_span, p_known=None):
+  def plot(self, fn, sites, center, p_known=None, half_span=150, scale=10):
     ''' Plot search space. '''
 
     if self.num_sites == 0:
@@ -328,7 +340,7 @@ class Ellipse:
 
 class ConfidenceRegion (Ellipse):
 
-  def __init__(self, pos, sites, conf_level, half_span=75, scale=0.5, p_known=None):
+  def __init__(self, pos, sites, conf_level, p_known=None, half_span=75, scale=0.5):
     ''' Confidence region from asymptotic covariance. ''' 
     self.level = conf_level
     N = sum(map(lambda l : len(l), pos.sub_splines.values())) 
@@ -337,7 +349,7 @@ class ConfidenceRegion (Ellipse):
     if p_known:
       p = p_known
     else: 
-      p = self.p_hat
+      p = pos.p
     x = np.array([half_span, half_span])
 
     (positions, likelihoods) = compute_likelihood(
@@ -349,8 +361,8 @@ class ConfidenceRegion (Ellipse):
     Del = nd.Gradient(J)
    
     # Covariance.  
-    b = Del(x) / k 
-    A = np.linalg.inv(H(x) / k)
+    b = Del(x) / N 
+    A = np.linalg.inv(H(x) / N)
     C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
 
     # Confidence interval. 
@@ -402,7 +414,7 @@ class ConfidenceRegion2 (Ellipse): # FIXME out of data (divide b and A by k)
     if p_known: 
       p = p_known
     else: 
-      p = self.p_hat
+      p = pos.p 
     x = np.array([half_span, half_span])
 
     (positions, likelihoods) = compute_likelihood(
@@ -459,17 +471,23 @@ def aggregate_window(P, signal, obj, t_start, t_end):
     edsp = signal[id].edsp[mask]
     if edsp.shape[0] > 0:
       l = L[mask]
+      
       # Aggregated bearing spectrum spline per site.
       p = aggregate_spectrum(l)
       splines[id] = compute_bearing_spline(p) 
+      
       # Sub sample splines. 
       sub_splines[id] = []
       if len(l) == 1: 
         sub_splines[id].append(compute_bearing_spline(l[0]))
+      elif len(l) == 2:
+        sub_splines[id].append(compute_bearing_spline(l[0]))
+        sub_splines[id].append(compute_bearing_spline(l[1]))
       else:
         for index in itertools.combinations(range(len(l)), len(l)-1):
           p = aggregate_spectrum(l[np.array(index)])
           sub_splines[id].append(compute_bearing_spline(p)) 
+      
       # Aggregated activity measurement per site. 
       activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
       theta = obj(p); bearing[id] = (theta, p[theta])

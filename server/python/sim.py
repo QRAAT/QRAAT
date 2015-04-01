@@ -49,14 +49,14 @@ def montecarlo(exp_params, sys_params, sv, conf_level=None):
             # Estimate confidence region. 
             if conf_level:
               try: 
-                C = position1.ConfidenceRegion(P_hat, sites, conf_level, p_known=P)
-                #C = position1.BootstrapConfidenceRegion(P_hat, sites, conf_level)
+                #C = position1.ConfidenceRegion(P_hat, sites, conf_level, p_known=P)
+                C = position1.BootstrapConfidenceRegion(P_hat, sites, conf_level)
                 conf[i,j,e,n,k,:] = np.array([C.axes[0], C.axes[1], C.angle])
               #except IndexError: # Hessian matrix computation
               #  print "Warning!"
               except np.linalg.linalg.LinAlgError:
                 print "Singular matrix!"
-              except position1.UnboundedConfRegionError:
+              except position1.UnboundedContourError:
                 print "Unbounded!"
               except position1.PosDefError:
                 print "Positive definite!"
@@ -111,19 +111,21 @@ def pretty_report(pos, conf, exp_params, sys_params, conf_level):
   
           print '  (%s, %s)' % (fmt(mean[0]), fmt(mean[1])), fmt(rmse), 
           if conf_level:
-            a = b = 0
+            a = b = ct = 0
             area = 0
             for k in range(exp_params['trials']):
               axes = np.array([conf[i,j,e,n,k,0], conf[i,j,e,n,k,1]])
               angle = conf[i,j,e,n,k,2]
               E_hat = position1.Ellipse(p_hat[k], angle, axes, 
                                 sys_params['conf_half_span'], sys_params['conf_scale'])
-              area += E_hat.area()
-              if p in E_hat:    a += 1
+              if E_hat.axes[0] > 0:
+                area += E_hat.area()
+                ct += 1
+                if p in E_hat: a += 1
               if not E or p_hat[k] in E: b += 1
-            print fmt(float(a) / exp_params['trials']), \
+            print fmt(float(a) / ct), \
                   fmt(float(b) / exp_params['trials']), \
-                  fmt((area / exp_params['trials'])), fmt((E.area() if E else 1)), \
+                  fmt(area / ct), fmt((E.area() if E else 1)), \
                   fmt((area / exp_params['trials']) / (E.area() if E else 1))
           else: print 
 
@@ -207,15 +209,15 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
-                 'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05],
-                 'pulse_ct'  : [1,2,5,10,100],
-                 'center'    : (4260838.3+574049j), 
+                 'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
+                 'pulse_ct'  : [3,4,5,6,7,8,9,10],
+                 'center'    : (4261100+574650j),#(4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
                  'trials'    : 1000 }
 
   sys_params = { 'method'         : 'bartlet', 
-                 'include'        : [4,6,8],#[2, 3, 4, 5, 6, 8],
+                 'include'        : [2,3,6],#[4,6,8],
                  'center'         : center,
                  'sites'          : sites,
                  'conf_half_span' : position1.HALF_SPAN*10, 
@@ -234,7 +236,7 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  conf_test('exp/conf2', center, sites, sv, 0.90, 'real')
-  #res = load('exp/conf2', 0.90); pretty_report(*res, conf_level=0.90)
+  conf_test('exp/conf6', center, sites, sv, 0.90, 'real')
+  #res = load('exp/conf4', 0.90); pretty_report(*res, conf_level=0.90)
   #res = load('exp/conf5', 0.68); pretty_report(*res, conf_level=0.68)
   
