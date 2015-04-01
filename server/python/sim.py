@@ -49,8 +49,8 @@ def montecarlo(exp_params, sys_params, sv, conf_level=None):
             # Estimate confidence region. 
             if conf_level:
               try: 
-                #C = position1.ConfidenceRegion(P_hat, sites, conf_level, p_known=P)
-                C = position1.BootstrapConfidenceRegion(P_hat, sites, conf_level)
+                C = position1.ConfidenceRegion(P_hat, sites, conf_level, p_known=P)
+                #C = position1.BootstrapConfidenceRegion(P_hat, sites, conf_level)
                 conf[i,j,e,n,k,:] = np.array([C.axes[0], C.axes[1], C.angle])
               #except IndexError: # Hessian matrix computation
               #  print "Warning!"
@@ -211,13 +211,13 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
                  'rho'       : 1,
                  'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
                  'pulse_ct'  : [3,4,5,6,7,8,9,10],
-                 'center'    : (4261100+574650j),#(4260838.3+574049j), 
+                 'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
                  'trials'    : 1000 }
 
   sys_params = { 'method'         : 'bartlet', 
-                 'include'        : [2,3,6],#[4,6,8],
+                 'include'        : [4,6,8],
                  'center'         : center,
                  'sites'          : sites,
                  'conf_half_span' : position1.HALF_SPAN*10, 
@@ -236,7 +236,7 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  conf_test('exp/conf6', center, sites, sv, 0.90, 'real')
+  conf_test('exp/conf3', center, sites, sv, 0.68, 'real')
   #res = load('exp/conf4', 0.90); pretty_report(*res, conf_level=0.90)
   #res = load('exp/conf5', 0.68); pretty_report(*res, conf_level=0.68)
   

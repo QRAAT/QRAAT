@@ -361,12 +361,12 @@ class ConfidenceRegion (Ellipse):
     Del = nd.Gradient(J)
    
     # Covariance.  
-    b = Del(x) / N 
-    A = np.linalg.inv(H(x) / N)
+    b = Del(x) / k  
+    A = np.linalg.inv(H(x) / k)
     C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
 
     # Confidence interval. 
-    Qt = scipy.stats.chi2.ppf(conf_level, 2) 
+    Qt = scipy.stats.chi2.ppf(conf_level, 2) * scale
     (angle, axes) = compute_conf(C, Qt, 1) 
     Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
 
@@ -400,54 +400,6 @@ class BootstrapConfidenceRegion (Ellipse):
     
     (angle, axes) = compute_conf(C, Qt, 1) 
     Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
-
-
-class ConfidenceRegion2 (Ellipse): # FIXME out of data (divide b and A by k) 
-
-  def __init__(self, pos, sites, conf_level, half_span=10, scale=1, p_known=None):
-    ''' Confidence region from asymptotic covariance. ''' 
-    self.p_hat = pos.p
-    self.level = conf_level
-    self.half_span = 0
-    self.scale = 1
-  
-    if p_known: 
-      p = p_known
-    else: 
-      p = pos.p 
-    x = np.array([half_span, half_span])
-
-    (positions, likelihoods) = compute_likelihood(
-                             sites, pos.splines, p, scale, half_span)
-    
-    # Obj function, Hessian matrix, and gradient vector. 
-    J = lambda (x) : likelihoods[x[0], x[1]]
-
-    f = np.zeros((3,3), dtype=np.float64)
-    for i in range(-1,2):
-      for j in range(-1,2): 
-        f[i,j] = J(x + np.array([i,j])) 
-    
-    del_x = (f[1,0] - f[0,0]) / scale
-    del_y = (f[0,1] - f[0,0]) / scale
-    b = np.array([del_x, del_y])
-
-    H = np.zeros((2,2), dtype=np.float64)
-    H[0,0] = (-f[-1,0] + 2*f[0,0] - f[1,0]) / (scale**2) # f_xx
-    H[1,1] = (-f[0,-1] + 2*f[0,0] - f[0,1]) / (scale**2) # f_yy
-    H[0,1] = (f[-1,1] - f[-1,-1] - f[1,1] + f[1,-1]) / (4 * (scale**2)) # f_xy
-    H[1,0] = (f[-1,1] - f[-1,-1] - f[1,1] + f[1,-1]) / (4 * (scale**2)) # f_yx
-
-    # Covariance.  
-    A = np.linalg.inv(H)
-    C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
-    C /= scale
-
-    # Confidence interval. 
-    Qt = scipy.stats.chi2.ppf(conf_level, 2) 
-    (angle, axes) = compute_conf(C, Qt, 1) 
-    Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
-
 
 
 
