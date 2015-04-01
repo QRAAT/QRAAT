@@ -255,7 +255,7 @@ class Position:
 
 class Ellipse:
 
-  def __init__(self, p_hat, angle, axes, half_span, scale, x=None):
+  def __init__(self, p_hat, angle, axes, half_span=0, scale=1, x=None):
     ''' Ellipse data structure. ''' 
     self.p_hat = p_hat
     self.angle = angle
@@ -281,39 +281,6 @@ class Ellipse:
                   [-np.sin(self.angle), np.cos(self.angle) ]])   
     y = np.dot(R, x - self.x)
     return ((y[0] / self.axes[0])**2 + (y[1] / self.axes[1])**2) <= 1 
-
-
-
-class ConfidenceRegion (Ellipse):
-
-  def __init__(self, pos, sites, conf_level, half_span=75, scale=1, p_known=None):
-    ''' Confidence region from asymptotic covariance. ''' 
-    self.level = conf_level
-  
-    if p_known:
-      p = p_known
-    else: 
-      p = self.p_hat
-    x = np.array([half_span, half_span])
-
-    (positions, likelihoods) = compute_likelihood(
-                             sites, pos.splines, p, scale, half_span)
-    
-    # Obj function, Hessian matrix, and gradient vector. 
-    J = lambda (x) : likelihoods[x[0], x[1]]
-    H = nd.Hessian(J)
-    Del = nd.Gradient(J)
-   
-    # Covariance.  
-    b = Del(x)
-    A = np.linalg.inv(H(x))
-    C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
-    C /= scale
-
-    # Confidence interval. 
-    Qt = scipy.stats.chi2.ppf(conf_level, 2)
-    (angle, axes) = compute_conf(C, Qt, 1) 
-    Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
 
   def display(self, p_known=None):
     ''' Ugly console renderring of confidence region. ''' 
@@ -359,8 +326,71 @@ class ConfidenceRegion (Ellipse):
     pp.clf()
 
 
+class ConfidenceRegion (Ellipse):
 
-class ConfidenceRegion2 (ConfidenceRegion): 
+  def __init__(self, pos, sites, conf_level, half_span=75, scale=0.5, p_known=None):
+    ''' Confidence region from asymptotic covariance. ''' 
+    self.level = conf_level
+    N = sum(map(lambda l : len(l), pos.sub_splines.values())) 
+    k = N / pos.num_sites
+  
+    if p_known:
+      p = p_known
+    else: 
+      p = self.p_hat
+    x = np.array([half_span, half_span])
+
+    (positions, likelihoods) = compute_likelihood(
+                             sites, pos.splines, p, scale, half_span)
+    
+    # Obj function, Hessian matrix, and gradient vector. 
+    J = lambda (x) : likelihoods[x[0], x[1]]
+    H = nd.Hessian(J)
+    Del = nd.Gradient(J)
+   
+    # Covariance.  
+    b = Del(x) / k 
+    A = np.linalg.inv(H(x) / k)
+    C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
+
+    # Confidence interval. 
+    Qt = scipy.stats.chi2.ppf(conf_level, 2) 
+    (angle, axes) = compute_conf(C, Qt, 1) 
+    Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
+
+
+class BootstrapConfidenceRegion (Ellipse): 
+
+  def __init__(self, pos, sites, conf_level, max_resamples=100):
+    ''' Bootstrap method for estimationg covariance of a position estimate. 
+
+      Generate at most `max_resamples` position estimates by resampling the signals used
+      in computing `pos`. 
+    '''
+    self.level = conf_level
+    N = sum(map(lambda l : len(l), pos.sub_splines.values())) 
+    k = N / pos.num_sites
+    
+    P = bootstrap_resample(pos, sites, max_resamples, pos.obj)
+    A = np.array(P[len(P)/2:])
+    B = np.array(P[:len(P)/2])
+    C = np.cov(A[:,0], A[:,1]) 
+    D = np.linalg.inv(C)
+    x_bar = np.array([np.mean(B[:,0]), np.mean(B[:,1])])
+    x_hat = np.array([pos.p.imag, pos.p.real])
+    
+    W = []
+    for x in iter(B): 
+      y = x - x_bar
+      w = np.dot(np.transpose(y), np.dot(D, y))
+      W.append(w)
+    Qt = sorted(W)[int(len(W) * (conf_level))] * k 
+    
+    (angle, axes) = compute_conf(C, Qt, 1) 
+    Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
+
+
+class ConfidenceRegion2 (Ellipse): # FIXME out of data (divide b and A by k) 
 
   def __init__(self, pos, sites, conf_level, half_span=10, scale=1, p_known=None):
     ''' Confidence region from asymptotic covariance. ''' 
@@ -406,54 +436,6 @@ class ConfidenceRegion2 (ConfidenceRegion):
     (angle, axes) = compute_conf(C, Qt, 1) 
     Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
 
-
-class BootstrapConfidenceRegion (ConfidenceRegion): 
-
-  def __init__(self, pos, sites, conf_level, max_resamples=100):
-    ''' Bootstrap method for estimationg covariance of a position estimate. 
-
-      Generate at most `max_resamples` position estimates by resampling the signals used
-      in computing `pos`. 
-    '''
-    self.p_hat = pos.p
-    self.level = conf_level
-    self.half_span = 0
-    self.scale = 1
-    
-    P = bootstrap_resample(pos, sites, max_resamples, pos.obj)
-    A = np.array(P[len(P)/2:])
-    B = np.array(P[:len(P)/2])
-    C = np.cov(A[:,0], A[:,1]) 
-    D = np.linalg.inv(C)
-    x_bar = np.array([np.mean(B[:,0]), np.mean(B[:,1])])
-    x_hat = np.array([self.p_hat.imag, self.p_hat.real])
-    
-    W = []
-    N = sum(map(lambda l : len(l), pos.sub_splines.values())) 
-    k = N / pos.num_sites
-    for x in iter(B): 
-      y = x - x_bar
-      w = np.dot(np.transpose(y), np.dot(D, y))
-      W.append(w)
-    Qt = sorted(W)[int(len(W) * (conf_level))] * k 
-    
-    (angle, axes) = compute_conf(C, Qt, 1) 
-    Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
-
-
-
-    #f = lambda(x) : np.dot(np.transpose(x_hat - x), np.dot(D, np.transpose(x_hat - x)))
-    #(level_set, contour) = compute_contour(x_hat, f, Qt)
-    #if contour is None:
-    #  raise UnboundedConfRegionError 
-    #X = np.array(map(lambda x : x[0], contour))
-    #Y = np.array(map(lambda x : x[1], contour))
-    #(x_center, angle, axes) = fit_ellipse(X, Y)
-    #p_center = transform_coord_inv(x_center, self.p_hat, self.half_span, self.scale)
-    #self.e = Ellipse(self.p_hat, angle, axes, self.half_span, self.scale)
-
-
-    
 
 
 

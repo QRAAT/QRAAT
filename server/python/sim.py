@@ -50,7 +50,8 @@ def montecarlo(exp_params, sys_params, sv, conf_level=None):
             if conf_level:
               try: 
                 C = position1.ConfidenceRegion(P_hat, sites, conf_level, p_known=P)
-                conf[i,j,e,n,k,:] = np.array([C.e.axes[0], C.e.axes[1], C.e.angle])
+                #C = position1.BootstrapConfidenceRegion(P_hat, sites, conf_level)
+                conf[i,j,e,n,k,:] = np.array([C.axes[0], C.axes[1], C.angle])
               #except IndexError: # Hessian matrix computation
               #  print "Warning!"
               except np.linalg.linalg.LinAlgError:
@@ -102,7 +103,8 @@ def pretty_report(pos, conf, exp_params, sys_params, conf_level):
           #print rmse, np.std(np.imag(p_hat)), np.std(np.real(p_hat))
           try: 
             C = np.cov(np.imag(p_hat), np.real(p_hat))
-            E = position1.compute_conf(p, C, Qt)
+            (angle, axes) = position1.compute_conf(C, Qt)
+            E = position1.Ellipse(p, angle, axes)
           except position1.PosDefError:
             E = None
             print "skippiong positive definite"
@@ -206,11 +208,11 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
                  'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05],
-                 'pulse_ct'  : [1,10,100],
+                 'pulse_ct'  : [1,2,5,10,100],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 100 }
+                 'trials'    : 1000 }
 
   sys_params = { 'method'         : 'bartlet', 
                  'include'        : [4,6,8],#[2, 3, 4, 5, 6, 8],

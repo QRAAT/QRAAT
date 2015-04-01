@@ -57,7 +57,7 @@ def sim_data():
 
   rho = 1   # signal
   sig_n = 0.002 # noise
-  sig = signal1.Simulator(p, sites, sv, rho, sig_n, 3, include=[2,3,5,4,6,8])
+  sig = signal1.Simulator(p, sites, sv, rho, sig_n, 10, include=[2,3,5,4,6,8])
   (sig_n, sig_t) = sig.estimate_var()
 
   pos = position1.PositionEstimator(999, sites, center, 
@@ -71,8 +71,8 @@ def sim_data():
   #print '%0.4f' % (conf2.area() / conf1.area())
  
   #conf1.plot('yeah.jpg', p)
-  conf = position1.BootstrapConfidenceRegion(pos, sites, 0.68)
-  conf.display(p)
+  #conf = position1.BootstrapConfidenceRegion(pos, sites, 0.68)
+  #conf.display(p)
   #if p in conf:
   #  print 'yes!'
   #else: print 'no.'
