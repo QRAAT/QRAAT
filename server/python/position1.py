@@ -253,14 +253,42 @@ class Position:
 
 ### class ConfidenceRegion. ###################################################
 
-class ConfidenceRegion: 
+class Ellipse:
 
-  def __init__(self, pos, sites, conf_level, half_span=150, scale=1, p_known=None):
-    ''' Confidence region from asymptotic covariance. ''' 
-    self.p_hat = pos.p
-    self.level = conf_level
+  def __init__(self, p_hat, angle, axes, half_span, scale, x=None):
+    ''' Ellipse data structure. ''' 
+    self.p_hat = p_hat
+    self.angle = angle
+    self.axes = axes
     self.half_span = half_span
-    self.scale = 1
+    self.scale = scale
+    self.x = np.array([half_span, half_span])
+
+  def area(self):
+    return np.pi * self.axes[0] * self.axes[1]
+
+  def cartesian(self): 
+    theta = np.linspace(0,2*np.pi)
+    X = self.x[0] + self.axes[0]*np.cos(theta)*np.cos(self.angle) - \
+                    self.axes[1]*np.sin(theta)*np.sin(self.angle)
+    Y = self.x[1] + self.axes[0]*np.cos(theta)*np.sin(self.angle) + \
+                    self.axes[1]*np.sin(theta)*np.cos(self.angle)
+    return (X, Y)
+
+  def __contains__(self, p):
+    x = transform_coord(p, self.p_hat, self.half_span, self.scale)
+    R = np.array([[ np.cos(self.angle), np.sin(self.angle) ],
+                  [-np.sin(self.angle), np.cos(self.angle) ]])   
+    y = np.dot(R, x - self.x)
+    return ((y[0] / self.axes[0])**2 + (y[1] / self.axes[1])**2) <= 1 
+
+
+
+class ConfidenceRegion (Ellipse):
+
+  def __init__(self, pos, sites, conf_level, half_span=75, scale=1, p_known=None):
+    ''' Confidence region from asymptotic covariance. ''' 
+    self.level = conf_level
   
     if p_known:
       p = p_known
@@ -280,14 +308,16 @@ class ConfidenceRegion:
     b = Del(x)
     A = np.linalg.inv(H(x))
     C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
+    C /= scale
 
     # Confidence interval. 
     Qt = scipy.stats.chi2.ppf(conf_level, 2)
-    self.e = compute_conf(self.p_hat, C, Qt, half_span, scale) 
+    (angle, axes) = compute_conf(C, Qt, 1) 
+    Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
 
   def display(self, p_known=None):
     ''' Ugly console renderring of confidence region. ''' 
-    X, Y = self.e.cartesian()
+    X, Y = self.cartesian()
     X = map(lambda x: int(x), X)
     Y = map(lambda y: int(y), Y)
     self.contour = set(zip(list(X), list(Y)))
@@ -298,9 +328,9 @@ class ConfidenceRegion:
     dim = 20
     for i in range(-dim, dim+1):
       for j in range(-dim, dim+1):
-        x = self.e.x + np.array([i,j])
+        x = self.x + np.array([i,j])
         if x_known is not None and x[0] == x_known[0] and x[1] == x_known[1]: print 'C', 
-        elif x[0] == self.e.x[0] and x[1] == self.e.x[1]: print 'P', 
+        elif x[0] == self.x[0] and x[1] == self.x[1]: print 'P', 
         elif tuple(x) in self.contour: print '.',
         else: print ' ',
       print 
@@ -308,10 +338,10 @@ class ConfidenceRegion:
   def plot(self, fn, p_known=None):
     ''' A pretty plot of confidence region. ''' 
     fig = pp.gcf()
-    x_hat = self.e.x
+    x_hat = self.x
   
     #(x_fit, y_fit) = fit_contour(x, y, N=10000)
-    (x_fit, y_fit) = self.e.cartesian()  
+    (x_fit, y_fit) = self.cartesian()  
     pp.plot(x_fit, y_fit, color='k', alpha=0.5)
 
     # x_hat
@@ -328,17 +358,15 @@ class ConfidenceRegion:
     pp.savefig(fn)
     pp.clf()
 
-  def __contains__(self, p):
-    return p in self.e
 
 
 class ConfidenceRegion2 (ConfidenceRegion): 
 
-  def __init__(self, pos, sites, conf_level, half_span=10, scale=0.5, p_known=None):
+  def __init__(self, pos, sites, conf_level, half_span=10, scale=1, p_known=None):
     ''' Confidence region from asymptotic covariance. ''' 
     self.p_hat = pos.p
     self.level = conf_level
-    self.half_span = half_span
+    self.half_span = 0
     self.scale = 1
   
     if p_known: 
@@ -371,10 +399,12 @@ class ConfidenceRegion2 (ConfidenceRegion):
     # Covariance.  
     A = np.linalg.inv(H)
     C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
+    C /= scale
 
     # Confidence interval. 
     Qt = scipy.stats.chi2.ppf(conf_level, 2) 
-    self.e = compute_conf(self.p_hat, C, Qt, half_span, scale) 
+    (angle, axes) = compute_conf(C, Qt, 1) 
+    Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
 
 
 class BootstrapConfidenceRegion (ConfidenceRegion): 
@@ -405,8 +435,10 @@ class BootstrapConfidenceRegion (ConfidenceRegion):
       y = x - x_bar
       w = np.dot(np.transpose(y), np.dot(D, y))
       W.append(w)
-    Qt = sorted(W)[int(len(W) * (conf_level))] * k  
-    self.e = compute_conf(self.p_hat, C, Qt, self.half_span, self.scale) 
+    Qt = sorted(W)[int(len(W) * (conf_level))] * k 
+    
+    (angle, axes) = compute_conf(C, Qt, 1) 
+    Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
 
 
 
@@ -421,34 +453,6 @@ class BootstrapConfidenceRegion (ConfidenceRegion):
     #self.e = Ellipse(self.p_hat, angle, axes, self.half_span, self.scale)
 
 
-class Ellipse:
-
-  def __init__(self, p_hat, angle, axes, half_span, scale, x=None):
-    ''' Ellipse data structure. ''' 
-    self.p_hat = p_hat
-    self.angle = angle
-    self.axes = axes
-    self.half_span = half_span
-    self.scale = scale
-    self.x = np.array([half_span, half_span])
-
-  def area(self):
-    return np.pi * self.axes[0] * self.axes[1]
-
-  def cartesian(self): 
-    theta = np.linspace(0,2*np.pi)
-    X = self.x[0] + self.axes[0]*np.cos(theta)*np.cos(self.angle) - \
-                    self.axes[1]*np.sin(theta)*np.sin(self.angle)
-    Y = self.x[1] + self.axes[0]*np.cos(theta)*np.sin(self.angle) + \
-                    self.axes[1]*np.sin(theta)*np.cos(self.angle)
-    return (X, Y)
-
-  def __contains__(self, p):
-    x = transform_coord(p, self.p_hat, self.half_span, self.scale)
-    R = np.array([[ np.cos(self.angle), np.sin(self.angle) ],
-                  [-np.sin(self.angle), np.cos(self.angle) ]])   
-    y = np.dot(R, x - self.x)
-    return ((y[0] / self.axes[0])**2 + (y[1] / self.axes[1])**2) <= 1 
     
 
 
@@ -585,7 +589,7 @@ def bootstrap_resample(pos, sites, max_samples, obj):
   '''
   N = reduce(int.__mul__, map(lambda S : len(S), pos.sub_splines.values()))
   if N < 2: # Number of pulse combinations
-    raise BootstrapError 
+    raise BootstrapError  
 
   P = []
   
@@ -611,7 +615,7 @@ def bootstrap_resample2(pos, sites, max_samples, obj):
     P.append(transform_coord(p, pos.p, 0, 1))
   return P
 
-def compute_conf(p_hat, C, Qt, half_span=0, scale=1):
+def compute_conf(C, Qt, scale=1):
   ''' Compute confidence region from covariance matrix.
     
     `Qt` is typically the cumulative probability of `t` from the chi-square 
@@ -634,7 +638,7 @@ def compute_conf(p_hat, C, Qt, half_span=0, scale=1):
 
   else: raise PosDefError
   
-  return Ellipse(p_hat, angle, axes, half_span, scale)
+  return (angle, axes)
 
 
 

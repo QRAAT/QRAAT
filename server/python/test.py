@@ -40,8 +40,8 @@ def real_data():
   #positions = position1.WindowedPositionEstimator(dep_id, sites, center, sig, sv, 
   #                60 * 5, 30, method=signal1.Signal.Bartlet)
 
-  pos = position1.PositionEstimator(dep_id, sites, center, sig, sv,
-                  method=signal1.Signal.Bartlet)
+  #pos = position1.PositionEstimator(dep_id, sites, center, sig, sv,
+  #                method=signal1.Signal.Bartlet)
   print pos.p
   pos.plot('yeah.png', sites, center, 10, 150)
   
@@ -66,12 +66,13 @@ def sim_data():
  
   conf1 = position1.ConfidenceRegion(pos, sites, 0.90, p_known=p) 
   conf1.display(p) 
-  conf2 = position1.ConfidenceRegion2(pos, sites, 0.90, p_known=p) 
-  conf2.display(p) 
-  print '%0.4f' % (conf2.e.area() / conf1.e.area())
-  
-  #conf = position1.BootstrapConfidenceRegion(pos, sites, 0.90)
-  #conf.display(p)
+  #conf2 = position1.ConfidenceRegion2(pos, sites, 0.90, p_known=p) 
+  #conf2.display(p) 
+  #print '%0.4f' % (conf2.area() / conf1.area())
+ 
+  #conf1.plot('yeah.jpg', p)
+  conf = position1.BootstrapConfidenceRegion(pos, sites, 0.68)
+  conf.display(p)
   #if p in conf:
   #  print 'yes!'
   #else: print 'no.'
