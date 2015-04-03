@@ -210,7 +210,7 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
                  'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [3,4,5,6,7,8,9,10],
+                 'pulse_ct'  : [1,10,100],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
@@ -236,7 +236,7 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  conf_test('exp/conf3', center, sites, sv, 0.68, 'real')
-  #res = load('exp/conf4', 0.90); pretty_report(*res, conf_level=0.90)
+  conf_test('exp/limit', center, sites, sv, 0.95, 'real')
+  #res = load('exp/test2', 0.95); pretty_report(*res, conf_level=0.95)
   #res = load('exp/conf5', 0.68); pretty_report(*res, conf_level=0.68)
   

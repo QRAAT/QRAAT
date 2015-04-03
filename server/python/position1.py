@@ -192,7 +192,7 @@ class Position:
       # NOTE if aggregate bearings are normalised, 
       # divide by self.num_sites; otherwise, divide
       # by self.num_est. See aggregate_spectrum().
-      return self.likelihood / self.num_est
+      return self.likelihood / self.num_sites
     else: return None
   
   def get_activity(self): 
@@ -361,9 +361,9 @@ class ConfidenceRegion (Ellipse):
     Del = nd.Gradient(J)
    
     # Covariance.  
-    b = Del(x) / k  
-    A = np.linalg.inv(H(x) / k)
-    C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A))
+    b = Del(x)  
+    A = np.linalg.inv(H(x))
+    C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A)) 
 
     # Confidence interval. 
     Qt = scipy.stats.chi2.ppf(conf_level, 2) * scale
@@ -373,16 +373,17 @@ class ConfidenceRegion (Ellipse):
 
 class BootstrapConfidenceRegion (Ellipse): 
 
-  def __init__(self, pos, sites, conf_level, max_resamples=100):
+  def __init__(self, pos, sites, conf_level, max_resamples=200):
     ''' Bootstrap method for estimationg covariance of a position estimate. 
 
       Generate at most `max_resamples` position estimates by resampling the signals used
       in computing `pos`. 
     '''
     self.level = conf_level
-    N = sum(map(lambda l : len(l), pos.sub_splines.values())) 
-    k = N / pos.num_sites
+    n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
+    m = n / pos.num_sites
     
+    # Estimate covariance. 
     P = bootstrap_resample(pos, sites, max_resamples, pos.obj)
     A = np.array(P[len(P)/2:])
     B = np.array(P[:len(P)/2])
@@ -391,13 +392,15 @@ class BootstrapConfidenceRegion (Ellipse):
     x_bar = np.array([np.mean(B[:,0]), np.mean(B[:,1])])
     x_hat = np.array([pos.p.imag, pos.p.real])
     
+    # Estimate mean. 
     W = []
     for x in iter(B): 
       y = x - x_bar
       w = np.dot(np.transpose(y), np.dot(D, y))
       W.append(w)
-    Qt = sorted(W)[int(len(W) * (conf_level))] * k 
     
+    # Confidence interval.
+    Qt = sorted(W)[int(len(W) * (conf_level))] * m
     (angle, axes) = compute_conf(C, Qt, 1) 
     Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
 
@@ -450,9 +453,7 @@ def aggregate_window(P, signal, obj, t_start, t_end):
 
 def aggregate_spectrum(p):
   ''' Sum a set of bearing likelihoods. '''
-  # NOTE normalising by the number of pulses effectively
-  # reduces the sample size. 
-  return np.sum(p, 0) #/ p.shape[0]
+  return np.sum(p, 0) / p.shape[0]
 
 def compute_bearing_spline(l): 
   ''' Interpolate a spline on a bearing likelihood distribuiton. 
@@ -539,6 +540,9 @@ def bootstrap_resample(pos, sites, max_samples, obj):
     Construct an objective function from a subset of the pulses (one pulse per site)
     and optimize over the search space. Repeat this at most `max_samples` times.
   '''
+  # TODO For large sample sizes, the call to itertools.product() is a combinatorial
+  # explosion. Think of a better way to draw random subsamples.  
+  
   N = reduce(int.__mul__, map(lambda S : len(S), pos.sub_splines.values()))
   if N < 2: # Number of pulse combinations
     raise BootstrapError  
@@ -559,12 +563,14 @@ def bootstrap_resample(pos, sites, max_samples, obj):
   
   return P
 
-def bootstrap_resample2(pos, sites, max_samples, obj):
+def bootstrap_resample_site(pos, sites, max_samples, obj):
+  ''' Random subsamples of sites. '''
   P = []
   for site_ids in itertools.combinations(pos.splines.keys(), 2):
     splines = { id : pos.splines[id] for id in site_ids }
     (p, _) = compute_position(sites, splines, pos.p, obj) 
     P.append(transform_coord(p, pos.p, 0, 1))
+  random.shuffle(P)
   return P
 
 def compute_conf(C, Qt, scale=1):
