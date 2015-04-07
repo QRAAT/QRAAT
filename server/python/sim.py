@@ -4,19 +4,30 @@ import util
 import signal1
 import position1
 
-import pickle
+import pickle, gzip
 import numpy as np
 import matplotlib.pyplot as pp
 import scipy
 
-def montecarlo(exp_params, sys_params, sv, conf_level=None):
+
+def create_array(exp_params, sys_params):
+  s = 2 * exp_params['half_span'] + 1
+  return [[[[[] for n in range(s) ] 
+                  for e in range(s) ]
+                    for j in range(len(exp_params['sig_n'])) ] 
+                      for i in range(len(exp_params['pulse_ct'])) ]
+  
+
+def montecarlo(exp_params, sys_params, sv):
   s = 2 * exp_params['half_span'] + 1
   shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s, exp_params['trials'])
   pos = np.zeros(shape, dtype=np.complex)
-  if conf_level: # conf[i,j,e,n,k,:] = (axes[0], axes[1], angle)
-    conf = np.zeros(shape + (3,), dtype=np.float)
-  else: conf = None
-  
+  cov0 = create_array(exp_params, sys_params) # bootstrap
+  cov1 = create_array(exp_params, sys_params) # true position
+  cov2 = create_array(exp_params, sys_params) # x_hat 
+  cov3 = create_array(exp_params, sys_params) # x_hat + [1,1] 
+  cov4 = create_array(exp_params, sys_params) # x_hat + [-1,0] 
+
   if sys_params['method'] == 'bartlet': 
     method = signal1.Signal.Bartlet
   elif sys_params['method'] == 'MLE': 
@@ -47,38 +58,44 @@ def montecarlo(exp_params, sys_params, sv, conf_level=None):
             pos[i,j,e,n,k] = P_hat.p
 
             # Estimate confidence region. 
-            if conf_level:
-              try: 
-                C = position1.ConfidenceRegion(P_hat, sites, conf_level, p_known=P)
-                #C = position1.BootstrapConfidenceRegion(P_hat, sites, conf_level)
-                conf[i,j,e,n,k,:] = np.array([C.axes[0], C.axes[1], C.angle])
-              #except IndexError: # Hessian matrix computation
-              #  print "Warning!"
-              except np.linalg.linalg.LinAlgError:
-                print "Singular matrix!"
-              except position1.UnboundedContourError:
-                print "Unbounded!"
-              except position1.PosDefError:
-                print "Positive definite!"
+            try: 
+              cov0[i][j][e][n].append(position1.BootstrapCovariance(P_hat, sites))
+              cov1[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P))
+              cov2[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P_hat.p))
+              cov3[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P_hat.p+np.complex(1,1)))
+              cov4[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P_hat.p+np.complex(-1,0)))
+            #except IndexError: # Hessian matrix computation
+            #  print "Warning!"
+            except np.linalg.linalg.LinAlgError:
+              print "Singular matrix!"
+            except position1.UnboundedContourError:
+              print "Unbounded!"
+            except position1.PosDefError:
+              print "Positive definite!"
 
-  return (pos, conf)
+  return (pos, (cov0, cov1, cov2, cov3, cov4))
 
 
-def save(prefix, pos, conf, exp_params, sys_params, conf_level=None):
+def save(prefix, pos, cov, exp_params, sys_params,):
   np.savez(prefix + '-pos', pos)
-  if conf_level:
-    np.savez(prefix + '-%0.2fconf' % conf_level, conf)
+  pickle.dump(cov[0], gzip.open(prefix + '-cov0' + '.gz', 'wb'))
+  pickle.dump(cov[1], gzip.open(prefix + '-cov1' + '.gz', 'wb'))
+  pickle.dump(cov[2], gzip.open(prefix + '-cov2' + '.gz', 'wb'))
+  pickle.dump(cov[3], gzip.open(prefix + '-cov3' + '.gz', 'wb'))
+  pickle.dump(cov[4], gzip.open(prefix + '-cov4' + '.gz', 'wb'))
   pickle.dump((exp_params, sys_params), open(prefix + '-params', 'w'))
 
-def load(prefix, conf_level=None):
+def load(prefix):
   pos = np.load(prefix + '-pos.npz')['arr_0']
-  if conf_level:
-    conf = np.load(prefix + '-%0.2fconf.npz' % conf_level)['arr_0']
-  else: conf = None
+  cov0 = pickle.load(gzip.open(prefix + '-cov0' + '.gz', 'rb'))
+  cov1 = pickle.load(gzip.open(prefix + '-cov1' + '.gz', 'rb'))
+  cov2 = pickle.load(gzip.open(prefix + '-cov2' + '.gz', 'rb'))
+  cov3 = pickle.load(gzip.open(prefix + '-cov3' + '.gz', 'rb'))
+  cov4 = pickle.load(gzip.open(prefix + '-cov4' + '.gz', 'rb'))
   (exp_params, sys_params) = pickle.load(open(prefix + '-params'))
-  return (pos, conf, exp_params, sys_params)
+  return (pos, (cov0, cov1, cov2, cov3, cov4), exp_params, sys_params)
     
-def pretty_report(pos, conf, exp_params, sys_params, conf_level):
+def pretty_report(pos, cov, exp_params, sys_params, conf_level):
   Qt = scipy.stats.chi2.ppf(conf_level, 2)
   fmt = lambda x : '%9s' % ('%0.2f' % x)
   s = 2 * exp_params['half_span'] + 1
@@ -110,27 +127,27 @@ def pretty_report(pos, conf, exp_params, sys_params, conf_level):
             print "skippiong positive definite"
   
           print '  (%s, %s)' % (fmt(mean[0]), fmt(mean[1])), fmt(rmse), 
-          if conf_level:
-            a = b = ct = 0
-            area = 0
-            for k in range(exp_params['trials']):
-              axes = np.array([conf[i,j,e,n,k,0], conf[i,j,e,n,k,1]])
-              angle = conf[i,j,e,n,k,2]
-              E_hat = position1.Ellipse(p_hat[k], angle, axes, 
-                                sys_params['conf_half_span'], sys_params['conf_scale'])
+          a = b = ct = 0
+          area = 0
+          for k in range(len(cov[i][j][e][n])):
+            try:
+              E_hat = cov[i][j][e][n][k].conf(conf_level)
               if E_hat.axes[0] > 0:
                 area += E_hat.area()
                 ct += 1
                 if p in E_hat: a += 1
               if not E or p_hat[k] in E: b += 1
-            print fmt(float(a) / ct), \
-                  fmt(float(b) / exp_params['trials']), \
-                  fmt(area / ct), fmt((E.area() if E else 1)), \
-                  fmt((area / exp_params['trials']) / (E.area() if E else 1))
-          else: print 
+            except position1.PosDefError:
+              print "Positive definite!"
+          
+          print fmt(float(a) / ct), \
+                fmt(float(b) / exp_params['trials']), \
+                fmt(area / ct), fmt((E.area() if E else 1)), \
+                fmt((area / exp_params['trials']) / (E.area() if E else 1))
+        else: print 
 
 
-def plot(pos, conf, exp_params, sys_params, conf_level):
+def plot(pos, conf, exp_params, sys_params, conf_level): # TODO out-of-date
   num_sites = len(sys_params['include'])
   s = 2 * exp_params['half_span'] + 1
   for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
@@ -172,7 +189,7 @@ def plot(pos, conf, exp_params, sys_params, conf_level):
           pp.clf()
 
 
-def plot_hist(pos, conf, exp_params, sys_params, conf_level):
+def plot_hist(pos, conf, exp_params, sys_params, conf_level): # TODO out-of-date
   num_sites = len(sys_params['include'])
   s = 2 * exp_params['half_span'] + 1
   for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
@@ -191,8 +208,7 @@ def plot_hist(pos, conf, exp_params, sys_params, conf_level):
           for k in range(exp_params['trials']):
             axes = np.array([conf[i,j,e,n,k,0], conf[i,j,e,n,k,1]])
             angle = conf[i,j,e,n,k,2]
-            E_hat = position1.Ellipse(p_hat[k], angle, axes, 
-                              sys_params['conf_half_span'], sys_params['conf_scale'])
+            E_hat = position1.Ellipse(p_hat[k], angle, axes)
             dist.append(np.abs(p - p_hat[k]))
             area.append(E_hat.area()) 
      
@@ -210,7 +226,7 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
                  'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [1,10,100],
+                 'pulse_ct'  : [3,4,5,6,7,8,9,10],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
@@ -219,13 +235,11 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   sys_params = { 'method'         : 'bartlet', 
                  'include'        : [4,6,8],
                  'center'         : center,
-                 'sites'          : sites,
-                 'conf_half_span' : position1.HALF_SPAN*10, 
-                 'conf_scale'     : 1 }
+                 'sites'          : sites } 
 
-  (pos, conf) = montecarlo(exp_params, sys_params, sv, conf_level)
-  save(prefix, pos, conf, exp_params, sys_params, conf_level)
-  pretty_report(pos, conf, exp_params, sys_params, conf_level)
+  (pos, cov) = montecarlo(exp_params, sys_params, sv)
+  save(prefix, pos, cov, exp_params, sys_params)
+  pos, cov, exp_params, sys_params = load(prefix)
 
 
 if __name__ == '__main__':
@@ -236,7 +250,12 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  conf_test('exp/limit', center, sites, sv, 0.95, 'real')
-  #res = load('exp/test2', 0.95); pretty_report(*res, conf_level=0.95)
-  #res = load('exp/conf5', 0.68); pretty_report(*res, conf_level=0.68)
+  #conf_test('exp/test', center, sites, sv, 0.95, 'real')
+  conf_level=0.90
+  pos, cov, exp_params, sys_params = load('exp/test')
+  pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
+  pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
+  pretty_report(pos, cov[2], exp_params, sys_params, conf_level)
+  pretty_report(pos, cov[3], exp_params, sys_params, conf_level)
+  pretty_report(pos, cov[4], exp_params, sys_params, conf_level)
   

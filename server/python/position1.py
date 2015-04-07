@@ -263,7 +263,7 @@ class Position:
 
 
 
-### class ConfidenceRegion. ###################################################
+### class Ellipse. ###################################################
 
 class Ellipse:
 
@@ -280,7 +280,7 @@ class Ellipse:
     return np.pi * self.axes[0] * self.axes[1]
 
   def cartesian(self): 
-    theta = np.linspace(0,2*np.pi)
+    theta = np.linspace(0,2*np.pi, 360)
     X = self.x[0] + self.axes[0]*np.cos(theta)*np.cos(self.angle) - \
                     self.axes[1]*np.sin(theta)*np.sin(self.angle)
     Y = self.x[1] + self.axes[0]*np.cos(theta)*np.sin(self.angle) + \
@@ -316,35 +316,58 @@ class Ellipse:
 
   def plot(self, fn, p_known=None):
     ''' A pretty plot of confidence region. ''' 
+    
+    pp.rc('text', usetex=True)
+    pp.rc('font', family='serif')
+    
     fig = pp.gcf()
     x_hat = self.x
-  
-    #(x_fit, y_fit) = fit_contour(x, y, N=10000)
-    (x_fit, y_fit) = self.cartesian()  
-    pp.plot(x_fit, y_fit, color='k', alpha=0.5)
+ 
+    ax = fig.add_subplot(111)
+    ax.axis('equal')
 
-    # x_hat
+    #(x_fit, y_fit) = fit_contour(x, y, N=10000)
+    X = np.vstack(self.cartesian())
+    pp.plot(X[0,:], X[1,:], color='k')
+
+    # Major, minor axes
+    D = (lambda d: np.sqrt(
+          (d[0] - x_hat[0])**2 + (d[1] - x_hat[1])**2))(X)
+    x_major = X[:,np.argmax(D)]
+    x_minor = X[:,np.argmin(D)]
+    pp.plot([x_hat[0], x_major[0]], [x_hat[1], x_major[1]], '-', label='major $\sqrt{\lambda_1 Q_\gamma}$')
+    pp.plot([x_hat[0], x_minor[0]], [x_hat[1], x_minor[1]], '-', label='minor $\sqrt{\lambda_2 Q_\gamma}$')
+
+    #x_hat
     pp.plot(x_hat[0], x_hat[1], color='k', marker='o')
-    pp.text(x_hat[0]+0.25, x_hat[1]-0.25, '$\hat{\mathbf{x}}$', fontsize=24)
+    pp.text(x_hat[0]-1.25, x_hat[1]-0.5, '$\hat{\mathbf{x}}$', fontsize=18)
       
     # x_known
+    offset = 0.5
     if p_known:
       x_known = transform_coord(p_known, self.p_hat, self.half_span, self.scale)
       pp.plot([x_known[0]], [x_known[1]],  
               marker='o', color='k', fillstyle='none')
-      pp.text(x_known[0]+0.25, x_known[1]-0.25, '$\mathbf{x}^*$', fontsize=24)
+      pp.text(x_known[0]+offset, x_known[1]-offset, '$\mathbf{x}^*$', fontsize=18)
     
+    ax.set_xlabel('easting (m)')
+    ax.set_ylabel('northing (m)')
+    pp.title("95\%-confidence region")
+    pp.legend(title="Axis length")
     pp.savefig(fn)
     pp.clf()
 
 
-class ConfidenceRegion (Ellipse):
 
-  def __init__(self, pos, sites, conf_level, p_known=None, half_span=75, scale=0.5):
+### Covariance. ###############################################################
+
+class Covariance:
+
+  def __init__(self, pos, sites, p_known=None, half_span=75, scale=0.5):
     ''' Confidence region from asymptotic covariance. ''' 
-    self.level = conf_level
-    N = sum(map(lambda l : len(l), pos.sub_splines.values())) 
-    k = N / pos.num_sites
+    self.p_hat = pos.p
+    self.half_span = half_span
+    self.scale = scale
   
     if p_known:
       p = p_known
@@ -363,46 +386,51 @@ class ConfidenceRegion (Ellipse):
     # Covariance.  
     b = Del(x)  
     A = np.linalg.inv(H(x))
-    C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A)) 
+    self.C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A)) 
 
-    # Confidence interval. 
-    Qt = scipy.stats.chi2.ppf(conf_level, 2) * scale
-    (angle, axes) = compute_conf(C, Qt, 1) 
-    Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
+  def conf(self, level): 
+    ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
+    Qt = scipy.stats.chi2.ppf(level, 2) * self.scale
+    (angle, axes) = compute_conf(self.C, Qt, 1) 
+    return Ellipse(self.p_hat, angle, axes, 0, 1)
 
 
-class BootstrapConfidenceRegion (Ellipse): 
+class BootstrapCovariance:
 
-  def __init__(self, pos, sites, conf_level, max_resamples=200):
+  def __init__(self, pos, sites, max_resamples=200):
     ''' Bootstrap method for estimationg covariance of a position estimate. 
 
       Generate at most `max_resamples` position estimates by resampling the signals used
       in computing `pos`. 
     '''
-    self.level = conf_level
+    self.p_hat = pos.p
     n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
-    m = n / pos.num_sites
-    
-    # Estimate covariance. 
+    self.m = n / pos.num_sites
+
+    # Generate sub samples. 
     P = bootstrap_resample(pos, sites, max_resamples, pos.obj)
     A = np.array(P[len(P)/2:])
     B = np.array(P[:len(P)/2])
-    C = np.cov(A[:,0], A[:,1]) 
-    D = np.linalg.inv(C)
+    
+    # Estimate covariance. 
+    self.C = np.cov(A[:,0], A[:,1]) 
+    
+    # Mahalanobis distance of remaining estimates. 
+    W = []
+    D = np.linalg.inv(self.C)
     x_bar = np.array([np.mean(B[:,0]), np.mean(B[:,1])])
     x_hat = np.array([pos.p.imag, pos.p.real])
-    
-    # Estimate mean. 
-    W = []
     for x in iter(B): 
       y = x - x_bar
       w = np.dot(np.transpose(y), np.dot(D, y))
       W.append(w)
-    
-    # Confidence interval.
-    Qt = sorted(W)[int(len(W) * (conf_level))] * m
-    (angle, axes) = compute_conf(C, Qt, 1) 
-    Ellipse.__init__(self, pos.p, angle, axes, 0, 1)
+    self.W = np.array(sorted(W))
+
+  def conf(self, level): 
+    ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
+    Qt = self.W[int(len(self.W) * level)] * self.m
+    (angle, axes) = compute_conf(self.C, Qt, 1) 
+    return Ellipse(self.p_hat, angle, axes, 0, 1)
 
 
 
@@ -565,6 +593,9 @@ def bootstrap_resample(pos, sites, max_samples, obj):
 
 def bootstrap_resample_site(pos, sites, max_samples, obj):
   ''' Random subsamples of sites. '''
+  # TODO This method is probably more appropriate than bootstrap_resample()
+  # for really small samples (<2 per site)
+
   P = []
   for site_ids in itertools.combinations(pos.splines.keys(), 2):
     splines = { id : pos.splines[id] for id in site_ids }

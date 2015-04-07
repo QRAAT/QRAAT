@@ -53,29 +53,29 @@ def real_data():
 def sim_data():
 
   # Simpulate signal given known position p.  
-  p = center + complex(600,150)
+  p = center + complex(650,0)
   print p
 
   rho = 1   # signal
   sig_n = 0.002 # noise
-  sig = signal1.Simulator(p, sites, sv, rho, sig_n, 10, include=[2,3,6])
+  sig = signal1.Simulator(p, sites, sv, rho, sig_n, 10, include=[4,6,8])
   (sig_n, sig_t) = sig.estimate_var()
 
-  conf_level=0.90
   pos = position1.PositionEstimator(999, sites, center, 
                                sig, sv, method=signal1.Signal.Bartlet)
   pos.plot('fella.png', sites, center, p)
  
-  conf = position1.ConfidenceRegion(pos, sites, conf_level, p_known=p)
-  conf.display(p)
-
-  boot_conf = position1.BootstrapConfidenceRegion(pos, sites, conf_level)
-  boot_conf.display(p)
-  #if p in conf:
-  #  print 'yes!'
-  #else: print 'no.'
+  level=0.95
+  cov = position1.Covariance(pos, sites, p_known=p)
+  conf = cov.conf(level) 
+  conf.plot('cov.png', p)
 
 
+  #boot_cov = position1.BootstrapCovariance(pos, sites)
+  #boot_conf = boot_cov.conf(level)
+  #boot_conf.display(p)
+
+  
 '''
 
   Notes:
