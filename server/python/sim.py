@@ -24,9 +24,6 @@ def montecarlo(exp_params, sys_params, sv):
   pos = np.zeros(shape, dtype=np.complex)
   cov0 = create_array(exp_params, sys_params) # bootstrap
   cov1 = create_array(exp_params, sys_params) # true position
-  cov2 = create_array(exp_params, sys_params) # x_hat 
-  cov3 = create_array(exp_params, sys_params) # x_hat + [1,1] 
-  cov4 = create_array(exp_params, sys_params) # x_hat + [-1,0] 
 
   if sys_params['method'] == 'bartlet': 
     method = signal1.Signal.Bartlet
@@ -59,11 +56,8 @@ def montecarlo(exp_params, sys_params, sv):
 
             # Estimate confidence region. 
             try: 
-              cov0[i][j][e][n].append(position1.BootstrapCovariance(P_hat, sites))
-              cov1[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P))
-              cov2[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P_hat.p))
-              cov3[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P_hat.p+np.complex(1,1)))
-              cov4[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P_hat.p+np.complex(-1,0)))
+              cov0[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P))
+              cov1[i][j][e][n].append(position1.Covariance2(P_hat, sites, p_known=P))
             #except IndexError: # Hessian matrix computation
             #  print "Warning!"
             except np.linalg.linalg.LinAlgError:
@@ -73,27 +67,25 @@ def montecarlo(exp_params, sys_params, sv):
             except position1.PosDefError:
               print "Positive definite!"
 
-  return (pos, (cov0, cov1, cov2, cov3, cov4))
+  return (pos, (cov0, cov1))
 
 
 def save(prefix, pos, cov, exp_params, sys_params,):
   np.savez(prefix + '-pos', pos)
-  pickle.dump(cov[0], gzip.open(prefix + '-cov0' + '.gz', 'wb'))
-  pickle.dump(cov[1], gzip.open(prefix + '-cov1' + '.gz', 'wb'))
-  pickle.dump(cov[2], gzip.open(prefix + '-cov2' + '.gz', 'wb'))
-  pickle.dump(cov[3], gzip.open(prefix + '-cov3' + '.gz', 'wb'))
-  pickle.dump(cov[4], gzip.open(prefix + '-cov4' + '.gz', 'wb'))
+  pickle.dump(cov[0], open(prefix + '-cov0', 'w'))
+  pickle.dump(cov[1], open(prefix + '-cov1', 'w'))
+  #pickle.dump(cov[0], gzip.open(prefix + '-cov0' + '.gz', 'wb'))
+  #pickle.dump(cov[1], gzip.open(prefix + '-cov1' + '.gz', 'wb'))
   pickle.dump((exp_params, sys_params), open(prefix + '-params', 'w'))
 
 def load(prefix):
   pos = np.load(prefix + '-pos.npz')['arr_0']
-  cov0 = pickle.load(gzip.open(prefix + '-cov0' + '.gz', 'rb'))
-  cov1 = pickle.load(gzip.open(prefix + '-cov1' + '.gz', 'rb'))
-  cov2 = pickle.load(gzip.open(prefix + '-cov2' + '.gz', 'rb'))
-  cov3 = pickle.load(gzip.open(prefix + '-cov3' + '.gz', 'rb'))
-  cov4 = pickle.load(gzip.open(prefix + '-cov4' + '.gz', 'rb'))
+  cov0 = pickle.load(open(prefix + '-cov0', 'r'))
+  cov1 = pickle.load(open(prefix + '-cov1', 'r'))
+  #cov0 = pickle.load(gzip.open(prefix + '-cov0' + '.gz', 'rb'))
+  #cov1 = pickle.load(gzip.open(prefix + '-cov1' + '.gz', 'rb'))
   (exp_params, sys_params) = pickle.load(open(prefix + '-params'))
-  return (pos, (cov0, cov1, cov2, cov3, cov4), exp_params, sys_params)
+  return (pos, (cov0, cov1), exp_params, sys_params)
     
 def pretty_report(pos, cov, exp_params, sys_params, conf_level):
   Qt = scipy.stats.chi2.ppf(conf_level, 2)
@@ -185,7 +177,7 @@ def plot(pos, conf, exp_params, sys_params, conf_level): # TODO out-of-date
           pp.scatter(P[0], P[1], color='r', zorder=11)
           
           pp.title('$\sigma_n^2$=%0.4f, sample_ct=%d' % (sig_n, pulse_ct))
-          pp.show()
+          ppi.show()
           pp.clf()
 
 
@@ -240,6 +232,10 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   (pos, cov) = montecarlo(exp_params, sys_params, sv)
   save(prefix, pos, cov, exp_params, sys_params)
   pos, cov, exp_params, sys_params = load(prefix)
+  print "Covariance\n"
+  pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
+  print "Covariance2\n"
+  pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
 
 
 if __name__ == '__main__':
@@ -250,12 +246,4 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  #conf_test('exp/test', center, sites, sv, 0.95, 'real')
-  conf_level=0.90
-  pos, cov, exp_params, sys_params = load('exp/test')
-  pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
-  pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
-  pretty_report(pos, cov[2], exp_params, sys_params, conf_level)
-  pretty_report(pos, cov[3], exp_params, sys_params, conf_level)
-  pretty_report(pos, cov[4], exp_params, sys_params, conf_level)
-  
+  conf_test('exp/test', center, sites, sv, 0.95, 'real')

@@ -145,7 +145,7 @@ def InsertPositions(db_con, positions, zone):
 
 class Position:
   
-  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines, sub_splines, obj):
+  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines, sub_splines, all_splines, obj):
     
     assert len(bearing) == len(activity) and len(bearing) == len(splines)
     self.dep_id = dep_id
@@ -158,6 +158,7 @@ class Position:
     self.activity = activity
     self.splines = splines
     self.sub_splines = sub_splines
+    self.all_splines = all_splines
     self.obj = obj
 
   @classmethod
@@ -165,7 +166,7 @@ class Position:
     ''' Compute a position given bearing likelihood data. ''' 
     
     # Aggregate site data. 
-    (splines, sub_splines, bearing, activity, num_est) = aggregate_window(
+    (splines, sub_splines, all_splines, bearing, activity, num_est) = aggregate_window(
                                   P, signal, obj, t_start, t_end)
     
     if len(splines) > 1: # Need at least two site bearings. 
@@ -184,6 +185,7 @@ class Position:
                activity,    # siteID -> activity
                splines,     # siteID -> aggregated bearing likelihood spline
                sub_splines, # siteID -> spline of sub samples for bootstrapping
+               all_splines,  
                obj)         # Objective function
 
   def get_likelihood(self):
@@ -386,13 +388,49 @@ class Covariance:
     # Covariance.  
     b = Del(x)  
     A = np.linalg.inv(H(x))
-    self.C = np.dot(A, np.dot(np.dot(b, np.transpose(b)), A)) 
+    self.C = np.dot(A, np.dot(np.dot(b, b.T), A)) 
 
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
     Qt = scipy.stats.chi2.ppf(level, 2) * self.scale
     (angle, axes) = compute_conf(self.C, Qt, 1) 
     return Ellipse(self.p_hat, angle, axes, 0, 1)
+
+
+class Covariance2 (Covariance):
+  
+  def __init__(self, pos, sites, p_known=None, half_span=75, scale=0.5):
+    ''' Confidence region from asymptotic covariance. ''' 
+    self.p_hat = pos.p
+    self.half_span = half_span
+    self.scale = scale
+    n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
+    m = n / pos.num_sites
+  
+    if p_known:
+      p = p_known
+    else: 
+      p = pos.p
+    x = np.array([half_span, half_span])
+    
+    # Hessian
+    (positions, likelihoods) = compute_likelihood(
+                             sites, pos.splines, p, scale, half_span)
+    J = lambda (x) : likelihoods[x[0], x[1]]
+    H = nd.Hessian(J)(x) 
+
+    # Gradient
+    b = np.zeros((2,), dtype=np.float64)
+    for i in range(m):
+      splines = { id : p[i] for (id, p) in pos.all_splines.iteritems() }
+      (positions, likelihoods) = compute_likelihood(
+                               sites, splines, p, scale, half_span)
+      J = lambda (x) : likelihoods[x[0], x[1]]
+      b += nd.Gradient(J)(x)
+   
+    A = np.linalg.inv(H)
+    b = b / m
+    self.C = (b[0]**2 + b[1]**2) * np.dot(A, A)
 
 
 class BootstrapCovariance:
@@ -449,6 +487,7 @@ def aggregate_window(P, signal, obj, t_start, t_end):
   activity = {}
   bearing = {}
   sub_splines = {}
+  all_splines = {}
   for (id, L) in P.iteritems():
     mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
     edsp = signal[id].edsp[mask]
@@ -471,12 +510,17 @@ def aggregate_window(P, signal, obj, t_start, t_end):
           p = aggregate_spectrum(l[np.array(index)])
           sub_splines[id].append(compute_bearing_spline(p)) 
       
+      # All splines.
+      all_splines[id] = []
+      for i in range(len(l)):
+        all_splines[id].append(compute_bearing_spline(l[i]))
+
       # Aggregated activity measurement per site. 
       activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
       theta = obj(p); bearing[id] = (theta, p[theta])
       num_est += edsp.shape[0]
   
-  return (splines, sub_splines, bearing, activity, num_est)
+  return (splines, sub_splines, all_splines, bearing, activity, num_est)
 
 
 def aggregate_spectrum(p):

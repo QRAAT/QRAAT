@@ -4,6 +4,7 @@
 #  numpy, scipy, matplotlib 
 
 import signal1, position1
+import util
 
 cal_id = 3   # Calibration ID, specifies steering vectors to use. 
 dep_id = 105 # Deployment ID, specifies a transmitter. 
@@ -25,7 +26,8 @@ center = (4260500+574500j)
 zone = (10, 'S') # UTM zone.
 
 # Read steering vectors from file.
-sv = signal1.SteeringVectors.read(cal_id, 'sample/sv')
+db_con = util.get_db('reader')
+sv = signal1.SteeringVectors(db_con, cal_id)
 
 
 def real_data():
@@ -66,9 +68,10 @@ def sim_data():
   pos.plot('fella.png', sites, center, p)
  
   level=0.95
-  cov = position1.Covariance(pos, sites, p_known=p)
-  conf = cov.conf(level) 
-  conf.plot('cov.png', p)
+  conf = position1.Covariance(pos, sites, p_known=p).conf(level)
+  conf2 = position1.Covariance2(pos, sites, p_known=p).conf(level)
+  conf.display(p)
+  conf2.display(p)
 
 
   #boot_cov = position1.BootstrapCovariance(pos, sites)
