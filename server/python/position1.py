@@ -435,7 +435,7 @@ class Covariance2 (Covariance):
 
 class BootstrapCovariance:
 
-  def __init__(self, pos, sites, max_resamples=200):
+  def __init__(self, pos, sites, max_resamples=100):
     ''' Bootstrap method for estimationg covariance of a position estimate. 
 
       Generate at most `max_resamples` position estimates by resampling the signals used
@@ -460,13 +460,13 @@ class BootstrapCovariance:
     x_hat = np.array([pos.p.imag, pos.p.real])
     for x in iter(B): 
       y = x - x_bar
-      w = np.dot(np.transpose(y), np.dot(D, y))
+      w = np.dot(np.transpose(y), np.dot(self.m * D, y))
       W.append(w)
     self.W = np.array(sorted(W))
 
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
-    Qt = self.W[int(len(self.W) * level)] * self.m
+    Qt = self.W[int(len(self.W) * level)] 
     (angle, axes) = compute_conf(self.C, Qt, 1) 
     return Ellipse(self.p_hat, angle, axes, 0, 1)
 
@@ -612,27 +612,19 @@ def bootstrap_resample(pos, sites, max_samples, obj):
     Construct an objective function from a subset of the pulses (one pulse per site)
     and optimize over the search space. Repeat this at most `max_samples` times.
   '''
-  # TODO For large sample sizes, the call to itertools.product() is a combinatorial
-  # explosion. Think of a better way to draw random subsamples.  
-  
   N = reduce(int.__mul__, map(lambda S : len(S), pos.sub_splines.values()))
   if N < 2: # Number of pulse combinations
     raise BootstrapError  
-
-  P = []
   
-  X = zip(*pos.sub_splines.iteritems())
-  site_id = list(X[0])
-  site_splines = list(X[1])
-
   P = []
-  samples = list(itertools.product(*site_splines))
-  random.shuffle(samples)
-  for S in samples[:max_samples]:  # Combinations of pulses
-    splines = { id : s for (id, s) in zip(site_id, S) }
+  for i in range(max_samples):
+    splines = {}
+    for id in pos.sub_splines.keys():
+      j = random.randint(0, len(pos.sub_splines[id])-1)
+      splines[id] = pos.sub_splines[id][j]
     (p, _) = compute_position(sites, splines, pos.p, obj) 
     P.append(transform_coord(p, pos.p, 0, 1))
-  
+    
   return P
 
 def bootstrap_resample_site(pos, sites, max_samples, obj):

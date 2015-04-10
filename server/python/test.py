@@ -56,11 +56,13 @@ def sim_data():
 
   # Simpulate signal given known position p.  
   p = center + complex(650,0)
-  print p
+  include = [4,6,8]
 
-  rho = 1   # signal
   sig_n = 0.002 # noise
-  sig = signal1.Simulator(p, sites, sv, rho, sig_n, 10, include=[4,6,8])
+  rho = signal1.scale_tx_coeff(p, 1, sites, include)
+  sv_splines = signal1.compute_bearing_splines(sv)
+  sig = signal1.Simulator(p, sites, sv_splines, rho, sig_n, 20, include)
+    
   (sig_n, sig_t) = sig.estimate_var()
 
   pos = position1.PositionEstimator(999, sites, center, 
@@ -69,7 +71,7 @@ def sim_data():
  
   level=0.95
   conf = position1.Covariance(pos, sites, p_known=p).conf(level)
-  conf2 = position1.Covariance2(pos, sites, p_known=p).conf(level)
+  conf2 = position1.BootstrapCovariance(pos, sites).conf(level)
   conf.display(p)
   conf2.display(p)
 

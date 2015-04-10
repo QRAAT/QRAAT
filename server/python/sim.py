@@ -9,6 +9,11 @@ import numpy as np
 import matplotlib.pyplot as pp
 import scipy
 
+def nearest_sites(p, sites, k):
+  # k nearest sites to p 
+  (site_ids, _) = zip(*sorted(list(sites.iteritems()), 
+                          key=lambda(item) : np.abs(p - item[1])))
+  return list(site_ids[:k])
 
 def create_array(exp_params, sys_params):
   s = 2 * exp_params['half_span'] + 1
@@ -18,12 +23,15 @@ def create_array(exp_params, sys_params):
                       for i in range(len(exp_params['pulse_ct'])) ]
   
 
-def montecarlo(exp_params, sys_params, sv):
+def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
   s = 2 * exp_params['half_span'] + 1
   shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s, exp_params['trials'])
   pos = np.zeros(shape, dtype=np.complex)
-  cov0 = create_array(exp_params, sys_params) # bootstrap
-  cov1 = create_array(exp_params, sys_params) # true position
+  if compute_cov:
+    cov0 = create_array(exp_params, sys_params) # bootstrap
+    cov1 = create_array(exp_params, sys_params) # true position
+  else: 
+    cov0 = cov1 = None
 
   if sys_params['method'] == 'bartlet': 
     method = signal1.Signal.Bartlet
@@ -36,8 +44,18 @@ def montecarlo(exp_params, sys_params, sv):
   elif exp_params['simulator'] == 'real':
     simulator = signal1.Simulator
   else: raise Exception('Unknown simulator')
-
+  
   sites = sys_params['sites']
+  
+  # Fix transmission power. 
+  scaled_rho = signal1.scale_tx_coeff(exp_params['center'], 
+                                      exp_params['rho'],
+                                      sites,
+                                      sys_params['include'])
+
+  # Interpolate steering vector splines.
+  sv_splines = signal1.compute_bearing_splines(sv)
+
   for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
     print 'pulse_ct=%d' % pulse_ct
     for j, sig_n in enumerate(exp_params['sig_n']): 
@@ -47,25 +65,30 @@ def montecarlo(exp_params, sys_params, sv):
           P = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
                                                  (e - exp_params['half_span']) * exp_params['scale'])
           for k in range(exp_params['trials']): 
-            # Run simulation. 
-            sig = simulator(P, sites, sv, exp_params['rho'], sig_n, pulse_ct, sys_params['include'])
+            # Run simulation.
+            if nearest is None:
+              include = sys_params['include']
+            else: 
+              include = nearest_sites(P, sites, nearest)
+            sig = simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
           
             # Estimate position.
             P_hat = position1.PositionEstimator(999, sites, sys_params['center'], sig, sv, method)
             pos[i,j,e,n,k] = P_hat.p
 
             # Estimate confidence region. 
-            try: 
-              cov0[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P))
-              cov1[i][j][e][n].append(position1.Covariance2(P_hat, sites, p_known=P))
-            #except IndexError: # Hessian matrix computation
-            #  print "Warning!"
-            except np.linalg.linalg.LinAlgError:
-              print "Singular matrix!"
-            except position1.UnboundedContourError:
-              print "Unbounded!"
-            except position1.PosDefError:
-              print "Positive definite!"
+            if compute_cov:
+              try: 
+                cov0[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P))
+                cov1[i][j][e][n].append(position1.BootstrapCovariance(P_hat, sites))
+              #except IndexError: # Hessian matrix computation
+              #  print "Warning!"
+              except np.linalg.linalg.LinAlgError:
+                print "Singular matrix!"
+              except position1.UnboundedContourError:
+                print "Unbounded!"
+              except position1.PosDefError:
+                print "Positive definite!"
 
   return (pos, (cov0, cov1))
 
@@ -119,67 +142,34 @@ def pretty_report(pos, cov, exp_params, sys_params, conf_level):
             print "skippiong positive definite"
   
           print '  (%s, %s)' % (fmt(mean[0]), fmt(mean[1])), fmt(rmse), 
-          a = b = ct = 0
-          area = 0
-          for k in range(len(cov[i][j][e][n])):
-            try:
-              E_hat = cov[i][j][e][n][k].conf(conf_level)
-              if E_hat.axes[0] > 0:
-                area += E_hat.area()
-                ct += 1
-                if p in E_hat: a += 1
+
+          if cov is not None:
+            a = b = ct = 0
+            area = 0
+            for k in range(len(cov[i][j][e][n])):
+              try:
+                E_hat = cov[i][j][e][n][k].conf(conf_level)
+                if E_hat.axes[0] > 0:
+                  area += E_hat.area()
+                  ct += 1
+                  if p in E_hat: a += 1
+                if not E or p_hat[k] in E: b += 1
+              except position1.PosDefError:
+                print "Positive definite!"
+            
+            print fmt(float(a) / ct), \
+                  fmt(float(b) / exp_params['trials']), \
+                  fmt(area / ct), fmt((E.area() if E else 1)), \
+                  fmt((area / exp_params['trials']) / (E.area() if E else 1))
+
+          else: 
+            b = 0
+            for k in range(exp_params['trials']):
               if not E or p_hat[k] in E: b += 1
-            except position1.PosDefError:
-              print "Positive definite!"
-          
-          print fmt(float(a) / ct), \
-                fmt(float(b) / exp_params['trials']), \
-                fmt(area / ct), fmt((E.area() if E else 1)), \
-                fmt((area / exp_params['trials']) / (E.area() if E else 1))
-        else: print 
+            print fmt(float(b) / exp_params['trials']), \
+                  fmt((E.area() if E else 1))
 
-
-def plot(pos, conf, exp_params, sys_params, conf_level): # TODO out-of-date
-  num_sites = len(sys_params['include'])
-  s = 2 * exp_params['half_span'] + 1
-  for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
-    print 'pulse_ct=%d' % pulse_ct
-    for j, sig_n in enumerate(exp_params['sig_n']): 
-      print '  sig_n=%f' % sig_n
-      for e in range(s): #easting 
-        for n in range(s): #northing
-          p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
-                                                 (e - exp_params['half_span']) * exp_params['scale'])
-          p_hat = pos[i,j,e,n,:]
-          f = lambda p : [p.imag, p.real]
-          P = f(exp_params['center'])
-          X = np.array(map(f, p_hat)) 
-          
-          fig = pp.gcf()
-      
-          extent = 50
-          pp.xlim([P[0]-extent, P[0]+extent])
-          pp.ylim([P[1]-extent, P[1]+extent])
-          
-          # x_hat's 
-          pp.scatter(X[:,0], X[:,1], alpha=0.1, edgecolor='none')
-          
-          # Confidence interval
-          try:
-            C = np.cov(np.imag(p_hat), np.real(p_hat))
-            E = position1.compute_conf(p, C, conf_level, k=num_sites)
-            (E_x, E_y) = E.cartesian()
-            pp.plot(E_x + p.imag, E_y + p.real, color='k', zorder=11)
-          except position1.PosDefError: 
-            print '    skipping pos. def. covariance'
-
-          # x
-          pp.scatter(P[0], P[1], color='r', zorder=11)
-          
-          pp.title('$\sigma_n^2$=%0.4f, sample_ct=%d' % (sig_n, pulse_ct))
-          ppi.show()
-          pp.clf()
-
+            
 
 def plot_hist(pos, conf, exp_params, sys_params, conf_level): # TODO out-of-date
   num_sites = len(sys_params['include'])
@@ -212,6 +202,52 @@ def plot_hist(pos, conf, exp_params, sys_params, conf_level): # TODO out-of-date
           pp.clf()
 
 
+def plot_grid(fn, exp_params, sys_params, pos=None):
+  
+  fig = pp.gcf()
+  fig.set_size_inches(12,10)
+  ax = fig.add_subplot(111)
+  ax.axis('equal')
+  ax.set_xlabel('easting (m)')
+  ax.set_ylabel('northing (m)')
+
+  # Plot sites
+  (site_ids, P) = zip(*sys_params['sites'].iteritems())
+  X = np.imag(P)
+  Y = np.real(P)
+  pp.xlim([np.min(X) - 100, np.max(X) + 100])
+  pp.ylim([np.min(Y) - 100, np.max(Y) + 100])
+  
+  offset = 20
+  for (id, (x,y)) in zip(site_ids, zip(X,Y)): 
+    pp.text(x+offset, y+offset, id)
+  pp.scatter(X, Y, label='sites', facecolors='r')
+
+  # Plot positions.
+  if pos is not None: 
+    X = np.imag(pos.flat)
+    Y = np.real(pos.flat)
+  pp.scatter(X, Y, label='estimates', alpha=0.1, facecolors='b', edgecolors='none', s=5)
+
+  # Plot grid
+  P = []
+  s = 2*exp_params['half_span'] + 1
+  for e in range(s): #easting 
+    for n in range(s): #northing
+      p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                             (e - exp_params['half_span']) * exp_params['scale'])
+      P.append(p)
+  X = np.imag(P)
+  Y = np.real(P)
+  pp.scatter(X, Y, label='grid', facecolors='g', edgecolors='k')
+
+
+  pp.savefig(fn)
+  pp.clf()
+
+
+
+# Testing, testing ... 
 
 def conf_test(prefix, center, sites, sv, conf_level, sim): 
   
@@ -234,9 +270,30 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   pos, cov, exp_params, sys_params = load(prefix)
   print "Covariance\n"
   pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
-  print "Covariance2\n"
+  print "BootstrapCovariance\n"
   pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
 
+
+def grid_test(prefix, center, sites, sv, conf_level, sim): 
+  
+  exp_params = { 'simulator' : sim,
+                 'rho'       : 1,
+                 'sig_n'     : [0.005],
+                 'pulse_ct'  : [5],
+                 'center'    : (4260738.3+574549j), 
+                 'half_span' : 3,
+                 'scale'     : 300,
+                 'trials'    : 1000 }
+
+  sys_params = { 'method'         : 'bartlet', 
+                 'include'        : [],
+                 'center'         : center,
+                 'sites'          : sites } 
+
+  (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=True)
+  save(prefix, pos, cov, exp_params, sys_params)
+  pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
+  plot_grid('fella.png', exp_params, sys_params, pos)
 
 if __name__ == '__main__':
 
@@ -246,4 +303,10 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  conf_test('exp/test', center, sites, sv, 0.95, 'real')
+  #grid_test('exp/grid', center, sites, sv, 0.95, 'real')
+  pos, cov, exp_params, sys_params = load('exp/grid')
+  plot_grid('grid.png', exp_params, sys_params, pos)
+  #print "Covariance\n"
+  #pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
+  #print "BootstrapCovariance\n"
+  #pretty_report(pos, cov[1], exp_params, sys_params, conf_level)

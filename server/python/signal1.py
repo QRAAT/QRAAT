@@ -112,7 +112,7 @@ def IdealSimulator(p, sites, sv, rho, sig_n, trials, include=[]):
 
 
 
-def Simulator(p, sites, sv, rho, sig_n, trials, include=[]): 
+def Simulator(p, sites, sv_splines, rho, sig_n, trials, include=[]): 
   ''' Constant SNR for all sites. ''' 
  
   # Elements of noise vector are modelled as independent, identically
@@ -130,8 +130,6 @@ def Simulator(p, sites, sv, rho, sig_n, trials, include=[]):
   edsp = rho**2 
   tnp = np.trace(Sigma)
 
-  # Interpolate splines to steering vectors. 
-  splines = compute_bearing_splines(sv)
   sig = Signal()
     
   sig.t_start = 0
@@ -140,16 +138,10 @@ def Simulator(p, sites, sv, rho, sig_n, trials, include=[]):
   if include == []: 
     include = sites.keys()
  
-  # Fix the closest point's transmission coefficient = rho. 
-  # Scale the others relative to this value. 
+  # Scale transmission coefficients to rho. 
   T = {}
-  nearest_id = include[0]
-  for id in include: 
-    if np.abs(p - sites[id]) < np.abs(p - sites[nearest_id]): 
-      nearest_id = id
-  scaled_rho = (rho * np.abs(p - sites[nearest_id]))**2
   for id in include:
-    T[id] = np.sqrt(scaled_rho / (np.abs(p - sites[id]) ** 2))
+    T[id] = np.sqrt(rho / (np.abs(p - sites[id]) ** 2))
 
   # Generate a (V, \rho, \Sigma) triple for each site. 
   for id in include:
@@ -158,7 +150,7 @@ def Simulator(p, sites, sv, rho, sig_n, trials, include=[]):
     # Compute modelled steering vector for DOA. 
     G = np.zeros(num_ch, dtype=np.complex)
     for i in range(num_ch):
-      (I, Q) = splines[id][i]
+      (I, Q) = sv_splines[id][i]
       G[i] = np.complex(I(bearing), Q(bearing))
     
     sig.table[id] = _per_site_data(id)
@@ -198,6 +190,16 @@ def compute_bearing_splines(sv):
       splines[id].append((I, Q)) 
   return splines
       
+
+def scale_tx_coeff(p, rho, sites, include=[]):
+  if include == []: 
+    include = sites.keys()
+  nearest_id = include[0]
+  for id in include: 
+    if np.abs(p - sites[id]) < np.abs(p - sites[nearest_id]): 
+      nearest_id = id
+  scaled_rho = (rho * np.abs(p - sites[nearest_id]))**2
+  return scaled_rho  
 
 
 ### class SteeringVectors. ####################################################
