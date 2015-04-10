@@ -202,7 +202,7 @@ def plot_hist(pos, conf, exp_params, sys_params, conf_level): # TODO out-of-date
           pp.clf()
 
 
-def plot_grid(fn, exp_params, sys_params, pos=None):
+def plot_grid(fn, exp_params, sys_params, pos=None, nearest=None):
   
   fig = pp.gcf()
   fig.set_size_inches(12,10)
@@ -230,17 +230,17 @@ def plot_grid(fn, exp_params, sys_params, pos=None):
   pp.scatter(X, Y, label='estimates', alpha=0.1, facecolors='b', edgecolors='none', s=5)
 
   # Plot grid
-  P = []
+  offset = 10
   s = 2*exp_params['half_span'] + 1
   for e in range(s): #easting 
     for n in range(s): #northing
       p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
                                              (e - exp_params['half_span']) * exp_params['scale'])
-      P.append(p)
-  X = np.imag(P)
-  Y = np.real(P)
-  pp.scatter(X, Y, label='grid', facecolors='g', edgecolors='k')
-
+      pp.plot(p.imag, p.real, label='grid', color='w', marker='o', ms=5)
+      if nearest:
+        include = nearest_sites(p, sys_params['sites'], nearest)
+        a = ', '.join(map(lambda(id) : str(id), sorted(include)))
+        pp.text(p.imag+offset, p.real+offset, a, fontsize=8)
 
   pp.savefig(fn)
   pp.clf()
@@ -290,10 +290,10 @@ def grid_test(prefix, center, sites, sv, conf_level, sim):
                  'center'         : center,
                  'sites'          : sites } 
 
-  (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=True)
+  (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=True, nearest=3)
   save(prefix, pos, cov, exp_params, sys_params)
   pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
-  plot_grid('fella.png', exp_params, sys_params, pos)
+  plot_grid('fella.png', exp_params, sys_params, pos, nearest=3)
 
 if __name__ == '__main__':
 
@@ -303,9 +303,9 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  #grid_test('exp/grid', center, sites, sv, 0.95, 'real')
-  pos, cov, exp_params, sys_params = load('exp/grid')
-  plot_grid('grid.png', exp_params, sys_params, pos)
+  grid_test('exp/grid', center, sites, sv, 0.95, 'real')
+  #pos, cov, exp_params, sys_params = load('exp/grid')
+  #plot_grid('grid.png', exp_params, sys_params, pos, 3)
   #print "Covariance\n"
   #pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
   #print "BootstrapCovariance\n"

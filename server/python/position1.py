@@ -631,7 +631,6 @@ def bootstrap_resample_site(pos, sites, max_samples, obj):
   ''' Random subsamples of sites. '''
   # TODO This method is probably more appropriate than bootstrap_resample()
   # for really small samples (<2 per site)
-
   P = []
   for site_ids in itertools.combinations(pos.splines.keys(), 2):
     splines = { id : pos.splines[id] for id in site_ids }
