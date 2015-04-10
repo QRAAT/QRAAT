@@ -80,7 +80,7 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
             if compute_cov:
               try: 
                 cov0[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P))
-                cov1[i][j][e][n].append(position1.BootstrapCovariance(P_hat, sites))
+                cov1[i][j][e][n].append(position1.Covariance2(P_hat, sites, p_known=P))
               #except IndexError: # Hessian matrix computation
               #  print "Warning!"
               except np.linalg.linalg.LinAlgError:
@@ -254,7 +254,7 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
                  'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [3,4,5,6,7,8,9,10],
+                 'pulse_ct'  : [5,6,7],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
@@ -290,7 +290,7 @@ def grid_test(prefix, center, sites, sv, conf_level, sim):
                  'center'         : center,
                  'sites'          : sites } 
 
-  (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=True, nearest=3)
+  (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False, nearest=3)
   save(prefix, pos, cov, exp_params, sys_params)
   pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
   plot_grid('fella.png', exp_params, sys_params, pos, nearest=3)
@@ -303,7 +303,8 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  grid_test('exp/grid', center, sites, sv, 0.95, 'real')
+  conf_test('exp/test', center, sites, sv, 0.95, 'real')
+  #grid_test('exp/grid', center, sites, sv, 0.95, 'real')
   #pos, cov, exp_params, sys_params = load('exp/grid')
   #plot_grid('grid.png', exp_params, sys_params, pos, 3)
   #print "Covariance\n"

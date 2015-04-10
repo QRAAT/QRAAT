@@ -61,7 +61,7 @@ def sim_data():
   sig_n = 0.002 # noise
   rho = signal1.scale_tx_coeff(p, 1, sites, include)
   sv_splines = signal1.compute_bearing_splines(sv)
-  sig = signal1.Simulator(p, sites, sv_splines, rho, sig_n, 20, include)
+  sig = signal1.Simulator(p, sites, sv_splines, rho, sig_n, 3, include)
     
   (sig_n, sig_t) = sig.estimate_var()
 

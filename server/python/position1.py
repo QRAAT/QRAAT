@@ -413,24 +413,18 @@ class Covariance2 (Covariance):
       p = pos.p
     x = np.array([half_span, half_span])
     
-    # Hessian
-    (positions, likelihoods) = compute_likelihood(
-                             sites, pos.splines, p, scale, half_span)
-    J = lambda (x) : likelihoods[x[0], x[1]]
-    H = nd.Hessian(J)(x) 
-
-    # Gradient
-    b = np.zeros((2,), dtype=np.float64)
+    C = np.zeros((2,2), dtype=np.float64)
     for i in range(m):
       splines = { id : p[i] for (id, p) in pos.all_splines.iteritems() }
       (positions, likelihoods) = compute_likelihood(
                                sites, splines, p, scale, half_span)
       J = lambda (x) : likelihoods[x[0], x[1]]
-      b += nd.Gradient(J)(x)
-   
-    A = np.linalg.inv(H)
-    b = b / m
-    self.C = (b[0]**2 + b[1]**2) * np.dot(A, A)
+      b = np.array([nd.Gradient(J)(x)]).T
+      A = np.linalg.inv(nd.Hessian(J)(x))
+      D = np.dot(A, b)
+      C += np.dot(D, D.T)
+      
+    self.C = C / n 
 
 
 class BootstrapCovariance:
