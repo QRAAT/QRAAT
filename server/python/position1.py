@@ -419,17 +419,49 @@ class Covariance2 (Covariance):
       (positions, likelihoods) = compute_likelihood(
                                sites, splines, p, scale, half_span)
       J = lambda (x) : likelihoods[x[0], x[1]]
-      b = np.array([nd.Gradient(J)(x)]).T
+      b = np.array([nd.Gradient(J)(x)])
+
       A = np.linalg.inv(nd.Hessian(J)(x))
-      D = np.dot(A, b)
-      C += np.dot(D, D.T)
+      d = np.dot(b, A)
+      C += np.dot(d.T, d)
       
-    self.C = C / n 
+    self.C = C / n
+
+
+class Covariance3 (Covariance):
+  
+  def __init__(self, pos, sites, p_known=None, half_span=75, scale=0.5):
+    ''' Confidence region from asymptotic covariance. ''' 
+    self.p_hat = pos.p
+    self.half_span = half_span
+    self.scale = scale
+    n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
+    m = n / pos.num_sites
+  
+    if p_known:
+      p = p_known
+    else: 
+      p = pos.p
+    x = np.array([half_span, half_span])
+    
+    A = np.zeros((2,2), dtype=np.float64)
+    b = np.zeros((2,), dtype=np.float64)
+    for i in range(m):
+      splines = { id : p[i] for (id, p) in pos.all_splines.iteritems() }
+      (positions, likelihoods) = compute_likelihood(
+                               sites, splines, p, scale, half_span)
+      J = lambda (x) : likelihoods[x[0], x[1]]
+      b += nd.Gradient(J)(x)
+      A += nd.Hessian(J)(x)
+      
+    Ainv = np.linalg.inv(A / n)
+    b = np.array([b / n]).T
+    self.C = np.dot(Ainv, np.dot(b, b.T), Ainv)
 
 
 class BootstrapCovariance:
 
-  def __init__(self, pos, sites, max_resamples=100):
+  def __init__(self, pos, sites, max_resamples=500):
     ''' Bootstrap method for estimationg covariance of a position estimate. 
 
       Generate at most `max_resamples` position estimates by resampling the signals used

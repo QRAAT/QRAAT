@@ -79,8 +79,8 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
             # Estimate confidence region. 
             if compute_cov:
               try: 
-                cov0[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P))
-                cov1[i][j][e][n].append(position1.Covariance2(P_hat, sites, p_known=P))
+                cov0[i][j][e][n].append(position1.Covariance2(P_hat, sites, p_known=P))
+                cov1[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P))
               #except IndexError: # Hessian matrix computation
               #  print "Warning!"
               except np.linalg.linalg.LinAlgError:
@@ -246,6 +246,78 @@ def plot_grid(fn, exp_params, sys_params, pos=None, nearest=None):
   pp.clf()
 
 
+def orientation(pos, cov, exp_parms, sys_params, conf_level, sig_n, pulse_ct):
+  i = exp_params['pulse_ct'].index(pulse_ct)
+  j = exp_params['sig_n'].index(sig_n)
+  e = n = 0
+
+  for (k, C) in enumerate(cov[i][j][e][n]):
+    fig = pp.gcf()
+    fig.set_size_inches(12,10)
+    ax = fig.add_subplot(111)
+    ax.axis('equal')
+    ax.set_xlabel('easting (m)')
+    ax.set_ylabel('northing (m)')
+    
+    X = np.imag(pos[i,j,e,n,:])
+    Y = np.real(pos[i,j,e,n,:])
+    pp.scatter(X, Y, label='estimates', alpha=0.5, facecolors='b', edgecolors='none', s=10)
+
+    conf = C.conf(conf_level)
+    X = np.vstack(conf.cartesian())
+    pp.plot(pos[i,j,e,n,k].imag + X[0,:], pos[i,j,e,n,k].real + X[1,:], color='k')
+
+    pp.show()
+    pp.clf()
+    
+  
+  
+
+def plot_grid2(exp_params, sys_params, pos, nearest=None):
+  
+  s = 2*exp_params['half_span'] + 1
+  for i in range(s):
+    for j in range(s): 
+      fig = pp.gcf()
+      fig.set_size_inches(12,10)
+      ax = fig.add_subplot(111)
+      ax.axis('equal')
+      ax.set_xlabel('easting (m)')
+      ax.set_ylabel('northing (m)')
+
+      # Plot sites
+      (site_ids, P) = zip(*sys_params['sites'].iteritems())
+      X = np.imag(P)
+      Y = np.real(P)
+      pp.xlim([np.min(X) - 100, np.max(X) + 100])
+      pp.ylim([np.min(Y) - 100, np.max(Y) + 100])
+      
+      offset = 20
+      for (id, (x,y)) in zip(site_ids, zip(X,Y)): 
+        pp.text(x+offset, y+offset, id)
+      pp.scatter(X, Y, label='sites', facecolors='r')
+
+      # Plot positions
+      P = pos[:,:,i,j,:].flat
+      X = np.imag(P)
+      Y = np.real(P)
+      pp.scatter(X, Y, label='estimates', alpha=0.1, facecolors='b', edgecolors='none', s=5)
+
+      # Plot grid
+      offset = 10
+      for e in range(s): #easting 
+        for n in range(s): #northing
+          p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                                 (e - exp_params['half_span']) * exp_params['scale'])
+          pp.plot(p.imag, p.real, label='grid', color='w', marker='o', ms=5)
+          if nearest:
+            include = nearest_sites(p, sys_params['sites'], nearest)
+            a = ', '.join(map(lambda(id) : str(id), sorted(include)))
+            pp.text(p.imag+offset, p.real+offset, a, fontsize=8)
+
+      pp.show()
+      pp.clf()
+
 
 # Testing, testing ... 
 
@@ -254,7 +326,7 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
                  'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [5,6,7],
+                 'pulse_ct'  : [8,9,10],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
@@ -270,7 +342,7 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   pos, cov, exp_params, sys_params = load(prefix)
   print "Covariance\n"
   pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
-  print "BootstrapCovariance\n"
+  print "Covariance2\n"
   pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
 
 
@@ -293,7 +365,7 @@ def grid_test(prefix, center, sites, sv, conf_level, sim):
   (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False, nearest=3)
   save(prefix, pos, cov, exp_params, sys_params)
   pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
-  plot_grid('fella.png', exp_params, sys_params, pos, nearest=3)
+  plot_grid('grid.png', exp_params, sys_params, pos, nearest=3)
 
 if __name__ == '__main__':
 
@@ -305,7 +377,13 @@ if __name__ == '__main__':
   
   conf_test('exp/test', center, sites, sv, 0.95, 'real')
   #grid_test('exp/grid', center, sites, sv, 0.95, 'real')
-  #pos, cov, exp_params, sys_params = load('exp/grid')
+  
+  #conf_level = 0.95
+  #pos, cov, exp_params, sys_params = load('exp/fella')
+  #pretty_report(pos, cov[0], exp_params, sys_params, conf_level) # cov2
+  #pretty_report(pos, cov[1], exp_params, sys_params, conf_level) # cov
+  #orientation(pos, cov[1], exp_params, sys_params, conf_level, 0.001, 8)
+
   #plot_grid('grid.png', exp_params, sys_params, pos, 3)
   #print "Covariance\n"
   #pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
