@@ -209,7 +209,7 @@ class SteeringVectors:
   suffix = 'csv'
   delim = ','
 
-  def __init__(self, db_con=None, cal_id=None):
+  def __init__(self, db_con=None, cal_id=None, site_ids=[]):
 
     ''' Represent steering vectors ($G_i(\theta)$).
       
@@ -237,7 +237,9 @@ class SteeringVectors:
       to_be_removed = []
       self.cal_id = cal_id
       cur = db_con.cursor()
-      for site_id in util.get_sites(db_con).keys():
+      if site_ids == []: 
+        site_ids = util.get_sites(db_con).keys()
+      for site_id in site_ids:
         cur.execute('''SELECT ID, Bearing,
                               sv1r, sv1i, sv2r, sv2i,
                               sv3r, sv3i, sv4r, sv4i

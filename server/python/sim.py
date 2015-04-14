@@ -246,6 +246,51 @@ def plot_grid(fn, exp_params, sys_params, pos=None, nearest=None):
   pp.clf()
 
 
+def plot_distance(fn, pos, exp_params, sys_params, conf_level):
+  
+  Qt = scipy.stats.chi2.ppf(conf_level, 2)
+  
+  pp.rc('text', usetex=True)
+  pp.rc('font', family='serif')
+  fig = pp.gcf()
+  #fig.set_size_inches(8,6)
+  ax = fig.add_subplot(111)
+  ax.axis('equal')
+  ax.set_xlabel('easting (m)')
+  ax.set_ylabel('northing (m)')
+
+  # Plot position
+  p  = exp_params['center']; offset = 15
+  pp.xlim([p.imag - offset, p.imag + offset])
+  pp.ylim([p.real - offset, p.real + offset])
+  pp.plot(p.imag, p.real, color='w', marker='o', ms=5)
+  
+  # Confidence intervals
+  for (i, P) in enumerate(pos): # Plot positions.
+    C = np.cov(np.imag(P.flat), np.real(P.flat))
+    (angle, axes) = position1.compute_conf(C, Qt)
+    E = position1.Ellipse(p, angle, axes)
+    x, y = E.cartesian()
+    pp.plot(x + p.imag, y + p.real, label='%d' % (100 + (10 * i)))
+  
+  # Sites
+  ax.arrow(p.imag-offset+3, p.real, -2, 0, fc="k", ec="k",
+                  head_width=0.5, head_length=0.75)
+  pp.text(p.imag-offset+1, p.real+0.75, 'Site 1 (100m)')
+  ax.arrow(p.imag, p.real+offset-6.45, 0, 2, fc="k", ec="k",
+                  head_width=0.5, head_length=0.75)
+  pp.text(p.imag-3, p.real+offset-4.5, 'Site 2')
+
+  # Exp params
+  pp.text(p.imag-offset+1, p.real-offset+4, 
+    '$\sigma_n^2$ = %0.3f, %d samples per site.' % (exp_params['sig_n'][0], exp_params['pulse_ct'][0]))
+
+  pp.legend(title='Distance to site 2 (m)', ncol=2)
+  pp.title('Varying distance, {0}\%-confidence'.format(int(100 * conf_level)))
+  pp.savefig(fn)
+  pp.clf()
+
+
 def orientation(pos, cov, exp_parms, sys_params, conf_level, sig_n, pulse_ct):
   i = exp_params['pulse_ct'].index(pulse_ct)
   j = exp_params['sig_n'].index(sig_n)
@@ -273,50 +318,6 @@ def orientation(pos, cov, exp_parms, sys_params, conf_level, sig_n, pulse_ct):
   
   
 
-def plot_grid2(exp_params, sys_params, pos, nearest=None):
-  
-  s = 2*exp_params['half_span'] + 1
-  for i in range(s):
-    for j in range(s): 
-      fig = pp.gcf()
-      fig.set_size_inches(12,10)
-      ax = fig.add_subplot(111)
-      ax.axis('equal')
-      ax.set_xlabel('easting (m)')
-      ax.set_ylabel('northing (m)')
-
-      # Plot sites
-      (site_ids, P) = zip(*sys_params['sites'].iteritems())
-      X = np.imag(P)
-      Y = np.real(P)
-      pp.xlim([np.min(X) - 100, np.max(X) + 100])
-      pp.ylim([np.min(Y) - 100, np.max(Y) + 100])
-      
-      offset = 20
-      for (id, (x,y)) in zip(site_ids, zip(X,Y)): 
-        pp.text(x+offset, y+offset, id)
-      pp.scatter(X, Y, label='sites', facecolors='r')
-
-      # Plot positions
-      P = pos[:,:,i,j,:].flat
-      X = np.imag(P)
-      Y = np.real(P)
-      pp.scatter(X, Y, label='estimates', alpha=0.1, facecolors='b', edgecolors='none', s=5)
-
-      # Plot grid
-      offset = 10
-      for e in range(s): #easting 
-        for n in range(s): #northing
-          p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
-                                                 (e - exp_params['half_span']) * exp_params['scale'])
-          pp.plot(p.imag, p.real, label='grid', color='w', marker='o', ms=5)
-          if nearest:
-            include = nearest_sites(p, sys_params['sites'], nearest)
-            a = ', '.join(map(lambda(id) : str(id), sorted(include)))
-            pp.text(p.imag+offset, p.real+offset, a, fontsize=8)
-
-      pp.show()
-      pp.clf()
 
 
 # Testing, testing ... 
@@ -357,15 +358,55 @@ def grid_test(prefix, center, sites, sv, conf_level, sim):
                  'scale'     : 300,
                  'trials'    : 1000 }
 
-  sys_params = { 'method'         : 'bartlet', 
-                 'include'        : [],
-                 'center'         : center,
-                 'sites'          : sites } 
+  sys_params = { 'method'  : 'bartlet', 
+                 'include' : [],
+                 'center'  : center,
+                 'sites'   : sites } 
 
   (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False, nearest=3)
   save(prefix, pos, cov, exp_params, sys_params)
   pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
   plot_grid('grid.png', exp_params, sys_params, pos, nearest=3)
+
+
+def distance_test(db_con, prefix, center):
+  
+  cal_id = 6
+  sv = signal1.SteeringVectors(db_con, cal_id, site_ids=[0])
+  sv.steering_vectors[1] = sv.steering_vectors[0]
+  sv.bearings[1] = sv.bearings[0]
+  sv.svID[1] = sv.svID[0]
+
+  sites = { 1 : (4260738.3+574549j) + (100+0j), 
+            0 : (4260738.3+574549j) + (0-100j) } 
+
+  exp_params = { 'simulator' : 'real',
+                 'rho'       : 1,
+                 'sig_n'     : [0.005],
+                 'pulse_ct'  : [5],
+                 'center'    : (4260738.3+574549j), 
+                 'half_span' : 0,
+                 'scale'     : 1,
+                 'trials'    : 10000 }
+                 
+
+  sys_params = { 'method'  : 'bartlet', 
+                 'include' : [],
+                 'center'  : center,
+                 'sites'   : sites.copy() } 
+  
+  pos = []
+  step = (10+0j)
+  for i in range(6): 
+    (P, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
+    save(prefix + str(i), P, cov, exp_params, sys_params)
+    sys_params['sites'][1] += step
+    pos.append(P) 
+  sys_params['sites'] = sites
+  plot_distance('grid.png', pos, exp_params, sys_params, 0.95)
+
+
+
 
 if __name__ == '__main__':
 
@@ -374,8 +415,10 @@ if __name__ == '__main__':
   sv = signal1.SteeringVectors(db_con, cal_id)
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
-  
-  conf_test('exp/test', center, sites, sv, 0.95, 'real')
+ 
+  distance_test(db_con, 'exp/dist', center)
+
+  #conf_test('exp/test', center, sites, sv, 0.95, 'real')
   #grid_test('exp/grid', center, sites, sv, 0.95, 'real')
   
   #conf_level = 0.95

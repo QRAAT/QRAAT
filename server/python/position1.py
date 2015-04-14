@@ -583,7 +583,7 @@ def compute_likelihood(sites, splines, center, scale, half_span):
   return (positions, likelihoods)
 
 
-def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=0, delta=SCALE):
+def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=-2, delta=SCALE):
   ''' Maximize (resp. minimize) over position space. 
 
     A simple, speedy algorithm for finding the most likely source of a 
