@@ -21,7 +21,7 @@ def create_array(exp_params, sys_params):
                   for e in range(s) ]
                     for j in range(len(exp_params['sig_n'])) ] 
                       for i in range(len(exp_params['pulse_ct'])) ]
-  
+
 
 def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
   s = 2 * exp_params['half_span'] + 1
@@ -73,7 +73,8 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
             sig = simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
           
             # Estimate position.
-            P_hat = position1.PositionEstimator(999, sites, sys_params['center'], sig, sv, method)
+            P_hat = position1.PositionEstimator(999, sites, P, sig, sv, method, 
+                                                  s=15, m=2, n=-1, delta=10)
             pos[i,j,e,n,k] = P_hat.p
 
             # Estimate confidence region. 
@@ -246,7 +247,9 @@ def plot_grid(fn, exp_params, sys_params, pos=None, nearest=None):
   pp.clf()
 
 
-def plot_distance(fn, pos, exp_params, sys_params, conf_level):
+def plot_distance(fn, pos, exp_params, sys_params, pulse_ct, sig_n, conf_level, step):
+  i = exp_params['pulse_ct'].index(pulse_ct)
+  j = exp_params['sig_n'].index(sig_n)
   
   Qt = scipy.stats.chi2.ppf(conf_level, 2)
   
@@ -266,29 +269,85 @@ def plot_distance(fn, pos, exp_params, sys_params, conf_level):
   pp.plot(p.imag, p.real, color='w', marker='o', ms=5)
   
   # Confidence intervals
-  for (i, P) in enumerate(pos): # Plot positions.
-    C = np.cov(np.imag(P.flat), np.real(P.flat))
+  dist2 = np.abs(p - sys_params['sites'][1])
+  for (k, P) in enumerate(pos): # Plot positions.
+    C = np.cov(np.imag(P[i,j,:,:,:].flat), np.real(P[i,j,:,:,:].flat))
     (angle, axes) = position1.compute_conf(C, Qt)
     E = position1.Ellipse(p, angle, axes)
     x, y = E.cartesian()
-    pp.plot(x + p.imag, y + p.real, label='%d' % (100 + (10 * i)))
+    pp.plot(x + p.imag, y + p.real, label='%d' % (dist2 + (step * k)))
   
   # Sites
-  ax.arrow(p.imag-offset+3, p.real, -2, 0, fc="k", ec="k",
+  ax.arrow(p.imag-offset-1, p.real, -2, 0, fc="k", ec="k",
                   head_width=0.5, head_length=0.75)
-  pp.text(p.imag-offset+1, p.real+0.75, 'Site 1 (100m)')
-  ax.arrow(p.imag, p.real+offset-6.45, 0, 2, fc="k", ec="k",
+  pp.text(p.imag-offset-3, p.real+0.75, 'Site 1')
+  pp.text(p.imag-offset-3.5, p.real-1.75, '(100 m)')
+  ax.arrow(p.imag, p.real+offset-3.45, 0, 2, fc="k", ec="k",
                   head_width=0.5, head_length=0.75)
-  pp.text(p.imag-3, p.real+offset-4.5, 'Site 2')
+  pp.text(p.imag-3.5, p.real+offset-3.5, 'Site 2')
 
   # Exp params
   pp.text(p.imag-offset+1, p.real-offset+4, 
-    '$\sigma_n^2$ = %0.3f, %d samples per site.' % (exp_params['sig_n'][0], exp_params['pulse_ct'][0]))
+    '$\sigma_n^2$ = %0.3f, %d samples per site.' % (exp_params['sig_n'][j], exp_params['pulse_ct'][i]))
 
   pp.legend(title='Distance to site 2 (m)', ncol=2)
   pp.title('Varying distance, {0}\%-confidence'.format(int(100 * conf_level)))
   pp.savefig(fn)
   pp.clf()
+
+
+
+def plot_angular(fn, pos, site2_pos, exp_params, sys_params, pulse_ct, sig_n, conf_level, step):
+  i = exp_params['pulse_ct'].index(pulse_ct)
+  j = exp_params['sig_n'].index(sig_n)
+  
+  Qt = scipy.stats.chi2.ppf(conf_level, 2)
+  
+  pp.rc('text', usetex=True)
+  pp.rc('font', family='serif')
+  fig = pp.gcf()
+  #fig.set_size_inches(8,6)
+  ax = fig.add_subplot(111)
+  ax.axis('equal')
+  ax.set_xlabel('easting (m)')
+  ax.set_ylabel('northing (m)')
+  
+  # Plot position
+  p  = exp_params['center']; offset = 15
+  pp.xlim([p.imag - offset, p.imag + offset])
+  pp.ylim([p.real - offset+5, p.real + offset])
+  pp.plot(p.imag, p.real, color='w', marker='o', ms=5)
+  
+  # Sites
+  ax.arrow(p.imag-offset+3, p.real, -2, 0, fc="k", ec="k",
+                  head_width=0.5, head_length=0.75)
+  pp.text(p.imag-offset+1, p.real+0.75, 'Site 1')
+  
+  # Confidence intervals
+  dist2 = np.abs(p - sys_params['sites'][1])
+  for (k, P) in enumerate(pos): # Plot positions.
+    try:
+      C = np.cov(np.imag(P[i,j,:,:,:].flat), np.real(P[i,j,:,:,:].flat))
+      (angle, axes) = position1.compute_conf(C, Qt)
+      E = position1.Ellipse(p, angle, axes)
+      x, y = E.cartesian()
+      angle = (180.0 * (k+1)) / step
+      pp.plot(x + p.imag, y + p.real, label='$%0.1f^\circ$' % angle)
+    except position1.PosDefError:
+      pass
+
+  # Exp params
+  pp.text(p.imag-offset+1, p.real-8.5, 
+    '$\sigma_n^2$ = %0.3f, %d samples per site.' % (exp_params['sig_n'][j], exp_params['pulse_ct'][i]))
+
+  pp.legend(title='Angle between site 1 and 2', ncol=2)
+  pp.title('Varying angle, {0}\%-confidence'.format(int(100 * conf_level)))
+  pp.savefig(fn)
+  pp.clf()
+
+
+
+
 
 
 def orientation(pos, cov, exp_parms, sys_params, conf_level, sig_n, pulse_ct):
@@ -356,7 +415,7 @@ def grid_test(prefix, center, sites, sv, conf_level, sim):
                  'center'    : (4260738.3+574549j), 
                  'half_span' : 3,
                  'scale'     : 300,
-                 'trials'    : 1000 }
+                 'trials'    : 10000 }
 
   sys_params = { 'method'  : 'bartlet', 
                  'include' : [],
@@ -387,7 +446,7 @@ def distance_test(db_con, prefix, center):
                  'center'    : (4260738.3+574549j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 10000 }
+                 'trials'    : 1000 }
                  
 
   sys_params = { 'method'  : 'bartlet', 
@@ -396,17 +455,66 @@ def distance_test(db_con, prefix, center):
                  'sites'   : sites.copy() } 
   
   pos = []
-  step = (10+0j)
-  for i in range(6): 
+  step = 20 
+  for i in range(6):
     (P, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
     save(prefix + str(i), P, cov, exp_params, sys_params)
     sys_params['sites'][1] += step
+    #(P, cov, exp_params, sys_params) = load(prefix + str(i))
     pos.append(P) 
   sys_params['sites'] = sites
-  plot_distance('grid.png', pos, exp_params, sys_params, 0.95)
+  plot_distance('dist.png', pos, exp_params, sys_params, 
+      exp_params['pulse_ct'][0], exp_params['sig_n'][0], 0.95, step)
 
 
 
+def angular_test(db_con, prefix, center):
+  
+  cal_id = 6
+  sv = signal1.SteeringVectors(db_con, cal_id, site_ids=[0])
+  sv.steering_vectors[1] = sv.steering_vectors[0]
+  sv.bearings[1] = sv.bearings[0]
+  sv.svID[1] = sv.svID[0]
+
+  sites = { 0 : (4260738.3+574549j) + (0-100j), 
+            1 : (4260738.3+574549j) + (0-100j) } 
+
+  exp_params = { 'simulator' : 'real',
+                 'rho'       : 1,
+                 'sig_n'     : [0.005],
+                 'pulse_ct'  : [5],
+                 'center'    : (4260738.3+574549j), 
+                 'half_span' : 0,
+                 'scale'     : 1,
+                 'trials'    : 1000 }
+                 
+  sys_params = { 'method'  : 'bartlet', 
+                 'include' : [],
+                 'center'  : center,
+                 'sites'   : sites.copy() } 
+  step = 8 
+  p = np.array([sys_params['sites'][0].imag, 
+                sys_params['sites'][0].real]) 
+  c = np.array([exp_params['center'].imag, 
+                exp_params['center'].real])
+  
+  pos = []; site2_pos = []
+  for i in range(step-1):
+    theta = (np.pi * (i+1)) / step
+    A = np.array([[  np.cos(theta), np.sin(theta) ], 
+                  [ -np.sin(theta), np.cos(theta) ]])
+    b = np.dot(A, p-c) + c
+    site2_pos.append(b)
+    sys_params['sites'][1] = np.complex(b[1], b[0])
+    (P, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
+    save(prefix + str(i), P, cov, exp_params, sys_params)
+    pos.append(P)
+  site2_pos = np.vstack(site2_pos)
+
+  plot_angular('angle.png', pos, site2_pos, exp_params, sys_params, 
+                exp_params['pulse_ct'][0], exp_params['sig_n'][0], 0.95, step)
+
+  
 
 if __name__ == '__main__':
 
@@ -416,7 +524,14 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
  
-  distance_test(db_con, 'exp/dist', center)
+  #### DISTANCE ###############################################################
+  #distance_test(db_con, 'exp/dist', center)
+  
+  #### ANGLE ##################################################################
+  #angular_test(db_con, 'exp/angle', center)
+
+  #### GRID ###################################################################
+  grid_test('exp/grid', center, sites, sv, 0.95, 'real')
 
   #conf_test('exp/test', center, sites, sv, 0.95, 'real')
   #grid_test('exp/grid', center, sites, sv, 0.95, 'real')

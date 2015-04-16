@@ -184,7 +184,8 @@ def compute_bearing_splines(sv):
   for (id, G) in sv.steering_vectors.iteritems():
     splines[id] = []
     for i in range(num_ch):
-      y = np.array(G)[:,i]; y = np.hstack((y,y))
+      y = np.array(G)[:,i]; 
+      y = np.hstack((y,y))
       I = spline1d(x, np.real(y)) # In-phase
       Q = spline1d(x, np.imag(y)) # Quadrature
       splines[id].append((I, Q)) 

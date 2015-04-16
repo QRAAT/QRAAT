@@ -59,7 +59,8 @@ class UnboundedContourError (PositionError):
 
 ### Position estimation. ######################################################
 
-def PositionEstimator(dep_id, sites, center, signal, sv, method=signal1.Signal.Bartlet):
+def PositionEstimator(dep_id, sites, center, signal, sv, method=signal1.Signal.Bartlet,
+                        s=HALF_SPAN, m=3, n=-1, delta=SCALE):
   ''' Estimate the source of a signal. 
   
     Inputs: 
@@ -84,11 +85,12 @@ def PositionEstimator(dep_id, sites, center, signal, sv, method=signal1.Signal.B
     (P[site_id], obj) = method(signal[site_id], sv)
 
   return Position.calc(dep_id, P, signal, obj, sites, center,
-                                    signal.t_start, signal.t_end)
+                                    signal.t_start, signal.t_end, s, m, n, delta)
 
 
 def WindowedPositionEstimator(dep_id, sites, center, signal, sv, t_step, t_win, 
-                              method=signal1.Signal.Bartlet):
+                              method=signal1.Signal.Bartlet, 
+                              s=HALF_SPAN, m=3, n=-1, delta=SCALE):
   ''' Estimate the source of a signal, aggregate site data. 
   
     Inputs: 
@@ -110,7 +112,7 @@ def WindowedPositionEstimator(dep_id, sites, center, signal, sv, t_step, t_win,
                       signal.t_start, signal.t_end, t_step, t_win):
   
     positions.append(Position.calc(dep_id, P, signal, obj, 
-                                    sites, center, t_start, t_end))
+                                    sites, center, t_start, t_end, s, m, n, delta))
   
   return positions
 
@@ -162,7 +164,7 @@ class Position:
     self.obj = obj
 
   @classmethod
-  def calc(cls, dep_id, P, signal, obj, sites, center, t_start, t_end):
+  def calc(cls, dep_id, P, signal, obj, sites, center, t_start, t_end, s, m, n, delta):
     ''' Compute a position given bearing likelihood data. ''' 
     
     # Aggregate site data. 
@@ -170,7 +172,7 @@ class Position:
                                   P, signal, obj, t_start, t_end)
     
     if len(splines) > 1: # Need at least two site bearings. 
-      p_hat, likelihood = compute_position(sites, splines, center, obj)
+      p_hat, likelihood = compute_position(sites, splines, center, obj, s, m, n, delta)
     else: p_hat, likelihood = None, None
     
     # Return a position object. 
@@ -560,13 +562,13 @@ def compute_bearing_spline(l):
     `aggregate_spectrum(p)` where p is the output of `_per_site_data.mle()` 
     or `_per_site_data.bartlet()`.
   '''
-  bearing_domain = np.arange(-360,360)         
-  likelihood_range = np.hstack((l, l)) 
+  bearing_domain = np.arange(-360,360)       
+  likelihood_range = np.hstack((l, l))
   return spline1d(bearing_domain, likelihood_range)
 
 def compute_likelihood(sites, splines, center, scale, half_span):
   ''' Compute a grid of candidate points and their likelihoods. '''
-    
+   
   # Generate a grid of positions with center at the center. 
   positions = np.zeros((half_span*2+1, half_span*2+1),np.complex)
   for e in range(-half_span,half_span+1):
@@ -583,7 +585,7 @@ def compute_likelihood(sites, splines, center, scale, half_span):
   return (positions, likelihoods)
 
 
-def compute_position(sites, splines, center, obj, s=HALF_SPAN, m=3, n=-2, delta=SCALE):
+def compute_position(sites, splines, center, obj, s, m, n, delta):
   ''' Maximize (resp. minimize) over position space. 
 
     A simple, speedy algorithm for finding the most likely source of a 
