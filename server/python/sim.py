@@ -40,12 +40,6 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
     method = signal1.Signal.MLE
   else: raise Exception('Unknown method')
 
-  if exp_params['simulator'] == 'ideal':
-    simulator = signal1.IdealSimulator
-  elif exp_params['simulator'] == 'real':
-    simulator = signal1.Simulator
-  else: raise Exception('Unknown simulator')
-  
   sites = sys_params['sites']
   
   # Fix transmission power. 
@@ -71,7 +65,7 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
               include = sys_params['include']
             else: 
               include = nearest_sites(P, sites, nearest)
-            sig = simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
+            sig = position1.Simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
           
             # Estimate position.
             P_hat = position1.PositionEstimator(999, sites, P, sig, sv, method, 
@@ -95,6 +89,7 @@ def save(prefix, pos, cov, exp_params, sys_params,):
   np.savez(prefix + '-pos', pos)
   pickle.dump(cov[0], open(prefix + '-cov0', 'w'))
   pickle.dump(cov[1], open(prefix + '-cov1', 'w'))
+  pickle.dump(cov[2], open(prefix + '-cov2', 'w'))
   #pickle.dump(cov[0], gzip.open(prefix + '-cov0' + '.gz', 'wb'))
   #pickle.dump(cov[1], gzip.open(prefix + '-cov1' + '.gz', 'wb'))
   pickle.dump((exp_params, sys_params), open(prefix + '-params', 'w'))
@@ -103,10 +98,11 @@ def load(prefix):
   pos = np.load(prefix + '-pos.npz')['arr_0']
   cov0 = pickle.load(open(prefix + '-cov0', 'r'))
   cov1 = pickle.load(open(prefix + '-cov1', 'r'))
+  cov2 = pickle.load(open(prefix + '-cov2', 'r'))
   #cov0 = pickle.load(gzip.open(prefix + '-cov0' + '.gz', 'rb'))
   #cov1 = pickle.load(gzip.open(prefix + '-cov1' + '.gz', 'rb'))
   (exp_params, sys_params) = pickle.load(open(prefix + '-params'))
-  return (pos, (cov0, cov1), exp_params, sys_params)
+  return (pos, (cov0, cov1, cov2), exp_params, sys_params)
     
 def pretty_report(pos, cov, exp_params, sys_params, conf_level):
   Qt = scipy.stats.chi2.ppf(conf_level, 2)
@@ -200,6 +196,9 @@ def plot_hist(pos, conf, exp_params, sys_params, conf_level): # TODO out-of-date
           pp.show()
           pp.clf()
 
+
+
+### Plotting. #################################################################
 
 def plot_grid(fn, exp_params, sys_params, pos=None, nearest=None):
   
@@ -377,12 +376,11 @@ def orientation(pos, cov, exp_parms, sys_params, conf_level, sig_n, pulse_ct):
 
 
 
-# Testing, testing ... 
+### Testing, testing ... ######################################################
 
-def conf_test(prefix, center, sites, sv, conf_level, sim): 
+def conf_test(prefix, center, sites, sv, conf_level): 
   
-  exp_params = { 'simulator' : sim,
-                 'rho'       : 1,
+  exp_params = { 'rho'       : 1,
                  'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
                  'pulse_ct'  : [3,4,5,6,7,8,9,10],
                  'center'    : (4260838.3+574049j), 
@@ -405,10 +403,9 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   pretty_report(pos, cov[2], exp_params, sys_params, conf_level)
 
 
-def grid_test(prefix, center, sites, sv, conf_level, sim): 
+def grid_test(prefix, center, sites, sv, conf_level): 
   
-  exp_params = { 'simulator' : sim,
-                 'rho'       : 1,
+  exp_params = { 'rho'       : 1,
                  'sig_n'     : [0.005],
                  'pulse_ct'  : [5],
                  'center'    : (4260738.3+574549j), 
@@ -421,7 +418,7 @@ def grid_test(prefix, center, sites, sv, conf_level, sim):
                  'center'  : center,
                  'sites'   : sites } 
 
-  (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False, nearest=3)
+  (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=True, nearest=3)
   save(prefix, pos, cov, exp_params, sys_params)
   pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
   plot_grid('grid.png', exp_params, sys_params, pos, nearest=3)
@@ -438,8 +435,7 @@ def distance_test(db_con, prefix, center):
   sites = { 1 : (4260738.3+574549j) + (100+0j), 
             0 : (4260738.3+574549j) + (0-100j) } 
 
-  exp_params = { 'simulator' : 'real',
-                 'rho'       : 1,
+  exp_params = { 'rho'       : 1,
                  'sig_n'     : [0.005],
                  'pulse_ct'  : [5],
                  'center'    : (4260738.3+574549j), 
@@ -478,8 +474,7 @@ def angular_test(db_con, prefix, center):
   sites = { 0 : (4260738.3+574549j) + (0-100j), 
             1 : (4260738.3+574549j) + (0-100j) } 
 
-  exp_params = { 'simulator' : 'real',
-                 'rho'       : 1,
+  exp_params = { 'rho'       : 1,
                  'sig_n'     : [0.005],
                  'pulse_ct'  : [5],
                  'center'    : (4260738.3+574549j), 
@@ -530,7 +525,7 @@ if __name__ == '__main__':
   #angular_test(db_con, 'exp/angle', center)
 
   #### GRID ###################################################################
-  grid_test('exp/grid', center, sites, sv, 0.95, 'real')
+  grid_test('exp/grid', center, sites, sv, 0.95)
 
   #### CONF ###################################################################
-  #conf_test('exp/conf', center, sites, sv, 0.95, 'real')
+  #conf_test('exp/conf', center, sites, sv, 0.95)
