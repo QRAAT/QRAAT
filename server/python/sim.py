@@ -414,7 +414,7 @@ def grid_test(prefix, center, sites, sv, conf_level, sim):
                  'center'    : (4260738.3+574549j), 
                  'half_span' : 3,
                  'scale'     : 300,
-                 'trials'    : 10000 }
+                 'trials'    : 1000 }
 
   sys_params = { 'method'  : 'bartlet', 
                  'include' : [],
@@ -530,7 +530,7 @@ if __name__ == '__main__':
   #angular_test(db_con, 'exp/angle', center)
 
   #### GRID ###################################################################
-  #grid_test('exp/grid', center, sites, sv, 0.95, 'real')
+  grid_test('exp/grid', center, sites, sv, 0.95, 'real')
 
   #### CONF ###################################################################
-  conf_test('exp/conf', center, sites, sv, 0.95, 'real')
+  #conf_test('exp/conf', center, sites, sv, 0.95, 'real')

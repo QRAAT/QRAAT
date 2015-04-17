@@ -463,7 +463,7 @@ class Covariance3 (Covariance):
 
 class BootstrapCovariance:
 
-  def __init__(self, pos, sites, max_resamples=500):
+  def __init__(self, pos, sites, max_resamples=100):
     ''' Bootstrap method for estimationg covariance of a position estimate. 
 
       Generate at most `max_resamples` position estimates by resampling the signals used
@@ -609,14 +609,20 @@ def compute_position(sites, splines, center, obj, s, m, n, delta):
       Returns UTM position estimate as a complex number. 
   '''
   p_hat = center
+  span = s * 2 + 1
   for i in reversed(range(n, m)):
     scale = pow(delta, i)
-    (positions, likelihoods) = compute_likelihood(
-                           sites, splines, p_hat, scale, s)
-    
-    index = obj(likelihoods)
-    p_hat = positions.flat[index]
-    likelihood = likelihoods.flat[index]
+    a = b = 0
+    while a == 0 or a == span-1 or b == 0 or b == span-1: 
+      # Deal with boundary cases. If p_hat falls along the 
+      # edge of the grid, recompute with p_hat as center. NOTE 
+      (positions, likelihoods) = compute_likelihood(
+                             sites, splines, p_hat, scale, s)
+      
+      index = obj(likelihoods)
+      p_hat = positions.flat[index]
+      likelihood = likelihoods.flat[index]
+      a = index / span; b = index % span
 
   return p_hat, likelihood
 
