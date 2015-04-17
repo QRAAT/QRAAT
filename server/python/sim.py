@@ -290,43 +290,30 @@ def plot_angular(fn, pos, site2_pos, exp_params, sys_params, pulse_ct, sig_n, co
   
   pp.rc('text', usetex=True)
   pp.rc('font', family='serif')
-  fig = pp.gcf()
-  #fig.set_size_inches(8,6)
-  ax = fig.add_subplot(111)
-  ax.axis('equal')
-  ax.set_xlabel('easting (m)')
-  ax.set_ylabel('northing (m)')
-  
+
+  f, axarr = pp.subplots(2, sharex=True)
+
   # Plot position
-  p  = exp_params['center']; offset = 15
-  pp.xlim([p.imag - offset, p.imag + offset])
-  pp.ylim([p.real - offset+5, p.real + offset])
-  pp.plot(p.imag, p.real, color='w', marker='o', ms=5)
-  
-  # Sites
-  ax.arrow(p.imag-offset+3, p.real, -2, 0, fc="k", ec="k",
-                  head_width=0.5, head_length=0.75)
-  pp.text(p.imag-offset+1, p.real+0.75, 'Site 1')
+  p  = exp_params['center']
   
   # Confidence intervals
-  dist2 = np.abs(p - sys_params['sites'][1])
+  angle = []
+  orientation = []
+  eccentricity = []
   for (k, P) in enumerate(pos): # Plot positions.
-    try:
-      C = np.cov(np.imag(P[i,j,:,:,:].flat), np.real(P[i,j,:,:,:].flat))
-      (angle, axes) = position1.compute_conf(C, Qt)
-      E = position1.Ellipse(p, angle, axes)
-      x, y = E.cartesian()
-      angle = (180.0 * (k+1)) / step
-      pp.plot(x + p.imag, y + p.real, label='$%0.1f^\circ$' % angle)
-    except position1.PosDefError:
-      pass
+    C = np.cov(np.imag(P[i,j,:,:,:].flat), np.real(P[i,j,:,:,:].flat))
+    E = position1.Ellipse(p, *position1.compute_conf(C, Qt))
+    angle.append((180.0 * (k+1)) / step)
+    orientation.append(-180 * E.angle / np.pi)
+    eccentricity.append(E.eccentricity())
 
-  # Exp params
-  pp.text(p.imag-offset+1, p.real-8.5, 
-    '$\sigma_n^2$ = %0.3f, %d samples per site.' % (exp_params['sig_n'][j], exp_params['pulse_ct'][i]))
+  axarr[0].plot(angle, orientation)
+  axarr[0].set_ylabel('Orientation of major axis')
+  axarr[1].plot(angle, eccentricity)
+  axarr[1].set_ylabel('Eccentricity')
 
-  pp.legend(title='Angle between site 1 and 2', ncol=2)
-  pp.title('Varying angle, {0}\%-confidence'.format(int(100 * conf_level)))
+  axarr[0].set_title('Varying angle, {0}\%-confidence'.format(int(100 * conf_level)))
+  axarr[1].set_xlabel('Angle between sites 1 and 2')
   pp.savefig(fn)
   pp.clf()
 
@@ -419,8 +406,7 @@ def grid_test(prefix, center, sites, sv, conf_level):
 
 
 
-
-def distance_test(db_con, prefix, center):
+def distance_test(db_con, prefix, center, conf_level):
   
   cal_id = 6
   sv = signal1.SteeringVectors(db_con, cal_id, site_ids=[0])
@@ -428,7 +414,7 @@ def distance_test(db_con, prefix, center):
   sv.bearings[1] = sv.bearings[0]
   sv.svID[1] = sv.svID[0]
 
-  sites = { 1 : (100+0j), 
+  sites = { 1 : (50+0j), 
             0 : (0-100j) } 
 
   exp_params = { 'rho'       : 1,
@@ -437,7 +423,7 @@ def distance_test(db_con, prefix, center):
                  'center'    : (0+0j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 10000 }
+                 'trials'    : 1000 }
                  
 
   sys_params = { 'method'  : 'bartlet', 
@@ -455,11 +441,11 @@ def distance_test(db_con, prefix, center):
     pos.append(P) 
   sys_params['sites'] = sites
   plot_distance('dist.png', pos, exp_params, sys_params, 
-      exp_params['pulse_ct'][0], exp_params['sig_n'][0], 0.95, step)
+      exp_params['pulse_ct'][0], exp_params['sig_n'][0], conf_level, step)
 
 
 
-def angular_test(db_con, prefix, center):
+def angular_test(db_con, prefix, center, conf_level):
   
   cal_id = 6
   sv = signal1.SteeringVectors(db_con, cal_id, site_ids=[0])
@@ -482,7 +468,7 @@ def angular_test(db_con, prefix, center):
                  'include' : [],
                  'center'  : center,
                  'sites'   : sites.copy() } 
-  step = 8 
+  step = 32
   p = np.array([sys_params['sites'][0].imag, 
                 sys_params['sites'][0].real]) 
   c = np.array([exp_params['center'].imag, 
@@ -502,7 +488,7 @@ def angular_test(db_con, prefix, center):
   site2_pos = np.vstack(site2_pos)
 
   plot_angular('angle.png', pos, site2_pos, exp_params, sys_params, 
-                exp_params['pulse_ct'][0], exp_params['sig_n'][0], 0.95, step)
+                exp_params['pulse_ct'][0], exp_params['sig_n'][0], conf_level, step)
 
   
 
@@ -515,10 +501,10 @@ if __name__ == '__main__':
   (center, zone) = util.get_center(db_con)
  
   #### DISTANCE ###############################################################
-  distance_test(db_con, 'exp/dist', center)
+  #distance_test(db_con, 'exp/dist', center, 0.95)
   
   #### ANGLE ##################################################################
-  #angular_test(db_con, 'exp/angle', center)
+  angular_test(db_con, 'exp/angle', center, 0.95)
 
   #### GRID ###################################################################
   #grid_test('exp/grid', center, sites, sv, 0.95)
