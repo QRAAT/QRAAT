@@ -257,39 +257,25 @@ def plot_distance(fn, pos, exp_params, sys_params, pulse_ct, sig_n, conf_level, 
   fig = pp.gcf()
   #fig.set_size_inches(8,6)
   ax = fig.add_subplot(111)
-  ax.axis('equal')
-  ax.set_xlabel('easting (m)')
-  ax.set_ylabel('northing (m)')
+  #ax.axis('equal')
+  ax.set_xlabel('Distance to site 2 (m)')
+  ax.set_ylabel('Eccentricity of ellipse')
 
-  # Plot position
-  p  = exp_params['center']; offset = 15
-  pp.xlim([p.imag - offset, p.imag + offset])
-  pp.ylim([p.real - offset, p.real + offset])
-  pp.plot(p.imag, p.real, color='w', marker='o', ms=5)
-  
-  # Confidence intervals
+  # Eccentricity of confidence intervals
+  p  = exp_params['center']
   dist2 = np.abs(p - sys_params['sites'][1])
-  for (k, P) in enumerate(pos): # Plot positions.
+  D = [] # distance 
+  E = [] # eccentricity
+  for (k, P) in enumerate(pos): 
     C = np.cov(np.imag(P[i,j,:,:,:].flat), np.real(P[i,j,:,:,:].flat))
     (angle, axes) = position1.compute_conf(C, Qt)
-    E = position1.Ellipse(p, angle, axes)
-    x, y = E.cartesian()
-    pp.plot(x + p.imag, y + p.real, label='%d' % (dist2 + (step * k)))
+    D.append(dist2 + (step * k))
+    E.append(position1.Ellipse(p, angle, axes).eccentricity())
+  pp.plot(D, E)
   
-  # Sites
-  ax.arrow(p.imag-offset-1, p.real, -2, 0, fc="k", ec="k",
-                  head_width=0.5, head_length=0.75)
-  pp.text(p.imag-offset-3, p.real+0.75, 'Site 1')
-  pp.text(p.imag-offset-3.5, p.real-1.75, '(100 m)')
-  ax.arrow(p.imag, p.real+offset-3.45, 0, 2, fc="k", ec="k",
-                  head_width=0.5, head_length=0.75)
-  pp.text(p.imag-3.5, p.real+offset-3.5, 'Site 2')
+  #pp.text(1,1, 
+  #  '$\sigma_n^2$ = %0.3f, %d samples per site.' % (exp_params['sig_n'][j], exp_params['pulse_ct'][i]))
 
-  # Exp params
-  pp.text(p.imag-offset+1, p.real-offset+4, 
-    '$\sigma_n^2$ = %0.3f, %d samples per site.' % (exp_params['sig_n'][j], exp_params['pulse_ct'][i]))
-
-  pp.legend(title='Distance to site 2 (m)', ncol=2)
   pp.title('Varying distance, {0}\%-confidence'.format(int(100 * conf_level)))
   pp.savefig(fn)
   pp.clf()
@@ -451,7 +437,7 @@ def distance_test(db_con, prefix, center):
                  'center'    : (0+0j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 10 }
+                 'trials'    : 10000 }
                  
 
   sys_params = { 'method'  : 'bartlet', 
@@ -460,8 +446,8 @@ def distance_test(db_con, prefix, center):
                  'sites'   : sites.copy() } 
   
   pos = []
-  step = 20 
-  for i in range(6):
+  step = 10 
+  for i in range(20):
     (P, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
     save(prefix + str(i), P, cov, exp_params, sys_params)
     sys_params['sites'][1] += step

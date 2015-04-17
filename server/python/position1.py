@@ -283,6 +283,9 @@ class Ellipse:
   def area(self):
     return np.pi * self.axes[0] * self.axes[1]
 
+  def eccentricity(self):
+    return np.sqrt(1 - ((self.axes[1]**2) / (self.axes[0]**2)))
+
   def cartesian(self): 
     theta = np.linspace(0,2*np.pi, 360)
     X = self.x[0] + self.axes[0]*np.cos(theta)*np.cos(self.angle) - \
