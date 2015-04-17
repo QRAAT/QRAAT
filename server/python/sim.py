@@ -405,6 +405,26 @@ def grid_test(prefix, center, sites, sv, conf_level):
       exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos, nearest=3)
 
 
+def contour_test(prefix, center, sites, sv, conf_level): 
+  
+  exp_params = { 'rho'       : 1,
+                 'sig_n'     : [0.005],
+                 'pulse_ct'  : [5],
+                 'center'    : (4260738.3+574549j), 
+                 'half_span' : 3 * 6,
+                 'scale'     : 300 / 6,
+                 'trials'    : 1000 }
+
+  sys_params = { 'method'  : 'bartlet', 
+                 'include' : [],
+                 'center'  : center,
+                 'sites'   : sites } 
+
+  (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
+  save(prefix, pos, cov, exp_params, sys_params)
+  plot_grid('contour_grid.png', exp_params, sys_params, 
+      exp_params['pulse_ct'][0], exp_params['sig_n'][0])
+
 
 def distance_test(db_con, prefix, center, conf_level):
   
@@ -414,7 +434,7 @@ def distance_test(db_con, prefix, center, conf_level):
   sv.bearings[1] = sv.bearings[0]
   sv.svID[1] = sv.svID[0]
 
-  sites = { 1 : (50+0j), 
+  sites = { 1 : (100+0j), 
             0 : (0-100j) } 
 
   exp_params = { 'rho'       : 1,
@@ -423,7 +443,7 @@ def distance_test(db_con, prefix, center, conf_level):
                  'center'    : (0+0j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 1000 }
+                 'trials'    : 10000 }
                  
 
   sys_params = { 'method'  : 'bartlet', 
@@ -433,7 +453,7 @@ def distance_test(db_con, prefix, center, conf_level):
   
   pos = []
   step = 10 
-  for i in range(20):
+  for i in range(50):
     (P, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
     save(prefix + str(i), P, cov, exp_params, sys_params)
     sys_params['sites'][1] += step
@@ -462,7 +482,7 @@ def angular_test(db_con, prefix, center, conf_level):
                  'center'    : (0+0j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 1000 }
+                 'trials'    : 10000 }
                  
   sys_params = { 'method'  : 'bartlet', 
                  'include' : [],
@@ -504,10 +524,13 @@ if __name__ == '__main__':
   #distance_test(db_con, 'exp/dist', center, 0.95)
   
   #### ANGLE ##################################################################
-  angular_test(db_con, 'exp/angle', center, 0.95)
+  #angular_test(db_con, 'exp/angle', center, 0.95)
 
   #### GRID ###################################################################
   #grid_test('exp/grid', center, sites, sv, 0.95)
 
+  #### CONTOUR ###################################################################
+  contour_test('exp/contour', center, sites, sv, 0.95)
+  
   #### CONF ###################################################################
   #conf_test('exp/conf', center, sites, sv, 0.95)
