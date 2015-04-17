@@ -30,8 +30,9 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
   if compute_cov:
     cov0 = create_array(exp_params, sys_params) # bootstrap
     cov1 = create_array(exp_params, sys_params) # true position
+    cov2 = create_array(exp_params, sys_params) # true position
   else: 
-    cov0 = cov1 = None
+    cov0 = cov1 = cov2 = None
 
   if sys_params['method'] == 'bartlet': 
     method = signal1.Signal.Bartlet
@@ -79,19 +80,15 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
 
             # Estimate confidence region. 
             if compute_cov:
+              cov0[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P))
+              cov1[i][j][e][n].append(position1.Covariance2(P_hat, sites, p_known=P))
               try: 
-                cov0[i][j][e][n].append(position1.Covariance2(P_hat, sites, p_known=P))
-                cov1[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P))
-              #except IndexError: # Hessian matrix computation
-              #  print "Warning!"
+                cov2[i][j][e][n].append(position1.BootstrapCovariance(P_hat, sites))
               except np.linalg.linalg.LinAlgError:
                 print "Singular matrix!"
-              except position1.UnboundedContourError:
-                print "Unbounded!"
-              except position1.PosDefError:
-                print "Positive definite!"
+                cov2[i][j][e][n].append(None)
 
-  return (pos, (cov0, cov1))
+  return (pos, (cov0, cov1, cov2))
 
 
 def save(prefix, pos, cov, exp_params, sys_params,):
@@ -148,15 +145,16 @@ def pretty_report(pos, cov, exp_params, sys_params, conf_level):
             a = b = ct = 0
             area = 0
             for k in range(len(cov[i][j][e][n])):
-              try:
-                E_hat = cov[i][j][e][n][k].conf(conf_level)
-                if E_hat.axes[0] > 0:
-                  area += E_hat.area()
-                  ct += 1
-                  if p in E_hat: a += 1
-                if not E or p_hat[k] in E: b += 1
-              except position1.PosDefError:
-                print "Positive definite!"
+              if cov[i][j][e][n][k] is not None: 
+                try:
+                  E_hat = cov[i][j][e][n][k].conf(conf_level)
+                  if E_hat.axes[0] > 0:
+                    area += E_hat.area()
+                    ct += 1
+                    if p in E_hat: a += 1
+                  if not E or p_hat[k] in E: b += 1
+                except position1.PosDefError:
+                  print "Positive definite!"
             
             print fmt(float(a) / ct), \
                   fmt(float(b) / exp_params['trials']), \
@@ -386,7 +384,7 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
   exp_params = { 'simulator' : sim,
                  'rho'       : 1,
                  'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [8,9,10],
+                 'pulse_ct'  : [3,4,5,6,7,8,9,10],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
@@ -399,11 +397,12 @@ def conf_test(prefix, center, sites, sv, conf_level, sim):
 
   (pos, cov) = montecarlo(exp_params, sys_params, sv)
   save(prefix, pos, cov, exp_params, sys_params)
-  pos, cov, exp_params, sys_params = load(prefix)
   print "Covariance\n"
   pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
   print "Covariance2\n"
   pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
+  print "BootstrapCovariance\n"
+  pretty_report(pos, cov[2], exp_params, sys_params, conf_level)
 
 
 def grid_test(prefix, center, sites, sv, conf_level, sim): 
@@ -531,19 +530,7 @@ if __name__ == '__main__':
   #angular_test(db_con, 'exp/angle', center)
 
   #### GRID ###################################################################
-  grid_test('exp/grid', center, sites, sv, 0.95, 'real')
-
-  #conf_test('exp/test', center, sites, sv, 0.95, 'real')
   #grid_test('exp/grid', center, sites, sv, 0.95, 'real')
-  
-  #conf_level = 0.95
-  #pos, cov, exp_params, sys_params = load('exp/fella')
-  #pretty_report(pos, cov[0], exp_params, sys_params, conf_level) # cov2
-  #pretty_report(pos, cov[1], exp_params, sys_params, conf_level) # cov
-  #orientation(pos, cov[1], exp_params, sys_params, conf_level, 0.001, 8)
 
-  #plot_grid('grid.png', exp_params, sys_params, pos, 3)
-  #print "Covariance\n"
-  #pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
-  #print "BootstrapCovariance\n"
-  #pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
+  #### CONF ###################################################################
+  conf_test('exp/conf', center, sites, sv, 0.95, 'real')

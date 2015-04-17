@@ -650,7 +650,8 @@ def bootstrap_resample(pos, sites, max_samples, obj):
     for id in pos.sub_splines.keys():
       j = random.randint(0, len(pos.sub_splines[id])-1)
       splines[id] = pos.sub_splines[id][j]
-    (p, _) = compute_position(sites, splines, pos.p, obj) 
+    (p, _) = compute_position(sites, splines, pos.p, obj,
+              s=HALF_SPAN, m=2, n=-1, delta=SCALE) 
     P.append(transform_coord(p, pos.p, 0, 1))
     
   return P
@@ -662,7 +663,8 @@ def bootstrap_resample_site(pos, sites, max_samples, obj):
   P = []
   for site_ids in itertools.combinations(pos.splines.keys(), 2):
     splines = { id : pos.splines[id] for id in site_ids }
-    (p, _) = compute_position(sites, splines, pos.p, obj) 
+    (p, _) = compute_position(sites, splines, pos.p, obj,
+              s=HALF_SPAN, m=2, n=-1, delta=SCALE) 
     P.append(transform_coord(p, pos.p, 0, 1))
   random.shuffle(P)
   return P
