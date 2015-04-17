@@ -427,38 +427,8 @@ class Covariance2 (Covariance):
       d = np.dot(b, A)
       C += np.dot(d.T, d)
       
-    self.C = C / n
+    self.C = C / m 
 
-
-class Covariance3 (Covariance):
-  
-  def __init__(self, pos, sites, p_known=None, half_span=75, scale=0.5):
-    ''' Confidence region from asymptotic covariance. ''' 
-    self.p_hat = pos.p
-    self.half_span = half_span
-    self.scale = scale
-    n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
-    m = n / pos.num_sites
-  
-    if p_known:
-      p = p_known
-    else: 
-      p = pos.p
-    x = np.array([half_span, half_span])
-    
-    A = np.zeros((2,2), dtype=np.float64)
-    b = np.zeros((2,), dtype=np.float64)
-    for i in range(m):
-      splines = { id : p[i] for (id, p) in pos.all_splines.iteritems() }
-      (positions, likelihoods) = compute_likelihood(
-                               sites, splines, p, scale, half_span)
-      J = lambda (x) : likelihoods[x[0], x[1]]
-      b += nd.Gradient(J)(x)
-      A += nd.Hessian(J)(x)
-      
-    Ainv = np.linalg.inv(A / n)
-    b = np.array([b / n]).T
-    self.C = np.dot(Ainv, np.dot(b, b.T), Ainv)
 
 
 class BootstrapCovariance:
@@ -615,7 +585,7 @@ def compute_position(sites, splines, center, obj, s, m, n, delta):
     a = b = 0
     while a == 0 or a == span-1 or b == 0 or b == span-1: 
       # Deal with boundary cases. If p_hat falls along the 
-      # edge of the grid, recompute with p_hat as center. NOTE 
+      # edge of the grid, recompute with p_hat as center. FIXME
       (positions, likelihoods) = compute_likelihood(
                              sites, splines, p_hat, scale, s)
       

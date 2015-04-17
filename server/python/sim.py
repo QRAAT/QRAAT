@@ -65,7 +65,7 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
               include = sys_params['include']
             else: 
               include = nearest_sites(P, sites, nearest)
-            sig = position1.Simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
+            sig = signal1.Simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
           
             # Estimate position.
             P_hat = position1.PositionEstimator(999, sites, P, sig, sv, method, 
@@ -200,7 +200,9 @@ def plot_hist(pos, conf, exp_params, sys_params, conf_level): # TODO out-of-date
 
 ### Plotting. #################################################################
 
-def plot_grid(fn, exp_params, sys_params, pos=None, nearest=None):
+def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=None):
+  i = exp_params['pulse_ct'].index(pulse_ct)
+  j = exp_params['sig_n'].index(sig_n)
   
   fig = pp.gcf()
   fig.set_size_inches(12,10)
@@ -420,8 +422,16 @@ def grid_test(prefix, center, sites, sv, conf_level):
 
   (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=True, nearest=3)
   save(prefix, pos, cov, exp_params, sys_params)
+  print "Covariance\n"
   pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
-  plot_grid('grid.png', exp_params, sys_params, pos, nearest=3)
+  print "Covariance2\n"
+  pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
+  print "BootstrapCovariance\n"
+  pretty_report(pos, cov[2], exp_params, sys_params, conf_level)
+  plot_grid('grid.png', exp_params, sys_params, 
+      exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos, nearest=3)
+
+
 
 
 def distance_test(db_con, prefix, center):
@@ -432,16 +442,16 @@ def distance_test(db_con, prefix, center):
   sv.bearings[1] = sv.bearings[0]
   sv.svID[1] = sv.svID[0]
 
-  sites = { 1 : (4260738.3+574549j) + (100+0j), 
-            0 : (4260738.3+574549j) + (0-100j) } 
+  sites = { 1 : (100+0j), 
+            0 : (0-100j) } 
 
   exp_params = { 'rho'       : 1,
                  'sig_n'     : [0.005],
                  'pulse_ct'  : [5],
-                 'center'    : (4260738.3+574549j), 
+                 'center'    : (0+0j), 
                  'half_span' : 0,
                  'scale'     : 1,
-                 'trials'    : 1000 }
+                 'trials'    : 10 }
                  
 
   sys_params = { 'method'  : 'bartlet', 
@@ -471,13 +481,13 @@ def angular_test(db_con, prefix, center):
   sv.bearings[1] = sv.bearings[0]
   sv.svID[1] = sv.svID[0]
 
-  sites = { 0 : (4260738.3+574549j) + (0-100j), 
-            1 : (4260738.3+574549j) + (0-100j) } 
+  sites = { 0 : (0-100j), 
+            1 : (0-100j) } 
 
   exp_params = { 'rho'       : 1,
                  'sig_n'     : [0.005],
                  'pulse_ct'  : [5],
-                 'center'    : (4260738.3+574549j), 
+                 'center'    : (0+0j), 
                  'half_span' : 0,
                  'scale'     : 1,
                  'trials'    : 1000 }
@@ -519,13 +529,13 @@ if __name__ == '__main__':
   (center, zone) = util.get_center(db_con)
  
   #### DISTANCE ###############################################################
-  #distance_test(db_con, 'exp/dist', center)
+  distance_test(db_con, 'exp/dist', center)
   
   #### ANGLE ##################################################################
   #angular_test(db_con, 'exp/angle', center)
 
   #### GRID ###################################################################
-  grid_test('exp/grid', center, sites, sv, 0.95)
+  #grid_test('exp/grid', center, sites, sv, 0.95)
 
   #### CONF ###################################################################
   #conf_test('exp/conf', center, sites, sv, 0.95)
