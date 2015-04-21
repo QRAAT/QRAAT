@@ -48,7 +48,24 @@ pi_n = np.pi ** num_ch
 ### Simulation. ###############################################################
 
 def Simulator(p, sites, sv_splines, rho, sig_n, trials, include=[]): 
-  ''' Constant SNR for all sites. ''' 
+  ''' Generate a number of signal recordings based on signal model. 
+  
+    p -- Location of transmitter. 
+
+    sites -- A map of site_ids to locations of receivers. 
+
+    sv_splines -- Interpolation of in-phase and quadrature combponents of the 
+                  steering vector channels. 
+
+    rho -- Transmission power. 
+
+    sig_n -- Signal noise. 
+
+    trials -- Number of recordings to generate per site. 
+
+    include -- Sites to generate signals from. If this array is empty, then all 
+               sites in ``sites`` are included. 
+  ''' 
  
   # Elements of noise vector are modelled as independent, identically
   # distributed, circularly-symmetric complex normal random varibles. 
@@ -73,12 +90,14 @@ def Simulator(p, sites, sv_splines, rho, sig_n, trials, include=[]):
   if include == []: 
     include = sites.keys()
  
-  # Scale transmission coefficients to rho. 
+  # Scale transmission coefficients to rho. The transmission power degrades 
+  # with distance according to the inverse-square law well-known in radio 
+  # engineering.  
   T = {}
   for id in include:
     T[id] = np.sqrt(rho / (np.abs(p - sites[id]) ** 2))
 
-  # Generate a (V, \rho, \Sigma) triple for each site. 
+  # Generate a signal for each site. 
   for id in include:
     bearing = np.angle(p - sites[id]) * 180 / np.pi
     
@@ -113,7 +132,8 @@ def Simulator(p, sites, sv_splines, rho, sig_n, trials, include=[]):
   return sig
 
 
-def compute_bearing_splines(sv): 
+def compute_bearing_splines(sv):
+  ''' Interpolate steering vectors. ''' 
   x = np.arange(-360,360)
   splines = {}
   for (id, G) in sv.steering_vectors.iteritems():
@@ -128,6 +148,11 @@ def compute_bearing_splines(sv):
       
 
 def scale_tx_coeff(p, rho, sites, include=[]):
+  ''' Scale transmission power to nearest site.
+  
+    Fix the transmission power so that the transmission coefficient at 
+    the nearest site in ``include`` is 1. 
+  '''
   if include == []: 
     include = sites.keys()
   nearest_id = include[0]
@@ -138,6 +163,7 @@ def scale_tx_coeff(p, rho, sites, include=[]):
   return scaled_rho  
 
 
+
 ### class SteeringVectors. ####################################################
 
 class SteeringVectors:
@@ -145,15 +171,15 @@ class SteeringVectors:
   suffix = 'csv'
   delim = ','
 
-  def __init__(self, db_con=None, cal_id=None, site_ids=[]):
+  def __init__(self, db_con=None, cal_id=None, include=[]):
 
-    ''' Represent steering vectors ($G_i(\theta)$).
+    ''' Represent steering vectors.
       
       The bearings and their corresponding steering vectors are stored in 
       dictionaries indexed by site ID. This class also stores provenance 
       information for direction-of-arrival and position estimation. Note 
       that it is implicitly assumed in the code that there are steering 
-      vectors for exactly 360 distinct bearings for each site. 
+      vectors for whole-degree bearings (0, 1, ... 359). 
 
       Inputs:
           
@@ -161,21 +187,24 @@ class SteeringVectors:
 
         cal_id -- Calibration ID, identifies the set of steering vectors to 
                   use for direction-of-arrival and position estimation. 
+
+        include -- Sites to include. If this is empty, use all sites in the 
+                   table `qraat.site`. 
     ''' 
 
     # Get steering vector data.
     self.steering_vectors = {} # site.ID -> sv
     self.bearings = {}         # site.ID -> bearing
-    self.svID = {}
-    self.calID = {}
+    self.sv_id = {}            # site.ID -> steering_vectors.ID
+    self.cal_id = cal_id
 
     if db_con:
       to_be_removed = []
       self.cal_id = cal_id
       cur = db_con.cursor()
-      if site_ids == []: 
-        site_ids = util.get_sites(db_con).keys()
-      for site_id in site_ids:
+      if include == []: 
+        include = util.get_sites(db_con).keys()
+      for site_id in include:
         cur.execute('''SELECT ID, Bearing,
                               sv1r, sv1i, sv2r, sv2i,
                               sv3r, sv3i, sv4r, sv4i
@@ -187,7 +216,7 @@ class SteeringVectors:
         if sv_data.shape[0] > 0:
           self.steering_vectors[site_id] = np.array(sv_data[:,2::2] + np.complex(0,1) * sv_data[:,3::2])
           self.bearings[site_id] = np.array(sv_data[:,1])
-          self.svID[site_id] = np.array(sv_data[:,0], dtype=int)
+          self.sv_id[site_id] = np.array(sv_data[:,0], dtype=int)
         else:
           to_be_removed.append(site)
       while len(to_be_removed) > 0:
@@ -204,7 +233,7 @@ class SteeringVectors:
     
     for (site_id, sv) in self.steering_vectors.iteritems():
       for i in range(sv.shape[0]):
-        line = [site_id, self.svID[site_id][i], self.bearings[site_id][i]] 
+        line = [site_id, self.sv_id[site_id][i], self.bearings[site_id][i]] 
         line += list(sv[i])
         fd.write(self.delim.join(map(lambda x: str(x), line)) + '\n')
    
@@ -222,9 +251,9 @@ class SteeringVectors:
       if sv.steering_vectors.get(site_id) is None:
         sv.steering_vectors[site_id] = []
         sv.bearings[site_id] = []
-        sv.svID[site_id] = []
+        sv.sv_id[site_id] = []
         
-      sv.svID[site_id].append(int(row[1]))
+      sv.sv_id[site_id].append(int(row[1]))
       sv.bearings[site_id].append(float(row[2]))
       sv.steering_vectors[site_id].append(map(lambda x: np.complex(x), row[3:]))
     return sv
@@ -237,9 +266,9 @@ class Signal:
 
   def __init__(self, db_con=None, dep_id=None, t_start=0, t_end=0, score_threshold=0):
    
-    ''' Represent signals in the `qraat.est` table ($V$, $\Sigma$, $sigma$).
+    ''' Represent signals in the `qraat.est` table.
     
-     Store data in a dictionary mapping sites to time-indexed signal data. 
+      Store data in a dictionary mapping sites to time-indexed signal data. 
       The relevant data are the eigenvalue decomposition of the signal (ed1r, 
       ed1i, ... ed4r, ed4i), the noise covariance matrix (nc11r, nc11i, ... 
       nc44r, nc44i), and the signal power (edsp). Each pulse is assigned
@@ -284,7 +313,7 @@ class Signal:
         raw_data = np.array(cur.fetchall(), dtype=float)
         est_ids = np.array(raw_data[:,0], dtype=int)
         self.max_est_id = np.max(est_ids)
-        site_ids = np.array(raw_data[:,1], dtype=int)
+        include = np.array(raw_data[:,1], dtype=int)
         timestamps = raw_data[:,2]
         edsp = raw_data[:,3]
         signal_vector = np.zeros((raw_data.shape[0], num_ch),dtype=np.complex)
@@ -299,15 +328,15 @@ class Signal:
               k = 13 + (i*num_ch*2) + (2*j)
               noise_cov[t,i,j] = np.complex(raw_data[t,k], raw_data[t,k+1])
 
-        for site_id in set(site_ids):
+        for site_id in set(include):
           site = _per_site_data(site_id)
-          site.est_ids = est_ids[site_ids == site_id]
-          site.t = timestamps[site_ids == site_id]
-          site.edsp = edsp[site_ids == site_id] # a.k.a. power
-          site.signal_vector = signal_vector[site_ids == site_id]
-          site.tnp = tnp[site_ids == site_id]
-          site.noise_cov = noise_cov[site_ids == site_id]
-          site.count = np.sum(site_ids == site_id)
+          site.est_ids = est_ids[include == site_id]
+          site.t = timestamps[include == site_id]
+          site.edsp = edsp[include == site_id] # a.k.a. power
+          site.signal_vector = signal_vector[include == site_id]
+          site.tnp = tnp[include == site_id]
+          site.noise_cov = noise_cov[include == site_id]
+          site.count = np.sum(include == site_id)
           self.table[site_id] = site
 
         self.t_start = np.min(timestamps)
@@ -400,7 +429,7 @@ class _per_site_data:
       for whole-degree bearings. The result is a matrix with as many rows as
       there are pulses and 360 columns. 
     
-      Input: site_id -- identifies a site in the DB. 
+      site_id -- identifies a site in the DB. 
     ''' 
 
     self.site_id = site_id     # Site ID
@@ -470,18 +499,16 @@ class _per_site_data:
       $G_i(\theta)^H in the equations, is written here as 
       `np.conj(np.transpose())`. 
 
-      Input: sv -- instance of `class SteeringVectors`.
+      sv -- instance of `class SteeringVectors`.
     ''' 
-    # FIXME I think the parallel code is causing a bug. 
-    pool = multiprocessing.Pool()
+    # FIXME Test to see if this crashes. 
     f = functools.partial(_mle, np.matrix(self.signal_vector), 
                                 sv.steering_vectors[self.site_id],
                                 self.edsp, self.noise_cov, self.count)
-    return np.array(pool.map(f, range(360))).transpose()
-    #p = np.zeros((self.count, 360), dtype=np.float)
-    #for j in range(360):
-    #  p[:,j] = f(j)
-    #return p
+    p = np.zeros((self.count, 360), dtype=np.float64)
+    for j in range(360):
+      p[:,j] = f(j)
+    return p
 
   def bartlet(self, sv): 
     ''' Bartlet's estimator for DOA. Use `argmax`. ''' 

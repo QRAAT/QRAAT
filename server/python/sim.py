@@ -4,7 +4,7 @@ import util
 import signal1
 import position1
 
-import pickle, gzip
+import pickle, gzip, os
 import numpy as np
 import matplotlib.pyplot as pp
 import scipy
@@ -28,9 +28,9 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
   shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s, exp_params['trials'])
   pos = np.zeros(shape, dtype=np.complex)
   if compute_cov:
-    cov0 = create_array(exp_params, sys_params) # bootstrap
-    cov1 = create_array(exp_params, sys_params) # true position
-    cov2 = create_array(exp_params, sys_params) # true position
+    cov0 = create_array(exp_params, sys_params) 
+    cov1 = create_array(exp_params, sys_params) 
+    cov2 = create_array(exp_params, sys_params) 
   else: 
     cov0 = cov1 = cov2 = None
 
@@ -90,17 +90,18 @@ def save(prefix, pos, cov, exp_params, sys_params,):
   pickle.dump(cov[0], open(prefix + '-cov0', 'w'))
   pickle.dump(cov[1], open(prefix + '-cov1', 'w'))
   pickle.dump(cov[2], open(prefix + '-cov2', 'w'))
-  #pickle.dump(cov[0], gzip.open(prefix + '-cov0' + '.gz', 'wb'))
-  #pickle.dump(cov[1], gzip.open(prefix + '-cov1' + '.gz', 'wb'))
   pickle.dump((exp_params, sys_params), open(prefix + '-params', 'w'))
+  os.chmod(prefix + '-cov0', 0444)
+  os.chmod(prefix + '-cov1', 0444)
+  os.chmod(prefix + '-cov2', 0444)
+  os.chmod(prefix + '-pos.npz', 0444)
+  os.chmod(prefix + '-params', 0444)
 
 def load(prefix):
   pos = np.load(prefix + '-pos.npz')['arr_0']
   cov0 = pickle.load(open(prefix + '-cov0', 'r'))
   cov1 = pickle.load(open(prefix + '-cov1', 'r'))
   cov2 = pickle.load(open(prefix + '-cov2', 'r'))
-  #cov0 = pickle.load(gzip.open(prefix + '-cov0' + '.gz', 'rb'))
-  #cov1 = pickle.load(gzip.open(prefix + '-cov1' + '.gz', 'rb'))
   (exp_params, sys_params) = pickle.load(open(prefix + '-params'))
   return (pos, (cov0, cov1, cov2), exp_params, sys_params)
     
@@ -249,7 +250,6 @@ def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=Non
 def plot_distance(fn, pos, exp_params, sys_params, pulse_ct, sig_n, conf_level, step):
   i = exp_params['pulse_ct'].index(pulse_ct)
   j = exp_params['sig_n'].index(sig_n)
-  
   Qt = scipy.stats.chi2.ppf(conf_level, 2)
   
   pp.rc('text', usetex=True)
@@ -273,9 +273,6 @@ def plot_distance(fn, pos, exp_params, sys_params, pulse_ct, sig_n, conf_level, 
     E.append(position1.Ellipse(p, angle, axes).eccentricity())
   pp.plot(D, E)
   
-  #pp.text(1,1, 
-  #  '$\sigma_n^2$ = %0.3f, %d samples per site.' % (exp_params['sig_n'][j], exp_params['pulse_ct'][i]))
-
   pp.title('Varying distance, {0}\%-confidence'.format(int(100 * conf_level)))
   pp.savefig(fn)
   pp.clf()
@@ -285,7 +282,6 @@ def plot_distance(fn, pos, exp_params, sys_params, pulse_ct, sig_n, conf_level, 
 def plot_angular(fn, pos, site2_pos, exp_params, sys_params, pulse_ct, sig_n, conf_level, step):
   i = exp_params['pulse_ct'].index(pulse_ct)
   j = exp_params['sig_n'].index(sig_n)
-  
   Qt = scipy.stats.chi2.ppf(conf_level, 2)
   
   pp.rc('text', usetex=True)
@@ -316,36 +312,6 @@ def plot_angular(fn, pos, site2_pos, exp_params, sys_params, pulse_ct, sig_n, co
   axarr[1].set_xlabel('Angle between sites 1 and 2')
   pp.savefig(fn)
   pp.clf()
-
-
-
-
-
-
-def orientation(pos, cov, exp_parms, sys_params, conf_level, sig_n, pulse_ct):
-  i = exp_params['pulse_ct'].index(pulse_ct)
-  j = exp_params['sig_n'].index(sig_n)
-  e = n = 0
-
-  for (k, C) in enumerate(cov[i][j][e][n]):
-    fig = pp.gcf()
-    fig.set_size_inches(12,10)
-    ax = fig.add_subplot(111)
-    ax.axis('equal')
-    ax.set_xlabel('easting (m)')
-    ax.set_ylabel('northing (m)')
-    
-    X = np.imag(pos[i,j,e,n,:])
-    Y = np.real(pos[i,j,e,n,:])
-    pp.scatter(X, Y, label='estimates', alpha=0.5, facecolors='b', edgecolors='none', s=10)
-
-    conf = C.conf(conf_level)
-    X = np.vstack(conf.cartesian())
-    pp.plot(pos[i,j,e,n,k].imag + X[0,:], pos[i,j,e,n,k].real + X[1,:], color='k')
-
-    pp.show()
-    pp.clf()
-    
   
   
 
@@ -413,7 +379,7 @@ def contour_test(prefix, center, sites, sv, conf_level):
                  'center'    : (4260738.3+574549j), 
                  'half_span' : 3 * 6,
                  'scale'     : 300 / 6,
-                 'trials'    : 1000 }
+                 'trials'    : 20 }
 
   sys_params = { 'method'  : 'bartlet', 
                  'include' : [],

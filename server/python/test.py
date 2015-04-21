@@ -33,23 +33,18 @@ sv = signal1.SteeringVectors(db_con, cal_id)
 def real_data():
 
   # Read signal data, about an hour's worth.
+  sv = signal1.SteeringVectors.read(3, 'sample/sv')
   sig = signal1.Signal.read(sites.keys(), 'sample/sig')
+  
 
   # Estimate position using all data. To use the MLE instead 
   # of Bartlet's, do `method=signal1.Signal.MLE`. 
-  #pos = position1.PositionEstimator(dep_id, sites, center, sig, sv,
-  #                method=signal1.Signal.Bartlet)
-  #positions = position1.WindowedPositionEstimator(dep_id, sites, center, sig, sv, 
-  #                60 * 5, 30, method=signal1.Signal.Bartlet)
-
-  #pos = position1.PositionEstimator(dep_id, sites, center, sig, sv,
-  #                method=signal1.Signal.Bartlet)
-  print pos.p
-  pos.plot('yeah.png', sites, center, 10, 150)
+  pos = position1.PositionEstimator(dep_id, sites, center, sig, sv,
+                  method=signal1.Signal.Bartlet)
   
-  # Plot position and search space. 
-  #for i, pos in enumerate(positions): 
-  #  pos.plot('%d.png' % (i), sites, center, 10, 150)
+  print pos.p
+  pos.plot('yeah.png', sites, center)
+  
 
 
 def sim_data():
@@ -70,25 +65,11 @@ def sim_data():
   pos.plot('fella.png', sites, center, p)
  
   level=0.95
-  position1.Covariance(pos, sites, p_known=p).conf(level).display(p)
+  #position1.Covariance(pos, sites, p_known=p).conf(level).display(p)
+  #position1.Covariance2(pos, sites, p_known=p).conf(level).display(p)
   position1.BootstrapCovariance(pos, sites).conf(level).display(p)
-  position1.Covariance2(pos, sites, p_known=p).conf(level).display(p)
 
 
-  #boot_cov = position1.BootstrapCovariance(pos, sites)
-  #boot_conf = boot_cov.conf(level)
-  #boot_conf.display(p)
-
-  
-'''
-
-  Notes:
-
-  Intuitively, the size of the confidence interval should scale with 
-  the SNR. 
-
-
-'''
 
 # Testing, testing .... 
 sim_data()
