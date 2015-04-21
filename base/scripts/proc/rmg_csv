@@ -93,25 +93,39 @@ else:
   (row, col, value) = sys.argv[1:4]
 
 
-    ## Read header ##
+    ## Operate on last row only ##
+  # FIXME not efficient for long files ("lines" contains all the data in the file)
+  # I want to eliminate the reading stdin and pass the file name
+  # then use head -n 1 file && tail -n 1 file to only read last line.
+  # Or build a bash wrapper which cuts out the unwanted data in this use case.
+  # TAB 2015-04-20
+if (not row and not col):
+  with open("/tmp/csv_lastrow_file.csv",'w') as tempfile:
+    tempfile.write(sys.stdin.readline())
+    lines = sys.stdin.readlines()
+    tempfile.write(lines[-1])
+    
+  with open("/tmp/csv_lastrow_file.csv",'r') as tempfile:
+    table = qraat.csv.csv(tempfile)
 
+  line = table[-1]
+
+  if param_list: 
+    for col in param_list:
+       print getattr(line, col)
+  else:
+    print ','.join(table.headers)
+    print ','.join(line)
+    
+  sys.exit(0)
+
+
+
+
+    ## Read header ##
 table = qraat.csv.csv(sys.stdin) 
 
 try:
-
-    ## Operate on last row only ##
-
-  if (not row and not col): 
-    # FIXME not efficient for long files
-    line = table[-1]
-    if param_list: 
-      for col in param_list:
-         print getattr(line, col)
-    else:
-      print ','.join(table.headers)
-      print ','.join(line)
-      
-    sys.exit(0)
 
     ## Parse line by line ##
 
