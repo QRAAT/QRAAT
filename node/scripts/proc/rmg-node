@@ -137,13 +137,25 @@ IP=$(rmg_csv --column power_ip <$SITE)
 RX_OUTLET=$(rmg_csv --column rx_outlet <$SITE)
 
 RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
-if [ $? -ne "0" ]
-  then echo "error $?: foreground pipeline exited unsuccessful"; exit 1; fi 
+if [ $? -ne "0" ]; then
+  echo "Couldn't check powerswitch status.";
+  echo "Checking disk status";
+  touch read_only.test
+  if [ $? -ne "0" ]; then
+    echo "Couldn't touch test file. Assumed read-only disk.";
+    echo "Rebooting"
+    sudo reboot
+    exit 2;
+  else
+    echo "Could touch test file. Unknown error. Exiting";
+    exit 1;
+  fi
+fi 
 
 SDR_PID=$(pgrep rmg_runretry)
 
-PREV_STATUS=$(rmg_csv --column site_status <$STATUS_LOG | tail -1)
-PREV_TIME=$(rmg_csv --column timestamp <$STATUS_LOG | tail -1)
+PREV_STATUS=$((head -n 1 $STATUS_LOG && tail -n 1 $STATUS_LOG) | rmg_csv --column site_status)
+PREV_TIME=$((head -n 1 $STATUS_LOG && tail -n 1 $STATUS_LOG) | rmg_csv --column timestamp)
 
 
 ## Transition functions ##
