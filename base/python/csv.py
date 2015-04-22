@@ -81,11 +81,16 @@ class csv:
 
     if type(fn) == str: 
       fd = open(fn, 'r')
-    elif type(fn) == file: 
+    else:
       fd = fn
-    else: raise TypeError('the read method requires either the file path as a str or a open file object')
+    #elif type(fn) == file: 
+      #fd = fn
+    #else: raise TypeError('the read method requires either the file path as a str or a open file object')
+    try:
+      headers = fd.readline().strip().split(',')
+    except AttributeError: #fd not file-like
+      raise TypeError('the read method requires either the file path as a str or a open file object')
 
-    headers = fd.readline().strip().split(',')
     if build_header:
       lengths = self.__build_header(headers)
     

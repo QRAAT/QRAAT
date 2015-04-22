@@ -140,23 +140,29 @@ RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
 if [ $? -ne "0" ]; then
   echo "Couldn't check powerswitch status.";
   echo "Checking disk status";
-  touch read_only.test
+  TMPFILE=$(mktemp ~/tempfile.XXXXXXXX)
   if [ $? -ne "0" ]; then
-    echo "Couldn't touch test file. Assumed read-only disk.";
-    echo "Rebooting"
-    sudo reboot
-    exit 2;
+    echo "Couldn't make test file."
+    AVAILABLE_BLOCKS=$(df -k / | tail -1 | awk '{print $4}')
+    if [ $AVAILABLE_BLOCKS -lt "1024" ]; then
+      echo "Disk Full"
+      #TODO poweroff? inform server? e-mail for help?
+      exit 3
+    else
+      echo "Read-only disk. Rebooting"
+      sudo reboot
+      exit 2
+    fi
   else
-    echo "Could touch test file. Unknown error. Exiting";
-    exit 1;
+    rm $TMPFILE
+    echo "Could make test file. Unknown error. Exiting"
+    exit 1
   fi
 fi 
 
 SDR_PID=$(pgrep rmg_runretry)
 
-PREV_STATUS=$((head -n 1 $STATUS_LOG && tail -n 1 $STATUS_LOG) | rmg_csv --column site_status)
-PREV_TIME=$((head -n 1 $STATUS_LOG && tail -n 1 $STATUS_LOG) | rmg_csv --column timestamp)
-
+read PREV_TIME PREV_STATUS <<< $((head -n 1 $STATUS_LOG && tail -n 1 $STATUS_LOG) | rmg_csv --last-row timestamp site_status)
 
 ## Transition functions ##
 function up() {
