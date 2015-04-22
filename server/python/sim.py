@@ -7,6 +7,8 @@ import position1
 import pickle, gzip, os
 import numpy as np
 import matplotlib.pyplot as pp
+import matplotlib.colors as colors
+import matplotlib.cm as cmx
 import scipy
 
 def nearest_sites(p, sites, k):
@@ -91,11 +93,6 @@ def save(prefix, pos, cov, exp_params, sys_params,):
   pickle.dump(cov[1], open(prefix + '-cov1', 'w'))
   pickle.dump(cov[2], open(prefix + '-cov2', 'w'))
   pickle.dump((exp_params, sys_params), open(prefix + '-params', 'w'))
-  os.chmod(prefix + '-cov0', 0444)
-  os.chmod(prefix + '-cov1', 0444)
-  os.chmod(prefix + '-cov2', 0444)
-  os.chmod(prefix + '-pos.npz', 0444)
-  os.chmod(prefix + '-params', 0444)
 
 def load(prefix):
   pos = np.load(prefix + '-pos.npz')['arr_0']
@@ -247,6 +244,74 @@ def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=Non
   pp.clf()
 
 
+def plot_contour(fn, exp_params, sys_params, pulse_ct, sig_n, pos, conf_level):
+  i = exp_params['pulse_ct'].index(pulse_ct)
+  j = exp_params['sig_n'].index(sig_n)
+  Qt = scipy.stats.chi2.ppf(conf_level, 2)
+  
+  fig = pp.gcf()
+  fig.set_size_inches(12,10)
+  ax = fig.add_subplot(111)
+  ax.axis('equal')
+  ax.set_xlabel('easting (m)')
+  ax.set_ylabel('northing (m)')
+
+  # Plot sites
+  (site_ids, P) = zip(*sys_params['sites'].iteritems())
+  X = np.imag(P)
+  Y = np.real(P)
+  pp.xlim([np.min(X) - 100, np.max(X) + 100])
+  pp.ylim([np.min(Y) - 100, np.max(Y) + 100])
+  
+  offset = 20
+  for (id, (x,y)) in zip(site_ids, zip(X,Y)): 
+    pp.text(x+offset, y+offset, id)
+  pp.scatter(X, Y, label='sites', facecolors='r')
+
+  # Plot positions.
+  s = 2 * exp_params['half_span'] + 1
+  angle = np.zeros((s,s), dtype=float)
+  eccentricity = np.zeros((s,s), dtype=float)
+  area = np.zeros((s,s), dtype=float)
+  for e in range(s): #easting 
+    for n in range(s): #northing
+      p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                             (e - exp_params['half_span']) * exp_params['scale'])
+      p_hat = pos[i,j,e,n,:]
+      C = np.cov(np.imag(p_hat), np.real(p_hat))
+      E = position1.Ellipse(p, *position1.compute_conf(C, Qt))
+      angle[e,n] = E.angle
+      eccentricity[e,n] = E.axes[1] / E.axes[0]
+      area[e,n] = E.area()
+
+  area = area / np.max(area)
+
+  c_norm  = colors.Normalize(vmin=np.min(eccentricity), vmax=np.max(eccentricity))
+  scalar_map = cmx.ScalarMappable(norm=c_norm,cmap='YlGnBu')
+  
+  weight = 1
+  lweight = 50
+  for e in range(s): #easting 
+    for n in range(s): #northing
+      p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                             (e - exp_params['half_span']) * exp_params['scale'])
+      a = 0.3 + area[e,n]
+      b = scalar_map.to_rgba(eccentricity[e,n])
+      dx = np.cos(angle[e,n]) * a * lweight
+      dy = np.sin(angle[e,n]) * a * lweight
+      pp.plot([p.imag - dx/2, p.imag + dx/2], 
+              [p.real - dy/2, p.real + dy/2],
+              lw=weight, color=b) 
+
+  #X = np.imag(pos.flat)
+  #Y = np.real(pos.flat)
+  #pp.scatter(X, Y, label='estimates', alpha=0.1, facecolors='b', edgecolors='none', s=5)
+
+  pp.savefig(fn, dpi=600)
+  pp.clf()
+
+
+
 def plot_distance(fn, pos, exp_params, sys_params, pulse_ct, sig_n, conf_level, step):
   i = exp_params['pulse_ct'].index(pulse_ct)
   j = exp_params['sig_n'].index(sig_n)
@@ -299,8 +364,8 @@ def plot_angular(fn, pos, site2_pos, exp_params, sys_params, pulse_ct, sig_n, co
   for (k, P) in enumerate(pos): # Plot positions.
     C = np.cov(np.imag(P[i,j,:,:,:].flat), np.real(P[i,j,:,:,:].flat))
     E = position1.Ellipse(p, *position1.compute_conf(C, Qt))
-    angle.append((180.0 * (k+1)) / step)
-    orientation.append(-180 * E.angle / np.pi)
+    angle.append((180 * (k+1)) / step)
+    orientation.append((180 * E.angle / np.pi) % 180)
     eccentricity.append(E.eccentricity())
 
   axarr[0].plot(angle, orientation)
@@ -377,31 +442,34 @@ def contour_test(prefix, center, sites, sv, conf_level):
                  'sig_n'     : [0.005],
                  'pulse_ct'  : [5],
                  'center'    : (4260738.3+574549j), 
-                 'half_span' : 3 * 6,
-                 'scale'     : 300 / 6,
-                 'trials'    : 20 }
+                 'half_span' : 3 * 12,
+                 'scale'     : 300 / 12,
+                 'trials'    : 1000 }
 
   sys_params = { 'method'  : 'bartlet', 
                  'include' : [],
                  'center'  : center,
                  'sites'   : sites } 
 
-  (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
-  save(prefix, pos, cov, exp_params, sys_params)
+  #(pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
+  #save(prefix, pos, cov, exp_params, sys_params)
+  (pos, cov, exp_params, sys_params) = load(prefix)
   plot_grid('contour_grid.png', exp_params, sys_params, 
       exp_params['pulse_ct'][0], exp_params['sig_n'][0])
+  plot_contour('contour.png', exp_params, sys_params, 
+      exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos, conf_level)
 
 
 def distance_test(db_con, prefix, center, conf_level):
   
   cal_id = 6
-  sv = signal1.SteeringVectors(db_con, cal_id, site_ids=[0])
+  sv = signal1.SteeringVectors(db_con, cal_id, include=[0])
   sv.steering_vectors[1] = sv.steering_vectors[0]
   sv.bearings[1] = sv.bearings[0]
-  sv.svID[1] = sv.svID[0]
+  sv.sv_id[1] = sv.sv_id[0]
 
-  sites = { 1 : (100+0j), 
-            0 : (0-100j) } 
+  sites = { 0 : (0+100j), 
+            1 : (100+0j) } 
 
   exp_params = { 'rho'       : 1,
                  'sig_n'     : [0.005],
@@ -418,7 +486,7 @@ def distance_test(db_con, prefix, center, conf_level):
                  'sites'   : sites.copy() } 
   
   pos = []
-  step = 10 
+  step = 5
   for i in range(50):
     (P, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
     save(prefix + str(i), P, cov, exp_params, sys_params)
@@ -434,12 +502,12 @@ def distance_test(db_con, prefix, center, conf_level):
 def angular_test(db_con, prefix, center, conf_level):
   
   cal_id = 6
-  sv = signal1.SteeringVectors(db_con, cal_id, site_ids=[0])
+  sv = signal1.SteeringVectors(db_con, cal_id, include=[0])
   sv.steering_vectors[1] = sv.steering_vectors[0]
   sv.bearings[1] = sv.bearings[0]
-  sv.svID[1] = sv.svID[0]
+  sv.sv_id[1] = sv.sv_id[0]
 
-  sites = { 0 : (0-100j), 
+  sites = { 0 : (0+100j), 
             1 : (0-100j) } 
 
   exp_params = { 'rho'       : 1,
@@ -454,7 +522,9 @@ def angular_test(db_con, prefix, center, conf_level):
                  'include' : [],
                  'center'  : center,
                  'sites'   : sites.copy() } 
-  step = 32
+  step = 40
+  # NOTE if `step` is too large than the position estimator won't 
+  # converge on extreme angles!
   p = np.array([sys_params['sites'][0].imag, 
                 sys_params['sites'][0].real]) 
   c = np.array([exp_params['center'].imag, 
@@ -490,13 +560,13 @@ if __name__ == '__main__':
   #distance_test(db_con, 'exp/dist', center, 0.95)
   
   #### ANGLE ##################################################################
-  #angular_test(db_con, 'exp/angle', center, 0.95)
+  angular_test(db_con, 'exp/angle', center, 0.95)
 
   #### GRID ###################################################################
   #grid_test('exp/grid', center, sites, sv, 0.95)
 
   #### CONTOUR ###################################################################
-  contour_test('exp/contour', center, sites, sv, 0.95)
+  #contour_test('exp/contour', center, sites, sv, 0.95)
   
   #### CONF ###################################################################
   #conf_test('exp/conf', center, sites, sv, 0.95)
