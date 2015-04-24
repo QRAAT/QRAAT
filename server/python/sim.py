@@ -8,8 +8,12 @@ import pickle, gzip, os
 import numpy as np
 import matplotlib.pyplot as pp
 import matplotlib.colors as colors
+import matplotlib.patches as patches
 import matplotlib.cm as cmx
 import scipy
+
+
+### SIMULATION ################################################################
 
 def nearest_sites(p, sites, k):
   # k nearest sites to p 
@@ -24,17 +28,15 @@ def create_array(exp_params, sys_params):
                     for j in range(len(exp_params['sig_n'])) ] 
                       for i in range(len(exp_params['pulse_ct'])) ]
 
-
 def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
   s = 2 * exp_params['half_span'] + 1
   shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s, exp_params['trials'])
   pos = np.zeros(shape, dtype=np.complex)
   if compute_cov:
-    cov0 = create_array(exp_params, sys_params) 
-    cov1 = create_array(exp_params, sys_params) 
-    cov2 = create_array(exp_params, sys_params) 
+    cov0 = create_array(exp_params, sys_params) # Asymptotic 
+    cov1 = create_array(exp_params, sys_params) # Bootstrap
   else: 
-    cov0 = cov1 = cov2 = None
+    cov0 = cov1 = None
 
   if sys_params['method'] == 'bartlet': 
     method = signal1.Signal.Bartlet
@@ -58,6 +60,7 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
     for j, sig_n in enumerate(exp_params['sig_n']): 
       print '  sig_n=%f' % sig_n
       for e in range(s): #easting 
+        print e, '|',
         for n in range(s): #northing
           P = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
                                                  (e - exp_params['half_span']) * exp_params['scale'])
@@ -77,31 +80,79 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
             # Estimate confidence region. 
             if compute_cov:
               cov0[i][j][e][n].append(position1.Covariance(P_hat, sites, p_known=P))
-              cov1[i][j][e][n].append(position1.Covariance2(P_hat, sites, p_known=P))
-              try: 
-                cov2[i][j][e][n].append(position1.BootstrapCovariance(P_hat, sites))
-              except np.linalg.linalg.LinAlgError:
-                print "Singular matrix!"
-                cov2[i][j][e][n].append(None)
+              cov1[i][j][e][n].append(None)
+              #try: 
+              #  cov1[i][j][e][n].append(position1.BootstrapCovariance(P_hat, sites))
+              #except np.linalg.linalg.LinAlgError:
+              #  print "Singular matrix!"
+              #  cov1[i][j][e][n].append(None)
+          print n,
+        print
+  return (pos, (cov0, cov1))
 
-  return (pos, (cov0, cov1, cov2))
+def montecarlo_spectrum(exp_params, sys_params, sv):
+  ''' MLE / Bartlet. ''' 
+  s = 2 * exp_params['half_span'] + 1
+  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s, exp_params['trials'])
+  pos_bartlet = np.zeros(shape, dtype=np.complex)
+  pos_mle = np.zeros(shape, dtype=np.complex)
 
+  sites = sys_params['sites']
+  include = sys_params['include']
+  
+  # Fix transmission power. 
+  scaled_rho = signal1.scale_tx_coeff(exp_params['center'], 
+                                      exp_params['rho'],
+                                      sites,
+                                      sys_params['include'])
+
+  # Interpolate steering vector splines.
+  sv_splines = signal1.compute_bearing_splines(sv)
+
+  for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
+    print 'pulse_ct=%d' % pulse_ct
+    for j, sig_n in enumerate(exp_params['sig_n']): 
+      print '  sig_n=%f' % sig_n
+      for e in range(s): #easting 
+        print e, '|',
+        for n in range(s): #northing
+          P = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                                 (e - exp_params['half_span']) * exp_params['scale'])
+          for k in range(exp_params['trials']): 
+            # Run simulation.
+            sig = signal1.Simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
+          
+            # Estimate position.
+            A = position1.PositionEstimator(999, sites, P, sig, sv, signal1.Signal.Bartlet, 
+                                                  s=15, m=3, n=-1, delta=10)
+            pos_bartlet[i,j,e,n,k] = A.p
+            B = position1.PositionEstimator(999, sites, P, sig, sv, signal1.Signal.MLE, 
+                                                  s=15, m=3, n=-1, delta=10)
+            pos_mle[i,j,e,n,k] = B.p
+          print n,
+        print
+  return (pos_bartlet, pos_mle)
+
+
+
+### SAVE RESULTS ##############################################################
 
 def save(prefix, pos, cov, exp_params, sys_params,):
   np.savez(prefix + '-pos', pos)
   pickle.dump(cov[0], open(prefix + '-cov0', 'w'))
   pickle.dump(cov[1], open(prefix + '-cov1', 'w'))
-  pickle.dump(cov[2], open(prefix + '-cov2', 'w'))
   pickle.dump((exp_params, sys_params), open(prefix + '-params', 'w'))
 
 def load(prefix):
   pos = np.load(prefix + '-pos.npz')['arr_0']
   cov0 = pickle.load(open(prefix + '-cov0', 'r'))
   cov1 = pickle.load(open(prefix + '-cov1', 'r'))
-  cov2 = pickle.load(open(prefix + '-cov2', 'r'))
   (exp_params, sys_params) = pickle.load(open(prefix + '-params'))
-  return (pos, (cov0, cov1, cov2), exp_params, sys_params)
-    
+  return (pos, (cov0, cov1), exp_params, sys_params)
+  
+
+### SUMARIZE RESULTS ##########################################################
+
 def pretty_report(pos, cov, exp_params, sys_params, conf_level):
   Qt = scipy.stats.chi2.ppf(conf_level, 2)
   fmt = lambda x : '%9s' % ('%0.2f' % x)
@@ -196,9 +247,9 @@ def plot_hist(pos, conf, exp_params, sys_params, conf_level): # TODO out-of-date
 
 
 
-### Plotting. #################################################################
+### PLOTTING ##################################################################
 
-def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=None):
+def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=None, alpha=0.1):
   i = exp_params['pulse_ct'].index(pulse_ct)
   j = exp_params['sig_n'].index(sig_n)
   
@@ -225,7 +276,7 @@ def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=Non
   if pos is not None: 
     X = np.imag(pos.flat)
     Y = np.real(pos.flat)
-  pp.scatter(X, Y, label='estimates', alpha=0.1, facecolors='b', edgecolors='none', s=5)
+  pp.scatter(X, Y, label='estimates', alpha=alpha, facecolors='b', edgecolors='none', s=5)
 
   # Plot grid
   offset = 10
@@ -240,7 +291,7 @@ def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=Non
         a = ', '.join(map(lambda(id) : str(id), sorted(include)))
         pp.text(p.imag+offset, p.real+offset, a, fontsize=8)
 
-  pp.savefig(fn)
+  pp.savefig(fn, dpi=300, bbox_inches='tight')
   pp.clf()
 
 
@@ -256,20 +307,10 @@ def plot_contour(fn, exp_params, sys_params, pulse_ct, sig_n, pos, conf_level):
   ax.set_xlabel('easting (m)')
   ax.set_ylabel('northing (m)')
 
-  # Plot sites
-  (site_ids, P) = zip(*sys_params['sites'].iteritems())
-  X = np.imag(P)
-  Y = np.real(P)
-  pp.xlim([np.min(X) - 100, np.max(X) + 100])
-  pp.ylim([np.min(Y) - 100, np.max(Y) + 100])
-  
-  offset = 20
-  for (id, (x,y)) in zip(site_ids, zip(X,Y)): 
-    pp.text(x+offset, y+offset, id)
-  pp.scatter(X, Y, label='sites', facecolors='r')
+  s = 2 * exp_params['half_span'] + 1
+
 
   # Plot positions.
-  s = 2 * exp_params['half_span'] + 1
   angle = np.zeros((s,s), dtype=float)
   eccentricity = np.zeros((s,s), dtype=float)
   area = np.zeros((s,s), dtype=float)
@@ -284,24 +325,44 @@ def plot_contour(fn, exp_params, sys_params, pulse_ct, sig_n, pos, conf_level):
       eccentricity[e,n] = E.axes[1] / E.axes[0]
       area[e,n] = E.area()
 
-  area = area / np.max(area)
 
   c_norm  = colors.Normalize(vmin=np.min(eccentricity), vmax=np.max(eccentricity))
   scalar_map = cmx.ScalarMappable(norm=c_norm,cmap='YlGnBu')
-  
-  weight = 1
+ 
+  # Eccentricity
+  for e in range(s):
+    for n in range(s):
+      p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                             (e - exp_params['half_span']) * exp_params['scale'])
+      b = scalar_map.to_rgba(eccentricity[e,n])
+      pp.scatter(p.imag, p.real, marker='s', color=b, edgecolors='none', s=50, alpha=0.8) 
+
+  # Area, orientation
+  area = area / np.max(area)
+  weight = 0.5
   lweight = 50
   for e in range(s): #easting 
     for n in range(s): #northing
       p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
                                              (e - exp_params['half_span']) * exp_params['scale'])
-      a = 0.3 + area[e,n]
-      b = scalar_map.to_rgba(eccentricity[e,n])
+      a = area[e,n]
       dx = np.cos(angle[e,n]) * a * lweight
       dy = np.sin(angle[e,n]) * a * lweight
       pp.plot([p.imag - dx/2, p.imag + dx/2], 
               [p.real - dy/2, p.real + dy/2],
-              lw=weight, color=b) 
+              lw=weight, color='k') 
+  
+  # Plot sites
+  (site_ids, P) = zip(*sys_params['sites'].iteritems())
+  X = np.imag(P)
+  Y = np.real(P)
+  pp.xlim([np.min(X) - 100, np.max(X) + 100])
+  pp.ylim([np.min(Y) - 100, np.max(Y) + 100])
+  
+  offset = 20
+  for (id, (x,y)) in zip(site_ids, zip(X,Y)): 
+    pp.text(x+offset, y+offset, id)
+  pp.scatter(X, Y, label='sites', facecolors='r')
 
   #X = np.imag(pos.flat)
   #Y = np.real(pos.flat)
@@ -338,8 +399,11 @@ def plot_distance(fn, pos, exp_params, sys_params, pulse_ct, sig_n, conf_level, 
     E.append(position1.Ellipse(p, angle, axes).eccentricity())
   pp.plot(D, E)
   
-  pp.title('Varying distance, {0}\%-confidence'.format(int(100 * conf_level)))
-  pp.savefig(fn)
+  l = 300; h = 0.17
+  pp.text(l, h, '$\sigma_n^2=%0.3f$' % exp_params['sig_n'][j])
+  pp.text(l, h-0.033, '$%d$ samples/site' % exp_params['pulse_ct'][i])
+  #pp.title('Varying distance, {0}\%-confidence'.format(int(100 * conf_level)))
+  pp.savefig(fn, dpi=300, bbox_inches='tight')
   pp.clf()
 
 
@@ -373,22 +437,22 @@ def plot_angular(fn, pos, site2_pos, exp_params, sys_params, pulse_ct, sig_n, co
   axarr[1].plot(angle, eccentricity)
   axarr[1].set_ylabel('Eccentricity')
 
-  axarr[0].set_title('Varying angle, {0}\%-confidence'.format(int(100 * conf_level)))
+  #axarr[0].set_title('Varying angle, {0}\%-confidence'.format(int(100 * conf_level)))
   axarr[1].set_xlabel('Angle between sites 1 and 2')
-  pp.savefig(fn)
+  pp.savefig(fn, dpi=300, bbox_inches='tight')
   pp.clf()
   
   
 
 
 
-### Testing, testing ... ######################################################
+### EXPERIMENTS ###############################################################
 
 def conf_test(prefix, center, sites, sv, conf_level): 
   
   exp_params = { 'rho'       : 1,
-                 'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [3,4,5,6,7,8,9,10],
+                 'sig_n'     : [0.001, 0.01, 0.1],#[0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
+                 'pulse_ct'  : [10,20,50,100],#[3,4,5,6,7,8,9,10],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
@@ -401,12 +465,11 @@ def conf_test(prefix, center, sites, sv, conf_level):
 
   (pos, cov) = montecarlo(exp_params, sys_params, sv)
   save(prefix, pos, cov, exp_params, sys_params)
+  #(pos, cov, exp_params, sys_params) = load(prefix)
   print "Covariance\n"
   pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
-  print "Covariance2\n"
-  pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
-  print "BootstrapCovariance\n"
-  pretty_report(pos, cov[2], exp_params, sys_params, conf_level)
+  #print "BootstrapCovariance\n"
+  #pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
 
 
 def grid_test(prefix, center, sites, sv, conf_level): 
@@ -444,7 +507,7 @@ def contour_test(prefix, center, sites, sv, conf_level):
                  'center'    : (4260738.3+574549j), 
                  'half_span' : 3 * 12,
                  'scale'     : 300 / 12,
-                 'trials'    : 1000 }
+                 'trials'    : 100 }
 
   sys_params = { 'method'  : 'bartlet', 
                  'include' : [],
@@ -458,6 +521,36 @@ def contour_test(prefix, center, sites, sv, conf_level):
       exp_params['pulse_ct'][0], exp_params['sig_n'][0])
   plot_contour('contour.png', exp_params, sys_params, 
       exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos, conf_level)
+
+
+def spectrum_test(db_con, prefix, center, conf_level): 
+  
+  cal_id = 6
+  sv = signal1.SteeringVectors(db_con, cal_id, include=[0])
+  sv.steering_vectors[1] = sv.steering_vectors[0]
+  sv.bearings[1] = sv.bearings[0]
+  sv.sv_id[1] = sv.sv_id[0]
+  
+  sites = { 0 : (0+100j), 
+            1 : (200+50j) } 
+
+  exp_params = { 'rho'       : 1,
+                 'sig_n'     : [0.5],
+                 'pulse_ct'  : [5],
+                 'center'    : (0+0j), 
+                 'half_span' : 0,
+                 'scale'     : 1,
+                 'trials'    : 10 }
+
+  sys_params = { 'include'        : [],
+                 'sites'          : sites } 
+
+  (pos_bartlet, pos_mle) = montecarlo_spectrum(exp_params, sys_params, sv)
+  plot_grid('pos_bartlet.png', exp_params, sys_params, 
+    exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos_bartlet, alpha=1)
+  plot_grid('pos_mle.png', exp_params, sys_params, 
+    exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos_mle, alpha=1)
+  
 
 
 def distance_test(db_con, prefix, center, conf_level):
@@ -488,10 +581,10 @@ def distance_test(db_con, prefix, center, conf_level):
   pos = []
   step = 5
   for i in range(50):
-    (P, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
-    save(prefix + str(i), P, cov, exp_params, sys_params)
+    #(P, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
+    #save(prefix + str(i), P, cov, exp_params, sys_params)
+    (P, cov, exp_params, sys_params) = load(prefix + str(i))
     sys_params['sites'][1] += step
-    #(P, cov, exp_params, sys_params) = load(prefix + str(i))
     pos.append(P) 
   sys_params['sites'] = sites
   plot_distance('dist.png', pos, exp_params, sys_params, 
@@ -538,15 +631,18 @@ def angular_test(db_con, prefix, center, conf_level):
     b = np.dot(A, p-c) + c
     site2_pos.append(b)
     sys_params['sites'][1] = np.complex(b[1], b[0])
-    (P, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
-    save(prefix + str(i), P, cov, exp_params, sys_params)
+    #(P, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
+    #save(prefix + str(i), P, cov, exp_params, sys_params)
+    (P, cov, exp_params, sys_params) = load(prefix + str(i))
     pos.append(P)
   site2_pos = np.vstack(site2_pos)
 
   plot_angular('angle.png', pos, site2_pos, exp_params, sys_params, 
                 exp_params['pulse_ct'][0], exp_params['sig_n'][0], conf_level, step)
 
-  
+ 
+
+### Testing, testing ... ######################################################
 
 if __name__ == '__main__':
 
@@ -556,11 +652,14 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
  
+  #### SPECTRUM ##############################################################
+  #spectrum_test(db_con, 'exp/spectrum', center, 0.95)
+
   #### DISTANCE ###############################################################
   #distance_test(db_con, 'exp/dist', center, 0.95)
   
   #### ANGLE ##################################################################
-  angular_test(db_con, 'exp/angle', center, 0.95)
+  #angular_test(db_con, 'exp/angle', center, 0.95)
 
   #### GRID ###################################################################
   #grid_test('exp/grid', center, sites, sv, 0.95)
@@ -569,4 +668,4 @@ if __name__ == '__main__':
   #contour_test('exp/contour', center, sites, sv, 0.95)
   
   #### CONF ###################################################################
-  #conf_test('exp/conf', center, sites, sv, 0.95)
+  conf_test('exp/asym', center, sites, sv, 0.95)

@@ -369,40 +369,6 @@ class Ellipse:
 ### Covariance. ###############################################################
 
 class Covariance:
-
-  def __init__(self, pos, sites, p_known=None, half_span=75, scale=0.5):
-    ''' Confidence region from asymptotic covariance. ''' 
-    self.p_hat = pos.p
-    self.half_span = half_span
-    self.scale = scale
-  
-    if p_known:
-      p = p_known
-    else: 
-      p = pos.p
-    x = np.array([half_span, half_span])
-
-    (positions, likelihoods) = compute_likelihood(
-                             sites, pos.splines, p, scale, half_span)
-    
-    # Obj function, Hessian matrix, and gradient vector. 
-    J = lambda (x) : likelihoods[x[0], x[1]]
-    H = nd.Hessian(J)
-    Del = nd.Gradient(J)
-   
-    # Covariance.  
-    b = Del(x)  
-    A = np.linalg.inv(H(x))
-    self.C = np.dot(A, np.dot(np.dot(b, b.T), A)) 
-
-  def conf(self, level): 
-    ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
-    Qt = scipy.stats.chi2.ppf(level, 2) * self.scale
-    (angle, axes) = compute_conf(self.C, Qt, 1) 
-    return Ellipse(self.p_hat, angle, axes, 0, 1)
-
-
-class Covariance2 (Covariance):
   
   def __init__(self, pos, sites, p_known=None, half_span=75, scale=0.5):
     ''' Confidence region from asymptotic covariance. ''' 
@@ -410,33 +376,45 @@ class Covariance2 (Covariance):
     self.half_span = half_span
     self.scale = scale
     n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
-    m = n / pos.num_sites
+    self.m = n / pos.num_sites
   
     if p_known:
       p = p_known
     else: 
       p = pos.p
     x = np.array([half_span, half_span])
-    
-    C = np.zeros((2,2), dtype=np.float64)
-    for i in range(m):
+   
+    # Hessian
+    (positions, likelihoods) = compute_likelihood(
+                             sites, pos.splines, p, scale, half_span)
+    J = lambda (x) : likelihoods[x[0], x[1]]
+    H = nd.Hessian(J)(x)
+    A = np.linalg.inv(H)
+
+    # Gradient
+    B = np.zeros((2,2), dtype=np.float64)
+    for i in range(self.m):
       splines = { id : p[i] for (id, p) in pos.all_splines.iteritems() }
       (positions, likelihoods) = compute_likelihood(
                                sites, splines, p, scale, half_span)
       J = lambda (x) : likelihoods[x[0], x[1]]
-      b = np.array([nd.Gradient(J)(x)])
+      b = np.array([nd.Gradient(J)(x)]).T
+      B += np.dot(b, b.T)
+    B = B / self.m
+    
+    self.C = np.dot(A, np.dot(B, A))
 
-      A = np.linalg.inv(nd.Hessian(J)(x))
-      d = np.dot(b, A)
-      C += np.dot(d.T, d)
-      
-    self.C = C / m 
+  def conf(self, level): 
+    ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
+    Qt = scipy.stats.chi2.ppf(level, 2) 
+    k = 1.0 / self.m
+    (angle, axes) = compute_conf(self.C * k, Qt, 1) 
+    return Ellipse(self.p_hat, angle, axes, 0, 1)
 
 
+class BootstrapCovariance (Covariance):
 
-class BootstrapCovariance:
-
-  def __init__(self, pos, sites, max_resamples=100):
+  def __init__(self, pos, sites, max_resamples=200):
     ''' Bootstrap method for estimationg covariance of a position estimate. 
 
       Generate at most `max_resamples` position estimates by resampling the signals used

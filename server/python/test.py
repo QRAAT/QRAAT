@@ -65,9 +65,9 @@ def sim_data():
   pos.plot('fella.png', sites, center, p)
  
   level=0.95
-  #position1.Covariance(pos, sites, p_known=p).conf(level).display(p)
-  #position1.Covariance2(pos, sites, p_known=p).conf(level).display(p)
   position1.BootstrapCovariance(pos, sites).conf(level).display(p)
+  position1.Covariance(pos, sites, p_known=p).conf(level).display(p)
+  #position1.Covariance2(pos, sites, p_known=p).conf(level).display(p)
 
 
 
