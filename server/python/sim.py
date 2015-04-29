@@ -332,8 +332,11 @@ def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=Non
   i = exp_params['pulse_ct'].index(pulse_ct)
   j = exp_params['sig_n'].index(sig_n)
   
+  pp.rc('text', usetex=True)
+  pp.rc('font', family='serif')
+  
   fig = pp.gcf()
-  fig.set_size_inches(12,10)
+  #fig.set_size_inches(12,10)
   ax = fig.add_subplot(111)
   ax.axis('equal')
   ax.set_xlabel('easting (m)')
@@ -343,18 +346,19 @@ def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=Non
   (site_ids, P) = zip(*sys_params['sites'].iteritems())
   X = np.imag(P)
   Y = np.real(P)
-  pp.xlim([np.min(X) - 100, np.max(X) + 100])
-  pp.ylim([np.min(Y) - 100, np.max(Y) + 100])
-  
-  offset = 20
+  pp.xlim([np.min(X) - 10, np.max(X) + 10])
+  pp.ylim([np.min(Y) - 20, np.max(Y) + 20])
+  l = np.max(X) - 10; h = np.max(Y) - 10
+
+  offset = 5
   for (id, (x,y)) in zip(site_ids, zip(X,Y)): 
     pp.text(x+offset, y+offset, id)
   pp.scatter(X, Y, label='sites', facecolors='r')
 
   # Plot positions.
   if pos is not None: 
-    X = np.imag(pos.flat)
-    Y = np.real(pos.flat)
+    X = np.imag(pos[i,j].flat)
+    Y = np.real(pos[i,j].flat)
   pp.scatter(X, Y, label='estimates', alpha=alpha, facecolors='b', edgecolors='none', s=5)
 
   # Plot grid
@@ -369,9 +373,46 @@ def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=Non
         include = nearest_sites(p, sys_params['sites'], nearest)
         a = ', '.join(map(lambda(id) : str(id), sorted(include)))
         pp.text(p.imag+offset, p.real+offset, a, fontsize=8)
+  
+  # Exp. params
+  pp.text(l, h, '$\sigma_n^2=%0.1f$' % exp_params['sig_n'][j])
+  pp.text(l, h-5, '$%d$ samples/site' % exp_params['pulse_ct'][i])
 
   pp.savefig(fn, dpi=300, bbox_inches='tight')
   pp.clf()
+
+
+
+def plot_distribution(fn, exp_params, sys_params, pulse_ct, sig_n, pos, alpha=0.1):
+  i = exp_params['pulse_ct'].index(pulse_ct)
+  j = exp_params['sig_n'].index(sig_n)
+  e = 0; n = 0;
+  
+  pp.rc('text', usetex=True)
+  pp.rc('font', family='serif')
+  
+  fig = pp.gcf()
+  fig.set_size_inches(4,2)
+  ax = fig.add_subplot(111)
+  ax.axis('equal')
+  ax.set_xlabel('easting (m)')
+  ax.set_ylabel('northing (m)')
+
+  X = np.imag(pos[i,j,e,n].flat)
+  Y = np.real(pos[i,j,e,n].flat)
+  
+  pp.scatter(X, Y, label='estimates', alpha=alpha, facecolors='b', edgecolors='none', s=5)
+  pp.xlim([np.min(X) - 0, np.max(X) + 0])
+  pp.ylim([np.min(Y) - 0, np.max(Y) + 0])
+  l = np.max(X) - 10; h = np.max(Y) - 10
+
+  p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                         (e - exp_params['half_span']) * exp_params['scale'])
+  pp.plot(p.imag, p.real, label='grid', color='w', marker='o', ms=5)
+  
+  pp.savefig(fn, dpi=300, bbox_inches='tight')
+  pp.clf()
+
 
 
 def plot_contour(fn, exp_params, sys_params, pulse_ct, sig_n, pos, conf_level):
@@ -463,7 +504,7 @@ def plot_distance(fn, pos, exp_params, sys_params, pulse_ct, sig_n, conf_level, 
   #fig.set_size_inches(8,6)
   ax = fig.add_subplot(111)
   #ax.axis('equal')
-  ax.set_xlabel('Distance to site 2 (m)')
+  ax.set_xlabel('Distance to site 1 (m)')
   ax.set_ylabel('Eccentricity of ellipse')
 
   # Eccentricity of confidence intervals
@@ -517,11 +558,63 @@ def plot_angular(fn, pos, site2_pos, exp_params, sys_params, pulse_ct, sig_n, co
   axarr[1].set_ylabel('Eccentricity')
 
   #axarr[0].set_title('Varying angle, {0}\%-confidence'.format(int(100 * conf_level)))
-  axarr[1].set_xlabel('Angle between sites 1 and 2')
+  axarr[1].set_xlabel('Angle between sites 0 and 1')
   pp.savefig(fn, dpi=300, bbox_inches='tight')
   pp.clf()
   
   
+def plot_rmse(fn, pos, p, exp_params, sys_params): 
+  x = position1.transform_coord(p, exp_params['center'], 
+                  exp_params['half_span'], exp_params['scale'])
+  e = x[0]; n = x[1]
+  
+  pp.rc('text', usetex=True)
+  pp.rc('font', family='serif')
+  fig = pp.gcf()
+  fig.set_size_inches(6,4)
+  ax = fig.add_subplot(111)
+  ax.set_xlabel('Samples per site')
+  ax.set_ylabel('$\\textsc{Rmse}$')
+  
+  for (j, sig_n) in enumerate(exp_params['sig_n']):
+    rmse = []
+    for (i, pulse_ct) in enumerate(exp_params['pulse_ct']):
+      rmse.append(
+        np.sqrt(np.mean(np.abs(pos[i,j,e,n,:] - p) ** 2)))
+    pp.plot(exp_params['pulse_ct'], rmse, label='$\sigma_n^2=%0.3f$' % sig_n)
+
+  #pp.legend(title='Noise level', ncol=2)
+  pp.savefig(fn, dpi=300, bbox_inches='tight')
+  pp.clf()
+
+
+def plot_area(fn, pos, p, exp_params, sys_params, conf_level, cov=None): 
+  x = position1.transform_coord(p, exp_params['center'], 
+                  exp_params['half_span'], exp_params['scale'])
+  e = x[0]; n = x[1]
+  Qt = scipy.stats.chi2.ppf(conf_level, 2)
+  
+  pp.rc('text', usetex=True)
+  pp.rc('font', family='serif')
+  fig = pp.gcf()
+  fig.set_size_inches(6,4)
+  ax = fig.add_subplot(111)
+  ax.set_xlabel('Samples per site')
+  ax.set_ylabel('Area of {0}\%--conf. region (m$^2$)'.format(int(100 * conf_level)))
+  for (j, sig_n) in enumerate(exp_params['sig_n']):
+    area = []
+    for (i, pulse_ct) in enumerate(exp_params['pulse_ct']):
+      p_hat = pos[i,j,e,n,:]
+      C = np.cov(np.imag(p_hat), np.real(p_hat))
+      (angle, axes) = position1.compute_conf(C, Qt)
+      area.append(
+        position1.Ellipse(p, angle, axes).area())
+    pp.plot(exp_params['pulse_ct'], area, label='$\sigma_n^2=%0.3f$' % sig_n)
+
+  pp.legend(title='Noise level', ncol=2)
+  pp.savefig(fn, dpi=300, bbox_inches='tight')
+  pp.clf()
+
 
 
 
@@ -530,8 +623,8 @@ def plot_angular(fn, pos, site2_pos, exp_params, sys_params, pulse_ct, sig_n, co
 def conf_test(prefix, center, sites, sv, conf_level): 
   
   exp_params = { 'rho'       : 1,
-                 'sig_n'     : [0.001, 0.01, 0.1],#[0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [10,20,50,100],#[3,4,5,6,7,8,9,10],
+                 'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
+                 'pulse_ct'  : [10,20,50,100],
                  'center'    : (4260838.3+574049j), 
                  'half_span' : 0,
                  'scale'     : 1,
@@ -575,10 +668,13 @@ def one_test(db_con, prefix, conf_level):
                  'include' : [],
                  'sites'   : sites.copy() } 
   
-  
-  (pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
-  save(prefix, pos, cov, exp_params, sys_params)
-  pretty_report(pos, None, exp_params, sys_params, conf_level)
+  #(pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
+  #save(prefix, pos, cov, exp_params, sys_params)
+  (pos, _, exp_params, sys_params) = load(prefix)
+  #plot_rmse('rmse.png', pos, exp_params['center'], exp_params, sys_params)
+  #plot_area('area.png', pos, exp_params['center'], exp_params, sys_params, 0.95)
+  plot_grid('noise-sample-ill.png', exp_params, sys_params, 5, 0.1, pos)
+  #pretty_report(pos, None, exp_params, sys_params, conf_level)
 
 
 def grid_test(prefix, center, sites, sv, conf_level): 
@@ -604,7 +700,7 @@ def grid_test(prefix, center, sites, sv, conf_level):
   #print "BootstrapCovariance\n"
   #pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
   plot_grid('grid.png', exp_params, sys_params, 
-      exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos, nearest=3)
+      exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos)
 
 
 def contour_test(prefix, center, sites, sv, conf_level): 
@@ -697,8 +793,8 @@ def distance_test(db_con, prefix, center, conf_level):
   sys_params['sites'] = sites
   plot_distance('dist.png', pos, exp_params, sys_params, 
       exp_params['pulse_ct'][0], exp_params['sig_n'][0], conf_level, step)
-  plot_grid('distribution.png', exp_params, sys_params, 
-    exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos[0], alpha=0.1)
+  plot_distribution('dist-ill.png', exp_params, sys_params, 
+    exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos[20], alpha=0.1)
       
 
 
@@ -749,6 +845,8 @@ def angular_test(db_con, prefix, center, conf_level):
 
   plot_angular('angle.png', pos, site2_pos, exp_params, sys_params, 
                 exp_params['pulse_ct'][0], exp_params['sig_n'][0], conf_level, step)
+  plot_distribution('angle-ill.png', exp_params, sys_params, 
+    exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos[30], alpha=0.1)
 
  
 
@@ -775,10 +873,10 @@ if __name__ == '__main__':
   #angular_test(db_con, 'exp/angle', center, 0.95)
 
   #### GRID ###################################################################
-  grid_test('exp/grid', center, sites, sv, 0.95)
+  #grid_test('exp/grid', center, sites, sv, 0.95)
 
   #### CONTOUR ###################################################################
   #contour_test('exp/contour', center, sites, sv, 0.95)
   
   #### CONF ###################################################################
-  #conf_test('exp/asym', center, sites, sv, 0.95)
+  conf_test('exp/asym', center, sites, sv, 0.95)

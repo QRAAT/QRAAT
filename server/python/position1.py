@@ -281,10 +281,10 @@ class Ellipse:
     self.x = np.array([half_span, half_span])
 
   def area(self):
-    return np.pi * self.axes[0] * self.axes[1]
+    return np.pi * self.axes[0] * self.axes[1] / 4
 
   def eccentricity(self):
-    return np.sqrt(1 - ((self.axes[1]**2) / (self.axes[0]**2)))
+    return np.sqrt(1 - ((self.axes[1]/2)**2) / ((self.axes[0]/2)**2))
 
   def cartesian(self): 
     theta = np.linspace(0,2*np.pi, 360)
@@ -566,8 +566,8 @@ def compute_position(sites, splines, center, obj, s, m, n, delta):
   span = s * 2 + 1
   for i in reversed(range(n, m)):
     scale = pow(delta, i)
-    a = b = 0
-    while a == 0 or a == span-1 or b == 0 or b == span-1: 
+    a = b = ct = 0
+    while ct < 10 and (a == 0 or a == span-1 or b == 0 or b == span-1): 
       # Deal with boundary cases. If p_hat falls along the 
       # edge of the grid, recompute with p_hat as center. FIXME
       (positions, likelihoods) = compute_likelihood(
@@ -577,7 +577,7 @@ def compute_position(sites, splines, center, obj, s, m, n, delta):
       p_hat = positions.flat[index]
       likelihood = likelihoods.flat[index]
       a = index / span; b = index % span
-      break
+      ct += 1
 
   return p_hat, likelihood
 

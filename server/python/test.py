@@ -67,8 +67,7 @@ def sim_data():
   level=0.95
   position1.BootstrapCovariance(pos, sites).conf(level).display(p)
   position1.Covariance(pos, sites, p_known=p).conf(level).display(p)
-  #position1.Covariance2(pos, sites, p_known=p).conf(level).display(p)
-
+  print position1.Covariance(pos, sites, p_known=p).conf(level).eccentricity()
 
 
 # Testing, testing .... 
