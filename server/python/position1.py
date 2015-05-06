@@ -212,7 +212,7 @@ class Position:
       print 'yes'
       return 
 
-    (positions, likelihoods) = compute_likelihood(
+    (positions, likelihoods) = compute_likelihood_grid(
                          sites, self.splines, center, scale, half_span)
 
     fig = pp.gcf()
@@ -385,7 +385,7 @@ class Covariance:
     x = np.array([half_span, half_span])
    
     # Hessian
-    (positions, likelihoods) = compute_likelihood(
+    (positions, likelihoods) = compute_likelihood_grid(
                              sites, pos.splines, p, scale, half_span)
     J = lambda (x) : likelihoods[x[0], x[1]]
     H = nd.Hessian(J)(x)
@@ -395,7 +395,7 @@ class Covariance:
     B = np.zeros((2,2), dtype=np.float64)
     for i in range(self.m):
       splines = { id : p[i] for (id, p) in pos.all_splines.iteritems() }
-      (positions, likelihoods) = compute_likelihood(
+      (positions, likelihoods) = compute_likelihood_grid(
                                sites, splines, p, scale, half_span)
       J = lambda (x) : likelihoods[x[0], x[1]]
       b = np.array([nd.Gradient(J)(x)]).T
@@ -520,7 +520,7 @@ def compute_bearing_spline(l):
   likelihood_range = np.hstack((l, l))
   return spline1d(bearing_domain, likelihood_range)
 
-def compute_likelihood(sites, splines, center, scale, half_span):
+def compute_likelihood_grid(sites, splines, center, scale, half_span):
   ''' Compute a grid of candidate points and their likelihoods. '''
    
   # Generate a grid of positions with center at the center. 
@@ -537,6 +537,14 @@ def compute_likelihood(sites, splines, center, scale, half_span):
     likelihoods += splines[id](bearing_to_positions.flat).reshape(bearing_to_positions.shape)
   
   return (positions, likelihoods)
+
+
+def compute_likelihood(sites, splines, p): 
+  likelihood = 0
+  for id in splines.keys():
+    bearing = np.angle(p - sites[id]) * 180 / np.pi
+    likelihood += splines[id](bearing)
+  return likelihood
 
 
 def compute_position(sites, splines, center, obj, s, m, n, delta):
@@ -562,15 +570,16 @@ def compute_position(sites, splines, center, obj, s, m, n, delta):
     
       Returns UTM position estimate as a complex number. 
   '''
+  assert m >= n
   p_hat = center
   span = s * 2 + 1
-  for i in reversed(range(n, m)):
-    scale = pow(delta, i)
+  for i in reversed(range(n, m+1)):
+    scale = delta ** i
     a = b = ct = 0
     while ct < 10 and (a == 0 or a == span-1 or b == 0 or b == span-1): 
       # Deal with boundary cases. If p_hat falls along the 
       # edge of the grid, recompute with p_hat as center. FIXME
-      (positions, likelihoods) = compute_likelihood(
+      (positions, likelihoods) = compute_likelihood_grid(
                              sites, splines, p_hat, scale, s)
       
       index = obj(likelihoods)
@@ -580,6 +589,27 @@ def compute_position(sites, splines, center, obj, s, m, n, delta):
       ct += 1
 
   return p_hat, likelihood
+
+def compute_position2(sites, splines, center, obj, s, m, n, delta):
+  
+  # Initial guess
+  (positions, likelihoods) = compute_likelihood_grid(
+                          sites, splines, center, delta**m, s)
+  center = positions.flat[obj(likelihoods)]
+  x0 = [center.imag, center.real]
+ 
+  # Optimize starting at initial guess
+  bounds = ((center.imag - (s * delta**(m-1)), center.imag + (s * delta**(m-1))), 
+            (center.real - (s * delta**(m-1)), center.real + (s * delta**(m-1))))
+  
+  if obj == np.argmin: A = 1
+  else: A = -1
+  f = lambda(x) : A * compute_likelihood(sites, splines, np.complex(x[1], x[0]))
+ 
+  res = scipy.optimize.minimize(f, x0, bounds=bounds)
+  p_hat = np.complex(res.x[1], res.x[0])
+  return p_hat, compute_likelihood(sites, splines, p_hat)
+  
 
 
 def transform_coord(p, center, half_span, scale):

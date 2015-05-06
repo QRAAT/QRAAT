@@ -75,8 +75,8 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
             sig = signal1.Simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
           
             # Estimate position.
-            P_hat = position1.PositionEstimator(999, sites, P, sig, sv, method, 
-                                                  s=15, m=2, n=-1, delta=10)
+            P_hat = position1.PositionEstimator(999, sites, sys_params['center'], sig, sv, method, 
+                                                  s=150, m=2, n=-1, delta=10)
             pos[i,j,e,n,k] = P_hat.p
 
             # Estimate confidence region. 
@@ -644,6 +644,28 @@ def conf_test(prefix, center, sites, sv, conf_level):
   #pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
 
 
+
+def convergence_test(prefix, center, sites, sv, conf_level): 
+  
+    
+  exp_params = { 'rho'       : 1,
+                 'sig_n'     : [0.01],
+                 'pulse_ct'  : [5],
+                 'center'    : 4260738.3+575199j + 0-50j,
+                 'half_span' : 0,
+                 'scale'     : 1,
+                 'trials'    : 100 }
+
+  sys_params = { 'method'         : 'bartlet', 
+                 'include'        : [4,6,8],
+                 'center'         : center,
+                 'sites'          : sites } 
+
+  (pos, cov) = montecarlo(exp_params, sys_params, sv, nearest=3, compute_cov=False)
+  plot_grid('convergence.png', exp_params, sys_params, 5, 0.01, pos)
+
+
+
 def one_test(db_con, prefix, conf_level):
   
   cal_id = 6
@@ -692,15 +714,14 @@ def grid_test(prefix, center, sites, sv, conf_level):
                  'center'  : center,
                  'sites'   : sites } 
 
-  montecarlo_huge(prefix, exp_params, sys_params, 
-                              sv, compute_cov=True, nearest=3)
+  #montecarlo_huge(prefix, exp_params, sys_params, 
+  #                            sv, compute_cov=True, nearest=3)
   pos = load_grid(prefix, exp_params, sys_params)
   #print "Covariance\n"
   #pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
   #print "BootstrapCovariance\n"
   #pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
-  plot_grid('grid.png', exp_params, sys_params, 
-      exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos)
+  plot_grid('grid.png', exp_params, sys_params, 4, 0.001, pos)
 
 
 def contour_test(prefix, center, sites, sv, conf_level): 
@@ -860,6 +881,8 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
 
+  convergence_test('exp/test', center, sites, sv, 0.95)
+
   #### ONE ###################################################################
   #one_test(db_con, 'exp/one', 0.95)
 
@@ -879,4 +902,4 @@ if __name__ == '__main__':
   #contour_test('exp/contour', center, sites, sv, 0.95)
   
   #### CONF ###################################################################
-  conf_test('exp/asym', center, sites, sv, 0.95)
+  #conf_test('exp/asym', center, sites, sv, 0.95)
