@@ -36,9 +36,10 @@ import numdifftools as nd
 import utm
 import itertools, random
 
-HALF_SPAN = 15         
-SCALE = 10             # Meters
-ELLIPSE_PLOT_SCALE = 5 # Scaling factor
+POS_EST_M = 3
+POS_EST_N = -1
+POS_EST_DELTA = 5
+POS_EST_S = 10
 
 class PositionError (Exception): 
   value = 0; msg = ''
@@ -60,7 +61,7 @@ class UnboundedContourError (PositionError):
 ### Position estimation. ######################################################
 
 def PositionEstimator(dep_id, sites, center, signal, sv, method=signal1.Signal.Bartlet,
-                        s=HALF_SPAN, m=3, n=-1, delta=SCALE):
+                        s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA):
   ''' Estimate the source of a signal. 
   
     Inputs: 
@@ -90,7 +91,7 @@ def PositionEstimator(dep_id, sites, center, signal, sv, method=signal1.Signal.B
 
 def WindowedPositionEstimator(dep_id, sites, center, signal, sv, t_step, t_win, 
                               method=signal1.Signal.Bartlet, 
-                              s=HALF_SPAN, m=3, n=-1, delta=SCALE):
+                              s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA):
   ''' Estimate the source of a signal, aggregate site data. 
   
     Inputs: 
@@ -239,7 +240,7 @@ class Position:
     pp.scatter(
       [e(float(s.imag)) for s in sites.values()],
       [n(float(s.real)) for s in sites.values()],
-       s=HALF_SPAN, facecolor='0.5', label='sites', zorder=10)
+       s=half_span / scale, facecolor='0.5', label='sites', zorder=10)
    
     # True position (if known).
     if p_known: 
@@ -590,27 +591,6 @@ def compute_position(sites, splines, center, obj, s, m, n, delta):
 
   return p_hat, likelihood
 
-def compute_position2(sites, splines, center, obj, s, m, n, delta):
-  
-  # Initial guess
-  (positions, likelihoods) = compute_likelihood_grid(
-                          sites, splines, center, delta**m, s)
-  center = positions.flat[obj(likelihoods)]
-  x0 = [center.imag, center.real]
- 
-  # Optimize starting at initial guess
-  bounds = ((center.imag - (s * delta**(m-1)), center.imag + (s * delta**(m-1))), 
-            (center.real - (s * delta**(m-1)), center.real + (s * delta**(m-1))))
-  
-  if obj == np.argmin: A = 1
-  else: A = -1
-  f = lambda(x) : A * compute_likelihood(sites, splines, np.complex(x[1], x[0]))
- 
-  res = scipy.optimize.minimize(f, x0, bounds=bounds)
-  p_hat = np.complex(res.x[1], res.x[0])
-  return p_hat, compute_likelihood(sites, splines, p_hat)
-  
-
 
 def transform_coord(p, center, half_span, scale):
   ''' Transform position as a complex number to some coordinate system. ''' 
@@ -642,7 +622,7 @@ def bootstrap_resample(pos, sites, max_samples, obj):
       j = random.randint(0, len(pos.sub_splines[id])-1)
       splines[id] = pos.sub_splines[id][j]
     (p, _) = compute_position(sites, splines, pos.p, obj,
-              s=HALF_SPAN, m=2, n=-1, delta=SCALE) 
+              s=POS_EST_S, m=POS_EST_M-1, n=POS_EST_N, delta=POS_EST_DELTA) 
     P.append(transform_coord(p, pos.p, 0, 1))
     
   return P
@@ -655,7 +635,7 @@ def bootstrap_resample_site(pos, sites, max_samples, obj):
   for site_ids in itertools.combinations(pos.splines.keys(), 2):
     splines = { id : pos.splines[id] for id in site_ids }
     (p, _) = compute_position(sites, splines, pos.p, obj,
-              s=HALF_SPAN, m=2, n=-1, delta=SCALE) 
+              s=POS_EST_S, m=POS_EST_M-1, n=POS_EST_N, delta=POS_EST_DELTA) 
     P.append(transform_coord(p, pos.p, 0, 1))
   random.shuffle(P)
   return P

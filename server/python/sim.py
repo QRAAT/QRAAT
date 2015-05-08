@@ -15,7 +15,15 @@ import scipy
 
 ### SIMULATION ################################################################
 
+
 POS_EXT_FMT = '-%02d.%02d'
+
+# Constraint: (delta * s)^m = 1500. m=2, n=-1, delta=10, s=150.
+POS_EST_M = 3
+POS_EST_N = -1
+POS_EST_DELTA = 5
+POS_EST_S = 10
+
 
 def nearest_sites(p, sites, k):
   # k nearest sites to p 
@@ -76,7 +84,7 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
           
             # Estimate position.
             P_hat = position1.PositionEstimator(999, sites, sys_params['center'], sig, sv, method, 
-                                                  s=150, m=2, n=-1, delta=10)
+                             s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA)
             pos[i,j,e,n,k] = P_hat.p
 
             # Estimate confidence region. 
@@ -142,7 +150,7 @@ def montecarlo_huge(prefix, exp_params, sys_params, sv, nearest=None, compute_co
           
             # Estimate position.
             P_hat = position1.PositionEstimator(999, sites, P, sig, sv, method, 
-                                                  s=15, m=2, n=-1, delta=10)
+                             s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA)
             pos[i,j,k] = P_hat.p
 
             # Estimate confidence region. 
@@ -193,10 +201,10 @@ def montecarlo_spectrum(exp_params, sys_params, sv):
           
             # Estimate position.
             A = position1.PositionEstimator(999, sites, P, sig, sv, signal1.Signal.Bartlet, 
-                                                  s=15, m=3, n=-1, delta=10)
+                             s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA)
             pos_bartlet[i,j,e,n,k] = A.p
             B = position1.PositionEstimator(999, sites, P, sig, sv, signal1.Signal.MLE, 
-                                                  s=15, m=3, n=-1, delta=10)
+                             s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA)
             pos_mle[i,j,e,n,k] = B.p
           print n,
         print
@@ -649,20 +657,21 @@ def convergence_test(prefix, center, sites, sv, conf_level):
   
     
   exp_params = { 'rho'       : 1,
-                 'sig_n'     : [0.01],
-                 'pulse_ct'  : [5],
-                 'center'    : 4260738.3+575199j + 0-50j,
-                 'half_span' : 0,
-                 'scale'     : 1,
-                 'trials'    : 100 }
+                 'sig_n'     : [0.001],
+                 'pulse_ct'  : [10],
+                 #'center'    : 4260738.3+575199j + 0-50j,
+                 'center'    : (4260738.3+574549j), 
+                 'half_span' : 6,
+                 'scale'     : 150,
+                 'trials'    : 1000 }
 
   sys_params = { 'method'         : 'bartlet', 
-                 'include'        : [4,6,8],
+                 'include'        : [],
                  'center'         : center,
                  'sites'          : sites } 
 
   (pos, cov) = montecarlo(exp_params, sys_params, sv, nearest=3, compute_cov=False)
-  plot_grid('convergence.png', exp_params, sys_params, 5, 0.01, pos)
+  plot_grid('convergence.png', exp_params, sys_params, 10, 0.001, pos)
 
 
 
