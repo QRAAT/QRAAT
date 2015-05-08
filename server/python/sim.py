@@ -31,6 +31,14 @@ def nearest_sites(p, sites, k):
                           key=lambda(item) : np.abs(p - item[1])))
   return list(site_ids[:k])
 
+def sites_within_dist(p, sites, dist): 
+  # sites within `dist` meters of `p`
+  site_ids = []
+  for (id, site) in sites.iteritems():
+    if np.abs(p - site) <= dist: 
+      site_ids.append(id)
+  return site_ids
+
 def create_array(exp_params, sys_params):
   s = 2 * exp_params['half_span'] + 1
   return [[[[[] for n in range(s) ] 
@@ -38,7 +46,7 @@ def create_array(exp_params, sys_params):
                     for j in range(len(exp_params['sig_n'])) ] 
                       for i in range(len(exp_params['pulse_ct'])) ]
 
-def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
+def montecarlo(exp_params, sys_params, sv, nearest=None, max_dist=None, compute_cov=True):
   s = 2 * exp_params['half_span'] + 1
   shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s, exp_params['trials'])
   pos = np.zeros(shape, dtype=np.complex)
@@ -74,12 +82,17 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, compute_cov=True):
         for n in range(s): #northing
           P = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
                                                  (e - exp_params['half_span']) * exp_params['scale'])
+          if nearest is not None and max_dist is not None: 
+            raise Exception("Use either `nearest` or `max_dist`, not both.")
+          elif nearest is not None:
+            include = nearest_sites(P, sites, nearest)
+          elif max_dist is not None:
+            include = sites_within_dist(P, sites, max_dist)
+          else: 
+            include = sys_params['include']
+
           for k in range(exp_params['trials']): 
             # Run simulation.
-            if nearest is None:
-              include = sys_params['include']
-            else: 
-              include = nearest_sites(P, sites, nearest)
             sig = signal1.Simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
           
             # Estimate position.
@@ -370,17 +383,17 @@ def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=Non
   pp.scatter(X, Y, label='estimates', alpha=alpha, facecolors='b', edgecolors='none', s=5)
 
   # Plot grid
-  offset = 10
-  s = 2*exp_params['half_span'] + 1
-  for e in range(s): #easting 
-    for n in range(s): #northing
-      p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
-                                             (e - exp_params['half_span']) * exp_params['scale'])
-      pp.plot(p.imag, p.real, label='grid', color='w', marker='o', ms=5)
-      if nearest:
-        include = nearest_sites(p, sys_params['sites'], nearest)
-        a = ', '.join(map(lambda(id) : str(id), sorted(include)))
-        pp.text(p.imag+offset, p.real+offset, a, fontsize=8)
+#  offset = 10
+#  s = 2*exp_params['half_span'] + 1
+#  for e in range(s): #easting 
+#    for n in range(s): #northing
+#      p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+#                                             (e - exp_params['half_span']) * exp_params['scale'])
+#      pp.plot(p.imag, p.real, label='grid', color='w', marker='o', ms=5)
+#      if nearest:
+#        include = nearest_sites(p, sys_params['sites'], nearest)
+#        a = ', '.join(map(lambda(id) : str(id), sorted(include)))
+#        pp.text(p.imag+offset, p.real+offset, a, fontsize=8)
   
   # Exp. params
   pp.text(l, h, '$\sigma_n^2=%0.1f$' % exp_params['sig_n'][j])
@@ -663,14 +676,14 @@ def convergence_test(prefix, center, sites, sv, conf_level):
                  'center'    : (4260738.3+574549j), 
                  'half_span' : 6,
                  'scale'     : 150,
-                 'trials'    : 1000 }
+                 'trials'    : 10 }
 
   sys_params = { 'method'         : 'bartlet', 
                  'include'        : [],
                  'center'         : center,
                  'sites'          : sites } 
 
-  (pos, cov) = montecarlo(exp_params, sys_params, sv, nearest=3, compute_cov=False)
+  (pos, cov) = montecarlo(exp_params, sys_params, sv, max_dist=1000, compute_cov=False)
   plot_grid('convergence.png', exp_params, sys_params, 10, 0.001, pos)
 
 
@@ -736,25 +749,25 @@ def grid_test(prefix, center, sites, sv, conf_level):
 def contour_test(prefix, center, sites, sv, conf_level): 
   
   exp_params = { 'rho'       : 1,
-                 'sig_n'     : [0.005],
+                 'sig_n'     : [0.001, 0.01, 0.1],
                  'pulse_ct'  : [5],
                  'center'    : (4260738.3+574549j), 
-                 'half_span' : 3 * 12,
-                 'scale'     : 300 / 12,
-                 'trials'    : 100 }
+                 'half_span' : 50,
+                 'scale'     : 25,
+                 'trials'    : 1000 }
 
   sys_params = { 'method'  : 'bartlet', 
                  'include' : [],
                  'center'  : center,
                  'sites'   : sites } 
 
-  #(pos, cov) = montecarlo(exp_params, sys_params, sv, compute_cov=False)
-  #save(prefix, pos, cov, exp_params, sys_params)
-  (pos, cov, exp_params, sys_params) = load(prefix)
-  plot_grid('contour_grid.png', exp_params, sys_params, 
-      exp_params['pulse_ct'][0], exp_params['sig_n'][0])
+  (pos, cov) = montecarlo(exp_params, sys_params, sv, max_dist=1000, compute_cov=False)
+  save(prefix, pos, cov, exp_params, sys_params)
+  #(pos, cov, exp_params, sys_params) = load(prefix)
+  plot_grid('contour-grid.png', exp_params, sys_params,
+       exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos)
   plot_contour('contour.png', exp_params, sys_params, 
-      exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos, conf_level)
+       exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos, conf_level)
 
 
 def spectrum_test(db_con, prefix, center, conf_level): 
@@ -890,7 +903,7 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
 
-  convergence_test('exp/test', center, sites, sv, 0.95)
+  #convergence_test('exp/test', center, sites, sv, 0.95)
 
   #### ONE ###################################################################
   #one_test(db_con, 'exp/one', 0.95)
@@ -908,7 +921,7 @@ if __name__ == '__main__':
   #grid_test('exp/grid', center, sites, sv, 0.95)
 
   #### CONTOUR ###################################################################
-  #contour_test('exp/contour', center, sites, sv, 0.95)
+  contour_test('exp/contour', center, sites, sv, 0.95)
   
   #### CONF ###################################################################
   #conf_test('exp/asym', center, sites, sv, 0.95)
