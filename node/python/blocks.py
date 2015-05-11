@@ -24,7 +24,7 @@
 """
 
 from gnuradio import gr, blks2, uhd, gru
-from rmg_swig import detect
+from rmg_swig import pulse_sink_c
 import params
 
 import sys, time
@@ -123,7 +123,7 @@ class software_backend(gr.hier_block2):
                                 gr.io_signature(4, 4, gr.sizeof_gr_complex), # Input signature
                                 gr.io_signature(0, 0, 0))                    # Output signature
 
-        band_rate = be_param.bw
+        self.band_rate = be_param.bw
         print "Number of Bands :", be_param.num_bands
         print "Band sampling rate :",band_rate
 
@@ -147,7 +147,7 @@ class software_backend(gr.hier_block2):
             
             # Using default parameters for now. Actual parameters are provided 
             # when the detector bank is enabled. 
-            new_det = detect(channels, band_rate)
+            new_det = pulse_sink_c(channels)
 
             self.det.append(new_det)
   
@@ -184,9 +184,10 @@ class software_backend(gr.hier_block2):
             if (j.tx_type == params.det_type.PULSE):
                 self.det[j.band_num].enable(j.filter_length, 
                                             j.filter_length*3, 
+                                            j.cf,
+                                            self.band_rate,
                                             self.directory, 
                                             j.name, 
-                                            j.cf,
                                             j.rise,
                                             j.alpha)
 

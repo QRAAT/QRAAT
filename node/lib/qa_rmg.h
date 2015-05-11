@@ -1,3 +1,4 @@
+/* -*- c++ -*- */
 /*
  * Copyright 2012 Free Software Foundation, Inc.
  *
@@ -19,18 +20,19 @@
  * Boston, MA 02110-1301, USA.
  */
 
-/*
- * This class gathers together all the test cases for the gr-filter
- * directory into a single test suite.  As you create new test cases,
- * add them here.
- */
+#ifndef _QA_RMG_H_
+#define _QA_RMG_H_
 
-#include "qa_rmg.h"
+#include <gnuradio/attributes.h>
+#include <cppunit/TestSuite.h>
 
-CppUnit::TestSuite *
-qa_rmg::suite()
+//! collect all the tests for the gr-filter directory
+
+class __GR_ATTR_EXPORT qa_rmg
 {
-  CppUnit::TestSuite *s = new CppUnit::TestSuite("rmg");
+ public:
+  //! return suite of tests for all of gr-filter directory
+  static CppUnit::TestSuite *suite();
+};
 
-  return s;
-}
+#endif /* _QA_RMG_H_ */

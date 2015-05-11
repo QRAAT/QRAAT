@@ -29,7 +29,6 @@ typedef enum
 
 static float FALL_RATIO = 0.9;
 
-class detectmod_detect;
 
 /*!
  * \brief Peak detection state machine. 
@@ -56,7 +55,6 @@ public:
    * \brief Constructor.
    * \param rise_in - Rise trigger
    * \param confirmation_time_in - period to wait to confirm peak
-   * \param wait_time_in - period to wait to restart detect
    * \param time_constant_in - time constant for exponential filter
    */
   peak_detect(float rise_in, int confirmation_time_in, int time_constant_in);
@@ -131,6 +129,7 @@ public:
   /*!
    * \brief Set noise floor value
    * \param noise_floor_in - New noise_floor estimate.
+   * \param samples - Number of samples used to construct noise_floor estimate
    */
   void set_noise_floor(float noise_floor_in, int samples);
 

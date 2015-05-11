@@ -25,39 +25,10 @@
 """) pulse_data
 
 %{
-#include "pulse_data.h"
+#include "../include/pulse_data.h"
 %}
 
-
-/* param_t */
-typedef struct {
-  int channel_ct,
-      sample_ct,
-      pulse_sample_ct,
-      pulse_index;
-  float sample_rate, 
-        ctr_freq;
-  int t_sec, t_usec; 
-  %extend{ 
-    char* __str__() {
-      static char tmp [256];
-      time_t pulse_time = $self->t_sec + ($self->t_usec * 0.000001); 
-      sprintf(tmp, 
-"channel_ct      %d\n\
-sample_ct       %d\n\
-pulse_sample_ct %d\n\
-pulse_index     %d\n\
-sample_rate     %g\n\
-ctr_freq        %g\n\
-pulse_time      %s", 
-       $self->channel_ct, $self->sample_ct, $self->pulse_sample_ct, $self->pulse_index,
-       $self->sample_rate, $self->ctr_freq, asctime(gmtime(&pulse_time))
-      );
-      return &tmp[0];
-    }
-  }
-} param_t; 
-
+%include "../include/pulse_data.h"
 
 %exception {
   try { 
@@ -86,39 +57,4 @@ pulse_time      %s",
   PyTuple_SetItem($result, 1, i);
 }
 
-/* pulse_data */
-class pulse_data {
-friend class detectmod_detect; 
-protected:
 
-  my_complex *data;
-
-public:
-  
-  param_t params; 
-  char *filename;
-
-  pulse_data (const char *fn=NULL); // throw PulseDataErr
-  pulse_data (
-    int channel_ct, 
-    int sample_ct,
-    int pulse_sample_ct,
-    float sample_rate,
-    float ctr_freq
-  ); 
-  ~pulse_data ();
-
-  /* file io */
-  int read(const char *fn); 
-  int write(const char *fn);
-
-  /* accessors - throw PulseDataErr */
-  const param_t& param(); 
-  float imag(int i);
-  float real(int i); 
-  void set_imag(int i, float val);
-  void set_real(int i, float val);
-  my_complex &sample(int i); 
-
-};
-  

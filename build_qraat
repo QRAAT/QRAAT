@@ -64,11 +64,18 @@ function sudocheck {
   if [ $SUDOASKED = false ]
   then
     echo Sudo privileges are required 
-    echo -n Do you have sudo privileges'?'
-    read ans
-    case $ans in
-      y|yes|YES|Y)
-        echo Continuing with script
+    #echo -n Do you have sudo privileges'?'
+    #read ans
+    #case $ans in
+    #  y|yes|YES|Y)
+    case `groups | grep sudo` in
+      '')
+        echo Exiting. Please ensure that you have sudo privileges 
+        echo on this system to continue install. 
+        exit
+        ;;
+      *)
+        #echo Continuing with script
         SUDOASKED=true
         sudo grep timestamp_timeout /etc/sudoers >tmp$$
         timeout=`cat tmp$$|awk '/./ {print $4}'`
@@ -89,11 +96,6 @@ function sudocheck {
           echo timestamp_timeout is 90 or more
           exit
         fi
-      ;;
-    *)
-      echo Exiting. Please ensure that you have sudo privileges 
-      echo on this system to continue install. 
-      exit
       ;;
     esac
   fi

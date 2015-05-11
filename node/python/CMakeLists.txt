@@ -45,7 +45,8 @@ include(GrTest)
 
 set(GR_TEST_TARGET_DEPS gnuradio-rmg)
 set(GR_TEST_PYTHON_DIRS ${CMAKE_BINARY_DIR}/swig)
-GR_ADD_TEST(qa_rmg ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_rmg.py)
+GR_ADD_TEST(qa_pulse_sink_c ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_pulse_sink_c.py)
+file(COPY unit_test.tdat DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 ########################################################################
 # Add subdirectories

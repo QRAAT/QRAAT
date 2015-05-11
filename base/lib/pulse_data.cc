@@ -19,27 +19,15 @@
  */
 
 #include <iostream> 
-#include <iomanip>
 #include <fstream>
-#include <ctime>
-#include <cstdio>
-#include <cstring> // memcpy, strerror
 #include <sys/stat.h>
 #include <errno.h>
 
 #include "../include/pulse_data.h"
 
-using namespace std;
 
-ostream& operator<< ( ostream &out, const param_t &p ) {
-  time_t pulse_time = p.t_sec + (p.t_usec * 0.000001);
-  out << "channel_c t     " << p.channel_ct << endl;
-  out << "sample_ct       " << p.sample_ct << endl;
-  out << "pulse_sample_ct " << p.pulse_sample_ct << endl;
-  out << "pulse_inde x    " << p.pulse_index << endl;
-  out << "sample_rate     " << p.sample_rate << endl;
-  out << "ctr_freq        " << p.ctr_freq << endl;
-  printf("pulse_time      %s", asctime(gmtime(&pulse_time)));
+std::ostream& operator<< ( std::ostream &out, const pulse_data &p ) {
+  out << p.str();
   return out;
 }
 
@@ -47,122 +35,147 @@ ostream& operator<< ( ostream &out, const param_t &p ) {
 /**
  * class pulse_data. 
  */
-
 pulse_data::pulse_data( const char *fn ) 
 {
   data = NULL;
-  filename = NULL;
-  index = size = 0;  
   if( fn && read(fn)==-1 ) 
     throw FileReadError;
 } // constructor for Python interface
 
+
 pulse_data::pulse_data(
-   int channel_ct,
-   int sample_ct,
-   int pulse_sample_ct,
-   float sample_rate, 
-   float ctr_freq)
+   int _channel_ct,
+   int _sample_ct,
+   int _pulse_sample_ct,
+   float _sample_rate, 
+   float _ctr_freq)
 {
-  params.channel_ct = channel_ct;
-  params.sample_ct = sample_ct;
-  params.pulse_sample_ct = pulse_sample_ct;
-  params.sample_rate = sample_rate; 
-  params.ctr_freq = ctr_freq; 
-  index = 0;
-  size = params.channel_ct * params.sample_ct; 
- 
-  filename = NULL; 
-  data = new my_complex [params.channel_ct * params.sample_ct]; 
+  channel_ct = _channel_ct;
+  sample_ct = _sample_ct;
+  pulse_sample_ct = _pulse_sample_ct;
+  sample_rate = _sample_rate; 
+  ctr_freq = _ctr_freq; 
+
+  //default values so code doesn't access uninitialized variables
+  pulse_index = -1;
+  t_sec = 0;
+  t_usec = 0;
+
+  filename = ""; 
+  data = new boost::circular_buffer<my_complex>(channel_ct * sample_ct);
 } // constructor for pulse detector
 
+//Copy constructor. Deep copy of circular buffer.
 pulse_data::pulse_data(const pulse_data &det)
 {
-  params = det.params; 
-  index = det.index;
-  size = det.size; 
-  filename = NULL; 
-  data = new my_complex [params.channel_ct * params.sample_ct]; 
-  memcpy(data,det.data, params.channel_ct * params.sample_ct * sizeof(my_complex));
+  filename = det.filename;
+  channel_ct = det.channel_ct;
+  sample_ct = det.sample_ct;
+  pulse_sample_ct = det.pulse_sample_ct;
+  pulse_index = det.pulse_index;
+  sample_rate = det.sample_rate;
+  ctr_freq = det.ctr_freq;
+  t_sec = det.t_sec;
+  t_usec = det.t_usec;
+  //data = new boost::circular_buffer<my_complex>();
+  *data = *(det.data);
 } // constructor from pulse_data instance
 
 pulse_data::~pulse_data() 
 {
-  if( filename )
-    delete [] filename;
   if( data ) 
-    delete [] data;
+    delete data;
 } // destructor
 
 
 /*
- * Assignment operator. TODO this method can use a bit of cleaning up. 
+ * Assignment operator. Shallow copy of circular buffer. 
  */ 
 pulse_data& pulse_data::operator=(const pulse_data &det)
 {
-  if (params.channel_ct == det.params.channel_ct && params.sample_ct == det.params.sample_ct){
-    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(my_complex));
-    index = det.index;
-    size = det.size; 
-  }
-  else if (params.channel_ct*params.sample_ct == det.params.channel_ct*det.params.sample_ct){  /* What's this? */ 
-    params.channel_ct = det.params.channel_ct;
-    params.sample_ct = det.params.sample_ct;
-    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(my_complex));
-    index = det.index;
-    size = det.size;
-  }
-  else{
-    params.channel_ct = det.params.channel_ct;
-    params.sample_ct = det.params.sample_ct;
-    delete [] data; 
-    data = new my_complex [params.channel_ct * params.sample_ct]; 
-    memcpy(data,det.data,params.channel_ct*params.sample_ct*sizeof(my_complex));
-    index = det.index;
-    size = det.size; 
-  }
+  filename = det.filename;
+  channel_ct = det.channel_ct;
+  sample_ct = det.sample_ct;
+  pulse_sample_ct = det.pulse_sample_ct;
+  pulse_index = det.pulse_index;
+  sample_rate = det.sample_rate;
+  ctr_freq = det.ctr_freq;
+  t_sec = det.t_sec;
+  t_usec = det.t_usec;
+  data = det.data;
   return *this;
 } // operator=
 
+std::string pulse_data::str() const
+{
+  std::stringstream output;
+
+  time_t pulse_time = t_sec + (t_usec * 0.000001);
+  output << "channel_ct      " << channel_ct << std::endl;
+  output << "sample_ct       " << sample_ct << std::endl;
+  output << "pulse_sample_ct " << pulse_sample_ct << std::endl;
+  output << "pulse_index     " << pulse_index << std::endl;
+  output << "sample_rate     " << sample_rate << std::endl;
+  output << "ctr_freq        " << ctr_freq << std::endl;
+  output << "pulse_time      " << asctime(gmtime(&pulse_time)) << std::endl;
+  output << "stored_data_ct  " << data->size() << std::endl;
+
+  return output.str();
+}
 
 /* 
  * Read a pulse record file (.det). 
  */
 int pulse_data::read(const char *fn) 
 {
-  if( filename )
-    delete [] filename;
-  if( data ) 
-    delete [] data;
 
   int res = -1;
-  filename = new char [strlen(fn)+1];
-  strcpy(filename, fn); 
-  
+  filename = fn;
+  if (data){
+    delete data;
+  }
+
   /* Check file integrity. */ 
   struct stat results; 
-  if( stat(filename, &results) != 0 ) 
+  if( stat(filename.c_str(), &results) != 0 ) 
     return -1; 
 
   /* Get parameters. */
-  fstream file( filename, ios::in | ios::binary ); 
-  file.read((char*)&params, sizeof(param_t)); 
-  if (file.eof()) {
+  std::fstream file( filename.c_str(), std::ios::in | std::ios::binary ); 
+  file.read((char*)&channel_ct, sizeof(int));
+  if (channel_ct > 0) { //backward compatable det file
+    file.read((char*)&sample_ct, sizeof(int));
+    file.read((char*)&pulse_sample_ct, sizeof(int));
+    file.read((char*)&pulse_index, sizeof(int));
+    file.read((char*)&sample_rate, sizeof(float));
+    file.read((char*)&ctr_freq, sizeof(float));
+    file.read((char*)&t_sec, sizeof(int));
+    file.read((char*)&t_usec, sizeof(int));
+  }
+  else {  //new det file format
+    return -1;
+  }
+
+  if (file.eof()) { //no data
     file.close();
     res = -1;
   }
   else {
-    size = params.sample_ct * params.channel_ct; 
+    int size = sample_ct * channel_ct;
+    my_complex *file_data = new my_complex[size];
   
     /* Get data. */
-    data = new my_complex [params.channel_ct * params.sample_ct]; 
-    file.read((char*)data, sizeof(my_complex) * params.sample_ct * params.channel_ct);
+    file.read((char*)file_data, sizeof(my_complex)*size);
+    data = new boost::circular_buffer<my_complex>(file_data, file_data+size);
+    delete[] file_data;
   }
 
   if (file)
     res = results.st_size; 
 
-  file.close(); 
+  file.close();
+
+
   return res; 
 } // read()
 
@@ -172,111 +185,79 @@ int pulse_data::read(const char *fn)
 int pulse_data::write( const char *fn ) 
 {
   /* filename for writing */
-  if( strcmp(fn,"")==0 ) 
-    fn = filename; 
+  if( fn == NULL || fn[0] == '\0' ) {
+    if( filename == "" ) {
+      return -1;
+    }
+    //else use filename string in "filename"
+  }
+  else {
+    filename = fn;
+  }
 
-  fstream file( fn, ios::out | ios::binary );
+  std::fstream file( filename.c_str(), std::ios::out | std::ios::trunc | std::ios::binary );
   if (!file.is_open())
     return -1; 
   
   /* write parameters */
-  file.write((char*)&params, sizeof(param_t)); 
+  file.write((char*)&channel_ct, sizeof(int));
+  file.write((char*)&sample_ct, sizeof(int));
+  file.write((char*)&pulse_sample_ct, sizeof(int));
+  file.write((char*)&pulse_index, sizeof(int));
+  file.write((char*)&sample_rate, sizeof(float));
+  file.write((char*)&ctr_freq, sizeof(float));
+  file.write((char*)&t_sec, sizeof(int));
+  file.write((char*)&t_usec, sizeof(int));
+
 
   /* Unwrap circular buffer and write data */
-  file.write((char*)(data + (index * params.channel_ct)), 
-          sizeof(my_complex) * (params.sample_ct - index) * params.channel_ct);
-  file.write((char*)data, sizeof(my_complex) * index * params.channel_ct); 
+  boost::circular_buffer<my_complex>::const_array_range range = data->array_one();
+  file.write((char*)range.first, sizeof(my_complex)*range.second);
+
+  range = data->array_two();
+  if (range.second > 0){
+    file.write((char*)range.first, sizeof(my_complex)*range.second);
+  }
   file.close();
+
   return 0; 
 } // write() 
 
-/* 
- * Return parameters as constant. 
- */  
-const param_t& pulse_data::param() const {
-  return params;
-} // params() const
+void pulse_data::set_pulse_index(const int pi){
+  pulse_index = pi;
+}
 
+void pulse_data::set_time(const struct timeval tp){
+  t_sec = (int)tp.tv_sec;
+  t_usec = (int)tp.tv_usec;
+}
 
- /* Accessors */
-
-my_complex& pulse_data::operator[] (int i) {
-  return sample(i); 
-} // operator[]
-
-my_complex& pulse_data::sample(int i) {
-  if( i< 0 || i > size ) 
-    throw IndexError; 
-  return data[(i + index) % size];    
-} // sample()
-
-float pulse_data::real(int i) {
-  if( !data ) 
-    throw NoDataError;
-  return data[(i + index) % size].real();
-} // real()
-
-float pulse_data::imag(int i) {
-  if( i< 0 || i > size ) 
-    throw IndexError; 
-  return data[(i + index) % size].imag();
-} // imag() 
-
-void pulse_data::set_real(int i, float val) {
-  int size = params.sample_ct * params.channel_ct; 
-  if( !data ) 
-    throw NoDataError;
-  if( i < 0 || i > size ) 
-    throw IndexError; 
-  data[(i + index) % size].real(val);
-} // set_real()
-
-void pulse_data::set_imag(int i, float val) {
-  int size = params.sample_ct * params.channel_ct; 
-  if( !data ) 
-    throw NoDataError;
-  if( i < 0 || i > size ) 
-    throw IndexError; 
-  data[(i + index) % size].imag(val);
-} // set_imag()
-
-my_complex* pulse_data::get()
-{
-  return data;
-} // get()
+void pulse_data::set_time(const int sec, const int usec){
+  t_sec = sec;
+  t_usec = usec;
+}
 
 
   /* Circular buffer methods */ 
 
-void pulse_data::add(my_complex *in)
+my_complex& pulse_data::operator[] (const int i) {
+  return (*data)[i*channel_ct]; 
+}
+
+my_complex* pulse_data::get_data()
 {
-  memcpy(data + (index * params.channel_ct), in, params.channel_ct * sizeof(my_complex));
-  index ++;
-  if(index >= params.sample_ct){
-    index = 0;
+  return data->linearize();
+}
+
+void pulse_data::append(my_complex *in)
+{
+  data->push_back(*in);
+  if (pulse_index >= 0){
+    pulse_index--;
   }
-} // add()
+}
 
-int pulse_data::get_index()
+bool pulse_data::buffer_full()
 {
-  return index;
-} // get_index()
-
-my_complex* pulse_data::get_buffer()
-{
-  return data;
-} // get_buffer()
-
-my_complex* pulse_data::get_sample()
-{
-  return data + (index * params.channel_ct);
-} // get_sample()
-
-void pulse_data::inc_index()
-{
-  index++;
-  if(index >= params.sample_ct){
-    index = 0;
-  }
-} // inc_index()
-
+  return data->full();
+}

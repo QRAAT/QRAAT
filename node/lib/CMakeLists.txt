@@ -1,4 +1,4 @@
-# Copyright 2011 Free Software Foundation, Inc.
+# Copyright 2011,2012 Free Software Foundation, Inc.
 #
 # This file is part of GNU Radio
 #
@@ -22,19 +22,34 @@
 ########################################################################
 include(GrPlatform) #define LIB_SUFFIX
 
-add_library(gnuradio-rmg SHARED 
-  detectmod_detect.cc 
-  accumulator.cc 
-  peak_detect.cc 
+include_directories(${Boost_INCLUDE_DIR})
+link_directories(${Boost_LIBRARY_DIRS})
+
+list(APPEND rmg_sources
+    pulse_sink_c_impl.cc
+    peak_detect.cc
 )
 
-target_link_libraries(gnuradio-rmg rmg-pulse ${Boost_LIBRARIES} ${GRUEL_LIBRARIES} ${GNURADIO_CORE_LIBRARIES})
+set(rmg_sources "${rmg_sources}" PARENT_SCOPE)
+if(NOT rmg_sources)
+	MESSAGE(STATUS "No C++ sources... skipping lib/")
+	return()
+endif(NOT rmg_sources)
+
+add_library(gnuradio-rmg SHARED ${rmg_sources})
+target_link_libraries(gnuradio-rmg ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES})
 set_target_properties(gnuradio-rmg PROPERTIES DEFINE_SYMBOL "gnuradio_rmg_EXPORTS")
+
+if(APPLE)
+    set_target_properties(gnuradio-rmg PROPERTIES
+        INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib"
+    )
+endif(APPLE)
 
 ########################################################################
 # Install built library files
 ########################################################################
-install(TARGETS gnuradio-rmg 
+install(TARGETS gnuradio-rmg
     LIBRARY DESTINATION lib${LIB_SUFFIX} # .so/.dylib file
     ARCHIVE DESTINATION lib${LIB_SUFFIX} # .lib file
     RUNTIME DESTINATION bin              # .dll file
@@ -43,14 +58,23 @@ install(TARGETS gnuradio-rmg
 ########################################################################
 # Build and register unit test
 ########################################################################
-find_package(Boost COMPONENTS unit_test_framework)
-
 include(GrTest)
-set(GR_TEST_TARGET_DEPS gnuradio-rmg)
-#turn each test cpp file into an executable with an int main() function
-add_definitions(-DBOOST_TEST_DYN_LINK -DBOOST_TEST_MAIN)
 
-add_executable(qa_rmg qa_rmg.cc)
-target_link_libraries(qa_rmg gnuradio-rmg ${Boost_LIBRARIES})
-GR_ADD_TEST(qa_rmg qa_rmg)
+include_directories(${CPPUNIT_INCLUDE_DIRS})
 
+list(APPEND test_rmg_sources
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rmg.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/qa_rmg.cc
+)
+
+add_executable(test-rmg ${test_rmg_sources})
+
+target_link_libraries(
+  test-rmg
+  ${GNURADIO_RUNTIME_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${CPPUNIT_LIBRARIES}
+  gnuradio-rmg
+)
+
+GR_ADD_TEST(test_rmg test-rmg)

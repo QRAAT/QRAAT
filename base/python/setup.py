@@ -7,7 +7,7 @@ import os, sys
 # them in the source tree. 
 def _post_install(build_dir):
   pass
-  target = os.getcwd() + "/python/pulse_data.py"
+  target = "pulse_data.py"
   print "Removing", target, "...", 
   try: 
     os.remove(target)
@@ -17,7 +17,7 @@ def _post_install(build_dir):
       print "not found."
     else: print e
 
-  target = os.getcwd() + "/python/pulse_data_wrap.cpp"
+  target = "pulse_data_wrap.cpp"
   print "Removing", target, "...", 
   try: 
     os.remove(target)
@@ -38,10 +38,10 @@ setup(name='QRAAT-base',
   description='QRAAT base Python package',
   packages=['qraat'],
   ext_modules=[Extension('qraat._pulse_data', 
-                         sources=['python/pulse_data.i', 'lib/pulse_data.cc'],
+                         sources=['pulse_data.i', '../lib/pulse_data.cc'],
                          swig_opts = ['-c++'], 
-                         include_dirs=['include'])],
+                         include_dirs=['../include'])],
   #py_modules=['qraat.pulse_data'],
-  package_dir={'qraat' : 'python'},
+  package_dir={'qraat' : './'},
   cmdclass={"install" : install},
 )

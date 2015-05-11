@@ -1,4 +1,4 @@
-# Copyright 2011 Free Software Foundation, Inc.
+# Copyright 2011,2012 Free Software Foundation, Inc.
 #
 # This file is part of GNU Radio
 #
@@ -21,8 +21,6 @@
 # Install public header files
 ########################################################################
 install(FILES
-    accumulator.h
-    detectmod_detect.h
-    peak_detect.h
-    DESTINATION include/rmg
+    api.h
+    pulse_sink_c.h DESTINATION include/rmg
 )
