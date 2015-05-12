@@ -39,20 +39,26 @@ def sites_within_dist(p, sites, dist):
       site_ids.append(id)
   return site_ids
 
-def create_array(exp_params, sys_params):
+def create_array_from_params(exp_params, sys_params):
   s = 2 * exp_params['half_span'] + 1
   return [[[[[] for n in range(s) ] 
                   for e in range(s) ]
                     for j in range(len(exp_params['sig_n'])) ] 
                       for i in range(len(exp_params['pulse_ct'])) ]
 
+def create_array_from_shape(shape):
+  return [[[[[] for n in range(shape[3]) ] 
+                  for e in range(shape[2]) ]
+                    for j in range(shape[1]) ] 
+                      for i in range(shape[0]) ]
+
 def montecarlo(exp_params, sys_params, sv, nearest=None, max_dist=None, compute_cov=True):
   s = 2 * exp_params['half_span'] + 1
   shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s, exp_params['trials'])
   pos = np.zeros(shape, dtype=np.complex)
   if compute_cov:
-    cov_asym = create_array(exp_params, sys_params) # Asymptotic 
-    cov_boot = create_array(exp_params, sys_params) # Bootstrap
+    cov_asym = create_array_from_params(exp_params, sys_params) # Asymptotic 
+    cov_boot = create_array_from_params(exp_params, sys_params) # Bootstrap
   else: 
     cov_asym = cov_boot = None
 
@@ -96,7 +102,10 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, max_dist=None, compute_
             sig = signal1.Simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
           
             # Estimate position.
-            P_hat = position1.PositionEstimator(999, sites, sys_params['center'], sig, sv, method, 
+            # NOTE For convergence test use `sys_params['center']` for initial guess 
+            # instead of `P`. The true position is used here to assure convergence to 
+            # the global maximum. 
+            P_hat = position1.PositionEstimator(999, sites, P, sig, sv, method, 
                              s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA)
             pos[i,j,e,n,k] = P_hat.p
 
@@ -253,16 +262,17 @@ def load_grid(prefix, exp_params, sys_params):
 
 ### SUMARIZE RESULTS ##########################################################
 
-def pretty_report(pos, cov, exp_params, sys_params, conf_level):
+def pretty_report(pos, cov, exp_params, sys_params, conf_level, offset=True):
   Qt = scipy.stats.chi2.ppf(conf_level, 2)
   fmt = lambda x : '%9s' % ('%0.2f' % x)
-  s = 2 * exp_params['half_span'] + 1
   num_sites = len(sys_params['include'])
   print 'SITES =', sys_params['include'], 'TRIALS = %d' % exp_params['trials']
-  for e in range(s): #easting 
-    for n in range(s): #northing
-      p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
-                                             (e - exp_params['half_span']) * exp_params['scale'])
+  for e in range(pos.shape[2]): #easting 
+    for n in range(pos.shape[3]): #northing
+      p = exp_params['center']
+      if offset: 
+        p += np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                        (e - exp_params['half_span']) * exp_params['scale'])
       print 'TRUE POSITION = (%.2f, %.2f)\n' % (p.imag, p.real)
       for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
         print 'pulse_ct=%d' % pulse_ct
@@ -299,12 +309,14 @@ def pretty_report(pos, cov, exp_params, sys_params, conf_level):
                     if p in E_hat: a += 1
                   if not E or p_hat[k] in E: b += 1
                 except position1.PosDefError:
-                  print "Positive definite!"
-            
-            print fmt(float(a) / ct), \
-                  fmt(float(b) / exp_params['trials']), \
-                  fmt(area / ct), fmt((E.area() if E else 1)), \
-                  fmt((area / exp_params['trials']) / (E.area() if E else 1))
+                  pass #print "Positive definite!"
+           
+            if ct == 0: print 'bad'
+            else: 
+              print fmt(float(a) / ct), \
+                    fmt(float(b) / exp_params['trials']), \
+                    fmt(area / ct), fmt((E.area() if E else 1)), \
+                    fmt((area / exp_params['trials']) / (E.area() if E else 1))
 
           else: 
             b = 0
@@ -736,14 +748,38 @@ def grid_test(prefix, center, sites, sv, conf_level):
                  'center'  : center,
                  'sites'   : sites } 
 
+  # Run simulations.
   #montecarlo_huge(prefix, exp_params, sys_params, 
   #                            sv, compute_cov=True, nearest=3)
-  pos = load_grid(prefix, exp_params, sys_params)
-  #print "Covariance\n"
-  #pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
-  #print "BootstrapCovariance\n"
-  #pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
-  plot_grid('grid.png', exp_params, sys_params, 4, 0.001, pos)
+  
+  # Load and plot grid. 
+  #pos = load_grid(prefix, exp_params, sys_params)
+  #plot_grid('grid.png', exp_params, sys_params, 2, 0.001, pos)
+  
+  # Report statistics.
+  center = exp_params['center']
+  s = 2 * exp_params['half_span'] + 1
+  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), 1, 1, exp_params['trials'])
+  for e in range(s):
+    for n in range(s):
+      (P, cov, _, _) = load(prefix, add=POS_EXT_FMT % (e,n))
+      pos = np.zeros(shape, dtype=np.complex)
+      pos[:,:,0,0,:] = P
+      cov_asym = create_array_from_shape(shape)
+      cov_boot = create_array_from_shape(shape)
+      for i in range(shape[0]): 
+        for j in range(shape[1]):
+          cov_asym[i][j][0][0] = cov[0][i][j]
+          cov_boot[i][j][0][0] = cov[1][i][j]
+      p = center + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                              (e - exp_params['half_span']) * exp_params['scale'])
+      exp_params['center'] = p
+      print '\n\n\n--- %d,%d -------------------------------------------' % (e,n)
+      #print "Covariance\n"
+      #pretty_report(pos, cov_asym, exp_params, sys_params, conf_level, offset=False)
+      print "BootstrapCovariance\n"
+      pretty_report(pos, cov_boot, exp_params, sys_params, conf_level, offset=False)
+  exp_params['center'] = center
 
 
 def contour_test(prefix, center, sites, sv, conf_level): 
@@ -918,10 +954,10 @@ if __name__ == '__main__':
   #angular_test(db_con, 'exp/angle', center, 0.95)
 
   #### GRID ###################################################################
-  #grid_test('exp/grid', center, sites, sv, 0.95)
+  grid_test('exp/grid', center, sites, sv, 0.95)
 
-  #### CONTOUR ###################################################################
-  contour_test('exp/contour', center, sites, sv, 0.95)
+  #### CONTOUR ################################################################
+  #contour_test('exp/contour', center, sites, sv, 0.95)
   
-  #### CONF ###################################################################
+  #### ASYMPTOTIC-CONF#########################################################
   #conf_test('exp/asym', center, sites, sv, 0.95)

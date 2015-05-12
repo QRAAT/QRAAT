@@ -412,7 +412,7 @@ class Covariance:
       k = 2.0 / (self.m - 2)
     else: 
       k = 2.0 / self.m
-    (angle, axes) = compute_conf(self.C * k, Qt, 1) 
+    (angle, axes) = compute_conf(self.C, Qt * k, 1) 
     return Ellipse(self.p_hat, angle, axes, 0, 1)
 
 
@@ -450,7 +450,11 @@ class BootstrapCovariance (Covariance):
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
     Qt = self.W[int(len(self.W) * level)] 
-    (angle, axes) = compute_conf(self.C, Qt, 1) 
+    #if self.m > 2: 
+    #  k = 2.0 / (self.m - 2)
+    #else: 
+    #  k = 2.0 / self.m
+    (angle, axes) = compute_conf(self.C, Qt * 2, 1) 
     return Ellipse(self.p_hat, angle, axes, 0, 1)
 
 
