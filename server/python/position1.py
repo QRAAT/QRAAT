@@ -408,8 +408,7 @@ class Covariance:
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
     Qt = scipy.stats.chi2.ppf(level, 2) 
-    k = 2.0 / self.m
-    (angle, axes) = compute_conf(self.C, Qt * k, 1) 
+    (angle, axes) = compute_conf(self.C, 2 * Qt / self.m, 1) 
     return Ellipse(self.p_hat, angle, axes, 0, 1)
 
 

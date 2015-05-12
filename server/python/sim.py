@@ -954,10 +954,10 @@ if __name__ == '__main__':
   #angular_test(db_con, 'exp/angle', center, 0.95)
 
   #### GRID ###################################################################
-  grid_test('exp/grid', center, sites, sv, 0.95)
+  #grid_test('exp/grid', center, sites, sv, 0.95)
 
   #### CONTOUR ################################################################
   #contour_test('exp/contour', center, sites, sv, 0.95)
   
   #### ASYMPTOTIC-CONF#########################################################
-  #conf_test('exp/asym', center, sites, sv, 0.95)
+  conf_test('exp/asym', center, sites, sv, 0.95)
