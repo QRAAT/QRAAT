@@ -775,8 +775,8 @@ def grid_test(prefix, center, sites, sv, conf_level):
                               (e - exp_params['half_span']) * exp_params['scale'])
       exp_params['center'] = p
       print '\n\n\n--- %d,%d -------------------------------------------' % (e,n)
-      #print "Covariance\n"
-      #pretty_report(pos, cov_asym, exp_params, sys_params, conf_level, offset=False)
+      print "Covariance\n"
+      pretty_report(pos, cov_asym, exp_params, sys_params, conf_level, offset=False)
       print "BootstrapCovariance\n"
       pretty_report(pos, cov_boot, exp_params, sys_params, conf_level, offset=False)
   exp_params['center'] = center

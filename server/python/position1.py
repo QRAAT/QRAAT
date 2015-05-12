@@ -408,10 +408,7 @@ class Covariance:
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
     Qt = scipy.stats.chi2.ppf(level, 2) 
-    if self.m > 2: 
-      k = 2.0 / (self.m - 2)
-    else: 
-      k = 2.0 / self.m
+    k = 2.0 / self.m
     (angle, axes) = compute_conf(self.C, Qt * k, 1) 
     return Ellipse(self.p_hat, angle, axes, 0, 1)
 
@@ -443,17 +440,13 @@ class BootstrapCovariance (Covariance):
     x_hat = np.array([pos.p.imag, pos.p.real])
     for x in iter(B): 
       y = x - x_bar
-      w = np.dot(np.transpose(y), np.dot(self.m * D, y))
+      w = np.dot(np.transpose(y), np.dot(self.m * D, y)) 
       W.append(w)
     self.W = np.array(sorted(W))
 
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
     Qt = self.W[int(len(self.W) * level)] 
-    #if self.m > 2: 
-    #  k = 2.0 / (self.m - 2)
-    #else: 
-    #  k = 2.0 / self.m
     (angle, axes) = compute_conf(self.C, Qt * 2, 1) 
     return Ellipse(self.p_hat, angle, axes, 0, 1)
 
