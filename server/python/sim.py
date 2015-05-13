@@ -55,7 +55,7 @@ def create_array_from_shape(shape):
                     for j in range(shape[1]) ] 
                       for i in range(shape[0]) ]
 
-def montecarlo(exp_params, sys_params, sv, nearest=None, max_dist=None, compute_cov=True):
+def montecarlo(exp_params, sys_params, sv, nearest=None, max_dist=None, compute_cov=True, scale_tx_pwr=True):
   s = 2 * exp_params['half_span'] + 1
   shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s, exp_params['trials'])
   pos = np.zeros(shape, dtype=np.complex)
@@ -74,11 +74,14 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, max_dist=None, compute_
   sites = sys_params['sites']
   
   # Fix transmission power. 
-  scaled_rho = signal1.scale_tx_coeff(exp_params['center'], 
-                                      exp_params['rho'],
-                                      sites,
-                                      sys_params['include'])
-
+  if scale_tx_pwr: 
+    scaled_rho = signal1.scale_tx_coeff(exp_params['center'], 
+                                        exp_params['rho'],
+                                        sites,
+                                        sys_params['include'])
+  else: 
+    scaled_rho = exp_params['rho']
+  
   # Interpolate steering vector splines.
   sv_splines = signal1.compute_bearing_splines(sv)
 
@@ -142,6 +145,7 @@ def montecarlo_huge(prefix, exp_params, sys_params, sv, nearest=None, compute_co
                                       exp_params['rho'],
                                       sites,
                                       sys_params['include'])
+  print 'scaled_rho:', scaled_rho
 
   # Interpolate steering vector splines.
   sv_splines = signal1.compute_bearing_splines(sv)
@@ -921,11 +925,10 @@ def grid_test(prefix, center, sites, sv, conf_level):
 # grid_test()
 
 
-
 def contour_test(prefix, center, sites, sv, conf_level): 
   
-  exp_params = { 'rho'       : 1,
-                 'sig_n'     : [0.001, 0.01, 0.1],
+  exp_params = { 'rho'       : 74101.39, # Scaled so that contour_test() and grid_test() are comparable. 
+                 'sig_n'     : None, 
                  'pulse_ct'  : [5],
                  'center'    : (4260738.3+574549j), 
                  'half_span' : 50,
@@ -937,13 +940,30 @@ def contour_test(prefix, center, sites, sv, conf_level):
                  'center'  : center,
                  'sites'   : sites } 
 
-  (pos, cov) = montecarlo(exp_params, sys_params, sv, max_dist=1000, compute_cov=False)
-  save(prefix, pos, cov, exp_params, sys_params)
-  #(pos, cov, exp_params, sys_params) = load(prefix)
+  # Spawn a process for each noise level. 
+  proc = []
+  for sig_n in [0.001, 0.01, 0.1]:
+    proc.append( Process(target=_contour_test, args=(exp_params, sys_params, sv, sig_n)) )
+    proc[-1].start()
+
+  # Wait for them to finish. 
+  for i in range(3): 
+    proc[i].join()
+    
+  sig_n = 0.001
+  (pos, cov, exp_params, sys_params) = load(prefix+('-%0.3f' % sig_n))
   plot_grid('contour-grid.png', exp_params, sys_params,
        exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos)
   plot_contour('contour.png', exp_params, sys_params, 
        exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos, conf_level)
+
+def _contour_test(exp_params, sys_params, sv, sig_n):
+  exp_params['sig_n'] = [sig_n]
+  (pos, cov) = montecarlo(exp_params, sys_params, sv, 
+      max_dist=1000, compute_cov=False, scale_tx_pwr=False)
+  save(prefix+('-%0.3f' % sig_n), pos, cov, exp_params, sys_params)
+
+# contour_test()
 
 
 def convergence_test(prefix, center, sites, sv, conf_level): 
@@ -1148,7 +1168,7 @@ if __name__ == '__main__':
   #grid_test('exp/grid', center, sites, sv, 0.95)
 
   #### CONTOUR ################################################################
-  #contour_test('exp/contour', center, sites, sv, 0.95)
+  contour_test('exp/contour', center, sites, sv, 0.95)
   
   #### ASYMPTOTIC-CONF#########################################################
-  asym_test('exp/asym', center, sites, sv, 0.95)
+  #asym_test('exp/asym', center, sites, sv, 0.95)
