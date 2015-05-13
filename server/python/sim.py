@@ -693,6 +693,96 @@ def plot_area(fn, pos, p, exp_params, sys_params, conf_level, cov=None):
 
 ### EXPERIMENTS ###############################################################
 
+def asym_test(prefix, center, sites, sv, conf_level): 
+  
+  exp_params = { 'rho'       : 1,
+                 'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
+                 'pulse_ct'  : [10,20,50,100],
+                 'center'    : (4260738.3+574549j), 
+                 'half_span' : 2,
+                 'scale'     : 350,
+                 'trials'    : 1000 }
+
+  sys_params = { 'method'  : 'bartlet', 
+                 'include' : [],
+                 'center'  : center,
+                 'sites'   : sites } 
+
+  # Run simulations.
+  montecarlo_huge(prefix, exp_params, sys_params, 
+                              sv, compute_cov=True, nearest=3)
+  
+  # Save summary statistics.
+  s = 2 * exp_params['half_span'] + 1
+  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s)
+  asym_res = { 'cvg_prob' : np.zeros(shape, dtype=np.float),
+               'mean' : np.zeros(shape, dtype=np.complex),
+               'rmse' : np.zeros(shape, dtype=np.float),
+               'area' : np.zeros(shape, dtype=np.float),
+               'ecc' : np.zeros(shape, dtype=np.float),
+               'avg_area' : np.zeros(shape, dtype=np.float),
+               'avg_ecc' : np.zeros(shape, dtype=np.float),
+               'area_ratio' : np.zeros(shape, dtype=np.float) }
+  
+  center = exp_params['center']
+  s = 2 * exp_params['half_span'] + 1
+  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), 1, 1, exp_params['trials'])
+  for e in range(s):
+    for n in range(s):
+      print e,n
+      (P, cov, _, _) = load(prefix, add=POS_EXT_FMT % (e,n))
+      pos = np.zeros(shape, dtype=np.complex)
+      pos[:,:,0,0,:] = P
+      cov_asym = create_array_from_shape(shape)
+      for i in range(shape[0]): 
+        for j in range(shape[1]):
+          cov_asym[i][j][0][0] = cov[0][i][j]
+      p = center + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                              (e - exp_params['half_span']) * exp_params['scale'])
+      exp_params['center'] = p
+      asym = generate_report(pos, cov_asym, exp_params, sys_params, conf_level, offset=False)
+      for key in asym_res.keys():
+        asym_res[key][:,:,e,n] = asym[key][:,:,0,0]
+  exp_params['center'] = center
+  pickle.dump(asym_res, open(prefix + '-stats', 'w'))
+
+  # Plot summary statistics.
+  asym_res = pickle.load(open(prefix + '-stats'))
+  I = len(exp_params['pulse_ct'])
+  J = len(exp_params['sig_n'])
+
+  feature = 'cvg_prob'
+  title = 'Coverage probability'
+  mean = np.zeros((2,I,J), dtype=np.float)
+  std  = np.zeros((2,I,J), dtype=np.float)
+  for i in range(I): 
+    for j in range(J): 
+      A = asym_res[feature][i,j].flat[~np.isnan(asym_res[feature][i,j].flat)]
+      mean[0,i,j] = np.mean(A)
+      std[0,i,j] =  np.std(A)
+  
+  pp.rc('text', usetex=True)
+  pp.rc('font', family='serif')
+  fig, axs = pp.subplots(nrows=1, ncols=1, sharex=True)
+  fig.set_size_inches(10,3.5)
+  ax0 = axs[0]
+  ax0.set_xscale('log')
+  ax0.set_xlim([exp_params['sig_n'][0]/2, exp_params['sig_n'][-1]*2])
+  ax0.set_xlabel('$\sigma_n^2$')
+  ax0.set_ylabel('Coverage probability')
+  ax0.set_title('Asymptotic')
+  
+  for i, pulse_ct in enumerate(exp_params['pulse_ct']):
+    ax0.errorbar(exp_params['sig_n'], mean[0,i,:], yerr=std[0,i,:], 
+      fmt='o', label='%d' % pulse_ct)
+    
+  pp.legend(title='Samples per site', ncol=1, bbox_to_anchor=(1.05,1), loc=2, borderaxespad=0)
+  pp.savefig('asym_cvg_prob.png', dpi=300, bbox_inches='tight')
+  pp.clf()
+
+# asym_test()
+
+
 def grid_test(prefix, center, sites, sv, conf_level): 
   
   exp_params = { 'rho'       : 1,
@@ -1025,10 +1115,10 @@ if __name__ == '__main__':
   #angular_test(db_con, 'exp/angle', center, 0.95)
 
   #### GRID ###################################################################
-  grid_test('exp/grid', center, sites, sv, 0.95)
+  #grid_test('exp/grid', center, sites, sv, 0.95)
 
   #### CONTOUR ################################################################
   #contour_test('exp/contour', center, sites, sv, 0.95)
   
   #### ASYMPTOTIC-CONF#########################################################
-  #conf_test('exp/asym', center, sites, sv, 0.95)
+  asym_test('exp/asym', center, sites, sv, 0.95)
