@@ -693,34 +693,140 @@ def plot_area(fn, pos, p, exp_params, sys_params, conf_level, cov=None):
 
 ### EXPERIMENTS ###############################################################
 
-def conf_test(prefix, center, sites, sv, conf_level): 
+def grid_test(prefix, center, sites, sv, conf_level): 
   
   exp_params = { 'rho'       : 1,
                  'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [10,20,50,100],
-                 'center'    : (4260838.3+574049j), 
-                 'half_span' : 0,
-                 'scale'     : 1,
+                 'pulse_ct'  : [2,4,6,8,10],
+                 'center'    : (4260738.3+574549j), 
+                 'half_span' : 2,
+                 'scale'     : 350,
                  'trials'    : 1000 }
 
-  sys_params = { 'method'         : 'bartlet', 
-                 'include'        : [4,6,8],
-                 'center'         : center,
-                 'sites'          : sites } 
+  sys_params = { 'method'  : 'bartlet', 
+                 'include' : [],
+                 'center'  : center,
+                 'sites'   : sites } 
 
-  #(pos, cov) = montecarlo(exp_params, sys_params, sv)
-  #save(prefix, pos, cov, exp_params, sys_params)
-  (pos, cov, exp_params, sys_params) = load(prefix)
-  print "Covariance\n"
-  res = generate_report(pos, cov[0], exp_params, sys_params, conf_level)
-  display_report(res, exp_params, sys_params)
-  #print "BootstrapCovariance\n"
-  #report(pos, cov[1], exp_params, sys_params, conf_level)
+  # Run simulations.
+  montecarlo_huge(prefix, exp_params, sys_params, 
+                              sv, compute_cov=True, nearest=3)
+  
+  # Load and plot grid. 
+  pos = load_grid(prefix, exp_params, sys_params)
+  plot_grid('grid.png', exp_params, sys_params, 6, 0.005, pos, nearest=3)
+  
+  # Save summary statistics.
+  s = 2 * exp_params['half_span'] + 1
+  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s)
+  asym_res = { 'cvg_prob' : np.zeros(shape, dtype=np.float),
+               'mean' : np.zeros(shape, dtype=np.complex),
+               'rmse' : np.zeros(shape, dtype=np.float),
+               'area' : np.zeros(shape, dtype=np.float),
+               'ecc' : np.zeros(shape, dtype=np.float),
+               'avg_area' : np.zeros(shape, dtype=np.float),
+               'avg_ecc' : np.zeros(shape, dtype=np.float),
+               'area_ratio' : np.zeros(shape, dtype=np.float) }
+  boot_res = copy.deepcopy(asym_res)
+  center = exp_params['center']
+  s = 2 * exp_params['half_span'] + 1
+  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), 1, 1, exp_params['trials'])
+  for e in range(s):
+    for n in range(s):
+      print e,n
+      (P, cov, _, _) = load(prefix, add=POS_EXT_FMT % (e,n))
+      pos = np.zeros(shape, dtype=np.complex)
+      pos[:,:,0,0,:] = P
+      cov_asym = create_array_from_shape(shape)
+      cov_boot = create_array_from_shape(shape)
+      for i in range(shape[0]): 
+        for j in range(shape[1]):
+          cov_asym[i][j][0][0] = cov[0][i][j]
+          cov_boot[i][j][0][0] = cov[1][i][j]
+      p = center + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                              (e - exp_params['half_span']) * exp_params['scale'])
+      exp_params['center'] = p
+      asym = generate_report(pos, cov_asym, exp_params, sys_params, conf_level, offset=False)
+      boot = generate_report(pos, cov_boot, exp_params, sys_params, conf_level, offset=False)
+      for key in asym_res.keys():
+        asym_res[key][:,:,e,n] = asym[key][:,:,0,0]
+        boot_res[key][:,:,e,n] = boot[key][:,:,0,0]
+  exp_params['center'] = center
+  pickle.dump((asym_res, boot_res), open(prefix + '-stats', 'w'))
 
+  # Plot summary statistics.
+  (asym_res, boot_res) = pickle.load(open(prefix + '-stats'))
+  I = len(exp_params['pulse_ct'])
+  J = len(exp_params['sig_n'])
+
+  feature = 'cvg_prob'
+  title = 'Coverage probability'
+  mean = np.zeros((2,I,J), dtype=np.float)
+  std  = np.zeros((2,I,J), dtype=np.float)
+  for i in range(I): 
+    for j in range(J): 
+      A = asym_res[feature][i,j].flat[~np.isnan(asym_res[feature][i,j].flat)]
+      mean[0,i,j] = np.mean(A)
+      std[0,i,j] =  np.std(A)
+      B = boot_res[feature][i,j].flat[~np.isnan(boot_res[feature][i,j].flat)]
+      mean[1,i,j] = np.mean(B)
+      std[1,i,j] =  np.std(B)
+  
+  pp.rc('text', usetex=True)
+  pp.rc('font', family='serif')
+  fig, axs = pp.subplots(nrows=1, ncols=2, sharex=True)
+  fig.set_size_inches(10,3.5)
+  ax0 = axs[0]
+  ax0.set_xscale('log')
+  ax0.set_xlim([exp_params['sig_n'][0]/2, exp_params['sig_n'][-1]*2])
+  ax0.set_xlabel('$\sigma_n^2$')
+  ax0.set_ylabel('Coverage probability')
+  ax0.set_title('Asymptotic')
+  ax1 = axs[1]
+  ax1.set_xscale('log')
+  ax1.set_title('Bootstrap')
+  ax1.set_xlim([exp_params['sig_n'][0]/2, exp_params['sig_n'][-1]*2])
+  ax1.set_xlabel('$\sigma_n^2$')
+  
+  for i, pulse_ct in enumerate(exp_params['pulse_ct']):
+    ax0.errorbar(exp_params['sig_n'], mean[0,i,:], yerr=std[0,i,:], 
+      fmt='o', label='%d' % pulse_ct)
+    ax1.errorbar(exp_params['sig_n'], mean[1,i,:], yerr=std[1,i,:], 
+      fmt='o', label='%d' % pulse_ct)
+    
+  pp.legend(title='Samples per site', ncol=1, bbox_to_anchor=(1.05,1), loc=2, borderaxespad=0)
+  pp.savefig('cvg_prob.png', dpi=300, bbox_inches='tight')
+  pp.clf()
+
+# grid_test()
+
+
+
+def contour_test(prefix, center, sites, sv, conf_level): 
+  
+  exp_params = { 'rho'       : 1,
+                 'sig_n'     : [0.001, 0.01, 0.1],
+                 'pulse_ct'  : [5],
+                 'center'    : (4260738.3+574549j), 
+                 'half_span' : 50,
+                 'scale'     : 25,
+                 'trials'    : 1000 }
+
+  sys_params = { 'method'  : 'bartlet', 
+                 'include' : [],
+                 'center'  : center,
+                 'sites'   : sites } 
+
+  (pos, cov) = montecarlo(exp_params, sys_params, sv, max_dist=1000, compute_cov=False)
+  save(prefix, pos, cov, exp_params, sys_params)
+  #(pos, cov, exp_params, sys_params) = load(prefix)
+  plot_grid('contour-grid.png', exp_params, sys_params,
+       exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos)
+  plot_contour('contour.png', exp_params, sys_params, 
+       exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos, conf_level)
 
 
 def convergence_test(prefix, center, sites, sv, conf_level): 
-  
     
   exp_params = { 'rho'       : 1,
                  'sig_n'     : [0.001],
@@ -738,7 +844,6 @@ def convergence_test(prefix, center, sites, sv, conf_level):
 
   (pos, cov) = montecarlo(exp_params, sys_params, sv, max_dist=1000, compute_cov=False)
   plot_grid('convergence.png', exp_params, sys_params, 10, 0.001, pos)
-
 
 
 def one_test(db_con, prefix, conf_level):
@@ -774,138 +879,6 @@ def one_test(db_con, prefix, conf_level):
   #report(pos, None, exp_params, sys_params, conf_level)
 
 
-def grid_test(prefix, center, sites, sv, conf_level): 
-  
-  exp_params = { 'rho'       : 1,
-                 'sig_n'     : [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
-                 'pulse_ct'  : [2,4,6,8,10],
-                 'center'    : (4260738.3+574549j), 
-                 'half_span' : 2,
-                 'scale'     : 350,
-                 'trials'    : 1000 }
-
-  sys_params = { 'method'  : 'bartlet', 
-                 'include' : [],
-                 'center'  : center,
-                 'sites'   : sites } 
-
-  # Run simulations.
-#  montecarlo_huge(prefix, exp_params, sys_params, 
-#                              sv, compute_cov=True, nearest=3)
-  
-  # Load and plot grid. 
-  pos = load_grid(prefix, exp_params, sys_params)
-  plot_grid('grid.png', exp_params, sys_params, 6, 0.005, pos, nearest=3)
-  
-  # Save summary statistics.
-#  s = 2 * exp_params['half_span'] + 1
-#  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s)
-#  asym_res = { 'cvg_prob' : np.zeros(shape, dtype=np.float),
-#               'mean' : np.zeros(shape, dtype=np.complex),
-#               'rmse' : np.zeros(shape, dtype=np.float),
-#               'area' : np.zeros(shape, dtype=np.float),
-#               'ecc' : np.zeros(shape, dtype=np.float),
-#               'avg_area' : np.zeros(shape, dtype=np.float),
-#               'avg_ecc' : np.zeros(shape, dtype=np.float),
-#               'area_ratio' : np.zeros(shape, dtype=np.float) }
-#  boot_res = copy.deepcopy(asym_res)
-#  center = exp_params['center']
-#  s = 2 * exp_params['half_span'] + 1
-#  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), 1, 1, exp_params['trials'])
-#  for e in range(s):
-#    for n in range(s):
-#      print e,n
-#      (P, cov, _, _) = load(prefix, add=POS_EXT_FMT % (e,n))
-#      pos = np.zeros(shape, dtype=np.complex)
-#      pos[:,:,0,0,:] = P
-#      cov_asym = create_array_from_shape(shape)
-#      cov_boot = create_array_from_shape(shape)
-#      for i in range(shape[0]): 
-#        for j in range(shape[1]):
-#          cov_asym[i][j][0][0] = cov[0][i][j]
-#          cov_boot[i][j][0][0] = cov[1][i][j]
-#      p = center + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
-#                              (e - exp_params['half_span']) * exp_params['scale'])
-#      exp_params['center'] = p
-#      asym = generate_report(pos, cov_asym, exp_params, sys_params, conf_level, offset=False)
-#      boot = generate_report(pos, cov_boot, exp_params, sys_params, conf_level, offset=False)
-#      for key in asym_res.keys():
-#        asym_res[key][:,:,e,n] = asym[key][:,:,0,0]
-#        boot_res[key][:,:,e,n] = boot[key][:,:,0,0]
-#  exp_params['center'] = center
-#  pickle.dump((asym_res, boot_res), open(prefix + '-stats', 'w'))
-
-  # Plot summary statistics.
-#  (asym_res, boot_res) = pickle.load(open(prefix + '-stats'))
-#  I = len(exp_params['pulse_ct'])
-#  J = len(exp_params['sig_n'])
-#
-#  feature = 'cvg_prob'
-#  title = 'Coverage probability'
-#  mean = np.zeros((2,I,J), dtype=np.float)
-#  std  = np.zeros((2,I,J), dtype=np.float)
-#  for i in range(I): 
-#    for j in range(J): 
-#      A = asym_res[feature][i,j].flat[~np.isnan(asym_res[feature][i,j].flat)]
-#      mean[0,i,j] = np.mean(A)
-#      std[0,i,j] =  np.std(A)
-#      B = boot_res[feature][i,j].flat[~np.isnan(boot_res[feature][i,j].flat)]
-#      mean[1,i,j] = np.mean(B)
-#      std[1,i,j] =  np.std(B)
-#  
-#  pp.rc('text', usetex=True)
-#  pp.rc('font', family='serif')
-#  fig, axs = pp.subplots(nrows=1, ncols=2, sharex=True)
-#  fig.set_size_inches(10,3.5)
-#  ax0 = axs[0]
-#  ax0.set_xscale('log')
-#  ax0.set_xlim([exp_params['sig_n'][0]/2, exp_params['sig_n'][-1]*2])
-#  ax0.set_xlabel('$\sigma_n^2$')
-#  ax0.set_ylabel('Coverage probability')
-#  ax0.set_title('Asymptotic')
-#  ax1 = axs[1]
-#  ax1.set_xscale('log')
-#  ax1.set_title('Bootstrap')
-#  ax1.set_xlim([exp_params['sig_n'][0]/2, exp_params['sig_n'][-1]*2])
-#  ax1.set_xlabel('$\sigma_n^2$')
-#  
-#  for i, pulse_ct in enumerate(exp_params['pulse_ct']):
-#    ax0.errorbar(exp_params['sig_n'], mean[0,i,:], yerr=std[0,i,:], 
-#      fmt='o', label='%d' % pulse_ct)
-#    ax1.errorbar(exp_params['sig_n'], mean[1,i,:], yerr=std[1,i,:], 
-#      fmt='o', label='%d' % pulse_ct)
-#    
-#  pp.legend(title='Samples per site', ncol=1, bbox_to_anchor=(1.05,1), loc=2, borderaxespad=0)
-#  pp.savefig('cvg_prob.png', dpi=300, bbox_inches='tight')
-#  pp.clf()
-
-      
-  
-
-def contour_test(prefix, center, sites, sv, conf_level): 
-  
-  exp_params = { 'rho'       : 1,
-                 'sig_n'     : [0.001, 0.01, 0.1],
-                 'pulse_ct'  : [5],
-                 'center'    : (4260738.3+574549j), 
-                 'half_span' : 50,
-                 'scale'     : 25,
-                 'trials'    : 1000 }
-
-  sys_params = { 'method'  : 'bartlet', 
-                 'include' : [],
-                 'center'  : center,
-                 'sites'   : sites } 
-
-  (pos, cov) = montecarlo(exp_params, sys_params, sv, max_dist=1000, compute_cov=False)
-  save(prefix, pos, cov, exp_params, sys_params)
-  #(pos, cov, exp_params, sys_params) = load(prefix)
-  plot_grid('contour-grid.png', exp_params, sys_params,
-       exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos)
-  plot_contour('contour.png', exp_params, sys_params, 
-       exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos, conf_level)
-
-
 def spectrum_test(db_con, prefix, center, conf_level): 
   
   cal_id = 6
@@ -933,7 +906,6 @@ def spectrum_test(db_con, prefix, center, conf_level):
     exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos_bartlet, alpha=1)
   plot_grid('pos_mle.png', exp_params, sys_params, 
     exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos_mle, alpha=1)
-  
 
 
 def distance_test(db_con, prefix, center, conf_level):
@@ -975,7 +947,6 @@ def distance_test(db_con, prefix, center, conf_level):
   plot_distribution('dist-ill.png', exp_params, sys_params, 
     exp_params['pulse_ct'][0], exp_params['sig_n'][0], pos[20], alpha=0.1)
       
-
 
 def angular_test(db_con, prefix, center, conf_level):
   
