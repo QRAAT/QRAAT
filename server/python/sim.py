@@ -4,7 +4,8 @@ import util
 import signal1
 import position1
 
-import pickle, gzip, os
+import pickle, gzip, copy
+import os
 import numpy as np
 import matplotlib.pyplot as pp
 import matplotlib.colors as colors
@@ -262,13 +263,90 @@ def load_grid(prefix, exp_params, sys_params):
 
 ### SUMARIZE RESULTS ##########################################################
 
-def pretty_report(pos, cov, exp_params, sys_params, conf_level, offset=True):
+def generate_report(pos, cov, exp_params, sys_params, conf_level, offset=True):
+  
+  # Results
+  res = { 'cvg_prob' : np.zeros(pos.shape[:-1], dtype=np.float),
+          'mean' : np.zeros(pos.shape[:-1], dtype=np.complex),
+          'rmse' : np.zeros(pos.shape[:-1], dtype=np.float),
+          'area' : np.zeros(pos.shape[:-1], dtype=np.float),
+          'ecc' : np.zeros(pos.shape[:-1], dtype=np.float),
+          'avg_area' : np.zeros(pos.shape[:-1], dtype=np.float),
+          'avg_ecc' : np.zeros(pos.shape[:-1], dtype=np.float),
+          'area_ratio' : np.zeros(pos.shape[:-1], dtype=np.float) }
+
   Qt = scipy.stats.chi2.ppf(conf_level, 2)
   fmt = lambda x : '%9s' % ('%0.2f' % x)
   num_sites = len(sys_params['include'])
-  print 'SITES =', sys_params['include'], 'TRIALS = %d' % exp_params['trials']
   for e in range(pos.shape[2]): #easting 
     for n in range(pos.shape[3]): #northing
+      p = exp_params['center']
+      if offset: 
+        p += np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                        (e - exp_params['half_span']) * exp_params['scale'])
+      for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
+        for j, sig_n in enumerate(exp_params['sig_n']): 
+          p_hat = pos[i,j,e,n,:]
+          mean = np.mean(p_hat)
+          mean = [mean.imag, mean.real]
+          rmse = np.sqrt(np.mean(np.abs(p_hat - p) ** 2))# / res.shape[3])
+          
+          res['mean'][i,j,e,n] = np.complex(mean[1], mean[0])
+          res['rmse'][i,j,e,n] = rmse
+          
+          try: 
+            C = np.cov(np.imag(p_hat), np.real(p_hat))
+            (angle, axes) = position1.compute_conf(C, Qt)
+            E = position1.Ellipse(p, angle, axes)
+          except position1.PosDefError:
+            E = None
+
+          res['area'][i,j,e,n] = E.area()
+          res['ecc'][i,j,e,n] = E.eccentricity()
+
+          if cov is not None:
+            a = b = ct = 0
+            area = 0
+            ecc = 0
+            for k in range(len(cov[i][j][e][n])):
+              if cov[i][j][e][n][k] is not None: 
+                try:
+                  E_hat = cov[i][j][e][n][k].conf(conf_level)
+                  if E_hat.axes[0] > 0:
+                    area += E_hat.area()
+                    ecc += E_hat.eccentricity()
+                    ct += 1
+                    if p in E_hat: a += 1
+                  if not E or p_hat[k] in E: b += 1
+                except position1.PosDefError:
+                  pass # print "Positive definite!"
+            
+            if ct == 0:
+              res['cvg_prob'][i,j,e,n] = None
+              res['avg_area'][i,j,e,n] = None
+              res['avg_ecc'][i,j,e,n] = None
+              res['area_ratio'][i,j,e,n] = None
+            else:
+              res['cvg_prob'][i,j,e,n] = float(a) / ct
+              res['avg_area'][i,j,e,n] = area / ct
+              res['avg_ecc'][i,j,e,n] = ecc / ct
+              res['area_ratio'][i,j,e,n] = res['avg_area'][i,j,e,n] / res['area'][i,j,e,n]
+
+          else: 
+            res['cvg_prob'][i,j,e,n] = None
+            res['avg_area'][i,j,e,n] = None
+            res['avg_ecc'][i,j,e,n] = None
+            res['area_ratio'][i,j,e,n] = None
+
+  return res
+
+
+def display_report(res, exp_params, sys_params, compute_cov=True, offset=True):  
+  fmt = lambda x : '%9s' % ('%0.2f' % x)
+  print 'SITES =', sys_params['include'], 'TRIALS = %d' % exp_params['trials']
+  s = res['rmse'].shape[2]
+  for e in range(s): #easting 
+    for n in range(s): #northing
       p = exp_params['center']
       if offset: 
         p += np.complex((n - exp_params['half_span']) * exp_params['scale'], 
@@ -278,54 +356,20 @@ def pretty_report(pos, cov, exp_params, sys_params, conf_level, offset=True):
         print 'pulse_ct=%d' % pulse_ct
         for j, sig_n in enumerate(exp_params['sig_n']): 
           print '  sig_n=%.3f' % sig_n,
-          p_hat = pos[i,j,e,n,:]
-          mean = np.mean(p_hat)
-          mean = [mean.imag, mean.real]
-          rmse = np.sqrt(np.mean(np.abs(p_hat - p) ** 2))# / res.shape[3])
-          #rmse = [ 
-          #  np.sqrt(np.mean((np.imag(p_hat) - p.imag) ** 2)), # / res.shape[3]),
-          #  np.sqrt(np.mean((np.real(p_hat) - p.real) ** 2))] # / res.shape[3])]
-          #print rmse, np.std(np.imag(p_hat)), np.std(np.real(p_hat))
-          try: 
-            C = np.cov(np.imag(p_hat), np.real(p_hat))
-            (angle, axes) = position1.compute_conf(C, Qt)
-            E = position1.Ellipse(p, angle, axes)
-          except position1.PosDefError:
-            E = None
-            print "skippiong positive definite"
-  
-          print '  (%s, %s)' % (fmt(mean[0]), fmt(mean[1])), fmt(rmse), 
-
-          if cov is not None:
-            a = b = ct = 0
-            area = 0
-            for k in range(len(cov[i][j][e][n])):
-              if cov[i][j][e][n][k] is not None: 
-                try:
-                  E_hat = cov[i][j][e][n][k].conf(conf_level)
-                  if E_hat.axes[0] > 0:
-                    area += E_hat.area()
-                    ct += 1
-                    if p in E_hat: a += 1
-                  if not E or p_hat[k] in E: b += 1
-                except position1.PosDefError:
-                  pass #print "Positive definite!"
-           
-            if ct == 0: print 'bad'
+          print '  (%s, %s)' % (fmt(res['mean'][i,j,e,n].imag), 
+                                fmt(res['mean'][i,j,e,n].real)), 
+          print fmt(res['rmse'][i,j,e,n]),
+          if compute_cov is True: 
+            if res['cvg_prob'][i,j,e,n] is None: 
+              print 'bad'
             else: 
-              print fmt(float(a) / ct), \
-                    fmt(float(b) / exp_params['trials']), \
-                    fmt(area / ct), fmt((E.area() if E else 1)), \
-                    fmt((area / exp_params['trials']) / (E.area() if E else 1))
-
+              print fmt(res['cvg_prob'][i,j,e,n]), 
+              print fmt(res['area'][i,j,e,n]), 
+              print fmt(res['avg_area'][i,j,e,n]), 
+              print fmt(res['avg_area'][i,j,e,n] / res['area'][i,j,e,n])
           else: 
-            b = 0
-            for k in range(exp_params['trials']):
-              if not E or p_hat[k] in E: b += 1
-            print fmt(float(b) / exp_params['trials']), \
-                  fmt((E.area() if E else 1))
+            print fmt(res['area'][i,j,e,n])
 
-            
 
 def plot_hist(pos, conf, exp_params, sys_params, conf_level): # TODO out-of-date
   num_sites = len(sys_params['include'])
@@ -379,14 +423,14 @@ def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=Non
   (site_ids, P) = zip(*sys_params['sites'].iteritems())
   X = np.imag(P)
   Y = np.real(P)
-  pp.xlim([np.min(X) - 10, np.max(X) + 10])
-  pp.ylim([np.min(Y) - 20, np.max(Y) + 20])
-  l = np.max(X) - 10; h = np.max(Y) - 10
+  pp.xlim([np.min(X) - 100, np.max(X) + 100])
+  pp.ylim([np.min(Y) - 100, np.max(Y) + 100])
+  l = np.max(X) - 10; h = np.max(Y) - 20
 
-  offset = 5
+  offset = 20
   for (id, (x,y)) in zip(site_ids, zip(X,Y)): 
     pp.text(x+offset, y+offset, id)
-  pp.scatter(X, Y, label='sites', facecolors='r')
+  pp.scatter(X, Y, label='sites', facecolors='r', s=10)
 
   # Plot positions.
   if pos is not None: 
@@ -395,22 +439,18 @@ def plot_grid(fn, exp_params, sys_params, pulse_ct, sig_n, pos=None, nearest=Non
   pp.scatter(X, Y, label='estimates', alpha=alpha, facecolors='b', edgecolors='none', s=5)
 
   # Plot grid
-#  offset = 10
-#  s = 2*exp_params['half_span'] + 1
-#  for e in range(s): #easting 
-#    for n in range(s): #northing
-#      p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
-#                                             (e - exp_params['half_span']) * exp_params['scale'])
-#      pp.plot(p.imag, p.real, label='grid', color='w', marker='o', ms=5)
-#      if nearest:
-#        include = nearest_sites(p, sys_params['sites'], nearest)
-#        a = ', '.join(map(lambda(id) : str(id), sorted(include)))
-#        pp.text(p.imag+offset, p.real+offset, a, fontsize=8)
+  offset = 20
+  s = 2*exp_params['half_span'] + 1
+  for e in range(s): #easting 
+    for n in range(s): #northing
+      p = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                             (e - exp_params['half_span']) * exp_params['scale'])
+      pp.plot(p.imag, p.real, label='grid', color='w', marker='o', ms=3)
+      if nearest:
+        include = nearest_sites(p, sys_params['sites'], nearest)
+        a = ', '.join(map(lambda(id) : str(id), sorted(include))) 
+        pp.text(p.imag-(offset*7), p.real+(offset), a, fontsize=8)
   
-  # Exp. params
-  pp.text(l, h, '$\sigma_n^2=%0.1f$' % exp_params['sig_n'][j])
-  pp.text(l, h-5, '$%d$ samples/site' % exp_params['pulse_ct'][i])
-
   pp.savefig(fn, dpi=300, bbox_inches='tight')
   pp.clf()
 
@@ -672,9 +712,10 @@ def conf_test(prefix, center, sites, sv, conf_level):
   #save(prefix, pos, cov, exp_params, sys_params)
   (pos, cov, exp_params, sys_params) = load(prefix)
   print "Covariance\n"
-  pretty_report(pos, cov[0], exp_params, sys_params, conf_level)
+  res = generate_report(pos, cov[0], exp_params, sys_params, conf_level)
+  display_report(res, exp_params, sys_params)
   #print "BootstrapCovariance\n"
-  #pretty_report(pos, cov[1], exp_params, sys_params, conf_level)
+  #report(pos, cov[1], exp_params, sys_params, conf_level)
 
 
 
@@ -730,7 +771,7 @@ def one_test(db_con, prefix, conf_level):
   #plot_rmse('rmse.png', pos, exp_params['center'], exp_params, sys_params)
   #plot_area('area.png', pos, exp_params['center'], exp_params, sys_params, 0.95)
   plot_grid('noise-sample-ill.png', exp_params, sys_params, 5, 0.1, pos)
-  #pretty_report(pos, None, exp_params, sys_params, conf_level)
+  #report(pos, None, exp_params, sys_params, conf_level)
 
 
 def grid_test(prefix, center, sites, sv, conf_level): 
@@ -749,38 +790,97 @@ def grid_test(prefix, center, sites, sv, conf_level):
                  'sites'   : sites } 
 
   # Run simulations.
-  #montecarlo_huge(prefix, exp_params, sys_params, 
-  #                            sv, compute_cov=True, nearest=3)
+#  montecarlo_huge(prefix, exp_params, sys_params, 
+#                              sv, compute_cov=True, nearest=3)
   
   # Load and plot grid. 
-  #pos = load_grid(prefix, exp_params, sys_params)
-  #plot_grid('grid.png', exp_params, sys_params, 2, 0.001, pos)
+  pos = load_grid(prefix, exp_params, sys_params)
+  plot_grid('grid.png', exp_params, sys_params, 6, 0.005, pos, nearest=3)
   
-  # Report statistics.
-  center = exp_params['center']
-  s = 2 * exp_params['half_span'] + 1
-  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), 1, 1, exp_params['trials'])
-  for e in range(s):
-    for n in range(s):
-      (P, cov, _, _) = load(prefix, add=POS_EXT_FMT % (e,n))
-      pos = np.zeros(shape, dtype=np.complex)
-      pos[:,:,0,0,:] = P
-      cov_asym = create_array_from_shape(shape)
-      cov_boot = create_array_from_shape(shape)
-      for i in range(shape[0]): 
-        for j in range(shape[1]):
-          cov_asym[i][j][0][0] = cov[0][i][j]
-          cov_boot[i][j][0][0] = cov[1][i][j]
-      p = center + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
-                              (e - exp_params['half_span']) * exp_params['scale'])
-      exp_params['center'] = p
-      print '\n\n\n--- %d,%d -------------------------------------------' % (e,n)
-      print "Covariance\n"
-      pretty_report(pos, cov_asym, exp_params, sys_params, conf_level, offset=False)
-      print "BootstrapCovariance\n"
-      pretty_report(pos, cov_boot, exp_params, sys_params, conf_level, offset=False)
-  exp_params['center'] = center
+  # Save summary statistics.
+#  s = 2 * exp_params['half_span'] + 1
+#  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s)
+#  asym_res = { 'cvg_prob' : np.zeros(shape, dtype=np.float),
+#               'mean' : np.zeros(shape, dtype=np.complex),
+#               'rmse' : np.zeros(shape, dtype=np.float),
+#               'area' : np.zeros(shape, dtype=np.float),
+#               'ecc' : np.zeros(shape, dtype=np.float),
+#               'avg_area' : np.zeros(shape, dtype=np.float),
+#               'avg_ecc' : np.zeros(shape, dtype=np.float),
+#               'area_ratio' : np.zeros(shape, dtype=np.float) }
+#  boot_res = copy.deepcopy(asym_res)
+#  center = exp_params['center']
+#  s = 2 * exp_params['half_span'] + 1
+#  shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), 1, 1, exp_params['trials'])
+#  for e in range(s):
+#    for n in range(s):
+#      print e,n
+#      (P, cov, _, _) = load(prefix, add=POS_EXT_FMT % (e,n))
+#      pos = np.zeros(shape, dtype=np.complex)
+#      pos[:,:,0,0,:] = P
+#      cov_asym = create_array_from_shape(shape)
+#      cov_boot = create_array_from_shape(shape)
+#      for i in range(shape[0]): 
+#        for j in range(shape[1]):
+#          cov_asym[i][j][0][0] = cov[0][i][j]
+#          cov_boot[i][j][0][0] = cov[1][i][j]
+#      p = center + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+#                              (e - exp_params['half_span']) * exp_params['scale'])
+#      exp_params['center'] = p
+#      asym = generate_report(pos, cov_asym, exp_params, sys_params, conf_level, offset=False)
+#      boot = generate_report(pos, cov_boot, exp_params, sys_params, conf_level, offset=False)
+#      for key in asym_res.keys():
+#        asym_res[key][:,:,e,n] = asym[key][:,:,0,0]
+#        boot_res[key][:,:,e,n] = boot[key][:,:,0,0]
+#  exp_params['center'] = center
+#  pickle.dump((asym_res, boot_res), open(prefix + '-stats', 'w'))
 
+  # Plot summary statistics.
+#  (asym_res, boot_res) = pickle.load(open(prefix + '-stats'))
+#  I = len(exp_params['pulse_ct'])
+#  J = len(exp_params['sig_n'])
+#
+#  feature = 'cvg_prob'
+#  title = 'Coverage probability'
+#  mean = np.zeros((2,I,J), dtype=np.float)
+#  std  = np.zeros((2,I,J), dtype=np.float)
+#  for i in range(I): 
+#    for j in range(J): 
+#      A = asym_res[feature][i,j].flat[~np.isnan(asym_res[feature][i,j].flat)]
+#      mean[0,i,j] = np.mean(A)
+#      std[0,i,j] =  np.std(A)
+#      B = boot_res[feature][i,j].flat[~np.isnan(boot_res[feature][i,j].flat)]
+#      mean[1,i,j] = np.mean(B)
+#      std[1,i,j] =  np.std(B)
+#  
+#  pp.rc('text', usetex=True)
+#  pp.rc('font', family='serif')
+#  fig, axs = pp.subplots(nrows=1, ncols=2, sharex=True)
+#  fig.set_size_inches(10,3.5)
+#  ax0 = axs[0]
+#  ax0.set_xscale('log')
+#  ax0.set_xlim([exp_params['sig_n'][0]/2, exp_params['sig_n'][-1]*2])
+#  ax0.set_xlabel('$\sigma_n^2$')
+#  ax0.set_ylabel('Coverage probability')
+#  ax0.set_title('Asymptotic')
+#  ax1 = axs[1]
+#  ax1.set_xscale('log')
+#  ax1.set_title('Bootstrap')
+#  ax1.set_xlim([exp_params['sig_n'][0]/2, exp_params['sig_n'][-1]*2])
+#  ax1.set_xlabel('$\sigma_n^2$')
+#  
+#  for i, pulse_ct in enumerate(exp_params['pulse_ct']):
+#    ax0.errorbar(exp_params['sig_n'], mean[0,i,:], yerr=std[0,i,:], 
+#      fmt='o', label='%d' % pulse_ct)
+#    ax1.errorbar(exp_params['sig_n'], mean[1,i,:], yerr=std[1,i,:], 
+#      fmt='o', label='%d' % pulse_ct)
+#    
+#  pp.legend(title='Samples per site', ncol=1, bbox_to_anchor=(1.05,1), loc=2, borderaxespad=0)
+#  pp.savefig('cvg_prob.png', dpi=300, bbox_inches='tight')
+#  pp.clf()
+
+      
+  
 
 def contour_test(prefix, center, sites, sv, conf_level): 
   
@@ -954,10 +1054,10 @@ if __name__ == '__main__':
   #angular_test(db_con, 'exp/angle', center, 0.95)
 
   #### GRID ###################################################################
-  #grid_test('exp/grid', center, sites, sv, 0.95)
+  grid_test('exp/grid', center, sites, sv, 0.95)
 
   #### CONTOUR ################################################################
   #contour_test('exp/contour', center, sites, sv, 0.95)
   
   #### ASYMPTOTIC-CONF#########################################################
-  conf_test('exp/asym', center, sites, sv, 0.95)
+  #conf_test('exp/asym', center, sites, sv, 0.95)
