@@ -5,7 +5,8 @@ import signal1
 import position1
 
 import pickle, gzip, copy
-import os
+import os, os.path
+from multiprocessing import Process 
 import numpy as np
 import matplotlib.pyplot as pp
 import matplotlib.colors as colors
@@ -16,6 +17,7 @@ import scipy
 
 ### SIMULATION ################################################################
 
+JOBS = 2 # Number of processes to spawn in montecarlo_huge()
 
 POS_EXT_FMT = '-%02d.%02d'
 
@@ -144,50 +146,78 @@ def montecarlo_huge(prefix, exp_params, sys_params, sv, nearest=None, compute_co
   # Interpolate steering vector splines.
   sv_splines = signal1.compute_bearing_splines(sv)
 
+  # Compile a list of points to simulate. 
+  Q = []
   for e in range(s): #easting 
     for n in range(s): #northing
-      print e, n
-      
-      pos = np.zeros(shape, dtype=np.complex)
-      if compute_cov:
-        cov_asym = [[[] for j in range(len(exp_params['sig_n'])) ] 
-                            for i in range(len(exp_params['pulse_ct'])) ]
-        cov_boot = [[[] for j in range(len(exp_params['sig_n'])) ] 
-                            for i in range(len(exp_params['pulse_ct'])) ]
-      else: 
-        cov_asym = cov_boot = None
-      
-      for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
-        print 'pulse_ct=%d' % pulse_ct
-        for j, sig_n in enumerate(exp_params['sig_n']): 
-          print '  sig_n=%f' % sig_n
-          P = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
-                                                 (e - exp_params['half_span']) * exp_params['scale'])
-          for k in range(exp_params['trials']): 
-            # Run simulation.
-            if nearest is None:
-              include = sys_params['include']
-            else: 
-              include = nearest_sites(P, sites, nearest)
-            sig = signal1.Simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
-          
-            # Estimate position.
-            P_hat = position1.PositionEstimator(999, sites, P, sig, sv, method, 
-                             s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA)
-            pos[i,j,k] = P_hat.p
+      if not os.path.isfile(prefix+(POS_EXT_FMT % (e,n))+'-pos.npz'):
+        Q.append((e,n))
 
-            # Estimate confidence region. 
-            if compute_cov:
-              cov_asym[i][j].append(position1.Covariance(P_hat, sites, p_known=P))
-              try: 
-                cov_boot[i][j].append(position1.BootstrapCovariance(P_hat, sites))
-              except np.linalg.linalg.LinAlgError:
-                print "Singular matrix!"
-                cov_boot[i][j].append(None)
+  # Partition points into processes. 
+  Qs = [] 
+  q = len(Q) / JOBS
+  for j in range(JOBS): 
+    Qs.append(Q[q*j:q*(j+1)])
+  Qs[-1] += Q[q*JOBS:]
   
-      # Save intermediate results. 
-      save(prefix, pos, (cov_asym, cov_boot), 
-        exp_params, sys_params, add=POS_EXT_FMT % (e, n))
+  args = (prefix, exp_params, sys_params, sv, nearest, compute_cov, 
+             shape, method, sites, scaled_rho, sv_splines)
+
+  # Spawn a process for each set of points. 
+  proc = []
+  for Q in Qs: 
+    proc.append( Process(target=_montecarlo_huge, args=args + (Q,)) )
+    proc[-1].start()
+
+  # Wait for them to finish. 
+  for i in range(len(Qs)): 
+    proc[i].join()
+
+
+def _montecarlo_huge(prefix, exp_params, sys_params, sv, nearest, compute_cov, 
+                       shape, method, sites, scaled_rho, sv_splines, Q):
+  for (e,n) in Q:
+    print e,n
+    pos = np.zeros(shape, dtype=np.complex)
+    if compute_cov:
+      cov_asym = [[[] for j in range(len(exp_params['sig_n'])) ] 
+                          for i in range(len(exp_params['pulse_ct'])) ]
+      cov_boot = [[[] for j in range(len(exp_params['sig_n'])) ] 
+                          for i in range(len(exp_params['pulse_ct'])) ]
+    else: 
+      cov_asym = cov_boot = None
+    
+    for i, pulse_ct in enumerate(exp_params['pulse_ct']): 
+      print 'pulse_ct=%d' % pulse_ct
+      for j, sig_n in enumerate(exp_params['sig_n']): 
+        print '  sig_n=%f' % sig_n
+        P = exp_params['center']  + np.complex((n - exp_params['half_span']) * exp_params['scale'], 
+                                               (e - exp_params['half_span']) * exp_params['scale'])
+        for k in range(exp_params['trials']): 
+          # Run simulation.
+          if nearest is None:
+            include = sys_params['include']
+          else: 
+            include = nearest_sites(P, sites, nearest)
+          sig = signal1.Simulator(P, sites, sv_splines, scaled_rho, sig_n, pulse_ct, include)
+        
+          # Estimate position.
+          P_hat = position1.PositionEstimator(999, sites, P, sig, sv, method, 
+                           s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA)
+          pos[i,j,k] = P_hat.p
+
+          # Estimate confidence region. 
+          if compute_cov:
+            cov_asym[i][j].append(position1.Covariance(P_hat, sites, p_known=P))
+            try: 
+              cov_boot[i][j].append(position1.BootstrapCovariance(P_hat, sites))
+            except np.linalg.linalg.LinAlgError:
+              print "Singular matrix!"
+              cov_boot[i][j].append(None)
+
+    # Save intermediate results. 
+    save(prefix, pos, (cov_asym, cov_boot), 
+      exp_params, sys_params, add=POS_EXT_FMT % (e, n))
 
 
 def montecarlo_spectrum(exp_params, sys_params, sv):
