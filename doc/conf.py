@@ -16,7 +16,7 @@ import sys, os
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('../python'))
+sys.path.insert(0, os.path.abspath('../'))
 
 # -- General configuration -----------------------------------------------------
 
@@ -28,9 +28,9 @@ sys.path.insert(0, os.path.abspath('../python'))
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.pngmath', 'sphinx.ext.viewcode', 'breathe']
 
 breathe_projects = { 
-  'fella' : os.path.abspath('doxyxml/'),
+  'detector' : os.path.abspath('doxyxml/'),
 }
-breathe_default_project = 'fella'
+breathe_default_project = 'detector'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

@@ -36,6 +36,8 @@
 #
 
 import sys
+import StringIO#used as temporary file-like object for returning "last row"
+import select#used to check if there's data on stdin
 import qraat
 
 usage = """\
@@ -49,6 +51,9 @@ usage: rmg_csv <site> <parameter> [<value>]
   If a value is specified, then a .csv file is emitted to 
   standard output; otherwise the requested parameter's value
   is emitted.""" 
+
+#TODO Use python option parsing library
+#TODO Add filename option instead of stdin
 
     ## Parse command line parameters ##
 
@@ -92,26 +97,44 @@ else:
   sys.argv.append(None)
   (row, col, value) = sys.argv[1:4]
 
+#check for data on stdin, 0 second timeout (expecting piped file not user input)
+r, w, x = select.select([sys.stdin],[],[],0)
+if not r:
+  print >> sys.stderr, "error (csv): No data to read on stdin"
+  sys.exit(1)
+
+    ## Operate on last row only ##
+  # FIXME not efficient for long files ("lines" contains all the data in the file)
+  # I want to eliminate the reading stdin and pass the file name
+  # then use head -n 1 file && tail -n 1 file to only read last line.
+  # Or build a bash wrapper which cuts out the unwanted data in this use case.
+  # TAB 2015-04-20
+if (not row and not col):
+  tf = StringIO.StringIO()
+  tf.write(sys.stdin.readline())
+  lines = sys.stdin.readlines()
+  tf.write(lines[-1])
+  tf.seek(0)
+  table = qraat.csv.csv(tf)
+
+  line = table[-1]
+
+  if param_list: 
+    for col in param_list:
+       print getattr(line, col)
+  else:
+    print ','.join(table.headers)
+    print ','.join(line)
+    
+  sys.exit(0)
+
+
+
 
     ## Read header ##
-
 table = qraat.csv.csv(sys.stdin) 
 
 try:
-
-    ## Operate on last row only ##
-
-  if (not row and not col): 
-    # FIXME not efficient for long files
-    line = table[-1]
-    if param_list: 
-      for col in param_list:
-         print getattr(line, col)
-    else:
-      print ','.join(table.headers)
-      print ','.join(line)
-      
-    sys.exit(0)
 
     ## Parse line by line ##
 
