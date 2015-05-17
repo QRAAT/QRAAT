@@ -473,7 +473,7 @@ do
             mkdir -p $RMG_SERVER_DET_DIR/$SITE 
             touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
             for DIR in $DIRECTORIES_TO_COPY; do
-              echo "copying $DIR"
+              echo "$SITE copying $DIR"
               mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
               # download to RMG server and delete from site if xfer succeeds
               rsync -az --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
