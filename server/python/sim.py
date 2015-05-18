@@ -728,6 +728,27 @@ def plot_area(fn, pos, p, exp_params, sys_params, conf_level, cov=None):
 
 ### EXPERIMENTS ###############################################################
 
+
+def conf_test(prefix, center, sites, sv, conf_level): 
+   
+  exp_params = { 'rho'       : 1,
+                 'sig_n'     : [0.01],
+                 'pulse_ct'  : [6],
+                 'center'    : (4260738.3+574549j), 
+                 'half_span' : 0,
+                 'scale'     : 1,
+                 'trials'    : 1000 }
+
+  sys_params = { 'method'         : 'bartlet', 
+                 'include'        : [],
+                 'center'         : center,
+                 'sites'          : sites } 
+
+  (pos, cov) = montecarlo(exp_params, sys_params, sv, nearest=3, compute_cov=True)
+  res = generate_report(pos, cov[1], exp_params, sys_params, conf_level)
+  display_report(res, exp_params, sys_params)  
+
+
 def asym_test(prefix, center, sites, sv, conf_level): 
   
   exp_params = { 'rho'       : 1,
@@ -1154,7 +1175,7 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
 
-  #convergence_test('exp/test', center, sites, sv, 0.95)
+  conf_test('exp/test', center, sites, sv, 0.95)
 
   #### ONE ###################################################################
   #one_test(db_con, 'exp/one', 0.95)
@@ -1175,4 +1196,4 @@ if __name__ == '__main__':
   #contour_test('exp/contour', center, sites, sv, 0.95)
   
   #### ASYMPTOTIC-CONF#########################################################
-  asym_test('exp/asym', center, sites, sv, 0.95)
+  #asym_test('exp/asym', center, sites, sv, 0.95)

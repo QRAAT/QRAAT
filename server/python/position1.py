@@ -416,7 +416,45 @@ class Covariance:
 
 class BootstrapCovariance (Covariance):
 
-  def __init__(self, pos, sites, max_resamples=200):
+  def __init__(self, pos, sites, max_resamples=100):
+    ''' Bootstrap method for estimationg covariance of a position estimate. 
+
+      Generate at most `max_resamples` position estimates by resampling the signals used
+      in computing `pos`. 
+    '''
+    self.p_hat = pos.p
+    n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
+    self.m = float(n) / pos.num_sites
+
+    # Generate sub samples.
+    P = bootstrap_resample_sites(pos, sites, max_resamples, pos.obj, pos.splines.keys())
+    A = np.array(P[len(P)/2:])
+    B = np.array(P[:len(P)/2])
+    
+    # Estimate covariance. 
+    self.C = np.cov(A[:,0], A[:,1]) 
+    
+    # Mahalanobis distance of remaining estimates. 
+    W = []
+    D = np.linalg.inv(self.C)
+    x_bar = np.array([np.mean(B[:,0]), np.mean(B[:,1])])
+    x_hat = np.array([pos.p.imag, pos.p.real])
+    for x in iter(B): 
+      y = x - x_bar
+      w = np.dot(np.transpose(y), np.dot(self.m * D, y)) 
+      W.append(w)
+    self.W = np.array(sorted(W))
+
+  def conf(self, level): 
+    ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
+    Qt = self.W[int(len(self.W) * level)] 
+    (angle, axes) = compute_conf(self.C, Qt * 2, 1) 
+    return Ellipse(self.p_hat, angle, axes, 0, 1)
+
+
+class BootstrapCovariance2 (Covariance):
+
+  def __init__(self, pos, sites, max_resamples=100):
     ''' Bootstrap method for estimationg covariance of a position estimate. 
 
       Generate at most `max_resamples` position estimates by resampling the signals used
@@ -441,14 +479,14 @@ class BootstrapCovariance (Covariance):
     x_hat = np.array([pos.p.imag, pos.p.real])
     for x in iter(B): 
       y = x - x_bar
-      w = np.dot(np.transpose(y), np.dot(self.m * D, y)) 
+      w = np.dot(np.transpose(y), np.dot(D, y)) 
       W.append(w)
     self.W = np.array(sorted(W))
 
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
     Qt = self.W[int(len(self.W) * level)] 
-    (angle, axes) = compute_conf(self.C, Qt * 2, 1) 
+    (angle, axes) = compute_conf(self.C, Qt, 1) 
     return Ellipse(self.p_hat, angle, axes, 0, 1)
 
 
@@ -610,16 +648,29 @@ def bootstrap_resample(pos, sites, max_samples, obj):
   ''' Generate positionn estimates by sub sampling signal data. 
 
     Construct an objective function from a subset of the pulses (one pulse per site)
-    and optimize over the search space. Repeat this at most `max_samples` times.
+    and optimize over the search space. Repeat this at most `max_samples / samples` 
+    for each pair of sites where `samples` is the number of such pairs. 
   '''
   N = reduce(int.__mul__, map(lambda S : len(S), pos.sub_splines.values()))
   if N < 2: # Number of pulse combinations
     raise BootstrapError  
   
+  resamples = max(1, max_samples / (pos.num_sites * (pos.num_sites + 1) / 2))
   P = []
-  for i in range(max_samples):
+  for site_ids in itertools.combinations(pos.splines.keys(), 2):
+    P += bootstrap_resample_sites(pos, sites, resamples, obj, site_ids)
+  random.shuffle(P)
+  return P
+
+def bootstrap_resample_sites(pos, sites, resamples, obj, site_ids):
+  N = reduce(int.__mul__, map(lambda S : len(S), pos.sub_splines.values()))
+  if N < 2: # Number of pulse combinations
+    raise BootstrapError  
+
+  P = []
+  for i in range(resamples):
     splines = {}
-    for id in pos.sub_splines.keys():
+    for id in site_ids:
       j = random.randint(0, len(pos.sub_splines[id])-1)
       splines[id] = pos.sub_splines[id][j]
     (p, _) = compute_position(sites, splines, pos.p, obj,
@@ -627,20 +678,6 @@ def bootstrap_resample(pos, sites, max_samples, obj):
     P.append(transform_coord(p, pos.p, 0, 1))
   return P
 
-def bootstrap_resample_site(pos, sites, max_samples, obj):
-  ''' Random subsamples of sites. '''
-  N = reduce(int.__mul__, map(lambda S : len(S), pos.sub_splines.values()))
-  if N < 2: # Number of pulse combinations
-    raise BootstrapError  
-  
-  P = []
-  for site_ids in itertools.combinations(pos.splines.keys(), 2):
-    splines = { id : pos.splines[id] for id in site_ids }
-    (p, _) = compute_position(sites, splines, pos.p, obj,
-              s=POS_EST_S, m=POS_EST_M-1, n=POS_EST_N, delta=POS_EST_DELTA) 
-    P.append(transform_coord(p, pos.p, 0, 1))
-  random.shuffle(P)
-  return P
 
 def compute_conf(C, Qt, scale=1):
   ''' Compute confidence region from covariance matrix.
