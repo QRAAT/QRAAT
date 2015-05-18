@@ -332,11 +332,12 @@ def generate_report(pos, cov, exp_params, sys_params, conf_level, offset=True):
             C = np.cov(np.imag(p_hat), np.real(p_hat))
             (angle, axes) = position1.compute_conf(C, Qt)
             E = position1.Ellipse(p, angle, axes)
+            res['area'][i,j,e,n] = E.area()
+            res['ecc'][i,j,e,n] = E.eccentricity()
           except position1.PosDefError:
             E = None
-
-          res['area'][i,j,e,n] = E.area()
-          res['ecc'][i,j,e,n] = E.eccentricity()
+            res['area'][i,j,e,n] = None
+            res['ecc'][i,j,e,n] = None
 
           if cov is not None:
             a = b = ct = 0
@@ -743,10 +744,12 @@ def asym_test(prefix, center, sites, sv, conf_level):
                  'sites'   : sites } 
 
   # Run simulations.
+  print "Running simulations"
   montecarlo_huge(prefix, exp_params, sys_params, 
                               sv, compute_cov=True, nearest=3)
   
   # Save summary statistics.
+  print "Generating summary statistics"
   s = 2 * exp_params['half_span'] + 1
   shape = (len(exp_params['pulse_ct']), len(exp_params['sig_n']), s, s)
   asym_res = { 'cvg_prob' : np.zeros(shape, dtype=np.float),
@@ -797,14 +800,15 @@ def asym_test(prefix, center, sites, sv, conf_level):
   
   pp.rc('text', usetex=True)
   pp.rc('font', family='serif')
-  fig, axs = pp.subplots(nrows=1, ncols=1, sharex=True)
-  fig.set_size_inches(10,3.5)
-  ax0 = axs[0]
+  #fig, axs = pp.subplots(nrows=1, ncols=1, sharex=True)
+  fig = pp.gcf()
+  fig.set_size_inches(5,3.5)
+  ax0 = fig.add_subplot(111)
   ax0.set_xscale('log')
   ax0.set_xlim([exp_params['sig_n'][0]/2, exp_params['sig_n'][-1]*2])
   ax0.set_xlabel('$\sigma_n^2$')
   ax0.set_ylabel('Coverage probability')
-  ax0.set_title('Asymptotic')
+  #ax0.set_title('Asymptotic')
   
   for i, pulse_ct in enumerate(exp_params['pulse_ct']):
     ax0.errorbar(exp_params['sig_n'], mean[0,i,:], yerr=std[0,i,:], 
@@ -1168,7 +1172,7 @@ if __name__ == '__main__':
   #grid_test('exp/grid', center, sites, sv, 0.95)
 
   #### CONTOUR ################################################################
-  contour_test('exp/contour', center, sites, sv, 0.95)
+  #contour_test('exp/contour', center, sites, sv, 0.95)
   
   #### ASYMPTOTIC-CONF#########################################################
-  #asym_test('exp/asym', center, sites, sv, 0.95)
+  asym_test('exp/asym', center, sites, sv, 0.95)

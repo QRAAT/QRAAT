@@ -264,7 +264,8 @@ class SteeringVectors:
 
 class Signal:
 
-  def __init__(self, db_con=None, dep_id=None, t_start=0, t_end=0, score_threshold=0):
+  def __init__(self, db_con=None, dep_id=None, t_start=0, t_end=0, 
+               score_threshold=None, exclude=[]):
    
     ''' Represent signals in the `qraat.est` table.
     
@@ -293,23 +294,38 @@ class Signal:
     
     if db_con: 
       cur = db_con.cursor()
-      ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
-                                 ed1r,  ed1i,  ed2r,  ed2i,  
-                                 ed3r,  ed3i,  ed4r,  ed4i, tnp,
-                                 nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
-                                 nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
-                                 nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
-                                 nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i 
-                            FROM est
-                            JOIN estscore ON est.ID = estscore.estID
-                           WHERE deploymentID= %s
-                             AND timestamp >= %s 
-                             AND timestamp <= %s
-                             AND (score / theoretical_score) >= %s
-                           ORDER BY timestamp''', 
-                (dep_id, t_start, t_end, score_threshold))
+      if score_threshold is not None: 
+        ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
+                                   ed1r,  ed1i,  ed2r,  ed2i,  
+                                   ed3r,  ed3i,  ed4r,  ed4i, tnp,
+                                   nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+                                   nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+                                   nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+                                   nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i 
+                              FROM est
+                              JOIN estscore ON est.ID = estscore.estID
+                             WHERE deploymentID= %s
+                               AND timestamp >= %s 
+                               AND timestamp <= %s
+                               AND (score / theoretical_score) >= %s
+                             ORDER BY timestamp''', 
+                  (dep_id, t_start, t_end, score_threshold))
+      else:
+        ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
+                                   ed1r,  ed1i,  ed2r,  ed2i,  
+                                   ed3r,  ed3i,  ed4r,  ed4i, tnp,
+                                   nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+                                   nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+                                   nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+                                   nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i 
+                              FROM est
+                             WHERE deploymentID= %s
+                               AND timestamp >= %s 
+                               AND timestamp <= %s
+                             ORDER BY timestamp''', 
+                  (dep_id, t_start, t_end))
    
-      if ct:
+      if ct > 0:
         raw_data = np.array(cur.fetchall(), dtype=float)
         est_ids = np.array(raw_data[:,0], dtype=int)
         self.max_est_id = np.max(est_ids)
@@ -328,7 +344,7 @@ class Signal:
               k = 13 + (i*num_ch*2) + (2*j)
               noise_cov[t,i,j] = np.complex(raw_data[t,k], raw_data[t,k+1])
 
-        for site_id in set(include):
+        for site_id in set(include).difference(set(exclude)):
           site = _per_site_data(site_id)
           site.est_ids = est_ids[include == site_id]
           site.t = timestamps[include == site_id]

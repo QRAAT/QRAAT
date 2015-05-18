@@ -41,6 +41,8 @@ POS_EST_N = -1
 POS_EST_DELTA = 5
 POS_EST_S = 10
 
+NORMALIZE_SPECTRUM = False
+
 class PositionError (Exception): 
   value = 0; msg = ''
   def __str__(self): return '%s (%d)' % (self.msg, self.value)
@@ -194,10 +196,10 @@ class Position:
   def get_likelihood(self):
     ''' Return normalized position likelihood. ''' 
     if self.likelihood and self.num_sites > 0:
-      # NOTE if aggregate bearings are normalised, 
-      # divide by self.num_sites; otherwise, divide
-      # by self.num_est. See aggregate_spectrum().
-      return self.likelihood / self.num_sites
+      if NORMALIZE_SPECTRUM:
+        return self.likelihood / self.num_sites
+      else: 
+        return self.likelihood / self.num_est
     else: return None
   
   def get_activity(self): 
@@ -422,9 +424,9 @@ class BootstrapCovariance (Covariance):
     '''
     self.p_hat = pos.p
     n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
-    self.m = n / pos.num_sites
+    self.m = float(n) / pos.num_sites
 
-    # Generate sub samples. 
+    # Generate sub samples.
     P = bootstrap_resample(pos, sites, max_resamples, pos.obj)
     A = np.array(P[len(P)/2:])
     B = np.array(P[:len(P)/2])
@@ -504,7 +506,10 @@ def aggregate_window(P, signal, obj, t_start, t_end):
 
 def aggregate_spectrum(p):
   ''' Sum a set of bearing likelihoods. '''
-  return np.sum(p, 0) / p.shape[0]
+  if NORMALIZE_SPECTRUM:
+    return np.sum(p, 0) / p.shape[0]
+  else: 
+    return np.sum(p, 0)
 
 def compute_bearing_spline(l): 
   ''' Interpolate a spline on a bearing likelihood distribuiton. 
@@ -620,13 +625,14 @@ def bootstrap_resample(pos, sites, max_samples, obj):
     (p, _) = compute_position(sites, splines, pos.p, obj,
               s=POS_EST_S, m=POS_EST_M-1, n=POS_EST_N, delta=POS_EST_DELTA) 
     P.append(transform_coord(p, pos.p, 0, 1))
-    
   return P
 
 def bootstrap_resample_site(pos, sites, max_samples, obj):
   ''' Random subsamples of sites. '''
-  # TODO This method is probably more appropriate than bootstrap_resample()
-  # for really small samples (<2 per site)
+  N = reduce(int.__mul__, map(lambda S : len(S), pos.sub_splines.values()))
+  if N < 2: # Number of pulse combinations
+    raise BootstrapError  
+  
   P = []
   for site_ids in itertools.combinations(pos.splines.keys(), 2):
     splines = { id : pos.splines[id] for id in site_ids }
