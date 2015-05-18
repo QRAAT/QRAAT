@@ -52,7 +52,7 @@ GR_SWIG_MAKE(rmg_swig rmg_swig.i)
 ########################################################################
 # Install the build swig module
 ########################################################################
-GR_SWIG_INSTALL(TARGETS rmg_swig DESTINATION ${GR_PYTHON_DIR}/rmg)
+GR_SWIG_INSTALL(TARGETS rmg_swig DESTINATION ${GR_PYTHON_DIR}/qraat/rmg)
 
 ########################################################################
 # Install swig .i files for development

@@ -37,7 +37,7 @@ if(NOT rmg_sources)
 endif(NOT rmg_sources)
 
 add_library(gnuradio-rmg SHARED ${rmg_sources})
-target_link_libraries(gnuradio-rmg ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES})
+target_link_libraries(gnuradio-rmg ${Boost_LIBRARIES} ${GNURADIO_ALL_LIBRARIES} rmg-pulse)
 set_target_properties(gnuradio-rmg PROPERTIES DEFINE_SYMBOL "gnuradio_rmg_EXPORTS")
 
 if(APPLE)

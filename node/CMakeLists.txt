@@ -137,6 +137,7 @@ include_directories(
     ${Boost_INCLUDE_DIRS}
     ${CPPUNIT_INCLUDE_DIRS}
     ${GNURADIO_ALL_INCLUDE_DIRS}
+    /usr/local/include/qraat
 )
 
 link_directories(

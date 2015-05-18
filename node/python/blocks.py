@@ -23,7 +23,8 @@
   backend detector array and filters. 
 """
 
-from gnuradio import gr, blks2, uhd, gru
+from gnuradio import gr, uhd
+from gnuradio import filter as gr_filter
 from rmg_swig import pulse_sink_c
 import params
 
@@ -125,22 +126,22 @@ class software_backend(gr.hier_block2):
 
         self.band_rate = be_param.bw
         print "Number of Bands :", be_param.num_bands
-        print "Band sampling rate :",band_rate
+        print "Band sampling rate :",self.band_rate
 
         self.directory = directory
 
         if be_param.num_bands > 1:
 
             # Calculate the polyphase filter.
-            taps = gr.firdes.low_pass(1.0, 
-                                  band_rate*be_param.num_bands, 
-                                  0.4*band_rate , 
-                                  0.1*band_rate ,
-                                  gr.firdes.WIN_HANN)
+            taps = gr_filter.firdes.low_pass(1.0, 
+                                  self.band_rate*be_param.num_bands, 
+                                  0.4*self.band_rate , 
+                                  0.1*self.band_rate ,
+                                  gr_filter.firdes.WIN_HANN)
             print "Band filter has", len(taps), "taps"
 
             for j in range(channels):
-                self.pp_filter.append(blks2.analysis_filterbank(be_param.num_bands,taps))
+                self.pp_filter.append(gr_filter.pfb.channelizer_ccf(be_param.num_bands,taps,1))
                 self.connect((self,j), self.pp_filter[j])
 
         for j in range(be_param.num_bands):
