@@ -107,7 +107,7 @@ def sim_data():
 
   # Simpulate signal given known position p.  
   p = center + complex(650,0)
-  include = [2,3,5,4,6,8]
+  include = [2,4,6,8]
 
   sig_n = 0.002 # noise
   rho = signal1.scale_tx_coeff(p, 1, sites, include)
@@ -122,9 +122,9 @@ def sim_data():
  
   level=0.95
   position1.BootstrapCovariance(pos, sites).conf(level).display(p)
-  position1.Covariance(pos, sites, p_known=p).conf(level).display(p)
-  print position1.Covariance(pos, sites, p_known=p).conf(level).eccentricity()
+  position1.BootstrapCovariance2(pos, sites).conf(level).display(p)
+  #position1.Covariance(pos, sites, p_known=p).conf(level).display(p)
 
 
 # Testing, testing .... 
-real_data()
+sim_data()

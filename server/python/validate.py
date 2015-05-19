@@ -74,7 +74,7 @@ def process(sv):
       
       if pos.p is not None:
         try: 
-          cov = position1.BootstrapCovariance2(pos, sites)
+          cov = position1.BootstrapCovariance(pos, sites)
           E = cov.conf(conf_level)
           C[site_ids].append((E.angle, E.axes[0], E.axes[1]))
           print "Ok"
@@ -96,24 +96,8 @@ def process(sv):
   return (P, C)
 
 
-if __name__ == '__main__':  
-  db_con = util.get_db('reader')
-  
-  # System params 
-  sv = signal1.SteeringVectors(db_con, cal_id)
-  sites = util.get_sites(db_con)
-  (center, zone) = util.get_center(db_con)
-  
-  P, C = process(sv)
-  pickle.dump((P, C), open(fn+'-data', 'w'))
-
-  for (site_ids, pos) in P.iteritems(): 
-
-    if len(site_ids) == 1: 
-      print "skpping", site_ids
-      continue
-    print site_ids, 'mean', np.mean(pos), len(pos)
-  
+def plot(pos, p_known, site_ids, fn):
+    
     fig = pp.gcf()
     ax = fig.add_subplot(111)
     ax.axis('equal')
@@ -124,9 +108,69 @@ if __name__ == '__main__':
     Y = np.real(pos)
     pp.scatter(X, Y, alpha=0.2, facecolors='b', edgecolors='none', s=5)
 
-    pp.plot(site34.imag, site34.real, color='w', marker='o', ms=3)
+    pp.plot(p_known.imag, p_known.real, color='w', marker='o', ms=3)
     
     pp.title("%s" % str(site_ids))
     pp.savefig("%s%s.png" % (fn, ''.join(map(lambda x: str(x), site_ids))))
     pp.clf()
+  
+
+
+if __name__ == '__main__':  
+  db_con = util.get_db('reader')
+  
+  # System params 
+  sv = signal1.SteeringVectors(db_con, cal_id)
+  sites = util.get_sites(db_con)
+  (center, zone) = util.get_center(db_con)
+  
+  #P, C = process(sv)
+  #pickle.dump((P, C), open(fn+'-data', 'w'))
+  (P, C) = pickle.load(open(fn+'-data', 'r'))
+
+  for site_ids in P.keys(): 
+
+    print '----------------------------------------'
+
+    if len(site_ids) < 2: 
+      print "skpping", site_ids
+      continue
+    
+    print site_ids
+    p_mean = np.complex(0,0)
+    total = good = 0
+    for p in P[site_ids]: 
+      total += 1
+      if p is not None:
+        p_mean += p
+        good += 1
+    p_mean /= good 
+
+    print 'mean: (%0.3f, %0.3f)' % (p_mean.imag, p_mean.real)
+
+    total = good = 0
+    area = 0
+    for i in range(len(P[site_ids])):
+      if P[site_ids][i] is not None and C[site_ids][i] is not None:
+        total += 1
+        angle, axis0, axis1 = C[site_ids][i]
+        E = position1.Ellipse(P[site_ids][i], angle, [axis0, axis1])
+        if p_mean in E: 
+          good += 1
+        area += E.area()
+
+
+    if total > 0:
+      print 'area: %0.3f' % (area / good)
+      print "coverage: %d out of %d (%0.3f)" % (good, total, float(good)/total)
+  
+    plot(P[site_ids], site34, site_ids, fn)
+  
+  #p_mean = np.mean(P[(1,3,6)])
+  #for ell in C[(1,3,6)]: 
+  #  if ell is not None:
+  #    angle, axis0, axis1 = C[site_ids][i]
+  #    E = position1.Ellipse(P[site_ids][i], angle, [axis0, axis1])
+  #    E.plot('test.png', p_mean)
+  #    raw_input() 
 

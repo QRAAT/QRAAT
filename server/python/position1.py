@@ -274,7 +274,7 @@ class Position:
 
 class Ellipse:
 
-  def __init__(self, p_hat, angle, axes, half_span=0, scale=1, x=None):
+  def __init__(self, p_hat, angle, axes, half_span=0, scale=1):
     ''' Ellipse data structure. ''' 
     self.p_hat = p_hat
     self.angle = angle
@@ -284,7 +284,7 @@ class Ellipse:
     self.x = np.array([half_span, half_span])
 
   def area(self):
-    return np.pi * self.axes[0] * self.axes[1] / 4
+    return np.pi * self.axes[0] * self.axes[1] 
 
   def eccentricity(self):
     return np.sqrt(1 - ((self.axes[1]/2)**2) / ((self.axes[0]/2)**2))
@@ -374,7 +374,11 @@ class Ellipse:
 class Covariance:
   
   def __init__(self, pos, sites, p_known=None, half_span=75, scale=0.5):
-    ''' Confidence region from asymptotic covariance. ''' 
+    ''' Confidence region from asymptotic covariance. 
+    
+      Note that this expression only works if the `NORMALIZE_SPECTRUM` flag at the
+      top of this program is set to `True`. 
+    ''' 
     self.p_hat = pos.p
     self.half_span = half_span
     self.scale = scale
@@ -427,19 +431,21 @@ class BootstrapCovariance (Covariance):
     self.m = float(n) / pos.num_sites
 
     # Generate sub samples.
-    P = bootstrap_resample_sites(pos, sites, max_resamples, pos.obj, pos.splines.keys())
+    P = np.array(bootstrap_resample_sites(pos, sites, 
+                                max_resamples, pos.obj, pos.splines.keys()))
     A = np.array(P[len(P)/2:])
     B = np.array(P[:len(P)/2])
-    
+   
     # Estimate covariance. 
-    self.C = np.cov(A[:,0], A[:,1]) 
+    self.C = np.cov(np.imag(A), np.real(A))
     
     # Mahalanobis distance of remaining estimates. 
     W = []
     D = np.linalg.inv(self.C)
-    x_bar = np.array([np.mean(B[:,0]), np.mean(B[:,1])])
+    p_bar = np.mean(B)
+    x_bar = np.array([p_bar.imag, p_bar.real])
     x_hat = np.array([pos.p.imag, pos.p.real])
-    for x in iter(B): 
+    for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
       y = x - x_bar
       w = np.dot(np.transpose(y), np.dot(self.m * D, y)) 
       W.append(w)
@@ -465,19 +471,20 @@ class BootstrapCovariance2 (Covariance):
     self.m = float(n) / pos.num_sites
 
     # Generate sub samples.
-    P = bootstrap_resample(pos, sites, max_resamples, pos.obj)
+    P = np.array(bootstrap_resample(pos, sites, max_resamples, pos.obj))
     A = np.array(P[len(P)/2:])
     B = np.array(P[:len(P)/2])
     
     # Estimate covariance. 
-    self.C = np.cov(A[:,0], A[:,1]) 
+    self.C = np.cov(np.imag(A), np.real(A)) 
     
     # Mahalanobis distance of remaining estimates. 
     W = []
     D = np.linalg.inv(self.C)
-    x_bar = np.array([np.mean(B[:,0]), np.mean(B[:,1])])
+    p_bar = np.mean(B)
+    x_bar = np.array([p_bar.imag, p_bar.real])
     x_hat = np.array([pos.p.imag, pos.p.real])
-    for x in iter(B): 
+    for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
       y = x - x_bar
       w = np.dot(np.transpose(y), np.dot(D, y)) 
       W.append(w)
@@ -644,18 +651,18 @@ def transform_coord_inv(x, center, half_span, scale):
   return p
 
 
-def bootstrap_resample(pos, sites, max_samples, obj):
+def bootstrap_resample(pos, sites, max_resamples, obj):
   ''' Generate positionn estimates by sub sampling signal data. 
 
     Construct an objective function from a subset of the pulses (one pulse per site)
-    and optimize over the search space. Repeat this at most `max_samples / samples` 
+    and optimize over the search space. Repeat this at most `max_resamples / samples` 
     for each pair of sites where `samples` is the number of such pairs. 
   '''
   N = reduce(int.__mul__, map(lambda S : len(S), pos.sub_splines.values()))
   if N < 2: # Number of pulse combinations
     raise BootstrapError  
   
-  resamples = max(1, max_samples / (pos.num_sites * (pos.num_sites + 1) / 2))
+  resamples = max(1, max_resamples / (pos.num_sites * (pos.num_sites - 1) / 2))
   P = []
   for site_ids in itertools.combinations(pos.splines.keys(), 2):
     P += bootstrap_resample_sites(pos, sites, resamples, obj, site_ids)
@@ -675,7 +682,7 @@ def bootstrap_resample_sites(pos, sites, resamples, obj, site_ids):
       splines[id] = pos.sub_splines[id][j]
     (p, _) = compute_position(sites, splines, pos.p, obj,
               s=POS_EST_S, m=POS_EST_M-1, n=POS_EST_N, delta=POS_EST_DELTA) 
-    P.append(transform_coord(p, pos.p, 0, 1))
+    P.append(p)
   return P
 
 
