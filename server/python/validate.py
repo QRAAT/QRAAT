@@ -7,8 +7,20 @@ Observations so far:
      the distribution looks way better for the beacon when the spectra are not
      normalized.
 
-  2. BootstrapCovariance performance is better with small sample windows! What
-     about alternate subsampling method for smaller sample sizes? 
+  2. Distribution of estimates does indeed depend on geometry. Moreover, referring
+     to the beacon data, the mean is different for different sets of sites, 
+     suggesting the estimates are biased. The distribution appears normal in 
+     some cases, but not in others. Perhaps as a result of interference? 
+
+  3. The covariance is more likely to be positive definite with smaller sample 
+     sizes. This is consistent with what I saw in simulation. t_win=15 is 
+     probably the best tradeoff. 
+
+  4. The results for coverage probability are inconclusive. I used the mean of the 
+     estimates for computing the coverage probability, since the estimates are 
+     biased; however, since the estimates aren't normal, the confidence region 
+     is not likely to behave as advertised. A more controlled experiment with 
+     line-of-sight to all receivers would be a better way to assesss the method. 
 
 '''
 
@@ -22,7 +34,7 @@ import pickle
 position1.NORMALIZE_SPECTRUM=False
 cal_id = 3
 t_step = 60
-t_win = 10
+t_win = 15
 t_chunk = 3600 / 4 
 conf_level=0.95
 
@@ -124,10 +136,11 @@ if __name__ == '__main__':
   sites = util.get_sites(db_con)
   (center, zone) = util.get_center(db_con)
   
-  #P, C = process(sv)
-  #pickle.dump((P, C), open(fn+'-data', 'w'))
-  (P, C) = pickle.load(open(fn+'-data', 'r'))
+  P, C = process(sv)
+  pickle.dump((P, C), open(fn+'-data', 'w'))
+  #(P, C) = pickle.load(open(fn+'-data', 'r'))
 
+  print 't_win=%d' % t_win
   for site_ids in P.keys(): 
 
     print '----------------------------------------'
