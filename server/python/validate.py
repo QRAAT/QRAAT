@@ -159,9 +159,8 @@ if __name__ == '__main__':
           good += 1
         area += E.area()
 
-
     if total > 0:
-      print 'area: %0.3f' % (area / good)
+      print 'area: %0.3f' % (area / total)
       print "coverage: %d out of %d (%0.3f)" % (good, total, float(good)/total)
   
     plot(P[site_ids], site34, site_ids, fn)
