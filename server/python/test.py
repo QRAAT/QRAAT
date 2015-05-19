@@ -3,7 +3,7 @@
 #  utm, numdifftools (available through pip)
 #  numpy, scipy, matplotlib 
 
-import signal1, position1
+import signal, position1
 import util
 import numpy as np
 import matplotlib.pyplot as pp
@@ -29,21 +29,21 @@ zone = (10, 'S') # UTM zone.
 
 # Read steering vectors from file.
 db_con = util.get_db('reader')
-sv = signal1.SteeringVectors(db_con, cal_id)
+sv = signal.SteeringVectors(db_con, cal_id)
 
 
 def real_data():
 
   # Read signal data, about an hour's worth.
-  sv = signal1.SteeringVectors.read(3, 'sample/sv')
-  sig = signal1.Signal.read(sites.keys(), 'sample/sig')
+  sv = signal.SteeringVectors.read(3, 'sample/sv')
+  sig = signal.Signal.read(sites.keys(), 'sample/sig')
  
   fn = 'two'
 
   t_step=15
   t_win=30
   positions = position1.WindowedPositionEstimator(dep_id, sites, center, sig, sv, 
-                             t_step, t_win, method=signal1.Signal.Bartlet)
+                             t_step, t_win, method=signal.Signal.Bartlet)
   
   C = {}
   P = {}
@@ -110,14 +110,14 @@ def sim_data():
   include = [2,4,6,8]
 
   sig_n = 0.002 # noise
-  rho = signal1.scale_tx_coeff(p, 1, sites, include)
-  sv_splines = signal1.compute_bearing_splines(sv)
-  sig = signal1.Simulator(p, sites, sv_splines, rho, sig_n, 10, include)
+  rho = signal.scale_tx_coeff(p, 1, sites, include)
+  sv_splines = signal.compute_bearing_splines(sv)
+  sig = signal.Simulator(p, sites, sv_splines, rho, sig_n, 10, include)
     
   (sig_n, sig_t) = sig.estimate_var()
 
   pos = position1.PositionEstimator(999, sites, center, 
-                               sig, sv, method=signal1.Signal.Bartlet)
+                               sig, sv, method=signal.Signal.Bartlet)
   pos.plot('fella.png', sites, center, p)
  
   level=0.95

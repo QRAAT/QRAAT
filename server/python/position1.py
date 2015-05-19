@@ -25,7 +25,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import util, signal1
+from . import util, signal
 
 import sys, time
 import numpy as np
@@ -64,7 +64,7 @@ class UnboundedContourError (PositionError):
 
 ### Position estimation. ######################################################
 
-def PositionEstimator(dep_id, sites, center, signal, sv, method=signal1.Signal.Bartlet,
+def PositionEstimator(dep_id, sites, center, signal, sv, method=signal.Signal.Bartlet,
                         s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA):
   ''' Estimate the source of a signal. 
   
@@ -77,9 +77,9 @@ def PositionEstimator(dep_id, sites, center, signal, sv, method=signal1.Signal.B
       center -- initial guess of position, represented in UTM as an `np.complex`. 
                 A good value would be the centroid of the sites.  
 
-      signal -- instance of `class signal1.Signal`, signal data. 
+      signal -- instance of `class signal.Signal`, signal data. 
 
-      sv -- instance of `class signal1.SteeringVectors`, calibration data. 
+      sv -- instance of `class signal.SteeringVectors`, calibration data. 
 
       method -- Specify method for computing bearing likelihood distribution.
 
@@ -94,7 +94,7 @@ def PositionEstimator(dep_id, sites, center, signal, sv, method=signal1.Signal.B
 
 
 def WindowedPositionEstimator(dep_id, sites, center, signal, sv, t_step, t_win, 
-                              method=signal1.Signal.Bartlet, 
+                              method=signal.Signal.Bartlet, 
                               s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA):
   ''' Estimate the source of a signal, aggregate site data. 
   
