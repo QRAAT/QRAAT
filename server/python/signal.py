@@ -1,13 +1,29 @@
-# Time filter. This program attempts to remove false positives from 
-# the pulse data based on the rate at which the transmitter emits 
+# signal_filter.py -- This program attempts to remove false positives 
+# from the pulse data based on the rate at which the transmitter emits 
 # pulses. Neighboring points are used to coraborate the validity of
 # a given point. This is on a per transmitter per site basis; a 
 # useful extension to this work will be to coroborate points between
 # sites. 
-
-# NOTE We don't yet account for the percentage of time the system is 
-#      listening for the transmitter. This should be encorpoerated 
-#      into the theoretical score over the pulse's neighborhood. 
+#
+# NOTE (duty cycle of RMG module) We don't yet account for the 
+#      percentage of time the system is listening for the transmitter. 
+#      This should be encorpoerated into the theoretical score over the 
+#      pulse's neighborhood. 
+#
+# Copyright (C) 2015 Chris Patton
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 import util

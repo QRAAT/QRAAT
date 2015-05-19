@@ -67,7 +67,7 @@ def montecarlo(exp_params, sys_params, sv, nearest=None, max_dist=None, compute_
 
   if sys_params['method'] == 'bartlet': 
     method = signal1.Signal.Bartlet
-  elif sys_params['method'] == 'MLE': 
+  elif sys_params['method'] == 'mle': 
     method = signal1.Signal.MLE
   else: raise Exception('Unknown method')
 
@@ -134,7 +134,7 @@ def montecarlo_huge(prefix, exp_params, sys_params, sv, nearest=None, compute_co
 
   if sys_params['method'] == 'bartlet': 
     method = signal1.Signal.Bartlet
-  elif sys_params['method'] == 'MLE': 
+  elif sys_params['method'] == 'mle': 
     method = signal1.Signal.MLE
   else: raise Exception('Unknown method')
 
@@ -730,7 +730,8 @@ def plot_area(fn, pos, p, exp_params, sys_params, conf_level, cov=None):
 
 
 def conf_test(prefix, center, sites, sv, conf_level): 
-   
+  
+  position1.NORMALIZE_SPECTRUM = True
   exp_params = { 'rho'       : 1,
                  'sig_n'     : [0.01],
                  'pulse_ct'  : [6],
@@ -739,7 +740,7 @@ def conf_test(prefix, center, sites, sv, conf_level):
                  'scale'     : 1,
                  'trials'    : 1000 }
 
-  sys_params = { 'method'         : 'bartlet', 
+  sys_params = { 'method'         : 'mle', 
                  'include'        : [],
                  'center'         : center,
                  'sites'          : sites } 
