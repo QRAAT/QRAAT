@@ -33,14 +33,13 @@ import pickle
 
 position1.NORMALIZE_SPECTRUM=False
 cal_id = 3
-t_step = 60
+t_step = 15
 t_win = 15
 t_chunk = 3600 / 4 
 conf_level=0.95
 
 dep_id = 60
 t_start = 1383098400.514320
-#t_end = t_start + (3600)
 t_end = 1383443999.351099
 fn = 'beacon'
 
@@ -86,7 +85,7 @@ def process(sv):
       
       if pos.p is not None:
         try: 
-          cov = position1.BootstrapCovariance(pos, sites)
+          cov = position1.BootstrapCovariance(pos, sites, max_resamples=500)
           E = cov.conf(conf_level)
           C[site_ids].append((E.angle, E.axes[0], E.axes[1]))
           print "Ok"
