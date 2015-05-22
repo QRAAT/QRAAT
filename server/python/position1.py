@@ -36,7 +36,7 @@ import numdifftools as nd
 import utm
 import itertools, random
 
-# Paramters for position estimation algorithm. 
+# Paramters for position estimation. 
 POS_EST_M = 3
 POS_EST_N = -1
 POS_EST_DELTA = 5
@@ -45,20 +45,28 @@ POS_EST_S = 10
 # Normalize bearing spectrum. 
 NORMALIZE_SPECTRUM = False
 
+# Paramters for bootstrap covariance estimation. 
+BOOT_MAX_RESAMPLES = 200
+BOOT_CONF_LEVELS = [0.68, 0.80, 0.90, 0.95, 0.997]
+
 class PositionError (Exception): 
   value = 0; msg = ''
   def __str__(self): return '%s (%d)' % (self.msg, self.value)
-  
+
+class SingularError (PositionError):
+  value = 2
+  msg = 'covariance matrix is singular.'
+
 class PosDefError (PositionError): 
-  value = 1
+  value = 3
   msg = 'covariance matrix is positive definite.'
 
 class BootstrapError (PositionError): 
-  value = 2
+  value = 4
   msg = 'not enough samples to perform boostrap.'
 
 class UnboundedContourError (PositionError): 
-  value = 3
+  value = 5
   msg = 'exceeded maximum size of level set.'
 
 
@@ -85,11 +93,11 @@ def PositionEstimator(dep_id, sites, center, signal, sv, method=signal.Signal.Ba
 
     Returns UTM position estimate as a complex number. 
   ''' 
-  P = {} # Compute bearing likelihood distributions.  
+  B = {} # Compute bearing likelihood distributions.  
   for site_id in signal.get_site_ids():
-    (P[site_id], obj) = method(signal[site_id], sv)
+    (B[site_id], obj) = method(signal[site_id], sv)
 
-  return Position.calc(dep_id, P, signal, obj, sites, center,
+  return Position.calc(dep_id, B, signal, obj, sites, center,
                                     signal.t_start, signal.t_end, s, m, n, delta)
 
 
@@ -107,20 +115,49 @@ def WindowedPositionEstimator(dep_id, sites, center, signal, sv, t_step, t_win,
 
     Returns a sequence of UTM positions. 
   ''' 
-  positions = []
+  pos = []
 
-  P = {} # Compute bearing likelihood distributions. 
+  B = {} # Compute bearing likelihood distributions. 
   for site_id in signal.get_site_ids():
-    (P[site_id], obj) = method(signal[site_id], sv)
+    (B[site_id], obj) = method(signal[site_id], sv)
   
   for (t_start, t_end) in util.compute_time_windows(
                       signal.t_start, signal.t_end, t_step, t_win):
   
-    positions.append(Position.calc(dep_id, P, signal, obj, 
-                                    sites, center, t_start, t_end, s, m, n, delta))
+    pos.append(Position.calc(dep_id, B, signal, obj, 
+                              sites, center, t_start, t_end, s, m, n, delta))
   
-  return positions
+  return pos
 
+
+def WindowedCovarianceEstimator(sites, pos, max_resamples=BOOT_MAX_RESAMPLES):  
+  cov = []
+  for P in pos: 
+    try: 
+      C = BootstrapCovariance(P, sites, max_resamples)
+    except BootstrapError: # undefined
+      C = None
+      status = 'undefined'
+    except SingularError: # singular
+      C = None
+      status = 'singular'
+    finally: 
+      lambda1 = lambda2 = alpha = None
+
+    if C is not None: 
+      try:      
+        level = BOOT_CONF_LEVELS[-1]
+        E = C.conf(level)
+        lambda1 = (E.axes[0]**2) / C.W[level]
+        lambda2 = (E.axes[1]**2) / C.W[level]
+        alpha = E.angle
+        status = 'ok'
+      except PosDefError: # nonposdef
+        lambda1 = lambda2 = alpha = None
+        status = 'nonposdef'
+
+    cov.append((C, lambda1, lambda2, alpha, status))
+  return cov
 
 def InsertPositions(db_con, positions, zone):
   ''' Insert positions into database. ''' 
@@ -364,9 +401,8 @@ class Ellipse:
     
     ax.set_xlabel('easting (m)')
     ax.set_ylabel('northing (m)')
-    pp.title("95\%-confidence region")
     pp.legend(title="Axis length")
-    pp.savefig(fn)
+    pp.savefig(fn, dpi=150, bbox_inches='tight')
     pp.clf()
 
 
@@ -424,15 +460,13 @@ class Covariance:
 
 class BootstrapCovariance (Covariance):
 
-  def __init__(self, pos, sites, max_resamples=100):
+  def __init__(self, pos, sites, max_resamples=200):
     ''' Bootstrap method for estimationg covariance of a position estimate. 
 
       Generate at most `max_resamples` position estimates by resampling the signals used
       in computing `pos`. 
     '''
     self.p_hat = pos.p
-    n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
-    self.m = float(n) / pos.num_sites
 
     # Generate sub samples.
     P = np.array(bootstrap_resample_sites(pos, sites, 
@@ -442,36 +476,45 @@ class BootstrapCovariance (Covariance):
    
     # Estimate covariance. 
     self.C = np.cov(np.imag(A), np.real(A))
+    n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
+    self.m = float(n) / pos.num_sites
     
     # Mahalanobis distance of remaining estimates. 
-    W = []
-    D = np.linalg.inv(self.C)
-    p_bar = np.mean(B)
-    x_bar = np.array([p_bar.imag, p_bar.real])
-    x_hat = np.array([pos.p.imag, pos.p.real])
-    for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
-      y = x - x_bar
-      w = np.dot(np.transpose(y), np.dot(self.m * D, y)) 
-      W.append(w)
-    self.W = np.array(sorted(W))
+    try: 
+      W = []
+      D = np.linalg.inv(self.C)
+      p_bar = np.mean(B)
+      x_bar = np.array([p_bar.imag, p_bar.real])
+      x_hat = np.array([pos.p.imag, pos.p.real])
+      for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
+        y = x - x_bar
+        w = np.dot(np.transpose(y), np.dot(self.m * D, y)) 
+        W.append(w)
+     
+      # Store just a few distances. 
+      W = np.array(sorted(W))
+      self.W = {}
+      for level in BOOT_CONF_LEVELS:
+        self.W[level] = W[int(len(W) * level)] * 2
+    
+    except np.linalg.linalg.LinAlgError: # Singular 
+      raise SingularError
 
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
-    Qt = self.W[int(len(self.W) * level)] 
-    (angle, axes) = compute_conf(self.C, Qt * 2, 1) 
+    Qt = self.W[level] 
+    (angle, axes) = compute_conf(self.C, Qt, 1) 
     return Ellipse(self.p_hat, angle, axes, 0, 1)
 
 
 class BootstrapCovariance2 (Covariance):
 
-  def __init__(self, pos, sites, max_resamples=100):
+  def __init__(self, pos, sites, max_resamples=200):
     ''' Bootstrap method originally proposed by the stats group.
 
       Resample by using pairs of sites to compute estimates. 
     '''
     self.p_hat = pos.p
-    n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
-    self.m = float(n) / pos.num_sites
 
     # Generate sub samples.
     P = np.array(bootstrap_resample(pos, sites, max_resamples, pos.obj))
@@ -480,22 +523,34 @@ class BootstrapCovariance2 (Covariance):
     
     # Estimate covariance. 
     self.C = np.cov(np.imag(A), np.real(A)) 
+    n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
+    self.m = float(n) / pos.num_sites
     
     # Mahalanobis distance of remaining estimates. 
-    W = []
-    D = np.linalg.inv(self.C)
-    p_bar = np.mean(B)
-    x_bar = np.array([p_bar.imag, p_bar.real])
-    x_hat = np.array([pos.p.imag, pos.p.real])
-    for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
-      y = x - x_bar
-      w = np.dot(np.transpose(y), np.dot(D, y)) 
-      W.append(w)
-    self.W = np.array(sorted(W))
+    try:
+      W = []
+      D = np.linalg.inv(self.C)
+      p_bar = np.mean(B)
+      x_bar = np.array([p_bar.imag, p_bar.real])
+      x_hat = np.array([pos.p.imag, pos.p.real])
+      for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
+        y = x - x_bar
+        w = np.dot(np.transpose(y), np.dot(D, y)) 
+        W.append(w)
+     
+      # Store just a few distances. 
+      W = np.array(sorted(W))
+      self.W = {}
+      for level in BOOT_CONF_LEVELS:
+        self.W[level] = W[int(len(W) * level)]
+      
+    except np.linalg.linalg.LinAlgError: # Singular 
+      raise SingularError
+    
 
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
-    Qt = self.W[int(len(self.W) * level)] 
+    Qt = self.W[level]
     (angle, axes) = compute_conf(self.C, Qt, 1) 
     return Ellipse(self.p_hat, angle, axes, 0, 1)
 
@@ -648,10 +703,6 @@ def bootstrap_resample(pos, sites, max_resamples, obj):
     and optimize over the search space. Repeat this at most `max_resamples / samples` 
     for each pair of sites where `samples` is the number of such pairs. 
   '''
-  N = reduce(int.__mul__, map(lambda S : len(S), pos.sub_splines.values()))
-  if N < 2: # Number of pulse combinations
-    raise BootstrapError  
-  
   resamples = max(1, max_resamples / (pos.num_sites * (pos.num_sites - 1) / 2))
   P = []
   for site_ids in itertools.combinations(pos.splines.keys(), 2):
@@ -661,7 +712,7 @@ def bootstrap_resample(pos, sites, max_resamples, obj):
 
 def bootstrap_resample_sites(pos, sites, resamples, obj, site_ids):
   ''' Resample from a specific set of sites. ''' 
-  N = reduce(int.__mul__, map(lambda S : len(S), pos.sub_splines.values()))
+  N = reduce(int.__mul__, [1] + map(lambda S : len(S), pos.sub_splines.values()))
   if N < 2: # Number of pulse combinations
     raise BootstrapError  
 
