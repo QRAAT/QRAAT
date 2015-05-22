@@ -145,7 +145,7 @@ PI_N = np.pi ** NUM_CHANNELS
 class Signal:
 
   def __init__(self, db_con=None, dep_id=None, t_start=0, t_end=0, 
-               score_threshold=None, exclude=[]):
+               score_threshold=None, include=[], exclude=[]):
    
     ''' Represent signals in the `qraat.est` table.
     
@@ -209,7 +209,7 @@ class Signal:
         raw_data = np.array(cur.fetchall(), dtype=float)
         est_ids = np.array(raw_data[:,0], dtype=int)
         self.max_est_id = np.max(est_ids)
-        include = np.array(raw_data[:,1], dtype=int)
+        site_ids = np.array(raw_data[:,1], dtype=int)
         timestamps = raw_data[:,2]
         edsp = raw_data[:,3]
         signal_vector = np.zeros((raw_data.shape[0], NUM_CHANNELS),dtype=np.complex)
@@ -224,15 +224,21 @@ class Signal:
               k = 13 + (i*NUM_CHANNELS*2) + (2*j)
               noise_cov[t,i,j] = np.complex(raw_data[t,k], raw_data[t,k+1])
 
-        for site_id in set(include).difference(set(exclude)):
+        if include == []:
+          inc = set(site_ids)
+        else: 
+          inc = set(include)
+
+        for site_id in inc.difference(set(exclude)):
+          mask = site_ids == site_id
           site = _per_site_data(site_id)
-          site.est_ids = est_ids[include == site_id]
-          site.t = timestamps[include == site_id]
-          site.edsp = edsp[include == site_id] # a.k.a. power
-          site.signal_vector = signal_vector[include == site_id]
-          site.tnp = tnp[include == site_id]
-          site.noise_cov = noise_cov[include == site_id]
-          site.count = np.sum(include == site_id)
+          site.est_ids = est_ids[mask]
+          site.t = timestamps[mask]
+          site.edsp = edsp[mask] # a.k.a. power
+          site.signal_vector = signal_vector[mask]
+          site.tnp = tnp[mask]
+          site.noise_cov = noise_cov[mask]
+          site.count = np.sum(mask)
           self.table[site_id] = site
 
         self.t_start = np.min(timestamps)
