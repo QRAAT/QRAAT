@@ -52,6 +52,7 @@ usage: rmg-node state/check/help [-options]
   'help' prints this help. 
 !EOF!
 }
+
 PATH="/usr/local/bin:$PATH"
 
 ## Site configuration ##
@@ -128,19 +129,10 @@ then
   export RETRY_MAX=10
 fi 
 
+function disk_status() {
+  #Check to see if disk is full or in read-only mode
 
-## Collect status information ##
-TYPE=$(rmg_csv --column powertype <$SITE)
-[[ "$TYPE" == "pingbrother" ]] && invert="--invert=true" 
-
-IP=$(rmg_csv --column power_ip <$SITE)
-RX_OUTLET=$(rmg_csv --column rx_outlet <$SITE)
-
-RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
-if [ $? -ne "0" ]; then
-  echo "Couldn't check powerswitch status.";
-  echo "Checking disk status";
-  TMPFILE=$(mktemp ~/tempfile.XXXXXXXX)
+  TMPFILE=$(mktemp $RMG_SITE_METADATA_DIR/tempfile.XXXXXXXX)
   if [ $? -ne "0" ]; then
     echo "Couldn't make test file."
     AVAILABLE_BLOCKS=$(df -k / | tail -1 | awk '{print $4}')
@@ -155,9 +147,27 @@ if [ $? -ne "0" ]; then
     fi
   else
     rm $TMPFILE
-    echo "Could make test file. Unknown error. Exiting"
-    exit 1
+    echo "Could make test file."
   fi
+
+}
+
+
+
+## Collect status information ##
+TYPE=$(rmg_csv --column powertype <$SITE)
+[[ "$TYPE" == "pingbrother" ]] && invert="--invert=true" 
+
+IP=$(rmg_csv --column power_ip <$SITE)
+RX_OUTLET=$(rmg_csv --column rx_outlet <$SITE)
+
+RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
+if [ $? -ne "0" ]; then
+  echo "Couldn't check powerswitch status.";
+  echo "Checking disk status";
+  disk_status
+  echo "Unknown error. Exiting"
+  exit 1
 fi 
 
 SDR_PID=$(pgrep rmg_runretry)
@@ -219,6 +229,7 @@ function active() {
           STATUS="Site already running"
       fi
     else
+      disk_status
       nohup rmg_runretry $TYPE $IP $RX_OUTLET &> /dev/null < /dev/null & 
       SDR_PID=$!
       STATUS="Site started"
