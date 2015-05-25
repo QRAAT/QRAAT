@@ -170,6 +170,7 @@ add_subdirectory(lib)
 add_subdirectory(swig)
 add_subdirectory(python)
 add_subdirectory(apps)
+add_subdirectory(scripts)
 
 ########################################################################
 # Install cmake search helper for this library
