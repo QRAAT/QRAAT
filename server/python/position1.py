@@ -45,6 +45,9 @@ POS_EST_S = 10
 # Normalize bearing spectrum. 
 NORMALIZE_SPECTRUM = False
 
+# Enable asymptotic covariance (compute Position.all_splines)
+ENABLE_ASYMPTOTIC = False
+
 # Paramters for bootstrap covariance estimation. 
 BOOT_MAX_RESAMPLES = 200
 BOOT_CONF_LEVELS = [0.68, 0.80, 0.90, 0.95, 0.997]
@@ -129,105 +132,101 @@ def WindowedPositionEstimator(dep_id, sites, center, signal, sv, t_step, t_win,
   
   return pos
 
-
 def WindowedCovarianceEstimator(sites, pos, max_resamples=BOOT_MAX_RESAMPLES):  
+  ''' Compute covariance of each pos. estimate in ``pos``.  ''' 
   cov = []
   for P in pos: 
-    try: 
-      C = BootstrapCovariance(P, sites, max_resamples)
-    except BootstrapError: # undefined
-      C = None
-      status = 'undefined'
-    except SingularError: # singular
-      C = None
-      status = 'singular'
-    finally: 
-      lambda1 = lambda2 = alpha = None
-
-    if C is not None: 
-      try:      
-        level = BOOT_CONF_LEVELS[-1]
-        E = C.conf(level)
-        lambda1 = (E.axes[0]**2) / C.W[level]
-        lambda2 = (E.axes[1]**2) / C.W[level]
-        alpha = E.angle
-        status = 'ok'
-      except PosDefError: # nonposdef
-        lambda1 = lambda2 = alpha = None
-        status = 'nonposdef'
-
-    cov.append((C, lambda1, lambda2, alpha, status))
+    C = BootstrapCovariance(P, sites, max_resamples)
+    cov.append(C)
   return cov
 
-
-def InsertPositions(db_con, zone, pos, cov=None):
+def InsertPositions(db_con, zone, pos):
   ''' Insert positions into database. ''' 
-  cur = db_con.cursor()
-  number, letter = zone
   max_id = 0
   for i in range(len(pos)):
-    if pos[i].p is None: 
-      continue
-    lat, lon = utm.to_latlon(pos[i].p.imag, pos[i].p.real, number, letter)
-    cur.execute('''INSERT INTO position
-                     (deploymentID, timestamp, latitude, longitude, easting, northing, 
-                      utm_zone_number, utm_zone_letter, likelihood, 
-                      activity, number_est_used)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                     (pos[i].dep_id, pos[i].t, round(lat,6), round(lon,6),
-                      pos[i].p.imag, pos[i].p.real, number, letter, 
-                      pos[i].get_likelihood(), pos[i].get_activity(),
-                      pos[i].num_est))
-    pos_id = cur.lastrowid
-    max_id = max(pos_id, max_id)
-    if cov: 
-      (C, lambda1, lambda2, alpha, status) = cov[i]
-      if C: 
-        cov11, cov12, cov21, cov22 = C[0,0], C[0,1], C[1,0], C[1,1]
-        w99, w95, w90, w80, w68 = (
-               C.W[0.997], C.W[0.95], C.W[0.90], C.W[0.80], C.W[0.68])
-      else: 
-        cov11, cov12, cov21, cov22 = None, None, None, None
-        w99, w95, w90, w80, w68 = None, None, None, None, None
-      
-      cur.execute('''INSERT INTO covariance
-                     (positionID, status, method, 
-                      cov11, cov12, cov21, cov22,
-                      lambda1, lambda2, alpha, 
-                      w99, w95, w90, w80, w68)
-                   VALUES (%s, %s, %s, 
-                           %s, %s, %s, %s, 
-                           %s, %s, %s, 
-                           %s, %s, %s, %s, %s)''', 
-              (pos_id, status, 'boot', 
-               cov11, cov12, cov21, cov22,
-               lambda1, lambda2, alpha, 
-               w99, w95, w90, w80, w68))
+    pos_id = pos[i].insert_db(db_con, zone)
+    if pos_id:
+      max_id = max(pos_id, max_id)
   return max_id
 
+def InsertPositionsCovariances(db_con, zone, pos, cov):
+  ''' Insert positions and covariances into database. ''' 
+  max_id = 0
+  for i in range(len(pos)):
+    pos_id = pos[i].insert_db(db_con, zone)
+    if pos_id:
+      max_id = max(pos_id, max_id)
+      cov_id = cov[i].insert_db(db_con, pos_id)
+  return max_id
 
+def ReadPositions(db_con, dep_id, t_start, t_end): 
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID, timestamp, latitude, longitude, easting, northing, 
+                        utm_zone_number, utm_zone_letter, likelihood, 
+                        activity, number_est_used
+                   FROM position
+                  WHERE deploymentID = %s
+                    AND timestamp >= %s
+                    AND timestamp <= %s''', (dep_id, t_start, t_end))
+  pos = []
+  for row in cur.fetchall():
+    P = Position()
+    P.pos_id = row[0]
+    P.t = row[1]
+    P.latitude = row[2]
+    P.longitude = row[3]
+    P.p = np.complex(row[5], row[4]) 
+    P.zone = (row[6], row[7])
+    P.likelihood = row[8]
+    P.activity = row[9]
+    P.num_est = row[1]
+    pos.append(P)
+  return pos 
 
+def ReadCovariances(db_con, dep_id, t_start, t_end): 
+  cur = db_con.cursor()
+  cur.execute('''SELECT status, method, 
+                        cov11, cov12, cov21, cov22,
+                        lambda1, lambda2, alpha, 
+                        w99, w95, w90, w80, w68
+                   FROM covariance
+                   JOIN position as p ON p.ID = positionID
+                  WHERE deploymentID = %s
+                    AND timestamp >= %s
+                    AND timestamp <= %s''', (dep_id, t_start, t_end))
+  cov = []
+  for row in cur.fetchall():
+    print row[0] # TODO 
+    cov.append(None)
+  return cov
+  
+  
 
 
 ### class Position. ###########################################################
 
 class Position:
   
-  def __init__(self, dep_id, p, t, likelihood, num_est, bearing, activity, splines, sub_splines, all_splines, obj):
+  def __init__(self):
+
+    self.dep_id = None
+    self.num_sites = None
+    self.num_est = None
+    self.p = None
+    self.t = None
+    self.likelihood = None
+    self.bearing = None
+    self.activity = None
     
-    assert len(bearing) == len(activity) and len(bearing) == len(splines)
-    self.dep_id = dep_id
-    self.num_sites = len(bearing)
-    self.num_est = num_est
-    self.p = p
-    self.t = t
-    self.likelihood = likelihood
-    self.bearing = bearing
-    self.activity = activity
-    self.splines = splines
-    self.sub_splines = sub_splines
-    self.all_splines = all_splines
-    self.obj = obj
+    self.splines = None
+    self.sub_splines = None
+    self.all_splines = None
+    self.obj = None
+    
+    self.pos_id = None
+    self.zone = None
+    self.latitude = None
+    self.longitude = None
 
   @classmethod
   def calc(cls, dep_id, P, signal, obj, sites, center, t_start, t_end, s, m, n, delta):
@@ -244,32 +243,49 @@ class Position:
     # Return a position object. 
     num_sites = len(bearing)
     t = (t_end + t_start) / 2
-    return cls(dep_id,      # deployment ID
-               p_hat,       # pos. estimate
-               t,           # middle of time window 
-               likelihood,  # likelihood of pos. esstimate
-               num_est,     # total pulses used in calculation
-               bearing,     # siteID -> (theta, likelihood)
-               activity,    # siteID -> activity
-               splines,     # siteID -> aggregated bearing likelihood spline
-               sub_splines, # siteID -> spline of sub samples for bootstrapping
-               all_splines,  
-               obj)         # Objective function
-
-  def get_likelihood(self):
-    ''' Return normalized position likelihood. ''' 
-    if self.likelihood and self.num_sites > 0:
+    
+    P = cls()
+    P.dep_id = dep_id
+    P.p = p_hat
+    P.t = t
+    
+    if likelihood and num_sites > 0:
       if NORMALIZE_SPECTRUM:
-        return self.likelihood / self.num_sites
+        P.likelihood = likelihood / num_sites
       else: 
-        return self.likelihood / self.num_est
-    else: return None
-  
-  def get_activity(self): 
-    ''' Return activity measurement. ''' 
-    if self.num_sites > 0:
-      return np.mean(self.activity.values())
-    else: return None
+        P.likelihood = likelihood / num_est
+    
+    if num_sites > 0:
+      P.activity = np.mean(activity.values())
+    
+    P.num_est = num_est
+    P.num_sites = num_sites
+    P.bearing = bearing
+
+    P.splines = splines         # siteID -> aggregated bearing likelihood spline
+    P.sub_splines = sub_splines # siteID -> spline of sub samples for bootstrapping
+    P.all_splines = all_splines # siteID -> spline for each pulse
+    P.obj = obj                 # objective function used in pos. est.
+
+    return P
+ 
+  def insert_db(self, db_con, zone):
+    ''' Insert position into DB. ''' 
+    if self.p is None: 
+      return None
+    number, letter = zone
+    lat, lon = utm.to_latlon(self.p.imag, self.p.real, number, letter)
+    cur = db_con.cursor()
+    cur.execute('''INSERT INTO position
+                     (deploymentID, timestamp, latitude, longitude, easting, northing, 
+                      utm_zone_number, utm_zone_letter, likelihood, 
+                      activity, number_est_used)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                     (self.dep_id, self.t, round(lat,6), round(lon,6),
+                      self.p.imag, self.p.real, number, letter, 
+                      self.likelihood, self.activity,
+                      self.num_est))
+    return cur.lastrowid
 
   def plot(self, fn, sites, center, p_known=None, half_span=150, scale=10):
     ''' Plot search space. '''
@@ -442,6 +458,7 @@ class Covariance:
       top of this program is set to `True`. 
     ''' 
     assert NORMALIZE_SPECTRUM
+    assert ENABLE_ASYMPTOTIC
 
     self.p_hat = pos.p
     self.half_span = half_span
@@ -493,95 +510,152 @@ class BootstrapCovariance (Covariance):
       Generate at most `max_resamples` position estimates by resampling the signals used
       in computing `pos`. 
     '''
+    self.method = 'boot'
+    self.C = self.W = None
     self.p_hat = pos.p
 
     # Generate sub samples.
     P = np.array(bootstrap_resample_sites(pos, sites, 
-                                max_resamples, pos.obj, pos.splines.keys()))
-    A = np.array(P[len(P)/2:])
-    B = np.array(P[:len(P)/2])
-   
-    # Estimate covariance. 
-    self.C = np.cov(np.imag(A), np.real(A))
-    n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
-    self.m = float(n) / pos.num_sites
-    
-    # Mahalanobis distance of remaining estimates. 
-    try: 
-      W = []
-      D = np.linalg.inv(self.C)
-      p_bar = np.mean(B)
-      x_bar = np.array([p_bar.imag, p_bar.real])
-      x_hat = np.array([pos.p.imag, pos.p.real])
-      for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
-        y = x - x_bar
-        w = np.dot(np.transpose(y), np.dot(self.m * D, y)) 
-        W.append(w)
+                                  max_resamples, pos.obj, pos.splines.keys()))
+    if len(P) > 0:  
+      A = np.array(P[len(P)/2:])
+      B = np.array(P[:len(P)/2])
      
-      # Store just a few distances. 
-      W = np.array(sorted(W))
-      self.W = {}
-      for level in BOOT_CONF_LEVELS:
-        self.W[level] = W[int(len(W) * level)] * 2
+      # Estimate covariance. 
+      self.C = np.cov(np.imag(A), np.real(A))
+      n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
+      self.m = float(n) / pos.num_sites
+      
+      # Mahalanobis distance of remaining estimates. 
+      try: 
+        W = []
+        D = np.linalg.inv(self.C)
+        p_bar = np.mean(B)
+        x_bar = np.array([p_bar.imag, p_bar.real])
+        x_hat = np.array([pos.p.imag, pos.p.real])
+        for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
+          y = x - x_bar
+          w = np.dot(np.transpose(y), np.dot(self.m * D, y)) 
+          W.append(w)
+       
+        # Store just a few distances. 
+        W = np.array(sorted(W))
+        self.W = {}
+        for level in BOOT_CONF_LEVELS:
+          self.W[level] = W[int(len(W) * level)] * 2
+        self.status = 'ok'
+      
+      except np.linalg.linalg.LinAlgError: # Singular 
+        self.status = 'singular'
+
+    else: # not enough samples
+      self.status = 'undefined'
+
+
+  def insert_db(self, db_con, pos_id): 
+    ''' Insert into DB. '''
+    if self.status == 'ok':
+      
+      cov11, cov12, cov21, cov22 = self.C[0,0], self.C[0,1], self.C[1,0], self.C[1,1]
+      w99, w95, w90, w80, w68 = (
+             self.W[0.997], self.W[0.95], self.W[0.90], self.W[0.80], self.W[0.68])
     
-    except np.linalg.linalg.LinAlgError: # Singular 
-      raise SingularError
+      w, v = np.linalg.eig(self.C)
+      if w[0] > 0 and w[1] > 0: # Positive definite. 
+
+        i = np.argmax(w) # Major w[i], v[:,i]
+        j = np.argmin(w) # Minor w[i], v[:,j]
+
+        alpha = np.arctan2(v[:,i][1], v[:,i][0]) 
+        lambda1 = w[i]
+        lambda2 = w[j]
+        self.status = 'ok'
+
+      else: 
+        alpha = lambda1 = lambda2 = None
+        self.status = 'nonposdef'
+
+    else: 
+      cov11, cov12, cov21, cov22 = None, None, None, None
+      w99, w95, w90, w80, w68 = None, None, None, None, None
+      alpha = lambda1 = lambda2 = None
+  
+    cur = db_con.cursor()
+    cur.execute('''INSERT INTO covariance
+                   (positionID, status, method, 
+                    cov11, cov12, cov21, cov22,
+                    lambda1, lambda2, alpha, 
+                    w99, w95, w90, w80, w68)
+                 VALUES (%s, %s, %s, 
+                         %s, %s, %s, %s, 
+                         %s, %s, %s, 
+                         %s, %s, %s, %s, %s)''', 
+            (pos_id, self.status, self.method,
+             cov11, cov12, cov21, cov22,
+             lambda1, lambda2, alpha, 
+             w99, w95, w90, w80, w68))
+    return cur.lastrowid
+      
 
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
-    Qt = self.W[level] 
-    (angle, axes) = compute_conf(self.C, Qt, 1) 
-    return Ellipse(self.p_hat, angle, axes, 0, 1)
+    if self.status == 'ok':
+      Qt = self.W[level] 
+      (angle, axes) = compute_conf(self.C, Qt, 1) 
+      return Ellipse(self.p_hat, angle, axes, 0, 1)
+    elif self.status == 'singular':
+      raise SingularError
+    elif self.status == 'undefined':
+      raise BootstrapError
 
 
-class BootstrapCovariance2 (Covariance):
+class BootstrapCovariance2 (BootstrapCovariance):
 
   def __init__(self, pos, sites, max_resamples=200):
     ''' Bootstrap method originally proposed by the stats group.
 
       Resample by using pairs of sites to compute estimates. 
     '''
+    self.method = 'boot2'
+    self.C = self.W = None
     self.p_hat = pos.p
 
     # Generate sub samples.
     P = np.array(bootstrap_resample(pos, sites, max_resamples, pos.obj))
-    A = np.array(P[len(P)/2:])
-    B = np.array(P[:len(P)/2])
     
-    # Estimate covariance. 
-    self.C = np.cov(np.imag(A), np.real(A)) 
-    n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
-    self.m = float(n) / pos.num_sites
-    
-    # Mahalanobis distance of remaining estimates. 
-    try:
-      W = []
-      D = np.linalg.inv(self.C)
-      p_bar = np.mean(B)
-      x_bar = np.array([p_bar.imag, p_bar.real])
-      x_hat = np.array([pos.p.imag, pos.p.real])
-      for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
-        y = x - x_bar
-        w = np.dot(np.transpose(y), np.dot(D, y)) 
-        W.append(w)
-     
-      # Store just a few distances. 
-      W = np.array(sorted(W))
-      self.W = {}
-      for level in BOOT_CONF_LEVELS:
-        self.W[level] = W[int(len(W) * level)]
+    if len(P) > 0: 
+      A = np.array(P[len(P)/2:])
+      B = np.array(P[:len(P)/2])
       
-    except np.linalg.linalg.LinAlgError: # Singular 
-      raise SingularError
+      # Estimate covariance. 
+      self.C = np.cov(np.imag(A), np.real(A)) 
+      n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
+      self.m = float(n) / pos.num_sites
+      
+      # Mahalanobis distance of remaining estimates. 
+      try:
+        W = []
+        D = np.linalg.inv(self.C)
+        p_bar = np.mean(B)
+        x_bar = np.array([p_bar.imag, p_bar.real])
+        x_hat = np.array([pos.p.imag, pos.p.real])
+        for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
+          y = x - x_bar
+          w = np.dot(np.transpose(y), np.dot(D, y)) 
+          W.append(w)
+       
+        # Store just a few distances. 
+        W = np.array(sorted(W))
+        self.W = {}
+        for level in BOOT_CONF_LEVELS:
+          self.W[level] = W[int(len(W) * level)]
+        self.status = 'ok'
+        
+      except np.linalg.linalg.LinAlgError: # Singular 
+        self.status = "singular"
     
-
-  def conf(self, level): 
-    ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
-    Qt = self.W[level]
-    (angle, axes) = compute_conf(self.C, Qt, 1) 
-    return Ellipse(self.p_hat, angle, axes, 0, 1)
-
-
+    else: # not enough samples
+      self.status = 'undefined'
 
 ### Low level calls. ##########################################################
 
@@ -598,7 +672,11 @@ def aggregate_window(P, signal, obj, t_start, t_end):
   activity = {}
   bearing = {}
   sub_splines = {}
-  all_splines = {}
+
+  if ENABLE_ASYMPTOTIC: 
+    all_splines = {}
+  else: all_splines = None
+
   for (id, L) in P.iteritems():
     mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
     edsp = signal[id].edsp[mask]
@@ -622,9 +700,10 @@ def aggregate_window(P, signal, obj, t_start, t_end):
           sub_splines[id].append(compute_bearing_spline(p)) 
       
       # All splines.
-      all_splines[id] = []
-      for i in range(len(l)):
-        all_splines[id].append(compute_bearing_spline(l[i]))
+      if ENABLE_ASYMPTOTIC: 
+        all_splines[id] = []
+        for i in range(len(l)):
+          all_splines[id].append(compute_bearing_spline(l[i]))
 
       # Aggregated activity measurement per site. 
       activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
@@ -741,7 +820,7 @@ def bootstrap_resample_sites(pos, sites, resamples, obj, site_ids):
   ''' Resample from a specific set of sites. ''' 
   N = reduce(int.__mul__, [1] + map(lambda S : len(S), pos.sub_splines.values()))
   if N < 2: # Number of pulse combinations
-    raise BootstrapError  
+    return []
 
   P = []
   for i in range(resamples):
