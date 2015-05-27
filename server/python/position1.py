@@ -159,26 +159,50 @@ def WindowedCovarianceEstimator(sites, pos, max_resamples=BOOT_MAX_RESAMPLES):
     cov.append((C, lambda1, lambda2, alpha, status))
   return cov
 
-def InsertPositions(db_con, positions, zone):
+
+def InsertPositions(db_con, zone, pos, cov=None):
   ''' Insert positions into database. ''' 
   cur = db_con.cursor()
   number, letter = zone
   max_id = 0
-  for pos in positions:
-    if pos.p is None: 
+  for i in range(len(pos)):
+    if pos[i].p is None: 
       continue
-    lat, lon = utm.to_latlon(pos.p.imag, pos.p.real, number, letter)
+    lat, lon = utm.to_latlon(pos[i].p.imag, pos[i].p.real, number, letter)
     cur.execute('''INSERT INTO position
                      (deploymentID, timestamp, latitude, longitude, easting, northing, 
                       utm_zone_number, utm_zone_letter, likelihood, 
                       activity, number_est_used)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                     (pos.dep_id, pos.t, round(lat,6), round(lon,6),
-                      pos.p.imag, pos.p.real, number, letter, 
-                      pos.get_likelihood(), pos.get_activity(),
-                      pos.num_est))
-    max_id = max(cur.lastrowid, max_id)
-
+                     (pos[i].dep_id, pos[i].t, round(lat,6), round(lon,6),
+                      pos[i].p.imag, pos[i].p.real, number, letter, 
+                      pos[i].get_likelihood(), pos[i].get_activity(),
+                      pos[i].num_est))
+    pos_id = cur.lastrowid
+    max_id = max(pos_id, max_id)
+    if cov: 
+      (C, lambda1, lambda2, alpha, status) = cov[i]
+      if C: 
+        cov11, cov12, cov21, cov22 = C[0,0], C[0,1], C[1,0], C[1,1]
+        w99, w95, w90, w80, w68 = (
+               C.W[0.997], C.W[0.95], C.W[0.90], C.W[0.80], C.W[0.68])
+      else: 
+        cov11, cov12, cov21, cov22 = None, None, None, None
+        w99, w95, w90, w80, w68 = None, None, None, None, None
+      
+      cur.execute('''INSERT INTO covariance
+                     (positionID, status, method, 
+                      cov11, cov12, cov21, cov22,
+                      lambda1, lambda2, alpha, 
+                      w99, w95, w90, w80, w68)
+                   VALUES (%s, %s, %s, 
+                           %s, %s, %s, %s, 
+                           %s, %s, %s, 
+                           %s, %s, %s, %s, %s)''', 
+              (pos_id, status, 'boot', 
+               cov11, cov12, cov21, cov22,
+               lambda1, lambda2, alpha, 
+               w99, w95, w90, w80, w68))
   return max_id
 
 
@@ -450,6 +474,9 @@ class Covariance:
     B = B / self.m
     
     self.C = np.dot(A, np.dot(B, A))
+
+  def __getitem__(self, index):
+    return self.C[index]
 
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
