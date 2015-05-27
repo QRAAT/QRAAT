@@ -257,6 +257,9 @@ class Signal:
   def __len__(self):
     return len(self.table)
 
+  def get_count(self):
+    return sum(map(lambda site_data: site_data.count, self. table.values()))
+
   def write(self):
     for (id, site) in self.table.iteritems():
       site.write()
