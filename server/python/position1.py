@@ -43,10 +43,10 @@ POS_EST_DELTA = 5
 POS_EST_S = 10
 
 # Normalize bearing spectrum. 
-NORMALIZE_SPECTRUM = False
+NORMALIZE_SPECTRUM = True # FIXME
 
 # Enable asymptotic covariance (compute Position.all_splines)
-ENABLE_ASYMPTOTIC = False
+ENABLE_ASYMPTOTIC = True # FIXME
 
 # Paramters for bootstrap covariance estimation. 
 BOOT_MAX_RESAMPLES = 200
@@ -100,7 +100,7 @@ def PositionEstimator(dep_id, sites, center, signal, sv, method=signal.Signal.Ba
   for site_id in signal.get_site_ids():
     (B[site_id], obj) = method(signal[site_id], sv)
 
-  return Position.calc(dep_id, B, signal, obj, sites, center,
+  return Position(dep_id, B, signal, obj, sites, center,
                                     signal.t_start, signal.t_end, s, m, n, delta)
 
 
@@ -127,7 +127,7 @@ def WindowedPositionEstimator(dep_id, sites, center, signal, sv, t_step, t_win,
   for (t_start, t_end) in util.compute_time_windows(
                       signal.t_start, signal.t_end, t_step, t_win):
   
-    pos.append(Position.calc(dep_id, B, signal, obj, 
+    pos.append(Position(dep_id, B, signal, obj, 
                               sites, center, t_start, t_end, s, m, n, delta))
   
   return pos
@@ -207,8 +207,8 @@ def ReadCovariances(db_con, dep_id, t_start, t_end):
 
 class Position:
   
-  def __init__(self):
-
+  def __init__(self, *args):
+    
     self.dep_id = None
     self.num_sites = None
     self.num_est = None
@@ -227,14 +227,16 @@ class Position:
     self.zone = None
     self.latitude = None
     self.longitude = None
+  
+    if len(args) == 12: 
+      self.calc(*args)
 
-  @classmethod
-  def calc(cls, dep_id, P, signal, obj, sites, center, t_start, t_end, s, m, n, delta):
+  def calc(self, dep_id, B, signal, obj, sites, center, t_start, t_end, s, m, n, delta):
     ''' Compute a position given bearing likelihood data. ''' 
     
     # Aggregate site data. 
     (splines, sub_splines, all_splines, bearing, activity, num_est) = aggregate_window(
-                                  P, signal, obj, t_start, t_end)
+                                  B, signal, obj, t_start, t_end)
     
     if len(splines) > 1: # Need at least two site bearings. 
       p_hat, likelihood = compute_position(sites, splines, center, obj, s, m, n, delta)
@@ -244,30 +246,27 @@ class Position:
     num_sites = len(bearing)
     t = (t_end + t_start) / 2
     
-    P = cls()
-    P.dep_id = dep_id
-    P.p = p_hat
-    P.t = t
+    self.dep_id = dep_id
+    self.p = p_hat
+    self.t = t
     
     if likelihood and num_sites > 0:
       if NORMALIZE_SPECTRUM:
-        P.likelihood = likelihood / num_sites
+        self.likelihood = likelihood / num_sites
       else: 
-        P.likelihood = likelihood / num_est
+        self.likelihood = likelihood / num_est
     
     if num_sites > 0:
-      P.activity = np.mean(activity.values())
+      self.activity = np.mean(activity.values())
     
-    P.num_est = num_est
-    P.num_sites = num_sites
-    P.bearing = bearing
+    self.num_est = num_est
+    self.num_sites = num_sites
+    self.bearing = bearing
 
-    P.splines = splines         # siteID -> aggregated bearing likelihood spline
-    P.sub_splines = sub_splines # siteID -> spline of sub samples for bootstrapping
-    P.all_splines = all_splines # siteID -> spline for each pulse
-    P.obj = obj                 # objective function used in pos. est.
-
-    return P
+    self.splines = splines         # siteID -> aggregated bearing likelihood spline
+    self.sub_splines = sub_splines # siteID -> spline of sub samples for bootstrapping
+    self.all_splines = all_splines # siteID -> spline for each pulse
+    self.obj = obj                 # objective function used in pos. est.
  
   def insert_db(self, db_con, zone):
     ''' Insert position into DB. ''' 
@@ -289,6 +288,7 @@ class Position:
 
   def plot(self, fn, sites, center, p_known=None, half_span=150, scale=10):
     ''' Plot search space. '''
+    assert self.splines != None 
 
     if self.num_sites == 0:
       print 'yes'
@@ -451,7 +451,18 @@ class Ellipse:
 
 class Covariance:
   
-  def __init__(self, pos, sites, p_known=None, half_span=75, scale=0.5):
+  def __init__(self, *args, **kwargs):
+    self.method = 'asym'
+    self.p_hat = None
+    self.half_span = None
+    self.scale = None
+    self.m = None
+    self.C = None
+
+    if len(args) == 2: 
+      self.calc(*args, **kwargs)
+  
+  def calc(self, pos, sites, p_known=None, half_span=75, scale=0.5):
     ''' Confidence region from asymptotic covariance. 
     
       Note that this expression only works if the `NORMALIZE_SPECTRUM` flag at the
@@ -459,7 +470,7 @@ class Covariance:
     ''' 
     assert NORMALIZE_SPECTRUM
     assert ENABLE_ASYMPTOTIC
-
+  
     self.p_hat = pos.p
     self.half_span = half_span
     self.scale = scale
@@ -504,14 +515,21 @@ class Covariance:
 
 class BootstrapCovariance (Covariance):
 
-  def __init__(self, pos, sites, max_resamples=200):
+  def __init__(self, *args, **kwargs):
     ''' Bootstrap method for estimationg covariance of a position estimate. 
 
       Generate at most `max_resamples` position estimates by resampling the signals used
       in computing `pos`. 
     '''
     self.method = 'boot'
-    self.C = self.W = None
+    self.C = None
+    self.W = None
+    self.p_hat = None
+    if len(args) == 2: 
+      self.calc(*args, **kwargs)
+ 
+
+  def calc(self, pos, sites, max_resamples=200):
     self.p_hat = pos.p
 
     # Generate sub samples.
@@ -611,13 +629,19 @@ class BootstrapCovariance (Covariance):
 
 class BootstrapCovariance2 (BootstrapCovariance):
 
-  def __init__(self, pos, sites, max_resamples=200):
+  def __init__(self, *args, **kwargs):
     ''' Bootstrap method originally proposed by the stats group.
 
       Resample by using pairs of sites to compute estimates. 
     '''
     self.method = 'boot2'
-    self.C = self.W = None
+    self.C = None
+    self.W = None
+    self.p_hat = None
+    if len(args) == 2: 
+      self.calc(*args, **kwargs)
+
+  def calc(self, pos, sites, max_resamples=200):
     self.p_hat = pos.p
 
     # Generate sub samples.
@@ -656,6 +680,8 @@ class BootstrapCovariance2 (BootstrapCovariance):
     
     else: # not enough samples
       self.status = 'undefined'
+
+
 
 ### Low level calls. ##########################################################
 
