@@ -140,6 +140,23 @@ def WindowedCovarianceEstimator(sites, pos, max_resamples=BOOT_MAX_RESAMPLES):
     cov.append(C)
   return cov
 
+def InsertBearings(db_con, pos):
+  ''' Insert bearings into database ''' 
+  cur = db_con.cursor()
+  max_id = 0
+  for P in pos:
+    for site_id in P.bearing.keys(): 
+      bearing, likelihood, activity, num_est = P.bearing[site_id]
+      cur.execute('''INSERT INTO bearing 
+                          (deploymentID, siteID, timestamp, 
+                           bearing, likelihood, activity, number_est_used)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)''', 
+                 (P.dep_id, site_id, P.t, 
+                  bearing, likelihood, activity, num_est))
+      max_id = max(max_id, cur.lastrowid)
+  return max_id
+
+
 def InsertPositions(db_con, zone, pos):
   ''' Insert positions into database. ''' 
   max_id = 0
@@ -255,8 +272,8 @@ class Position:
     self.p = None
     self.t = None
     self.likelihood = None
-    self.bearing = None
     self.activity = None
+    self.bearing = None
     
     self.splines = None
     self.sub_splines = None
@@ -299,9 +316,12 @@ class Position:
     if num_sites > 0:
       self.activity = np.mean(activity.values())
     
+    self.bearing = {}
+    for (site_id, (bearing, likelihood, num_est)) in bearing.iteritems():
+      self.bearing[site_id] = (bearing, likelihood, activity[site_id], num_est)
+
     self.num_est = num_est
     self.num_sites = num_sites
-    self.bearing = bearing
 
     self.splines = splines         # siteID -> aggregated bearing likelihood spline
     self.sub_splines = sub_splines # siteID -> spline of sub samples for bootstrapping
@@ -773,7 +793,8 @@ def aggregate_window(P, signal, obj, t_start, t_end):
 
       # Aggregated activity measurement per site. 
       activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
-      theta = obj(p); bearing[id] = (theta, p[theta])
+      theta = obj(p)
+      bearing[id] = (theta, p[theta] / signal[id].count, signal[id].count)
       num_est += edsp.shape[0]
   
   return (splines, sub_splines, all_splines, bearing, activity, num_est)
