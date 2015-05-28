@@ -140,13 +140,13 @@ def WindowedCovarianceEstimator(sites, pos, max_resamples=BOOT_MAX_RESAMPLES):
     cov.append(C)
   return cov
 
-def InsertPositions(db_con, zone, pos):
+def InsertPositions(db_con, cal_id, zone, pos):
   ''' Insert positions into database. ''' 
   max_id = 0
   for P in pos:
     pos_id = P.insert_db(db_con, zone)
     for (site_id, B) in P.bearings.iteritems():
-      bearing_id = B.insert_db(db_con, P.dep_id, site_id, P.t)
+      bearing_id = B.insert_db(db_con, cal_id, P.dep_id, site_id, P.t)
     if pos_id:
       max_id = max(pos_id, max_id)
   return max_id
@@ -242,19 +242,6 @@ def ReadConfidenceRegions(db_con, dep_id, t_start, t_end, conf_level):
       conf.append(E)
     else: conf.append(None)
   return conf
-  
-def handle_provenance_insertion(cur, depends_on, obj):
-  ''' Insert provenance data into database ''' 
-  query = 'insert into provenance (obj_table, obj_id, dep_table, dep_id) values (%s, %s, %s, %s);'
-  prov_args = []
-  for dep_k in depends_on.keys():
-    for dep_v in depends_on[dep_k]:
-      for obj_k in obj.keys():
-        for obj_v in obj[obj_k]:
-          args = (obj_k, obj_v, dep_k, dep_v)
-          prov_args.append(args)
-  cur.executemany(query, prov_args) 
-
 
 
 ### class Position. ###########################################################
@@ -404,16 +391,18 @@ class Position:
 class Bearing:
   
   def __init__(self, *args): 
-    
+
+    self.est_ids = None
     self.bearing = None
     self.likelihood = None
     self.activity = None
     self.num_est = None
 
-    if len(args) == 4:
+    if len(args) == 5:
       self.calc(*args)
 
-  def calc(self, edsp, bearing_spectrum, num_est, obj):
+  def calc(self, edsp, bearing_spectrum, num_est, obj, est_ids):
+    self.est_ids = est_ids
     self.num_est = num_est
     self.bearing = obj(bearing_spectrum)
 
@@ -425,7 +414,7 @@ class Bearing:
     # Activity.
     self.activity = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
 
-  def insert_db(self, db_con, dep_id, site_id, t):
+  def insert_db(self, db_con, cal_id, dep_id, site_id, t):
     ''' Insert bearing into database. ''' 
     cur = db_con.cursor()
     cur.execute('''INSERT INTO bearing 
@@ -434,7 +423,11 @@ class Bearing:
                   VALUES (%s, %s, %s, %s, %s, %s, %s)''', 
                  (dep_id, site_id, t, 
                   self.bearing, self.likelihood, self.activity, self.num_est))
-    return cur.lastrowid
+    bearing_id = cur.lastrowid
+    handle_provenance_insertion( cur, { 'est' : tuple(self.est_ids), 
+                                        'calibration_information' : (cal_id,) }, 
+                                      { 'bearing' : (bearing_id,) } )
+    return bearing_id
 
 
 
@@ -794,6 +787,7 @@ def aggregate_window(P, signal, obj, t_start, t_end):
   
   for (id, L) in P.iteritems():
     mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
+    est_ids = signal[id].est_ids[mask]
     edsp = signal[id].edsp[mask]
     if edsp.shape[0] > 0:
       l = L[mask]
@@ -820,7 +814,7 @@ def aggregate_window(P, signal, obj, t_start, t_end):
           all_splines[id].append(compute_bearing_spline(l[i]))
 
       # Aggregated data per site. 
-      bearings[id] = Bearing(edsp, p, len(edsp), obj)
+      bearings[id] = Bearing(edsp, p, len(edsp), obj, est_ids)
 
       num_est += edsp.shape[0]
   
@@ -985,4 +979,17 @@ def transform_coord_inv(x, center, half_span, scale):
   p = np.complex( (((x[1] - half_span) * scale) + center.real), 
                   (((x[0] - half_span) * scale) + center.imag) )
   return p
+
+  
+def handle_provenance_insertion(cur, depends_on, obj):
+  ''' Insert provenance data into database ''' 
+  query = 'insert into provenance (obj_table, obj_id, dep_table, dep_id) values (%s, %s, %s, %s);'
+  prov_args = []
+  for dep_k in depends_on.keys():
+    for dep_v in depends_on[dep_k]:
+      for obj_k in obj.keys():
+        for obj_v in obj[obj_k]:
+          args = (obj_k, obj_v, dep_k, dep_v)
+          prov_args.append(args)
+  cur.executemany(query, prov_args) 
 
