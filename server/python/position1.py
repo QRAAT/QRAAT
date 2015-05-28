@@ -75,7 +75,7 @@ class UnboundedContourError (PositionError):
 
 ### Position estimation. ######################################################
 
-def PositionEstimator(dep_id, sites, center, signal, sv, method=signal.Signal.Bartlet,
+def PositionEstimator(signal, sites, center, sv, method=signal.Signal.Bartlet,
                         s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA):
   ''' Estimate the source of a signal. 
   
@@ -100,11 +100,11 @@ def PositionEstimator(dep_id, sites, center, signal, sv, method=signal.Signal.Ba
   for site_id in signal.get_site_ids():
     (B[site_id], obj) = method(signal[site_id], sv)
 
-  return Position(dep_id, B, signal, obj, sites, center,
-                                    signal.t_start, signal.t_end, s, m, n, delta)
+  return Position(B, signal, obj, sites, center,
+                              signal.t_start, signal.t_end, s, m, n, delta)
 
 
-def WindowedPositionEstimator(dep_id, sites, center, signal, sv, t_step, t_win, 
+def WindowedPositionEstimator(signal, sites, center, sv, t_step, t_win, 
                               method=signal.Signal.Bartlet, 
                               s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA):
   ''' Estimate the source of a signal, aggregate site data. 
@@ -127,12 +127,12 @@ def WindowedPositionEstimator(dep_id, sites, center, signal, sv, t_step, t_win,
   for (t_start, t_end) in util.compute_time_windows(
                       signal.t_start, signal.t_end, t_step, t_win):
   
-    pos.append(Position(dep_id, B, signal, obj, 
-                              sites, center, t_start, t_end, s, m, n, delta))
+    pos.append(Position(B, signal, obj, 
+                sites, center, t_start, t_end, s, m, n, delta))
   
   return pos
 
-def WindowedCovarianceEstimator(sites, pos, max_resamples=BOOT_MAX_RESAMPLES):  
+def WindowedCovarianceEstimator(pos, sites, max_resamples=BOOT_MAX_RESAMPLES):  
   ''' Compute covariance of each pos. estimate in ``pos``.  ''' 
   cov = []
   for P in pos: 
@@ -140,26 +140,41 @@ def WindowedCovarianceEstimator(sites, pos, max_resamples=BOOT_MAX_RESAMPLES):
     cov.append(C)
   return cov
 
-def InsertPositions(db_con, cal_id, zone, pos):
-  ''' Insert positions into database. ''' 
+def InsertPositions(db_con, dep_id, cal_id, zone, pos):
+  ''' Insert positions and bearings into database. ''' 
   max_id = 0
   for P in pos:
-    pos_id = P.insert_db(db_con, zone)
+    # Insert bearings
+    bearing_ids = []
     for (site_id, B) in P.bearings.iteritems():
-      bearing_id = B.insert_db(db_con, cal_id, P.dep_id, site_id, P.t)
+      bearing_id = B.insert_db(db_con, cal_id, dep_id, site_id, P.t)
+      bearing_ids.append(bearing_id)
+    
+    # Insert position
+    pos_id = P.insert_db(db_con, dep_id, bearing_ids, zone)
     if pos_id:
       max_id = max(pos_id, max_id)
   return max_id
 
-def InsertPositionsCovariances(db_con, zone, pos, cov):
-  ''' Insert positions and covariances into database. ''' 
+def InsertPositionsCovariances(db_con, dep_id, cal_id, zone, pos, cov):
+  ''' Insert positions, bearings, and covariances into database. ''' 
   max_id = 0
-  for i in range(len(pos)):
-    pos_id = pos[i].insert_db(db_con, zone)
+  for (P, C) in zip(pos, cov):
+    # Insert bearings
+    bearing_ids = []
+    for (site_id, B) in P.bearings.iteritems():
+      bearing_id = B.insert_db(db_con, cal_id, dep_id, site_id, P.t)
+      bearing_ids.append(bearing_id)
+    
+    # Insert position
+    pos_id = P.insert_db(db_con, dep_id, bearing_ids, zone)
     if pos_id:
       max_id = max(pos_id, max_id)
-      cov_id = cov[i].insert_db(db_con, pos_id)
+      
+      # Insert covariance
+      cov_id = C.insert_db(db_con, pos_id)
   return max_id
+
 
 def ReadPositions(db_con, dep_id, t_start, t_end): 
   cur = db_con.cursor()
@@ -250,7 +265,6 @@ class Position:
   
   def __init__(self, *args):
     
-    self.dep_id = None
     self.num_sites = None
     self.num_est = None
     self.p = None
@@ -269,10 +283,10 @@ class Position:
     self.latitude = None
     self.longitude = None
   
-    if len(args) == 12: 
+    if len(args) == 11: 
       self.calc(*args)
 
-  def calc(self, dep_id, B, signal, obj, sites, center, t_start, t_end, s, m, n, delta):
+  def calc(self, B, signal, obj, sites, center, t_start, t_end, s, m, n, delta):
     ''' Compute a position given bearing likelihood data. ''' 
     
     # Aggregate site data. 
@@ -287,7 +301,6 @@ class Position:
     num_sites = len(bearings)
     t = (t_end + t_start) / 2
     
-    self.dep_id = dep_id
     self.p = p_hat
     self.t = t
     
@@ -309,7 +322,7 @@ class Position:
     self.all_splines = all_splines # siteID -> spline for each pulse
     self.obj = obj                 # objective function used in pos. est.
  
-  def insert_db(self, db_con, zone):
+  def insert_db(self, db_con, dep_id, bearing_ids, zone):
     ''' Insert position into DB. ''' 
     if self.p is None: 
       return None
@@ -321,13 +334,16 @@ class Position:
                       utm_zone_number, utm_zone_letter, likelihood, 
                       activity, number_est_used)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                     (self.dep_id, self.t, round(lat,6), round(lon,6),
+                     (dep_id, self.t, round(lat,6), round(lon,6),
                       self.p.imag, self.p.real, number, letter, 
                       self.likelihood, self.activity,
                       self.num_est))
-    return cur.lastrowid
+    pos_id = cur.lastrowid
+    handle_provenance_insertion(cur, {'bearing': tuple(bearing_ids)}, 
+                                     {'position' : (pos_id,)})
+    return pos_id
 
-  def plot(self, fn, sites, center, p_known=None, half_span=150, scale=10):
+  def plot(self, fn, dep_id, sites, center, p_known=None, half_span=150, scale=10):
     ''' Plot search space. '''
     assert self.splines != None 
 
@@ -382,7 +398,7 @@ class Position:
     pp.title('%04d-%02d-%02d %02d%02d:%02d depID=%d' % (
          t.tm_year, t.tm_mon, t.tm_mday,
          t.tm_hour, t.tm_min, t.tm_sec,
-         self.dep_id))
+         dep_id))
     
     pp.savefig(fn)
     pp.clf()
@@ -424,9 +440,9 @@ class Bearing:
                  (dep_id, site_id, t, 
                   self.bearing, self.likelihood, self.activity, self.num_est))
     bearing_id = cur.lastrowid
-    handle_provenance_insertion( cur, { 'est' : tuple(self.est_ids), 
-                                        'calibration_information' : (cal_id,) }, 
-                                      { 'bearing' : (bearing_id,) } )
+    handle_provenance_insertion(cur, {'est' : tuple(self.est_ids), 
+                                       'calibration_information' : (cal_id,)}, 
+                                      {'bearing' : (bearing_id,)})
     return bearing_id
 
 
