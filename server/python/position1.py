@@ -1,16 +1,24 @@
 # position1.py -- Working on clean, succinct positiion estimator code. 
 #
-# PositionEstimator, WindowedPositionEstimator -- high level calls for
-#   position estimation and aggregated site data. 
-# 
-# InsertPositions -- insert positoins into the datbaase.  
+# PositionEstimator
+# WindowedPositionEstimator
+# WindowedCovarianceEstimator
+# InsertPositions
+# InsertPositionsCovariances
+# ReadPositions
+# ReadBearings
+# ReadAllBearings
+# ReadCovariances
+# ReadConfidenceRegions
 #
-# class Position -- represent computed positions.
-# class ConfidenceRegion
-# class BoostrapConfidenceRegion (ConfidenceRegion)
+# class Position
+# class Bearing
+# class Covariance
+# class BootstrapCovariance (Covariance)
+# class BootstrapCovariance2 (BootstrapCovariance)
 # class Ellipse
 #
-# Copyright (C) 2015 Chris Patton, Todd Borrowman
+# Copyright (C) 2015 Chris Patton, Todd Borrowman, Sean Riddle
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -67,10 +75,6 @@ class PosDefError (PositionError):
 class BootstrapError (PositionError): 
   value = 4
   msg = 'not enough samples to perform boostrap.'
-
-class UnboundedContourError (PositionError): 
-  value = 5
-  msg = 'exceeded maximum size of level set.'
 
 
 ### Position estimation. ######################################################
@@ -175,6 +179,52 @@ def InsertPositionsCovariances(db_con, dep_id, cal_id, zone, pos, cov):
       cov_id = C.insert_db(db_con, pos_id)
   return max_id
 
+def ReadBearings(db_con, dep_id, site_id, t_start, t_end):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID, siteID, timestamp, bearing, 
+                        likelihood, activity, number_est_used 
+                   FROM bearing
+                  WHERE deploymentID = %s
+                    AND siteID = %s
+                    AND timestamp >= %s
+                    AND timestamp <= %s
+                  ORDER BY timestamp ASC ''', (dep_id, site_id, t_start, t_end))
+  bearings = []
+  for row in cur.fetchall():
+    B = Bearing()
+    B.bearing_id = row[0]
+    B.t = row[2]
+    B.bearing = row[3]
+    B.likelihood = row[4]
+    B.activity = row[5]
+    B.num_est = row[6]
+    bearings.append(B)
+  return bearings
+
+def ReadAllBearings(db_con, dep_id, t_start, t_end):
+  cur = db_con.cursor()
+  cur.execute('''SELECT ID, siteID, timestamp, bearing, 
+                        likelihood, activity, number_est_used 
+                   FROM bearing
+                  WHERE deploymentID = %s
+                    AND timestamp >= %s
+                    AND timestamp <= %s
+                  ORDER BY timestamp ASC ''', (dep_id, t_start, t_end))
+  bearings = {}
+  for row in cur.fetchall():
+    B = Bearing()
+    B.bearing_id = row[0]
+    B.t = row[2]
+    B.bearing = row[3]
+    B.likelihood = row[4]
+    B.activity = row[5]
+    B.num_est = row[6]
+    site_id = int(row[1])
+    if not bearings.get(site_id): 
+      bearings[site_id] = [B]
+    else: 
+      bearings[site_id].append(B)
+  return bearings
 
 def ReadPositions(db_con, dep_id, t_start, t_end): 
   cur = db_con.cursor()
@@ -184,7 +234,8 @@ def ReadPositions(db_con, dep_id, t_start, t_end):
                    FROM position
                   WHERE deploymentID = %s
                     AND timestamp >= %s
-                    AND timestamp <= %s''', (dep_id, t_start, t_end))
+                    AND timestamp <= %s
+                  ORDER BY timestamp ASC''', (dep_id, t_start, t_end))
   pos = []
   for row in cur.fetchall():
     P = Position()
@@ -211,7 +262,8 @@ def ReadCovariances(db_con, dep_id, t_start, t_end):
                    JOIN position as p ON p.ID = positionID
                   WHERE deploymentID = %s
                     AND timestamp >= %s
-                    AND timestamp <= %s''', (dep_id, t_start, t_end))
+                    AND timestamp <= %s
+                  ORDER BY timestamp ASC''', (dep_id, t_start, t_end))
   cov = []
   for row in cur.fetchall():
     if row[1] == 'boot':
@@ -407,6 +459,9 @@ class Position:
 class Bearing:
   
   def __init__(self, *args): 
+
+    self.bearing_id = None
+    self.t = None
 
     self.est_ids = None
     self.bearing = None
