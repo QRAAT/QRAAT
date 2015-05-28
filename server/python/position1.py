@@ -43,10 +43,10 @@ POS_EST_DELTA = 5
 POS_EST_S = 10
 
 # Normalize bearing spectrum. 
-NORMALIZE_SPECTRUM = True # FIXME
+NORMALIZE_SPECTRUM = False
 
 # Enable asymptotic covariance (compute Position.all_splines)
-ENABLE_ASYMPTOTIC = True # FIXME
+ENABLE_ASYMPTOTIC = False
 
 # Paramters for bootstrap covariance estimation. 
 BOOT_MAX_RESAMPLES = 200
@@ -183,12 +183,13 @@ def ReadPositions(db_con, dep_id, t_start, t_end):
     pos.append(P)
   return pos 
 
+
 def ReadCovariances(db_con, dep_id, t_start, t_end): 
   cur = db_con.cursor()
   cur.execute('''SELECT status, method, 
                         cov11, cov12, cov21, cov22,
-                        lambda1, lambda2, alpha, 
-                        w99, w95, w90, w80, w68
+                        w99, w95, w90, w80, w68,
+                        easting, northing
                    FROM covariance
                    JOIN position as p ON p.ID = positionID
                   WHERE deploymentID = %s
@@ -196,10 +197,49 @@ def ReadCovariances(db_con, dep_id, t_start, t_end):
                     AND timestamp <= %s''', (dep_id, t_start, t_end))
   cov = []
   for row in cur.fetchall():
-    print row[0] # TODO 
-    cov.append(None)
+    if row[1] == 'boot':
+      C = BootstrapCovariance()
+    elif row[2] == 'boot2': 
+      C = BootstrapCovariance2()
+    if row[0] == 'ok':
+      C.C = np.array([[row[2], row[3]], 
+                      [row[4], row[5]]])
+      C.W[0.997] = row[6]
+      C.W[0.95] = row[7]
+      C.W[0.90] = row[8]
+      C.W[0.80] = row[9]
+      C.W[0.68] = row[10]
+    C.p_hat = np.complex(row[12], row[11])
+    C.status = row[0]
+    cov.append(C)
   return cov
   
+
+def ReadConfidenceRegions(db_con, dep_id, t_start, t_end, conf_level): 
+  cur = db_con.cursor()
+  cur.execute('''SELECT status, method, 
+                        alpha, lambda1, lambda2, w{0},
+                        easting, northing
+                   FROM covariance
+                   JOIN position as p ON p.ID = positionID
+                  WHERE deploymentID = %s
+                    AND timestamp >= %s
+                    AND timestamp <= %s'''.format(int(100*conf_level)), 
+                      (dep_id, t_start, t_end))
+  conf = []
+  for row in cur.fetchall():
+    if row[0] == 'ok': 
+      alpha = row[2]
+      lambda1 = row[3]
+      lambda2 = row[4] 
+      Qt = row[5]
+      p_hat = np.complex(row[7], row[6])
+      axes = np.array([np.sqrt(Qt * lambda1), 
+                       np.sqrt(Qt * lambda2)])
+      E = Ellipse(p_hat, alpha, axes)
+      conf.append(E)
+    else: conf.append(None)
+  return conf
   
 
 
@@ -523,9 +563,9 @@ class BootstrapCovariance (Covariance):
     '''
     self.method = 'boot'
     self.C = None
-    self.W = None
+    self.W = {}
     self.p_hat = None
-    if len(args) == 2: 
+    if len(args) >= 2: 
       self.calc(*args, **kwargs)
  
 
@@ -636,9 +676,9 @@ class BootstrapCovariance2 (BootstrapCovariance):
     '''
     self.method = 'boot2'
     self.C = None
-    self.W = None
+    self.W = {}
     self.p_hat = None
-    if len(args) == 2: 
+    if len(args) >= 2: 
       self.calc(*args, **kwargs)
 
   def calc(self, pos, sites, max_resamples=200):
