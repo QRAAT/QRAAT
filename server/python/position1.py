@@ -140,28 +140,13 @@ def WindowedCovarianceEstimator(sites, pos, max_resamples=BOOT_MAX_RESAMPLES):
     cov.append(C)
   return cov
 
-def InsertBearings(db_con, pos):
-  ''' Insert bearings into database ''' 
-  cur = db_con.cursor()
-  max_id = 0
-  for P in pos:
-    for site_id in P.bearing.keys(): 
-      bearing, likelihood, activity, num_est = P.bearing[site_id]
-      cur.execute('''INSERT INTO bearing 
-                          (deploymentID, siteID, timestamp, 
-                           bearing, likelihood, activity, number_est_used)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)''', 
-                 (P.dep_id, site_id, P.t, 
-                  bearing, likelihood, activity, num_est))
-      max_id = max(max_id, cur.lastrowid)
-  return max_id
-
-
 def InsertPositions(db_con, zone, pos):
   ''' Insert positions into database. ''' 
   max_id = 0
-  for i in range(len(pos)):
-    pos_id = pos[i].insert_db(db_con, zone)
+  for P in pos:
+    pos_id = P.insert_db(db_con, zone)
+    for (site_id, B) in P.bearings.iteritems():
+      bearing_id = B.insert_db(db_con, P.dep_id, site_id, P.t)
     if pos_id:
       max_id = max(pos_id, max_id)
   return max_id
@@ -258,6 +243,18 @@ def ReadConfidenceRegions(db_con, dep_id, t_start, t_end, conf_level):
     else: conf.append(None)
   return conf
   
+def handle_provenance_insertion(cur, depends_on, obj):
+  ''' Insert provenance data into database ''' 
+  query = 'insert into provenance (obj_table, obj_id, dep_table, dep_id) values (%s, %s, %s, %s);'
+  prov_args = []
+  for dep_k in depends_on.keys():
+    for dep_v in depends_on[dep_k]:
+      for obj_k in obj.keys():
+        for obj_v in obj[obj_k]:
+          args = (obj_k, obj_v, dep_k, dep_v)
+          prov_args.append(args)
+  cur.executemany(query, prov_args) 
+
 
 
 ### class Position. ###########################################################
@@ -273,7 +270,7 @@ class Position:
     self.t = None
     self.likelihood = None
     self.activity = None
-    self.bearing = None
+    self.bearings = None
     
     self.splines = None
     self.sub_splines = None
@@ -292,7 +289,7 @@ class Position:
     ''' Compute a position given bearing likelihood data. ''' 
     
     # Aggregate site data. 
-    (splines, sub_splines, all_splines, bearing, activity, num_est) = aggregate_window(
+    (splines, sub_splines, all_splines, bearings, num_est) = aggregate_window(
                                   B, signal, obj, t_start, t_end)
     
     if len(splines) > 1: # Need at least two site bearings. 
@@ -300,7 +297,7 @@ class Position:
     else: p_hat, likelihood = None, None
     
     # Return a position object. 
-    num_sites = len(bearing)
+    num_sites = len(bearings)
     t = (t_end + t_start) / 2
     
     self.dep_id = dep_id
@@ -314,12 +311,9 @@ class Position:
         self.likelihood = likelihood / num_est
     
     if num_sites > 0:
-      self.activity = np.mean(activity.values())
+      self.activity = np.mean([ B.activity for B in bearings.values() ]) 
     
-    self.bearing = {}
-    for (site_id, (bearing, likelihood, num_est)) in bearing.iteritems():
-      self.bearing[site_id] = (bearing, likelihood, activity[site_id], num_est)
-
+    self.bearings = bearings
     self.num_est = num_est
     self.num_sites = num_sites
 
@@ -406,6 +400,41 @@ class Position:
     pp.savefig(fn)
     pp.clf()
 
+
+class Bearing:
+  
+  def __init__(self, *args): 
+    
+    self.bearing = None
+    self.likelihood = None
+    self.activity = None
+    self.num_est = None
+
+    if len(args) == 4:
+      self.calc(*args)
+
+  def calc(self, edsp, bearing_spectrum, num_est, obj):
+    self.num_est = num_est
+    self.bearing = obj(bearing_spectrum)
+
+    # Normalized likelihood. 
+    self.likelihood = bearing_spectrum[self.bearing]
+    if not NORMALIZE_SPECTRUM: 
+      self.likelihood /= num_est
+    
+    # Activity.
+    self.activity = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
+
+  def insert_db(self, db_con, dep_id, site_id, t):
+    ''' Insert bearing into database. ''' 
+    cur = db_con.cursor()
+    cur.execute('''INSERT INTO bearing 
+                          (deploymentID, siteID, timestamp, 
+                           bearing, likelihood, activity, number_est_used)
+                  VALUES (%s, %s, %s, %s, %s, %s, %s)''', 
+                 (dep_id, site_id, t, 
+                  self.bearing, self.likelihood, self.activity, self.num_est))
+    return cur.lastrowid
 
 
 
@@ -755,20 +784,19 @@ def aggregate_window(P, signal, obj, t_start, t_end):
 
   num_est = 0
   splines = {}  
-  activity = {}
-  bearing = {}
+  bearings = {}
   sub_splines = {}
 
   if ENABLE_ASYMPTOTIC: 
     all_splines = {}
   else: all_splines = None
 
+  
   for (id, L) in P.iteritems():
     mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
     edsp = signal[id].edsp[mask]
     if edsp.shape[0] > 0:
       l = L[mask]
-      
       # Aggregated bearing spectrum spline per site.
       p = aggregate_spectrum(l)
       splines[id] = compute_bearing_spline(p) 
@@ -791,13 +819,12 @@ def aggregate_window(P, signal, obj, t_start, t_end):
         for i in range(len(l)):
           all_splines[id].append(compute_bearing_spline(l[i]))
 
-      # Aggregated activity measurement per site. 
-      activity[id] = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
-      theta = obj(p)
-      bearing[id] = (theta, p[theta] / signal[id].count, signal[id].count)
+      # Aggregated data per site. 
+      bearings[id] = Bearing(edsp, p, len(edsp), obj)
+
       num_est += edsp.shape[0]
   
-  return (splines, sub_splines, all_splines, bearing, activity, num_est)
+  return (splines, sub_splines, all_splines, bearings, num_est)
 
 
 def aggregate_spectrum(p):

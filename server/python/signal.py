@@ -238,7 +238,7 @@ class Signal:
           site.signal_vector = signal_vector[mask]
           site.tnp = tnp[mask]
           site.noise_cov = noise_cov[mask]
-          site.count = np.sum(mask)
+          site.count = len(est_ids)
           self.table[site_id] = site
 
         self.t_start = np.min(timestamps)
