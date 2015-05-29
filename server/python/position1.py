@@ -1,22 +1,24 @@
-# position1.py -- Working on clean, succinct positiion estimator code. 
+# position.py -- Bearing, position, and covariance estimation of signals.  
 #
-# PositionEstimator
-# WindowedPositionEstimator
-# WindowedCovarianceEstimator
-# InsertPositions
-# InsertPositionsCovariances
-# ReadPositions
-# ReadBearings
-# ReadAllBearings
-# ReadCovariances
-# ReadConfidenceRegions
+# High level calls, database interaction: 
+#  - PositionEstimator
+#  - WindowedPositionEstimator
+#  - WindowedCovarianceEstimator
+#  - InsertPositions
+#  - InsertPositionsCovariances
+#  - ReadPositions
+#  - ReadBearings
+#  - ReadAllBearings
+#  - ReadCovariances
+#  - ReadConfidenceRegions
 #
-# class Position
-# class Bearing
-# class Covariance
-# class BootstrapCovariance (Covariance)
-# class BootstrapCovariance2 (BootstrapCovariance)
-# class Ellipse
+# Objects defined here: 
+#  - class Position
+#  - class Bearing
+#  - class Covariance
+#  - class BootstrapCovariance (Covariance)
+#  - class BootstrapCovariance2 (BootstrapCovariance)
+#  - class Ellipse
 #
 # Copyright (C) 2015 Chris Patton, Todd Borrowman, Sean Riddle
 # 
@@ -60,6 +62,10 @@ ENABLE_ASYMPTOTIC = False
 BOOT_MAX_RESAMPLES = 200
 BOOT_CONF_LEVELS = [0.68, 0.80, 0.90, 0.95, 0.997]
 
+
+
+### class PositionEstimator. ##################################################
+
 class PositionError (Exception): 
   value = 0; msg = ''
   def __str__(self): return '%s (%d)' % (self.msg, self.value)
@@ -77,7 +83,8 @@ class BootstrapError (PositionError):
   msg = 'not enough samples to perform boostrap.'
 
 
-### Position estimation. ######################################################
+
+### High level function calls. ################################################
 
 def PositionEstimator(signal, sites, center, sv, method=signal.Signal.Bartlet,
                         s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA):
@@ -85,67 +92,99 @@ def PositionEstimator(signal, sites, center, sv, method=signal.Signal.Bartlet,
   
     Inputs: 
       
-      sites -- a set of site locations represented in UTM easting/northing 
-               as an `np.complex`. The imaginary component is easting and 
-               the real part is northing.
-
-      center -- initial guess of position, represented in UTM as an `np.complex`. 
-                A good value would be the centroid of the sites.  
-
       signal -- instance of `class signal.Signal`, signal data. 
+      
+      sites -- a map from siteIDs to site positions represented as UTM 
+               easting/northing as a complex number. The imaginary component 
+               is easting and the real part is northing.
+
+      center -- initial guess of position, represented in UTM as a complex 
+                number. 
 
       sv -- instance of `class signal.SteeringVectors`, calibration data. 
 
       method -- Specify method for computing bearing likelihood distribution.
 
-    Returns UTM position estimate as a complex number. 
-  ''' 
-  B = {} # Compute bearing likelihood distributions.  
-  for site_id in signal.get_site_ids():
-    (B[site_id], obj) = method(signal[site_id], sv)
+      s, m, n, delta -- Parameters for position estimation algorithm. 
 
-  return Position(B, signal, obj, sites, center,
+    Returns an instance of `class position.Position`. 
+  ''' 
+  bearing_spectrum = {} # Compute bearing likelihood distributions.  
+  for site_id in signal.get_site_ids():
+    (bearing_spectrum[site_id], obj) = method(signal[site_id], sv)
+
+  return Position(bearing_spectrum, signal, obj, sites, center,
                               signal.t_start, signal.t_end, s, m, n, delta)
 
 
-def WindowedPositionEstimator(signal, sites, center, sv, t_step, t_win, 
-                              method=signal.Signal.Bartlet, 
-                              s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA):
-  ''' Estimate the source of a signal, aggregate site data. 
+def WindowedPositionEstimator(signal, sites, center, sv, t_step, t_win, method=signal.Signal.Bartlet, 
+                               s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA):
+  ''' Estimate the source of a signal for windows of data over ``signal``. 
   
     Inputs: 
     
-      sites, center, signal, sv
+      signal, sites, center, sv
       
       t_step, t_win -- time step and window respectively. A position 
                        is computed for each timestep. 
 
-    Returns a sequence of UTM positions. 
+      s, m, n, delta
+
+    Returns a list of `class position.Position` instances. 
   ''' 
   pos = []
 
-  B = {} # Compute bearing likelihood distributions. 
+  bearing_spectrum = {} # Compute bearing likelihood distributions. 
   for site_id in signal.get_site_ids():
-    (B[site_id], obj) = method(signal[site_id], sv)
+    (bearing_spectrum[site_id], obj) = method(signal[site_id], sv)
   
   for (t_start, t_end) in util.compute_time_windows(
                       signal.t_start, signal.t_end, t_step, t_win):
   
-    pos.append(Position(B, signal, obj, 
+    pos.append(Position(bearing_spectrum, signal, obj, 
                 sites, center, t_start, t_end, s, m, n, delta))
   
   return pos
 
+
 def WindowedCovarianceEstimator(pos, sites, max_resamples=BOOT_MAX_RESAMPLES):  
-  ''' Compute covariance of each pos. estimate in ``pos``.  ''' 
+  ''' Compute covariance of each position in `pos`. 
+
+    Inputs:
+      
+      pos -- list of `class position.Position` instances. 
+
+      sites -- mapping of siteIDs to receiver locations. 
+
+      max_resamples -- a paramter of the bootstrap covariance estimate, the 
+                       number of times to resample from the data. 
+
+    Returns a list of `position.BootstrapCovariance` instances. 
+  ''' 
   cov = []
   for P in pos: 
     C = BootstrapCovariance(P, sites, max_resamples)
     cov.append(C)
   return cov
 
+
 def InsertPositions(db_con, dep_id, cal_id, zone, pos):
-  ''' Insert positions and bearings into database. ''' 
+  ''' Insert positions and bearings into database. 
+
+    Inputs: 
+      
+      db_con -- MySQL database connector. 
+
+      dep_id -- deploymentID of positions
+
+      cal_id -- Cal_InfoID of steering vectors used to compute 
+                beaaring spectra. 
+
+      zone -- UTM zone for computation, represented as a tuple 
+              (zone number, zone letter). 
+  
+      pos -- list of `class position.Position` estimates. 
+  ''' 
   max_id = 0
   for P in pos:
     # Insert bearings
@@ -160,8 +199,20 @@ def InsertPositions(db_con, dep_id, cal_id, zone, pos):
       max_id = max(pos_id, max_id)
   return max_id
 
+
 def InsertPositionsCovariances(db_con, dep_id, cal_id, zone, pos, cov):
-  ''' Insert positions, bearings, and covariances into database. ''' 
+  ''' Insert positions, bearings, and covariances into database. 
+  
+    Inputs:
+
+      db_con, dep_id, cal_id, zone
+
+      pos -- list of `class position.Position` instances
+
+      cov -- list of `class position.BootstrapCovariance` instances 
+             corresponding to the positions in `pos`. 
+  
+  ''' 
   max_id = 0
   for (P, C) in zip(pos, cov):
     # Insert bearings
@@ -179,7 +230,19 @@ def InsertPositionsCovariances(db_con, dep_id, cal_id, zone, pos, cov):
       cov_id = C.insert_db(db_con, pos_id)
   return max_id
 
+
 def ReadBearings(db_con, dep_id, site_id, t_start, t_end):
+  ''' Read bearings from the database for a particular site and transmitter.  
+
+    Inputs:
+
+      db_con, dep_id, db_con
+
+      t_start, t_end -- Unix timestamps (in GMT) indicating the
+                        time range of the query.
+
+    Returns a list of `class position.Bearing` instances. 
+  '''
   cur = db_con.cursor()
   cur.execute('''SELECT ID, siteID, timestamp, bearing, 
                         likelihood, activity, number_est_used 
@@ -201,7 +264,13 @@ def ReadBearings(db_con, dep_id, site_id, t_start, t_end):
     bearings.append(B)
   return bearings
 
+
 def ReadAllBearings(db_con, dep_id, t_start, t_end):
+  ''' Read bearings from database for all available sites. 
+    
+    Returns a mapping from siteIDs to lists of `class position.Bearing` 
+    instances. 
+  '''
   cur = db_con.cursor()
   cur.execute('''SELECT ID, siteID, timestamp, bearing, 
                         likelihood, activity, number_est_used 
@@ -209,7 +278,7 @@ def ReadAllBearings(db_con, dep_id, t_start, t_end):
                   WHERE deploymentID = %s
                     AND timestamp >= %s
                     AND timestamp <= %s
-                  ORDER BY timestamp ASC ''', (dep_id, t_start, t_end))
+                  ORDER BY timestamp ASC''', (dep_id, t_start, t_end))
   bearings = {}
   for row in cur.fetchall():
     B = Bearing()
@@ -226,7 +295,12 @@ def ReadAllBearings(db_con, dep_id, t_start, t_end):
       bearings[site_id].append(B)
   return bearings
 
-def ReadPositions(db_con, dep_id, t_start, t_end): 
+
+def ReadPositions(db_con, dep_id, t_start, t_end):
+  ''' Read positions from database. 
+
+    Returns a list of `class position.Position` instances.
+  '''
   cur = db_con.cursor()
   cur.execute('''SELECT ID, timestamp, latitude, longitude, easting, northing, 
                         utm_zone_number, utm_zone_letter, likelihood, 
@@ -252,7 +326,11 @@ def ReadPositions(db_con, dep_id, t_start, t_end):
   return pos 
 
 
-def ReadCovariances(db_con, dep_id, t_start, t_end): 
+def ReadCovariances(db_con, dep_id, t_start, t_end):
+  ''' Read covariances from the database. 
+  
+    Return a list of `class position.Covariance` instances. 
+  ''' 
   cur = db_con.cursor()
   cur.execute('''SELECT status, method, 
                         cov11, cov12, cov21, cov22,
@@ -285,6 +363,16 @@ def ReadCovariances(db_con, dep_id, t_start, t_end):
   
 
 def ReadConfidenceRegions(db_con, dep_id, t_start, t_end, conf_level): 
+  ''' Read confidence regions from the database. 
+    
+    Input: 
+      
+      conf_level -- a number in [0 .. 1] (see `position.BOOT_CONF_LEVELS` for 
+                    valid choices) giving the desired confidence level. 
+                    
+    Returns a list of `class position.Ellipse` instances. If the covariance 
+    is singular or not positive definite, `None` is given instead.   
+  '''
   cur = db_con.cursor()
   cur.execute('''SELECT status, method, 
                         alpha, lambda1, lambda2, w{0},
@@ -316,7 +404,12 @@ def ReadConfidenceRegions(db_con, dep_id, t_start, t_end, conf_level):
 class Position:
   
   def __init__(self, *args):
+    ''' Representation of position estimtes. 
     
+      The default constructor sets all attributes to `None`. If arguments are provided, 
+      then the method `position.Position.calc()` is called, which estimates the 
+      transmitter's location from signal data. 
+    ''' 
     self.num_sites = None
     self.num_est = None
     self.p = None
@@ -338,12 +431,37 @@ class Position:
     if len(args) == 11: 
       self.calc(*args)
 
-  def calc(self, B, signal, obj, sites, center, t_start, t_end, s, m, n, delta):
-    ''' Compute a position given bearing likelihood data. ''' 
-    
+  def calc(self, bearing_spectrum, signal, obj, sites, center, t_start, t_end, s, m, n, delta):
+    ''' Compute a position from signal data.
+
+      In addition, compute the bearing data. If there is only data from one site, then 
+      no estimate is produced (`p_hat = None`). 
+
+      Inputs: 
+
+        bearing_spectrum -- mapping from siteIDs to a two-dimensional arrays representing the
+                            raw bearing spectra of the signals. The rows correspond to signals
+                            and the columns to bearings. There are 360 columns corresponding 
+                            to whole degree bearings. The cells are likelihoods of observing
+                            the signal given that the bearing is the true bearing from the 
+                            receiver to the transmitter. This is generated from either 
+                            `class signal.Signal.MLE` or `class signal.Signal.Bartlet`. 
+        
+        signal -- an instance of `class signal.Signal` encapsulating the raw signal data. 
+         
+        obj -- objective function for bearing spectrum (either `np.argmin` or `np.argmax`). 
+
+        sites -- mapping from siteIDs to receiver locations. 
+
+        center -- initial guess for position estimation. 
+
+        t_start, t_end -- slice of `signal` data to use for estimate. 
+
+        s, m, n, delta -- paramters of position estimation algorithm. 
+    ''' 
     # Aggregate site data. 
     (splines, sub_splines, all_splines, bearings, num_est) = aggregate_window(
-                                  B, signal, obj, t_start, t_end)
+                                  bearing_spectrum, signal, obj, t_start, t_end)
     
     if len(splines) > 1: # Need at least two site bearings. 
       p_hat, likelihood = compute_position(sites, splines, center, obj, s, m, n, delta)
@@ -375,7 +493,16 @@ class Position:
     self.obj = obj                 # objective function used in pos. est.
  
   def insert_db(self, db_con, dep_id, bearing_ids, zone):
-    ''' Insert position into DB. ''' 
+    ''' Insert position and bearings into the database. 
+    
+      Inputs: 
+        
+        db_con, dep_id, zone
+
+        bearing_ids -- bearingIDs (serial identifiers in the database) of the bearings
+                       corresponding to bearing data. These are used for provenance 
+                       in the database. 
+    ''' 
     if self.p is None: 
       return None
     number, letter = zone
@@ -396,7 +523,11 @@ class Position:
     return pos_id
 
   def plot(self, fn, dep_id, sites, center, p_known=None, half_span=150, scale=10):
-    ''' Plot search space. '''
+    ''' Plot search space of position estimate. 
+    
+      Note that this can only be called if `splines` is not `None`, that is, 
+      the position was computed from signal data. 
+    '''
     assert self.splines != None 
 
     if self.num_sites == 0:
@@ -456,10 +587,18 @@ class Position:
     pp.clf()
 
 
+
+### class Bearing. ############################################################
+
 class Bearing:
   
   def __init__(self, *args): 
+    ''' Representation of bearing estimates. 
 
+      This class also encapsulates the "activity" of the transmitter, as 
+      measured from the data received from the site. If arguments are provided, 
+      then `position.Bearing.calc()` is called.  
+    '''
     self.bearing_id = None
     self.t = None
 
@@ -473,6 +612,23 @@ class Bearing:
       self.calc(*args)
 
   def calc(self, edsp, bearing_spectrum, num_est, obj, est_ids):
+    ''' Compute bearing from `bearing_spectrum` and activity from `edsp`.
+
+      Inputs: 
+
+        bearing_spectrum -- two dimensional array of signals versus 
+                            bearing likelihoods. 
+
+        edsp -- a list of real numbers indicating the signal power 
+                of each signal. 
+
+        num_est -- number of signals 
+
+        obj -- objective function for bearing likelihood (either `np.argmin`
+               or `np.argmax`).
+
+        est_ids -- estIDs (serial identifiers in database) of the signals. 
+    '''
     self.est_ids = est_ids
     self.num_est = num_est
     self.bearing = obj(bearing_spectrum)
@@ -486,7 +642,12 @@ class Bearing:
     self.activity = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
 
   def insert_db(self, db_con, cal_id, dep_id, site_id, t):
-    ''' Insert bearing into database. ''' 
+    ''' Insert bearing into database. 
+    
+      Inputs: 
+          
+        t -- Unix timestamp in GMT. 
+    ''' 
     cur = db_con.cursor()
     cur.execute('''INSERT INTO bearing 
                           (deploymentID, siteID, timestamp, 
@@ -507,7 +668,23 @@ class Bearing:
 class Ellipse:
 
   def __init__(self, p_hat, angle, axes, half_span=0, scale=1):
-    ''' Ellipse data structure. ''' 
+    ''' Representation of an ellipse. 
+    
+      A confidence region for normally distributed data. 
+      
+      Input: 
+      
+        p_hat -- UTM position estimate represented as a complex number. This is the
+                 center of the ellipse. 
+
+        angle -- orientation of the ellipse, represented as the angle (in radians, 
+                 where 0 indicates east) between the x-axis and the major axis.
+
+        axes -- vector of length 2: `axes[0]` is half the length of the major axis 
+                and `axes[1]` is half the length of the minor axis. 
+
+        half_span, scale -- if the ellipse is to be scaled in a weird way.
+      ''' 
     self.p_hat = p_hat
     self.angle = angle
     self.axes = axes
@@ -516,12 +693,15 @@ class Ellipse:
     self.x = np.array([half_span, half_span])
 
   def area(self):
+    ''' Return the area of the ellipse. ''' 
     return np.pi * self.axes[0] * self.axes[1] 
 
   def eccentricity(self):
+    ''' Return the eccentricity of the ellipse. ''' 
     return np.sqrt(1 - ((self.axes[1]/2)**2) / ((self.axes[0]/2)**2))
 
   def cartesian(self): 
+    ''' Convert the ellipse to (x,y) coordinates. ''' 
     theta = np.linspace(0,2*np.pi, 360)
     X = self.x[0] + self.axes[0]*np.cos(theta)*np.cos(self.angle) - \
                     self.axes[1]*np.sin(theta)*np.sin(self.angle)
@@ -530,6 +710,10 @@ class Ellipse:
     return (X, Y)
 
   def __contains__(self, p):
+    ''' Return `True` if the ellipse contains the point. 
+
+      Input: p -- UTM position represented as a complex number.
+    '''
     x = transform_coord(p, self.p_hat, self.half_span, self.scale)
     R = np.array([[ np.cos(self.angle), np.sin(self.angle) ],
                   [-np.sin(self.angle), np.cos(self.angle) ]])   
@@ -558,7 +742,6 @@ class Ellipse:
 
   def plot(self, fn, p_known=None):
     ''' A pretty plot of confidence region. ''' 
-    
     pp.rc('text', usetex=True)
     pp.rc('font', family='serif')
     
@@ -605,6 +788,10 @@ class Ellipse:
 class Covariance:
   
   def __init__(self, *args, **kwargs):
+    ''' Asymptotic covariance of position estimate. 
+
+      If arguments are provided, then `position.Covariance.calc()` is called. 
+    '''
     self.method = 'asym'
     self.p_hat = None
     self.half_span = None
@@ -657,6 +844,7 @@ class Covariance:
     self.C = np.dot(A, np.dot(B, A))
 
   def __getitem__(self, index):
+    ''' Return an element of the covariance matrix. ''' 
     return self.C[index]
 
   def conf(self, level): 
@@ -669,10 +857,10 @@ class Covariance:
 class BootstrapCovariance (Covariance):
 
   def __init__(self, *args, **kwargs):
-    ''' Bootstrap method for estimationg covariance of a position estimate. 
+    ''' Bootstrap method for estimating covariance of a position estimate. 
 
-      Generate at most `max_resamples` position estimates by resampling the signals used
-      in computing `pos`. 
+      If arguments are provided, then `position.BootstrapCovariance.calc()` is 
+      called.
     '''
     self.method = 'boot'
     self.C = None
@@ -682,7 +870,20 @@ class BootstrapCovariance (Covariance):
       self.calc(*args, **kwargs)
  
 
-  def calc(self, pos, sites, max_resamples=200):
+  def calc(self, pos, sites, max_resamples=BOOT_MAX_RESAMPLES):
+    '''  Bootstrap estimation of covariance. 
+
+      Generate at most `max_resamples` position estimates by resampling the signals used
+      in computing `pos`.
+
+      Inputs:
+          
+        pos -- instance of `class position.Position`. 
+
+        sites -- mapping of siteIDs to positions of receivers. 
+
+        max_resamples -- number of times to resample the data.
+    '''
     self.p_hat = pos.p
 
     # Generate sub samples.
@@ -722,9 +923,14 @@ class BootstrapCovariance (Covariance):
     else: # not enough samples
       self.status = 'undefined'
 
-
   def insert_db(self, db_con, pos_id): 
-    ''' Insert into DB. '''
+    ''' Insert covariance into the database. 
+    
+      Input: 
+
+        pos_id -- positionID, serial identifier of position estimate in 
+                  the database. 
+    '''
     if self.status == 'ok':
       
       cov11, cov12, cov21, cov22 = self.C[0,0], self.C[0,1], self.C[1,0], self.C[1,1]
@@ -767,7 +973,6 @@ class BootstrapCovariance (Covariance):
              w99, w95, w90, w80, w68))
     return cur.lastrowid
       
-
   def conf(self, level): 
     ''' Emit confidence interval at the (1-conf_level) significance level. ''' 
     if self.status == 'ok':
@@ -794,7 +999,7 @@ class BootstrapCovariance2 (BootstrapCovariance):
     if len(args) >= 2: 
       self.calc(*args, **kwargs)
 
-  def calc(self, pos, sites, max_resamples=200):
+  def calc(self, pos, sites, max_resamples=BOOT_MAX_RESAMPLES):
     self.p_hat = pos.p
 
     # Generate sub samples.
@@ -855,7 +1060,6 @@ def aggregate_window(P, signal, obj, t_start, t_end):
     all_splines = {}
   else: all_splines = None
 
-  
   for (id, L) in P.iteritems():
     mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
     est_ids = signal[id].est_ids[mask]
@@ -899,6 +1103,7 @@ def aggregate_spectrum(p):
   else: 
     return np.sum(p, 0)
 
+
 def compute_bearing_spline(l): 
   ''' Interpolate a spline on a bearing likelihood distribuiton. 
     
@@ -909,6 +1114,7 @@ def compute_bearing_spline(l):
   bearing_domain = np.arange(-360,360)       
   likelihood_range = np.hstack((l, l))
   return spline1d(bearing_domain, likelihood_range)
+
 
 def compute_likelihood_grid(sites, splines, center, scale, half_span):
   ''' Compute a grid of candidate points and their likelihoods. '''
@@ -929,7 +1135,8 @@ def compute_likelihood_grid(sites, splines, center, scale, half_span):
   return (positions, likelihoods)
 
 
-def compute_likelihood(sites, splines, p): 
+def compute_likelihood(sites, splines, p):
+  ''' Compute the likelihood of position `p`. ''' 
   likelihood = 0
   for id in splines.keys():
     bearing = np.angle(p - sites[id]) * 180 / np.pi
@@ -940,9 +1147,10 @@ def compute_likelihood(sites, splines, p):
 def compute_position(sites, splines, center, obj, s, m, n, delta):
   ''' Maximize (resp. minimize) over position space. 
 
-    A simple, speedy algorithm for finding the most likely source of a 
-    transmitter signal in Euclidean space, given a bearing distribution from a 
-    set of receiver sites. 
+    Grid search algorithm for position estimation (optimizing over the 
+    search space). If the most likely position is at the edge of the grid,
+    then rerun at the same scale with the most likely position as the 
+    new center. This is done up to 3 times.  
 
     Inputs: 
       
@@ -952,13 +1160,21 @@ def compute_position(sites, splines, center, obj, s, m, n, delta):
       splines -- a set of splines corresponding to the bearing likelihood
                  distributions for each site.
 
-      half_span -- scaling factor for generating a grid of candidate positions. 
-                   This is half the length of a side of the square bounding the
-                   grid.
-
       obj -- np.argmin or np.argmax
+
+      s -- Half span of search grid. (The dimensions of the grid are 2*s+1 
+           by 2*s+1.) 
+
+      m -- Initial scale. The grid points are initially spaced delta**m 
+           meters apart. 
+
+      n -- Final scale. The grid points are spaced delta**n meters apart 
+           in the final iteration. 
+
+      delta -- Scaling factor.  
     
-      Returns UTM position estimate as a complex number. 
+      Returns UTM position estimate as a complex number and the likelihood
+      of the position
   '''
   assert m >= n
   p_hat = center
@@ -966,9 +1182,7 @@ def compute_position(sites, splines, center, obj, s, m, n, delta):
   for i in reversed(range(n, m+1)):
     scale = delta ** i
     a = b = ct = 0
-    while ct < 10 and (a == 0 or a == span-1 or b == 0 or b == span-1): 
-      # Deal with boundary cases. If p_hat falls along the 
-      # edge of the grid, recompute with p_hat as center. FIXME
+    while ct < 3 and (a == 0 or a == span-1 or b == 0 or b == span-1): 
       (positions, likelihoods) = compute_likelihood_grid(
                              sites, splines, p_hat, scale, s)
       
@@ -1016,11 +1230,16 @@ def bootstrap_resample_sites(pos, sites, resamples, obj, site_ids):
 def compute_conf(C, Qt, scale=1):
   ''' Compute confidence region from covariance matrix.
     
-    `Qt` is typically the cumulative probability of `t` from the chi-square 
-    distribution with two degrees of freedom. 
-
     Method due to http://www.visiondummy.com/2014/04/
       draw-error-ellipse-representing-covariance-matrix/. 
+    
+    C -- covariance matrix.
+
+    Qt -- is typically the cumulative probability of `t` from the chi-square 
+          distribution with two degrees of freedom. This is also the Mahalanobis
+          distance in the case of the bootstrap.
+
+    scale -- In case weird scaling was used. 
   '''
   w, v = np.linalg.eig(C)
   if w[0] > 0 and w[1] > 0: # Positive definite. 
@@ -1063,4 +1282,3 @@ def handle_provenance_insertion(cur, depends_on, obj):
           args = (obj_k, obj_v, dep_k, dep_v)
           prov_args.append(args)
   cur.executemany(query, prov_args) 
-
