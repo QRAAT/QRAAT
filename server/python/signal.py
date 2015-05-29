@@ -157,8 +157,9 @@ class Signal:
     self.table = {}
     self.t_start = float("+inf")
     self.t_end = float("-inf")
+    self.max_id = 0
 
-    if len(args) == 4:
+    if len(args) >= 4:
       self.read_db(*args, **kwargs)
 
   def read_db(self, db_con, dep_id, t_start, t_end,
@@ -247,7 +248,8 @@ class Signal:
 
       self.t_start = np.min(timestamps)
       self.t_end = np.max(timestamps)
-  
+      self.max_id = np.max(est_ids)
+
   @classmethod
   def read(cls, site_ids, prefix='sig'):
     ''' Read signals from files. ''' 

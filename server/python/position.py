@@ -810,7 +810,7 @@ class Covariance:
     self.m = None
     self.C = None
 
-    if len(args) == 2: 
+    if len(args) >= 2: 
       self.calc(*args, **kwargs)
   
   def calc(self, pos, sites, p_known=None, half_span=75, scale=0.5):
