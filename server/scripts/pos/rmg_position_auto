@@ -2,7 +2,6 @@
 # TODO clean up output, as well as error handling in position.py.  
 
 from qraat.srv import signal, position, util
-position.ENABLE_BOOTSTRAP = False
 import numpy as np
 import os, commands, sys, time
 
@@ -22,6 +21,14 @@ db_con = util.get_db('writer')#will throw missing environment error here
 cursor = db_con.cursor()
 
 EST_SCORE_THRESHOLD = float(os.environ["RMG_POS_EST_THRESHOLD"])
+
+# Compute covariances? 
+COMPUTE_COVARIANCE = False # TODO Make this an environment variable
+if COMPUTE_COVARIANCE: 
+  position.EANBLE_BOOTSTRAP=True
+else: 
+  position.EANBLE_BOOTSTRAP=False
+
 
 # Get id of last processed record (last record scored). 
 cursor.execute("SELECT value FROM qraat.processing_cursor WHERE name='position'")
@@ -97,7 +104,11 @@ for deployment in deployment_list:
     sig = signal.Signal(db_con, deployment_id, time_range[0], time_range[1], EST_SCORE_THRESHOLD)
     temp_max_id = max(temp_max_id, sig.max_id)
     pos = position.WindowedPositionEstimator(sig, sites, center, sv, time_delta, time_window)
-    position.InsertPositions(db_con, deployment_id, cal_id, zone, pos)
+    if COMPUTE_COVARIANCE:
+      cov = position.WindowedCovarianceEstimator(pos, sites)
+      position.InsertPositionsCovariances(db_con, deployment_id, cal_id, zone, pos, cov)
+    else:
+      position.InsertPositions(db_con, deployment_id, cal_id, zone, pos)
     total_output += len(filter(lambda P: P.p != None, pos))
 
   if temp_max_id > max_id:
