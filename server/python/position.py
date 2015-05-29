@@ -55,7 +55,13 @@ POS_EST_S = 10
 # Normalize bearing spectrum. 
 NORMALIZE_SPECTRUM = False
 
-# Enable asymptotic covariance (compute Position.all_splines)
+# Enable bootstrap covariance estimation (compute Position.sub_splines). 
+# The subsplines are computed in `aggregate_window()`. Disabling this 
+# will improve performance of position estimation when the covariance is 
+# not needed. 
+ENABLE_BOOTSTRAP = True
+
+# Enable asymptotic covariance (compute Position.all_splines). 
 ENABLE_ASYMPTOTIC = False
 
 # Paramters for bootstrap covariance estimation. 
@@ -889,6 +895,7 @@ class BootstrapCovariance (Covariance):
 
         max_resamples -- number of times to resample the data.
     '''
+    assert ENABLE_BOOTSTRAP
     self.p_hat = pos.p
 
     # Generate sub samples.
@@ -1005,6 +1012,7 @@ class BootstrapCovariance2 (BootstrapCovariance):
       self.calc(*args, **kwargs)
 
   def calc(self, pos, sites, max_resamples=BOOT_MAX_RESAMPLES):
+    assert ENABLE_BOOTSTRAP
     self.p_hat = pos.p
 
     # Generate sub samples.
@@ -1065,6 +1073,10 @@ def aggregate_window(P, signal, obj, t_start, t_end):
     all_splines = {}
   else: all_splines = None
 
+  if ENABLE_BOOTSTRAP:
+    sub_splines = {}
+  else: sub_splines = None
+
   for (id, L) in P.iteritems():
     mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
     est_ids = signal[id].est_ids[mask]
@@ -1075,17 +1087,18 @@ def aggregate_window(P, signal, obj, t_start, t_end):
       p = aggregate_spectrum(l)
       splines[id] = compute_bearing_spline(p) 
       
-      # Sub sample splines. 
-      sub_splines[id] = []
-      if len(l) == 1: 
-        sub_splines[id].append(compute_bearing_spline(l[0]))
-      elif len(l) == 2:
-        sub_splines[id].append(compute_bearing_spline(l[0]))
-        sub_splines[id].append(compute_bearing_spline(l[1]))
-      else:
-        for index in itertools.combinations(range(len(l)), len(l)-1):
-          p = aggregate_spectrum(l[np.array(index)])
-          sub_splines[id].append(compute_bearing_spline(p)) 
+      # Sub sample splines.
+      if ENABLE_BOOTSTRAP:
+        sub_splines[id] = []
+        if len(l) == 1: 
+          sub_splines[id].append(compute_bearing_spline(l[0]))
+        elif len(l) == 2:
+          sub_splines[id].append(compute_bearing_spline(l[0]))
+          sub_splines[id].append(compute_bearing_spline(l[1]))
+        else:
+          for index in itertools.combinations(range(len(l)), len(l)-1):
+            p = aggregate_spectrum(l[np.array(index)])
+            sub_splines[id].append(compute_bearing_spline(p)) 
       
       # All splines.
       if ENABLE_ASYMPTOTIC: 
