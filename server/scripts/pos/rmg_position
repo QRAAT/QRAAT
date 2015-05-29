@@ -103,7 +103,7 @@ chunks.append((ts, options.t_end))
 
 for i in range(len(chunks)):
 
-  print "position: fetching chunk %d of %d." % (i+1, len(chunks)) 
+  print "position: chunk %d of %d." % (i+1, len(chunks)) 
 
   # Get signal data.
   sig = signal.Signal(db_con, options.dep_id, chunks[i][0], chunks[i][1], 
@@ -114,12 +114,10 @@ for i in range(len(chunks)):
     
   # Compute bearing spectra (Bartlet's estimator), estimate the
   # position of the transmitter at each data window. 
-  print 'position: computing positions'
   pos = position.WindowedPositionEstimator(sig, sites, center, sv, options.t_delta, options.t_window)
 
   if options.compute_cov:
     # Compute covariances
-    print 'position: computing covariances'
     cov = position.WindowedCovarianceEstimator(pos, sites)
 
     # Insert positions, bearings, and covariances into database. 
