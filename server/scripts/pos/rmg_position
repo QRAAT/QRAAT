@@ -71,6 +71,9 @@ parser.add_option('--t-chunk', type='float', metavar='SEC', default=60 * 60 / 4,
                   help="Size of signal chunk to fetch simultaneously. (Note that this "
                        "doesn't affect the calculation, just the memory foot print of " 
                        "this program.)")
+
+parser.add_option('--no-cov', action='store_false', dest='compute_cov', default=True, 
+                  help="Don't compute covariance.")
   
 parser.add_option('-v', '--verbose', action='store_true', default=False, 
                   help="Print the progression of the algorithm to the terminal.")
@@ -106,11 +109,25 @@ for i in range(len(chunks)):
   sig = signal.Signal(db_con, options.dep_id, chunks[i][0], chunks[i][1], 
                                               score_threshold=options.thresh)
 
+  if not options.compute_cov: 
+    position.ENABLE_BOOTSTRAP = False
+    
   # Compute bearing spectra (Bartlet's estimator), estimate the
   # position of the transmitter at each data window. 
+  print 'position: computing positions'
   pos = position.WindowedPositionEstimator(sig, sites, center, sv, options.t_delta, options.t_window)
 
-  # Insert positions and bearings into database. 
-  position.InsertPositions(db_con, options.dep_id, options.cal_id, zone, pos)
+  if options.compute_cov:
+    # Compute covariances
+    print 'position: computing covariances'
+    cov = position.WindowedCovarianceEstimator(pos, sites)
+
+    # Insert positions, bearings, and covariances into database. 
+    position.InsertPositionsCovariances(db_con, options.dep_id, options.cal_id, zone, pos, cov)
+
+  else:
+    # Insert positions and bearings into database.
+    position.InsertPositions(db_con, options.dep_id, options.cal_id, zone, pos)
+    
 
 print "position: finished in {0:.2f} seconds.".format(time.time() - start)

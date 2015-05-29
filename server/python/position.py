@@ -52,9 +52,6 @@ POS_EST_N = -1
 POS_EST_DELTA = 5
 POS_EST_S = 10
 
-# Normalize bearing spectrum. 
-NORMALIZE_SPECTRUM = False
-
 # Enable bootstrap covariance estimation (compute Position.sub_splines). 
 # The subsplines are computed in `aggregate_window()`. Disabling this 
 # will improve performance of position estimation when the covariance is 
@@ -63,6 +60,9 @@ ENABLE_BOOTSTRAP = True
 
 # Enable asymptotic covariance (compute Position.all_splines). 
 ENABLE_ASYMPTOTIC = False
+
+# Normalize bearing spectrum. 
+NORMALIZE_SPECTRUM = False
 
 # Paramters for bootstrap covariance estimation. 
 BOOT_MAX_RESAMPLES = 200
