@@ -1,6 +1,12 @@
 # signal.py -- Represetnations of received signals and steering vectors, 
 #  simulation, and filtering of signals based on parameters and timing. 
 #
+# High level calls:
+#  - Simulator
+# 
+# Objects defined here:
+#  - class SteeringVectors
+# 
 # Copyright (C) 2015 Chris Patton
 # 
 # This program is free software: you can redistribute it and/or modify
@@ -25,21 +31,14 @@ from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
 
 
 
-###############################################################################
-#                                                                             #
-# class SteeringVectors -- Encapsulate steering vectors stored in thte data-  #
-#  base. These are the eigenvalue decompositions of signals we "espect" to    #
-#  see from known bearings to receivers.                                      #
-#                                                                             #
-###############################################################################
+### class SteeringVectors. ####################################################
 
 class SteeringVectors:
   
   suffix = 'csv'
   delim = ','
 
-  def __init__(self, db_con=None, cal_id=None, include=[]):
-
+  def __init__(self, *args, **kwargs):
     ''' Represent steering vectors.
       
       The bearings and their corresponding steering vectors are stored in 
@@ -47,6 +46,22 @@ class SteeringVectors:
       information for direction-of-arrival and position estimation. Note 
       that it is implicitly assumed in the code that there are steering 
       vectors for whole-degree bearings (0, 1, ... 359). 
+
+      If arguments are provided, then `signal.SteeringVectors.read_db()` 
+      is called. If `fn` is a keyword argument, then read from file. 
+    '''
+    self.steering_vectors = {} # site.ID -> sv
+    self.bearings = {}         # site.ID -> bearing
+    self.sv_id = {}            # site.ID -> steering_vectors.ID
+    self.cal_id = None
+  
+    if len(args) == 2: 
+      self.read_db(*args, **kwargs)
+    elif kwargs.get('fn'):
+      self.read(kwargs['fn'])
+   
+  def read_db(self, db_con, cal_id, include=[]):
+    ''' Read steering vectors from database. 
 
       Inputs:
           
@@ -57,73 +72,58 @@ class SteeringVectors:
 
         include -- Sites to include. If this is empty, use all sites in the 
                    table `qraat.site`. 
-    ''' 
+    '''
 
-    # Get steering vector data.
-    self.steering_vectors = {} # site.ID -> sv
-    self.bearings = {}         # site.ID -> bearing
-    self.sv_id = {}            # site.ID -> steering_vectors.ID
     self.cal_id = cal_id
+    to_be_removed = []
+    self.cal_id = cal_id
+    cur = db_con.cursor()
+    if include == []: 
+      include = util.get_sites(db_con).keys()
+    for site_id in include:
+      cur.execute('''SELECT ID, Bearing,
+                            sv1r, sv1i, sv2r, sv2i,
+                            sv3r, sv3i, sv4r, sv4i
+                       FROM steering_vectors
+                      WHERE SiteID=%s and Cal_InfoID=%s
+                   ORDER BY Bearing''', (site_id, cal_id))
+      raw_data = cur.fetchall()
+      sv_data = np.array(raw_data,dtype=float)
+      if sv_data.shape[0] > 0:
+        self.steering_vectors[site_id] = np.array(sv_data[:,2::2] + np.complex(0,1) * sv_data[:,3::2])
+        self.bearings[site_id] = np.array(sv_data[:,1])
+        self.sv_id[site_id] = np.array(sv_data[:,0], dtype=int)
+      else:
+        to_be_removed.append(site)
+    while len(to_be_removed) > 0:
+      self.sites.table.remove(to_be_removed.pop())
 
-    if db_con:
-      to_be_removed = []
-      self.cal_id = cal_id
-      cur = db_con.cursor()
-      if include == []: 
-        include = util.get_sites(db_con).keys()
-      for site_id in include:
-        cur.execute('''SELECT ID, Bearing,
-                              sv1r, sv1i, sv2r, sv2i,
-                              sv3r, sv3i, sv4r, sv4i
-                         FROM steering_vectors
-                        WHERE SiteID=%s and Cal_InfoID=%s
-                     ORDER BY Bearing''', (site_id, cal_id))
-        raw_data = cur.fetchall()
-        sv_data = np.array(raw_data,dtype=float)
-        if sv_data.shape[0] > 0:
-          self.steering_vectors[site_id] = np.array(sv_data[:,2::2] + np.complex(0,1) * sv_data[:,3::2])
-          self.bearings[site_id] = np.array(sv_data[:,1])
-          self.sv_id[site_id] = np.array(sv_data[:,0], dtype=int)
-        else:
-          to_be_removed.append(site)
-      while len(to_be_removed) > 0:
-        self.sites.table.remove(to_be_removed.pop())
-
-
-  def write(self, suffix='sv'):
-    fn = '%s%s.%s' % (suffix, self.cal_id, self.suffix)
+  def write(self, fn):
+    ''' Write steering vectors to file. ''' 
     fd = open(fn, 'w')
-
     header = ['site_id', 'id', 'bearing']
     for i in range(NUM_CHANNELS): header.append('sv%d' % (i+1))
     fd.write(self.delim.join(header) + '\n')
-    
     for (site_id, sv) in self.steering_vectors.iteritems():
       for i in range(sv.shape[0]):
         line = [site_id, self.sv_id[site_id][i], self.bearings[site_id][i]] 
         line += list(sv[i])
         fd.write(self.delim.join(map(lambda x: str(x), line)) + '\n')
    
-
-  @classmethod
-  def read(cls, cal_id, prefix='sv'):
-    sv = cls()
-    fn = '%s%s.%s' % (prefix, cal_id, sv.suffix)
+  def read(self, fn):
+    ''' Read steering vectors from file. ''' 
     fd = open(fn, 'r')
-
     header = fd.readline()
     for line in fd.readlines():
-      row = line.split(sv.delim)
+      row = line.split(self.delim)
       site_id = int(row[0])
-      if sv.steering_vectors.get(site_id) is None:
-        sv.steering_vectors[site_id] = []
-        sv.bearings[site_id] = []
-        sv.sv_id[site_id] = []
-        
-      sv.sv_id[site_id].append(int(row[1]))
-      sv.bearings[site_id].append(float(row[2]))
-      sv.steering_vectors[site_id].append(map(lambda x: np.complex(x), row[3:]))
-    return sv
+      if self.steering_vectors.get(site_id) is None:
+        self.steering_vectors[site_id] = []
+        self.bearings[site_id] = []
+        self.sv_id[site_id] = []
+      self.sv_id[site_id].append(int(row[1]))
+      self.bearings[site_id].append(float(row[2]))
+      self.steering_vectors[site_id].append(map(lambda x: np.complex(x), row[3:]))
   
 
 
