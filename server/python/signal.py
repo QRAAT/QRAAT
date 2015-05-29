@@ -1,13 +1,15 @@
 # signal.py -- Represetnations of received signals and steering vectors, 
-#  simulation, and filtering of signals based on parameters and timing. 
+# simulation, and filtering of signals based on parameters and timing. 
 #
 # High level calls:
 #  - Simulator
+#  - Filter
 # 
 # Objects defined here:
 #  - class SteeringVectors
+#  - class Signal
 # 
-# Copyright (C) 2015 Chris Patton
+# Copyright (C) 2015 Chris Patton, Todd Borrowman
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -57,8 +59,6 @@ class SteeringVectors:
   
     if len(args) == 2: 
       self.read_db(*args, **kwargs)
-    elif kwargs.get('fn'):
-      self.read(kwargs['fn'])
    
   def read_db(self, db_con, cal_id, include=[]):
     ''' Read steering vectors from database. 
@@ -98,6 +98,26 @@ class SteeringVectors:
     while len(to_be_removed) > 0:
       self.sites.table.remove(to_be_removed.pop())
 
+  @classmethod
+  def read(cls, cal_id, prefix='sv'):
+    ''' Read steering vectors from file. ''' 
+    sv = cls()
+    fn = '%s%s.%s' % (prefix, cal_id, sv.suffix)
+    fd = open(fn, 'r')
+    header = fd.readline()
+    for line in fd.readlines():
+      row = line.split(sv.delim)
+      site_id = int(row[0])
+      if sv.steering_vectors.get(site_id) is None:
+        sv.steering_vectors[site_id] = []
+        sv.bearings[site_id] = []
+        sv.sv_id[site_id] = []
+        
+      sv.sv_id[site_id].append(int(row[1]))
+      sv.bearings[site_id].append(float(row[2]))
+      sv.steering_vectors[site_id].append(map(lambda x: np.complex(x), row[3:]))
+    return sv
+  
   def write(self, fn):
     ''' Write steering vectors to file. ''' 
     fd = open(fn, 'w')
@@ -109,31 +129,11 @@ class SteeringVectors:
         line = [site_id, self.sv_id[site_id][i], self.bearings[site_id][i]] 
         line += list(sv[i])
         fd.write(self.delim.join(map(lambda x: str(x), line)) + '\n')
-   
-  def read(self, fn):
-    ''' Read steering vectors from file. ''' 
-    fd = open(fn, 'r')
-    header = fd.readline()
-    for line in fd.readlines():
-      row = line.split(self.delim)
-      site_id = int(row[0])
-      if self.steering_vectors.get(site_id) is None:
-        self.steering_vectors[site_id] = []
-        self.bearings[site_id] = []
-        self.sv_id[site_id] = []
-      self.sv_id[site_id].append(int(row[1]))
-      self.bearings[site_id].append(float(row[2]))
-      self.steering_vectors[site_id].append(map(lambda x: np.complex(x), row[3:]))
+
   
 
 
-###############################################################################
-#                                                                             #
-# class Signal -- Encaapsulate signal data either generated, stored in the    #
-#  database, or read from files. Implementations Bartlet's and the MLE        # 
-#  direction finders for bearing estimation.                                  #
-#                                                                             #
-###############################################################################
+### class Signal. #############################################################
 
 # Number of input channels on radio receivers.
 NUM_CHANNELS = 4 
@@ -144,9 +144,7 @@ PI_N = np.pi ** NUM_CHANNELS
 
 class Signal:
 
-  def __init__(self, db_con=None, dep_id=None, t_start=0, t_end=0, 
-               score_threshold=None, include=[], exclude=[]):
-   
+  def __init__(self, *args, **kwargs):
     ''' Represent signals in the `qraat.est` table.
     
       Store data in a dictionary mapping sites to time-indexed signal data. 
@@ -155,94 +153,118 @@ class Signal:
       nc44r, nc44i), and the signal power (edsp). Each pulse is assigned
       an ID (est_id). Time is represented in seconds as a floating point 
       number (timestamp). 
+    '''
+    self.table = {}
+    self.t_start = float("+inf")
+    self.t_end = float("-inf")
+
+    if len(args) == 4:
+      self.read_db(*args, **kwargs)
+
+  def read_db(self, db_con, dep_id, t_start, t_end,
+                score_threshold=None, include=[], exclude=[]):
+    ''' Read signals from database. 
 
       Inputs: 
 
-        db_con -- an interface to the database. 
+        db_con -- MySQL database connector
 
-        dep_id -- deployment ID, identifies a target/transmitter. 
+        dep_id -- deploymentID, identifies a target/transmitter. 
 
-        t_start, t_end -- time range of query set. 
+        t_start, t_end -- time range of query set represented as 
+                          Unix timestamps (GMT). 
 
         score_threshold -- Signals are given scores based on how likely we 
                            think they are real signals and not just noise. 
     '''
+    cur = db_con.cursor()
+    if score_threshold is not None: 
+      ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
+                                 ed1r,  ed1i,  ed2r,  ed2i,  
+                                 ed3r,  ed3i,  ed4r,  ed4i, tnp,
+                                 nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+                                 nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+                                 nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+                                 nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i 
+                            FROM est
+                            JOIN estscore ON est.ID = estscore.estID
+                           WHERE deploymentID= %s
+                             AND timestamp >= %s 
+                             AND timestamp <= %s
+                             AND (score / theoretical_score) >= %s
+                           ORDER BY timestamp''', 
+                (dep_id, t_start, t_end, score_threshold))
+    else:
+      ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
+                                 ed1r,  ed1i,  ed2r,  ed2i,  
+                                 ed3r,  ed3i,  ed4r,  ed4i, tnp,
+                                 nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
+                                 nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
+                                 nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
+                                 nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i 
+                            FROM est
+                           WHERE deploymentID= %s
+                             AND timestamp >= %s 
+                             AND timestamp <= %s
+                           ORDER BY timestamp''', 
+                (dep_id, t_start, t_end))
+ 
+    if ct > 0:
+      raw_data = np.array(cur.fetchall(), dtype=float)
+      est_ids = np.array(raw_data[:,0], dtype=int)
+      self.max_est_id = np.max(est_ids)
+      site_ids = np.array(raw_data[:,1], dtype=int)
+      timestamps = raw_data[:,2]
+      edsp = raw_data[:,3]
+      signal_vector = np.zeros((raw_data.shape[0], NUM_CHANNELS),dtype=np.complex)
+      for j in range(NUM_CHANNELS):
+        signal_vector[:,j] = raw_data[:,2*j+4] + np.complex(0,-1)*raw_data[:,2*j+5]
 
-    self.table = {}
-    self.t_start = float("+inf")
-    self.t_end =   float("-inf")
-    
-    if db_con: 
-      cur = db_con.cursor()
-      if score_threshold is not None: 
-        ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
-                                   ed1r,  ed1i,  ed2r,  ed2i,  
-                                   ed3r,  ed3i,  ed4r,  ed4i, tnp,
-                                   nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
-                                   nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
-                                   nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
-                                   nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i 
-                              FROM est
-                              JOIN estscore ON est.ID = estscore.estID
-                             WHERE deploymentID= %s
-                               AND timestamp >= %s 
-                               AND timestamp <= %s
-                               AND (score / theoretical_score) >= %s
-                             ORDER BY timestamp''', 
-                  (dep_id, t_start, t_end, score_threshold))
-      else:
-        ct = cur.execute('''SELECT ID, siteID, timestamp, edsp, 
-                                   ed1r,  ed1i,  ed2r,  ed2i,  
-                                   ed3r,  ed3i,  ed4r,  ed4i, tnp,
-                                   nc11r, nc11i, nc12r, nc12i, nc13r, nc13i, nc14r, nc14i, 
-                                   nc21r, nc21i, nc22r, nc22i, nc23r, nc23i, nc24r, nc24i, 
-                                   nc31r, nc31i, nc32r, nc32i, nc33r, nc33i, nc34r, nc34i, 
-                                   nc41r, nc41i, nc42r, nc42i, nc43r, nc43i, nc44r, nc44i 
-                              FROM est
-                             WHERE deploymentID= %s
-                               AND timestamp >= %s 
-                               AND timestamp <= %s
-                             ORDER BY timestamp''', 
-                  (dep_id, t_start, t_end))
-   
-      if ct > 0:
-        raw_data = np.array(cur.fetchall(), dtype=float)
-        est_ids = np.array(raw_data[:,0], dtype=int)
-        self.max_est_id = np.max(est_ids)
-        site_ids = np.array(raw_data[:,1], dtype=int)
-        timestamps = raw_data[:,2]
-        edsp = raw_data[:,3]
-        signal_vector = np.zeros((raw_data.shape[0], NUM_CHANNELS),dtype=np.complex)
-        for j in range(NUM_CHANNELS):
-          signal_vector[:,j] = raw_data[:,2*j+4] + np.complex(0,-1)*raw_data[:,2*j+5]
+      tnp = raw_data[:,12]
+      noise_cov = np.zeros((raw_data.shape[0],NUM_CHANNELS,NUM_CHANNELS),dtype=np.complex)
+      for t in range(raw_data.shape[0]):      
+        for i in range(NUM_CHANNELS):
+          for j in range(NUM_CHANNELS):
+            k = 13 + (i*NUM_CHANNELS*2) + (2*j)
+            noise_cov[t,i,j] = np.complex(raw_data[t,k], raw_data[t,k+1])
 
-        tnp = raw_data[:,12]
-        noise_cov = np.zeros((raw_data.shape[0],NUM_CHANNELS,NUM_CHANNELS),dtype=np.complex)
-        for t in range(raw_data.shape[0]):      
-          for i in range(NUM_CHANNELS):
-            for j in range(NUM_CHANNELS):
-              k = 13 + (i*NUM_CHANNELS*2) + (2*j)
-              noise_cov[t,i,j] = np.complex(raw_data[t,k], raw_data[t,k+1])
+      if include == []:
+        inc = set(site_ids)
+      else: 
+        inc = set(include)
 
-        if include == []:
-          inc = set(site_ids)
-        else: 
-          inc = set(include)
+      for site_id in inc.difference(set(exclude)):
+        mask = site_ids == site_id
+        site = _per_site_data(site_id)
+        site.est_ids = est_ids[mask]
+        site.t = timestamps[mask]
+        site.edsp = edsp[mask] # a.k.a. power
+        site.signal_vector = signal_vector[mask]
+        site.tnp = tnp[mask]
+        site.noise_cov = noise_cov[mask]
+        site.count = len(est_ids)
+        self.table[site_id] = site
 
-        for site_id in inc.difference(set(exclude)):
-          mask = site_ids == site_id
-          site = _per_site_data(site_id)
-          site.est_ids = est_ids[mask]
-          site.t = timestamps[mask]
-          site.edsp = edsp[mask] # a.k.a. power
-          site.signal_vector = signal_vector[mask]
-          site.tnp = tnp[mask]
-          site.noise_cov = noise_cov[mask]
-          site.count = len(est_ids)
-          self.table[site_id] = site
-
-        self.t_start = np.min(timestamps)
-        self.t_end = np.max(timestamps)
+      self.t_start = np.min(timestamps)
+      self.t_end = np.max(timestamps)
+  
+  @classmethod
+  def read(cls, site_ids, prefix='sig'):
+    ''' Read signals from files. ''' 
+    sig = Signal()
+    for id in site_ids:  
+      sig.table[id] = _per_site_data(id)
+      sig.table[id].read(prefix)
+      sig.t_start = min(sig.t_start, 
+                        min(sig.table[id].t))
+      sig.t_end = max(sig.t_end, 
+                      max(sig.table[id].t))
+    return sig
+  
+  def write(self):
+    ''' Write signals to files.. ''' 
+    for (id, site) in self.table.iteritems():
+      site.write()
   
   def __getitem__(self, *index):
     if len(index) == 1: 
@@ -255,28 +277,15 @@ class Signal:
     return None
 
   def __len__(self):
+    ''' Return number of sites. ''' 
     return len(self.table)
 
   def get_count(self):
+    ''' Return total number pulses across sites. '''
     return sum(map(lambda site_data: site_data.count, self. table.values()))
 
-  def write(self):
-    for (id, site) in self.table.iteritems():
-      site.write()
-
-  @classmethod
-  def read(cls, site_ids, prefix='sig'):
-    sig = cls()
-    for id in site_ids:  
-      sig.table[id] = _per_site_data(id)
-      sig.table[id].read(prefix)
-      sig.t_start = min(sig.t_start, 
-                        min(sig.table[id].t))
-      sig.t_end = max(sig.t_end, 
-                      max(sig.table[id].t))
-    return sig
-
   def estimate_var(self): 
+    ''' Estimate variance paramter of background noise from noise covariance. ''' 
     sig_t = {}; sig_n = {}
     for (site_id, site) in self.table.iteritems():
       A = []; B = []
@@ -294,11 +303,13 @@ class Signal:
 
   @classmethod
   def MLE(self, per_site_data, sv):
+    ''' Compute bearing spectrum of signals with respect to the MLE. '''    
     assert isinstance(per_site_data, _per_site_data)
     return (per_site_data.mle(sv), np.argmax)
 
   @classmethod
   def Bartlet(self, per_site_data, sv):
+    ''' Compute bearing spectrum of signals with respect to Bartlet's estimator. ''' 
     assert isinstance(per_site_data, _per_site_data)
     return (per_site_data.bartlet(sv), np.argmax)
 
@@ -404,7 +415,11 @@ class _per_site_data:
       $G_i(\theta)^H in the equations, is written here as 
       `np.conj(np.transpose())`. 
 
-      sv -- instance of `class SteeringVectors`.
+      Input: 
+        
+        sv -- instance of `class SteeringVectors`.
+
+      Returns the bearing spectrum. 
     ''' 
     f = functools.partial(_mle, np.matrix(self.signal_vector), 
                                 sv.steering_vectors[self.site_id],
@@ -425,12 +440,7 @@ class _per_site_data:
 
 
 
-###############################################################################
-#                                                                             #
-# Simulation -- Generate a set of signals for a given set of receivers and    #
-#  position of the transmitter.                                               #
-#                                                                             #
-###############################################################################
+### Simulator. ################################################################
 
 def Simulator(p, sites, sv_splines, rho, sig_n, trials, include=[]): 
   ''' Generate a number of signal recordings based on signal model. 
@@ -564,7 +574,6 @@ def scale_tx_coeff(p, rho, sites, include=[]):
 #       pulse's neighborhood.                                                 #
 #                                                                             #
 ###############################################################################
-
 
 #### Constants and parameters for per site/transmitter pulse filtering. #######
 
