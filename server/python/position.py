@@ -126,7 +126,7 @@ class per_site_data:
     return new_data
 
   def formulate_bearing_llh(self):
-    if self.num_est > 0:
+    if self.num_est > 0 and self.num_bearing > 0:
       sum_bearing_likelihoods = np.sum(self.bearing_likelihood,0) #normalize?
       upper_half = np.where(self.bearing < 180)#returns tuple with len()=dimensionality
       last_index = upper_half[0][-1] + 1
@@ -269,9 +269,10 @@ class estimator:
   def get_position_likelihood(self, positions):
     likelihoods = np.zeros(positions.shape, dtype=float)
     for site, data in self.per_site.iteritems():
-      bearing_to_positions = np.angle(positions - data.site_position) * 180 / np.pi
-      #likelihoods += data.bearing_likelihood_function(bearing_to_positions)
-      likelihoods += data.bearing_likelihood_function(bearing_to_positions.flat).reshape(bearing_to_positions.shape)
+      if data.num_bearing > 0:
+        bearing_to_positions = np.angle(positions - data.site_position) * 180 / np.pi
+        #likelihoods += data.bearing_likelihood_function(bearing_to_positions)
+        likelihoods += data.bearing_likelihood_function(bearing_to_positions.flat).reshape(bearing_to_positions.shape)
     return likelihoods
 
   def get_canidate_positions(self, center, scale, half_span=15):
@@ -322,7 +323,10 @@ class estimator:
                       utm_number, utm_letter, norm_likelihood,
                       activity, self.num_est))
       self.positionID = cur.lastrowid
-      bearingID = [ data.bearingID for data in self.per_site.itervalues() ]
+      bearingID = []
+      for data in self.per_site.itervalues():
+        if data.num_bearing > 0:
+          bearingID.append(data.bearingID)
       handle_provenance_insertion(cur, {'bearing':bearingID}, {'position':(self.positionID,)})
       return num_inserts
 
