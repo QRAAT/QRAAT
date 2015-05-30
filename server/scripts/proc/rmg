@@ -503,7 +503,9 @@ do
       if [[ "$ping_computer" == "success" ]]
         then
           scp $TX_FILE $SITE:$RMG_SITE_METADATA_DIR/tx.csv 
-          cp -f $TX_FILE $RMG_SERVER_METADATA_DIR/tx.csv 
+          #cp -f $TX_FILE $RMG_SERVER_METADATA_DIR/tx.csv 
+          date >> $RMG_SERVER_LOG_DIR/rmg_tx.log
+          echo "updating txlist on $SITE" >> $RMG_SERVER_LOG_DIR/rmg_tx.log
           cat $TX_FILE >>$RMG_SERVER_LOG_DIR/rmg_tx.log
         else
           echo "error: Computer ping test wasn't successful" 1>&2
