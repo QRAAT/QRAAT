@@ -64,7 +64,10 @@ private:
   int pulse_sample_ct; 
   
   //! Index of the start of pulse in samples. 
-  int pulse_index;     
+  int pulse_index;
+
+  //! Sample Index counting individual channel samples
+  int sample_index;
   
   //! Rate which the samples were produced (samples per second) 
   float sample_rate;   

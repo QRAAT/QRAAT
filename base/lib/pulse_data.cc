@@ -56,6 +56,8 @@ pulse_data::pulse_data(
   sample_rate = _sample_rate; 
   ctr_freq = _ctr_freq; 
 
+  sample_index = 0;
+
   //default values so code doesn't access uninitialized variables
   pulse_index = -1;
   t_sec = 0;
@@ -120,7 +122,7 @@ std::string pulse_data::str() const
   output << "pulse_time      " << asctime(gmtime(&pulse_time)) << std::endl;
   output << "stored_data_ct  " << data->size() << std::endl;
 
-  return output.str();
+  return output.str().c_str();
 }
 
 /* 
@@ -252,8 +254,11 @@ my_complex* pulse_data::get_data()
 void pulse_data::append(my_complex *in)
 {
   data->push_back(*in);
-  if (pulse_index >= 0){
-    pulse_index--;
+  if (++sample_index == channel_ct){
+    sample_index = 0;
+    if (pulse_index >= 0){
+      pulse_index--;
+    }
   }
 }
 
