@@ -46,8 +46,7 @@ import numdifftools as nd
 import utm
 import itertools, random
 
-from Queue import Queue
-from threading import Thread
+import Queue, threading
 
 # Paramters for position estimation. 
 POS_EST_M = 3
@@ -184,22 +183,22 @@ def WindowedCovarianceEstimator(pos, sites, max_resamples=BOOT_MAX_RESAMPLES):
 
 class EstimatorPool:
 
-  class Worker (Thread):
+  class Worker (threading.Thread):
 
     def __init__(self, jobs):
-      Thread.__init__(self)
+      threading.Thread.__init__(self)
       self.jobs = jobs
       self.daemon = True
       self.start()
 
     def run(self):
       while True:
-        func, args, kargs = self.jobs.get()
-        try: func(*args, **kargs)
+        func, args = self.jobs.get()
+        try: func(*args)
         except Exception, e: print e
-        self.tasks.task_done()
+        self.jobs.task_done()
 
-  def __init__(self, num_jobs, sites, center, sv
+  def __init__(self, num_jobs, sites, center, sv,
                method=signal.Signal.Bartlet,
                s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA,
                max_resamples=BOOT_MAX_RESAMPLES):
@@ -216,30 +215,30 @@ class EstimatorPool:
     self.cov_params = (max_resamples,)
   
     # Worker threads
-    self.jobs = Queue(num_jobs)
+    self.jobs = Queue.Queue(num_jobs)
     for _ in range(num_jobs):
       self.Worker(self.jobs)
     
     # Output queue
-    self.output = PriorityQueue()
+    self.output = Queue.PriorityQueue()
 
-  def enqueue(self, signal, t_step, t_win): 
-    ''' Enqueue a chunk of signal data. 
+  def enqueue(self, sig, t_step, t_win): 
+    ''' Enqueue a chunk of sig data. 
 
-      The bearing spectra for the signals are computed, then a bunch of jobs
+      The bearing spectra for the sigs are computed, then a bunch of jobs
       are added to the queue. A job consists of a reference the bearing spectrum 
-      data, the signal data, and a window of data to use for the position and 
+      data, the sig data, and a window of data to use for the position and 
       covariance estimation. 
     '''
-    if len(signal) > 0: 
+    if len(sig) > 0: 
       bearing_spectrum = {} # Compute bearing likelihood distributions. 
-      for site_id in signal.get_site_ids().intersection(sv.get_site_ids()): 
-        (bearing_spectrum[site_id], obj) = method(signal[site_id], sv)
+      for site_id in sig.get_site_ids().intersection(self.sv.get_site_ids()): 
+        (bearing_spectrum[site_id], obj) = self.method(sig[site_id], self.sv)
       
       for (t_start, t_end) in util.compute_time_windows(
-                          signal.t_start, signal.t_end, t_step, t_win):
+                          sig.t_start, sig.t_end, t_step, t_win):
       
-        self.jobs.put((self.job, bearing_spectrum, signal, t_start, t_end, obj))
+        self.jobs.put((self.job, (bearing_spectrum, sig, t_start, t_end, obj)))
 
   def dequeue(self):
     ''' Dequeue a position and covariance estimate in chronological order. 
@@ -249,15 +248,18 @@ class EstimatorPool:
     ''' 
     return self.output.get()
 
-  def job(self, bearing_spectrum, signal, t_start, t_end, obj):
+  def empty(self):
+    return self.output.empty()
+
+  def job(self, bearing_spectrum, sig, t_start, t_end, obj):
     ''' Estimate position and covariance and put objects in output queue. ''' 
-    P = Position(bearing_spectrum, signal, obj, 
-                  sites, center, t_start, t_end, *self.pos_params)
-    C = BootstrapCovariance(P, *self.cov_params)
+    P = Position(bearing_spectrum, sig, obj, 
+                  self.sites, self.center, t_start, t_end, *self.pos_params)
+    C = BootstrapCovariance(P, self.sites, *self.cov_params)
     self.output.put((P, C))
 
-  def join():
-    self.tasks.join()
+  def join(self):
+    self.jobs.join()
 
    
 
@@ -556,7 +558,7 @@ class Position:
     # Aggregate site data. 
     (splines, sub_splines, all_splines, bearings, num_est) = aggregate_window(
                                   bearing_spectrum, signal, obj, t_start, t_end)
-    
+   
     if len(splines) > 1: # Need at least two site bearings. 
       p_hat, likelihood = compute_position(sites, splines, center, obj, s, m, n, delta)
     else: p_hat, likelihood = None, None
