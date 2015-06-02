@@ -75,8 +75,6 @@ class SteeringVectors:
     '''
 
     self.cal_id = cal_id
-    to_be_removed = []
-    self.cal_id = cal_id
     cur = db_con.cursor()
     if include == []: 
       include = util.get_sites(db_con).keys()
@@ -93,10 +91,6 @@ class SteeringVectors:
         self.steering_vectors[site_id] = np.array(sv_data[:,2::2] + np.complex(0,1) * sv_data[:,3::2])
         self.bearings[site_id] = np.array(sv_data[:,1])
         self.sv_id[site_id] = np.array(sv_data[:,0], dtype=int)
-      else:
-        to_be_removed.append(site)
-    while len(to_be_removed) > 0:
-      self.sites.table.remove(to_be_removed.pop())
 
   @classmethod
   def read(cls, cal_id, prefix='sv'):
