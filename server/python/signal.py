@@ -130,7 +130,8 @@ class SteeringVectors:
         line += list(sv[i])
         fd.write(self.delim.join(map(lambda x: str(x), line)) + '\n')
 
-  
+  def get_site_ids(self):
+    return set(self.steering_vectors.keys())
 
 
 ### class Signal. #############################################################
@@ -301,7 +302,7 @@ class Signal:
 
   def get_site_ids(self):
     ''' Return a list of site ID's. ''' 
-    return self.table.keys()
+    return set(self.table.keys())
 
   @classmethod
   def MLE(self, per_site_data, sv):

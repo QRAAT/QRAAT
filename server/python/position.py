@@ -117,7 +117,7 @@ def PositionEstimator(signal, sites, center, sv, method=signal.Signal.Bartlet,
   ''' 
   if len(signal) > 0: 
     bearing_spectrum = {} # Compute bearing likelihood distributions.  
-    for site_id in signal.get_site_ids():
+    for site_id in signal.get_site_ids().intersection(sv.get_site_ids()): 
       (bearing_spectrum[site_id], obj) = method(signal[site_id], sv)
 
     return Position(bearing_spectrum, signal, obj, sites, center,
@@ -146,7 +146,7 @@ def WindowedPositionEstimator(signal, sites, center, sv, t_step, t_win, method=s
 
   if len(signal) > 0: 
     bearing_spectrum = {} # Compute bearing likelihood distributions. 
-    for site_id in signal.get_site_ids():
+    for site_id in signal.get_site_ids().intersection(sv.get_site_ids()): 
       (bearing_spectrum[site_id], obj) = method(signal[site_id], sv)
     
     for (t_start, t_end) in util.compute_time_windows(
@@ -173,7 +173,7 @@ def WindowedCovarianceEstimator(pos, sites, max_resamples=BOOT_MAX_RESAMPLES):
     Returns a list of `position.BootstrapCovariance` instances. 
   ''' 
   cov = []
-  for P in pos: 
+  for P in pos:
     C = BootstrapCovariance(P, sites, max_resamples)
     cov.append(C)
   return cov
@@ -1230,7 +1230,7 @@ def bootstrap_resample(pos, sites, max_resamples, obj):
 def bootstrap_resample_sites(pos, sites, resamples, obj, site_ids):
   ''' Resample from a specific set of sites. ''' 
   N = reduce(int.__mul__, [1] + map(lambda S : len(S), pos.sub_splines.values()))
-  if N < 2: # Number of pulse combinations
+  if N < 2 or pos.p is None: # Number of pulse combinations
     return []
 
   P = []

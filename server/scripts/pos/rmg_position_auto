@@ -108,7 +108,7 @@ for deployment in deployment_list:
     sig = signal.Signal(db_con, deployment_id, time_range[0], time_range[1], EST_SCORE_THRESHOLD)
     temp_max_id = max(temp_max_id, sig.max_id)
     pos = position.WindowedPositionEstimator(sig, sites, center, sv, time_delta, time_window)
-    if COMPUTE_COVARIANCE:
+    if position.ENABLE_BOOTSTRAP:
       cov = position.WindowedCovarianceEstimator(pos, sites)
       position.InsertPositionsCovariances(db_con, deployment_id, cal_id, zone, pos, cov)
     else:
