@@ -1321,12 +1321,17 @@ def bootstrap_resample_sites(pos, sites, resamples, obj, site_ids):
   if N < 2 or pos.p is None: # Number of pulse combinations
     return []
 
+#  a = 1 if obj == np.argmin else -1
+#  x0 = np.array([pos.p.imag, pos.p.real])
   P = []
   for i in range(resamples):
     splines = {}
     for id in site_ids:
       j = random.randint(0, len(pos.sub_splines[id])-1)
       splines[id] = pos.sub_splines[id][j]
+#    f = lambda(x) : a * compute_likelihood(sites, splines, np.complex(x[1], x[0]))    
+#    res = scipy.optimize.minimize(f, x0)
+#    p = np.complex(res.x[1], res.x[0])
     (p, _) = compute_position(sites, splines, pos.p, obj,
               s=POS_EST_S, m=POS_EST_M-1, n=POS_EST_N, delta=POS_EST_DELTA) 
     P.append(p)
