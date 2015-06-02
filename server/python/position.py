@@ -46,6 +46,9 @@ import numdifftools as nd
 import utm
 import itertools, random
 
+from Queue import Queue
+from threading import Thread
+
 # Paramters for position estimation. 
 POS_EST_M = 3
 POS_EST_N = -1
@@ -177,6 +180,86 @@ def WindowedCovarianceEstimator(pos, sites, max_resamples=BOOT_MAX_RESAMPLES):
     C = BootstrapCovariance(P, sites, max_resamples)
     cov.append(C)
   return cov
+
+
+class EstimatorPool:
+
+  class Worker (Thread):
+
+    def __init__(self, jobs):
+      Thread.__init__(self)
+      self.jobs = jobs
+      self.daemon = True
+      self.start()
+
+    def run(self):
+      while True:
+        func, args, kargs = self.jobs.get()
+        try: func(*args, **kargs)
+        except Exception, e: print e
+        self.tasks.task_done()
+
+  def __init__(self, num_jobs, sites, center, sv
+               method=signal.Signal.Bartlet,
+               s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA,
+               max_resamples=BOOT_MAX_RESAMPLES):
+    ''' Pool of worker threads for multihtreaded position and covariance estimation. 
+
+      Input: jobs -- number of workers to spawn. 
+    '''
+    # Parameters
+    self.sites = sites
+    self.center = center
+    self.sv = sv
+    self.method = method
+    self.pos_params = (s, m, n, delta)
+    self.cov_params = (max_resamples,)
+  
+    # Worker threads
+    self.jobs = Queue(num_jobs)
+    for _ in range(num_jobs):
+      self.Worker(self.jobs)
+    
+    # Output queue
+    self.output = PriorityQueue()
+
+  def enqueue(self, signal, t_step, t_win): 
+    ''' Enqueue a chunk of signal data. 
+
+      The bearing spectra for the signals are computed, then a bunch of jobs
+      are added to the queue. A job consists of a reference the bearing spectrum 
+      data, the signal data, and a window of data to use for the position and 
+      covariance estimation. 
+    '''
+    if len(signal) > 0: 
+      bearing_spectrum = {} # Compute bearing likelihood distributions. 
+      for site_id in signal.get_site_ids().intersection(sv.get_site_ids()): 
+        (bearing_spectrum[site_id], obj) = method(signal[site_id], sv)
+      
+      for (t_start, t_end) in util.compute_time_windows(
+                          signal.t_start, signal.t_end, t_step, t_win):
+      
+        self.jobs.put((self.job, bearing_spectrum, signal, t_start, t_end, obj))
+
+  def dequeue(self):
+    ''' Dequeue a position and covariance estimate in chronological order. 
+    
+      Returns a tuple (P, C) where P is an instance of `position.Position`
+      and C is an instance of `position.BootstrapCovariance`. 
+    ''' 
+    return self.output.get()
+
+  def job(self, bearing_spectrum, signal, t_start, t_end, obj):
+    ''' Estimate position and covariance and put objects in output queue. ''' 
+    P = Position(bearing_spectrum, signal, obj, 
+                  sites, center, t_start, t_end, *self.pos_params)
+    C = BootstrapCovariance(P, *self.cov_params)
+    self.output.put((P, C))
+
+  def join():
+    self.tasks.join()
+
+   
 
 
 def InsertPositions(db_con, dep_id, cal_id, zone, pos):
@@ -597,6 +680,9 @@ class Position:
     pp.savefig(fn)
     pp.clf()
 
+def __lt__(self): 
+  assert self.t is not None
+  return self.t
 
 
 ### class Bearing. ############################################################

@@ -24,9 +24,11 @@ EST_SCORE_THRESHOLD = float(os.environ["RMG_POS_EST_THRESHOLD"])
 
 # Compute covariances? 
 if os.environ["RMG_POS_ENABLE_COV"] == 'true':
-  position.EANBLE_BOOTSTRAP = True
+  print "position_auto: running with covariance estimator"
+  position.ENABLE_BOOTSTRAP = True
 else: 
-  position.EANBLE_BOOTSTRAP = False
+  print "position_auto: no covariance"
+  position.ENABLE_BOOTSTRAP = False
 
 if os.environ["RMG_POS_NORMALIZE_SPECTRUM"] == 'true':
   position.NORMALIZE_SPECTRUM = True
