@@ -178,7 +178,7 @@ export RMG_EST_SCORE_NEIGHBORHOOD=20
 #position_auto
 
 # Averaging window used for auto position calculation
-export RMG_POS_TIME_WINDOW=30
+export RMG_POS_TIME_WINDOW=15
 
 # Time step for auto position calculation
 export RMG_POS_TIME_STEP=15
@@ -188,6 +188,12 @@ export RMG_POS_CAL_ID=3
 
 # EST Score Threshold for filter before position estimation
 export RMG_POS_EST_THRESHOLD=0.0
+
+# Enable covariance estimation 
+export RMG_POS_ENABLE_COV=true
+
+# Normalize beaaring spectrum
+export RMG_POS_NORMALIZE_SPECTRUM=false
 
 #END#position_auto
 

@@ -23,11 +23,15 @@ cursor = db_con.cursor()
 EST_SCORE_THRESHOLD = float(os.environ["RMG_POS_EST_THRESHOLD"])
 
 # Compute covariances? 
-COMPUTE_COVARIANCE = False # TODO Make this an environment variable
-if COMPUTE_COVARIANCE: 
-  position.EANBLE_BOOTSTRAP=True
+if os.environ["RMG_POS_ENABLE_COV"] == 'true':
+  position.EANBLE_BOOTSTRAP = True
 else: 
-  position.EANBLE_BOOTSTRAP=False
+  position.EANBLE_BOOTSTRAP = False
+
+if os.environ["RMG_POS_NORMALIZE_SPECTRUM"] == 'true':
+  position.NORMALIZE_SPECTRUM = True
+else:
+  position.NORMALIZE_SPECTRUM = False
 
 
 # Get id of last processed record (last record scored). 
