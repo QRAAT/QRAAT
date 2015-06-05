@@ -137,10 +137,10 @@ class band:
         else:
           self.name = self.name  + '_ID' + tx.ID
 
-        if (self.tx_type != CONT):
+        if (self.tx_type != det_type.CONT):
         
-            if (tx.type == CONT):
-                self.tx_type = CONT
+            if (tx.type == det_type.CONT):
+                self.tx_type = det_type.CONT
             else:
                 if (filter_length > self.filter_length):
                     self.filter_length = filter_length

@@ -25,10 +25,12 @@
 
 from gnuradio import gr, uhd
 from gnuradio import filter as gr_filter
+from gnuradio import analog as gr_analog
+from gnuradio import blocks as gr_blocks
 from rmg_swig import pulse_sink_c
 import params
 
-import sys, time
+import sys, time, os
 
 
 class usrp_top_block(gr.top_block):
@@ -76,14 +78,14 @@ class no_usrp_top_block(gr.top_block):
         gr.top_block.__init__(self)
 
         # Gaussian distributed signal source. 
-        noise_src = gr.noise_source_c(gr.GR_GAUSSIAN, variance, int(time.time()))
+        noise_src = gr_analog.noise_source_c(gr_analog.GR_GAUSSIAN, variance, int(time.time()))
 
         # Throttle signal to the same sampling rate as the USRP. 
-        throttle  = gr.throttle(gr.sizeof_gr_complex, 
+        throttle  = gr_blocks.throttle(gr.sizeof_gr_complex, 
                                 params.usrp_sampling_rate / float(decim_factor) * channels)
                 
         #: Gaussian distributed signal source, deinterleaved to the number of channels. 
-        self.u = gr.deinterleave(gr.sizeof_gr_complex)
+        self.u = gr_blocks.deinterleave(gr.sizeof_gr_complex)
         self.connect(noise_src,throttle,self.u)
 
 
@@ -125,8 +127,8 @@ class software_backend(gr.hier_block2):
                                 gr.io_signature(0, 0, 0))                    # Output signature
 
         self.band_rate = be_param.bw
-        print "Number of Bands :", be_param.num_bands
-        print "Band sampling rate :",self.band_rate
+        print "Number of Bands: ", be_param.num_bands
+        print "Band sampling rate: ",self.band_rate
 
         self.directory = directory
 
@@ -194,9 +196,10 @@ class software_backend(gr.hier_block2):
 
             # Enable continuous recording. 
             elif (j.tx_type == params.det_type.CONT):
-                self.det[j.band_num].enable_cont(
-                  str(j.directory + '/' + j.name + '_' + time.strftime(
-                    '%Y%m%d%H%M%S', time.gmtime()) + '.tdat'))
+                print "Continuous recording not implimented, skipping"
+                #self.det[j.band_num].enable_cont(
+                #  str(j.directory + '/' + j.name + '_' + time.strftime(
+                #    '%Y%m%d%H%M%S', time.gmtime()) + '.tdat'))
 
 
     def disable(self):
@@ -214,4 +217,52 @@ class software_backend(gr.hier_block2):
         self.disable()
         self.enable(bands)
 
+class record_backend(gr.hier_block2):
+  
+    """ record baseband for given LO settings
+
+    :param channels: Number of input channels from the USRP. 
+    :type channels: int
+    :param be_param: Backend RF parameters.
+    :type be_param: qraat.rmg.params.backend
+    """ 
+    
+    def __init__(self, channels, be_param, directory = "./det_files"):
+
+        gr.hier_block2.__init__(self, "record_backend",
+                                gr.io_signature(4, 4, gr.sizeof_gr_complex), # Input signature
+                                gr.io_signature(0, 0, 0))                    # Output signature
+
+        self.band_rate = be_param.bw*be_param.num_bands
+        print "Number of Bands: 1"
+        print "Band sampling rate: ",self.band_rate
+
+        self.directory = directory
+
+        filename = os.path.join(self.directory, "placeholder.tdat")
+
+        interleaver = gr_blocks.interleave(gr.sizeof_gr_complex)
+        self.file_sink = gr_blocks.file_sink(gr.sizeof_gr_complex, filename)
+        self.file_sink.close()
+        # Connect filter outputs to each detector.             
+        for k in range(channels):
+            self.connect((self,k),(interleaver,k))
+
+        self.connect(interleaver, self.file_sink)
+
+        #: Band set of current tuning. 
+        self.current_bands = None
+   
+    def enable(self, bands=None):
+        if bands:
+          self.center_frequency = bands[0].cf
+          print "HERE", bands[0].cf, bands[0].band_num
+        self.file_sink.open(os.path.join(self.directory, "{0:.0f}kHz_{1}.tdat".format(self.center_frequency/1000.0,time.strftime("%Y%m%d%H%M%Z"))))
+
+    def disable(self):
+        self.file_sink.close()
+
+    def reset(self):
+        self.disable()
+        self.enable()
 

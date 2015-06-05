@@ -35,6 +35,7 @@ GR_PYTHON_INSTALL(
     params.py
     pic_interface.py
     run.py
+    record.py
     DESTINATION ${GR_PYTHON_DIR}/qraat/rmg
 )
 

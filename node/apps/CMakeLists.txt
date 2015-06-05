@@ -28,6 +28,7 @@ GR_PYTHON_INSTALL(
     read_det
     active_rmg
     run_rmg
+    record_rmg
     DESTINATION bin
 )
 
