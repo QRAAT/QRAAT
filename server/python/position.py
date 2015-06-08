@@ -148,6 +148,8 @@ def WindowedPositionEstimator(signal, sites, center, sv, t_step, t_win, method=s
 
   if len(signal) > 0: 
     bearing_spectrum = {} # Compute bearing likelihood distributions. 
+    obj = None 
+
     for site_id in signal.get_site_ids().intersection(sv.get_site_ids()): 
       (bearing_spectrum[site_id], obj) = method(signal[site_id], sv)
     
