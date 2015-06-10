@@ -94,9 +94,13 @@ if ct > 0:
   est_easting = np.interp(est_timestamp, gps_timestamp, gps_easting)
   est_northing = np.interp(est_timestamp, gps_timestamp, gps_northing)
 
-  site_mask = np.where(est_siteid == site_data[:,0])
-  site_easting = site_data[site_mask,1]
-  site_northing = site_data[site_mask,2]
+  site_easting = np.zeros(est_easting.shape,dtype=est_easting.dtype)
+  site_northing = np.zeros(est_northing.shape,dtype=est_northing.dtype)
+
+  for j in range(site_data.shape[0]):
+    indexes = np.where(est_siteid == site_data[j,0])
+    site_easting[indexes] = site_data[j,1]
+    site_northing[indexes] = site_data[j,2]
 
   # Calculate pulse bearing
   est_bearing = np.arctan2(est_easting - site_easting, 
