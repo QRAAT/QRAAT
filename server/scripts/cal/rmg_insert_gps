@@ -65,16 +65,19 @@ db_con = qraat.srv.util.get_db('writer')
 cur = db_con.cursor()
   
 # Establish validity of dep_id choice. 
-if not cur.execute("SELECT (1) FROM deployment WHERE ID=%s limit 1", options.dep_id)
+if not cur.execute("SELECT (1) FROM deployment WHERE ID=%s limit 1", options.dep_id):
   print >>sys.stderr, "insert_gps: error: specified deployment not in the databse."
   sys.exit(1)
 
 # Check for GPS data for that deployment
 if cur.execute("SELECT (1) FROM gps_data WHERE deploymentID=%s limit 1", options.dep_id):
   print >>sys.stderr, ("insert_gps: warning: database already contains GPS data for the "
-                         "specified cal run. Would you like to replace it? [y,n] "), 
-  if raw_input().strip() in ['y', 'Y', 'yes', 'YES']: 
+                         "specified cal run. Would you like to replace it? [y,n,a(=append)] "), 
+  ans = raw_input().strip()
+  if ans in ['y', 'Y', 'yes', 'YES']: 
     cur.execute("DELETE FROM GPS_Calibration_Data WHERE cal_infoid = %s",options.dep_id)
+  elif ans in ['a', 'A', 'append', 'APPEND', 'Append']:
+    pass
   else:
     print >>sys.stderr, "insert_gps: exiting."
     sys.exit(0)
@@ -96,7 +99,7 @@ cur.executemany('''INSERT INTO gps_data
     [ ( options.dep_id, gps.time[j], gps.latitude[j], 
         gps.longitude[j], gps.elevation[j], 
         gps.easting[j], gps.northing[j], 
-        gps.zone[j], utm.from_latlon(gps.latitude[j],gps.longitude[j])[3]) ) 
+        gps.zone[j], utm.from_latlon(gps.latitude[j],gps.longitude[j])[3] ) 
       for j in range(gps.num_records) ]
   )
 
