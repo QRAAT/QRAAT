@@ -35,6 +35,8 @@ class Form(forms.Form):
   def __init__(self, deps=[], req_deps=[], data=None, label_suffix=''):
     #self.deployment_id = depID
     super(forms.Form, self).__init__(data, label_suffix='')
+    print "********dir(self)********"
+    print dir(self)
     self.fields['deployment'].choices = get_choices(deps)
     #self.fields['graph_dep'].choices = get_deps(req_deps)
     #Use get_choices(req_deps) if don't need to limit num of selected deps
@@ -133,10 +135,4 @@ class Form(forms.Form):
             required=True, 
             label="View Site Locations",
             initial=True)
-
-
-
-  
-
-  
 

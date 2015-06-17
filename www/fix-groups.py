@@ -1,8 +1,8 @@
 #!/usr/bin/env python2
 # fix-gropus.py -- QRAAT metadata is dumped without Django group/user 
-# data. The code (as written) assumes the existence of gropus corresponding
+# data. The code (as written) assumes the existence of groups corresponding
 # to qraat.auth_project_{viewer,collaborator}. This script removes whatever
-# gropus are there and uses the `qraat` tables to create new ones. 
+# groups are there and uses the `qraat` tables to create new ones. 
 
 import qraat, qraat.srv
 import time, os, sys, commands

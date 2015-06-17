@@ -1,0 +1,172 @@
+{% extends "qraat_ui/base.html" %}
+
+{% block script %}
+
+    <link rel="stylesheet" type="text/css" href="/static/qraat_ui/css/style.css"/>
+    <script src="/static/flot/jquery.min.js"></script>
+    <script src="/static/flot/jquery.flot.min.js"></script>
+    <script src ="/static/flot/jquery.flot.time.min.js"></script>
+    <script src ="/static/flot/jquery.flot.selection.min.js"></script>
+    <script src="/static/flot/jquery.flot.threshold.min.js"></script>
+    <script src="/static/flot/jquery.flot.resize.min.js"></script>
+    <script src="/static/flot/jquery.flot.axislabels.js"></script>
+    
+		<script>
+
+function submitForm() {
+  document.getElementById('form').action = "";
+  document.getElementById('form').submit();
+}
+
+function loadFlot(data, site_id, graph_variable){
+
+		// Loads Flot graph
+
+		var site_name = {{sites|safe}}[site_id]
+    
+    var plot_min_y = {{min_plot_range_lookup|safe}}[graph_variable];
+    var plot_max_y = {{max_plot_range_lookup|safe}}[graph_variable];
+	
+		var organized_data = getGraphData(data, site_id, graph_variable);
+
+    var graph_data =[ { data: organized_data} ];
+
+    // set plot display options
+    var options = {
+        legend: { show: false },
+        points: { show: true, fill: true, radius: 1 },
+        grid: { hoverable: true, clickable: true },
+
+        xaxis: {
+            mode: "time",
+            timeformat: "%H:%M <br> %m-%d",
+            min: ({{start_timestamp}}) * 1000 - 7*60*60*1000, // hard coded timestamp conversion
+            max: ({{end_timestamp}}) * 1000 - 7*60*60*1000 // hard coded timestamp conversion
+            },
+        yaxis: {
+            min: plot_min_y,
+            max: plot_max_y,
+            labelWidth: 75 //somewhat arbitrarily chosen - may need to be changed
+            },            
+        highlightColor: 'red',
+        selection: { mode: "xy" },
+        colors: ["#8383FF", "yellow", "green", "#B00000"]
+    };
+
+    if ((graph_variable == "estserver") | (graph_variable == "site") | (graph_variable == "server"))
+    {
+        // HELP? should Math.log(0.00001) be changed to null?
+        options["yaxis"] = {
+            min: 0,
+            max: 10000,
+            ticks: [0,1,10,100,1000,10000],
+            transform: function(v) { return v == 0 ? null : Math.log(v) },
+            labelWidth: 75, //somewhat arbitrarily chosen - may need to be changed
+        };
+    }
+
+    if (graph_variable == "site_status")
+    {
+        options["yaxis"] = {
+            min: plot_min_y,
+            max: plot_max_y,
+            ticks: [[0,'unknown'],[1,'off'],[2,'other'],[3,'down'],[4,'up'],[5,'active']],
+            labelWidth: 75, //somewhat arbitrarily chosen - may need to be changed
+        };
+    }
+
+    var div_id = "#flotplot" + "-" + site_id + "-" + graph_variable
+    var plot = $.plot(div_id, graph_data, options);
+
+}
+
+function getGraphData(data, site_id, graph_variable){
+    
+    var graph_data = []
+    
+    for (var i=0; i < data.length; i++) {
+        if ((data[i]).siteID == site_id) {
+            var data_point = (data[i])[graph_variable] // fix this? slow?
+            var flot_point = [((data[i]).timestamp)*1000-7*60*60*1000, data_point]; // used to get UTC to PDT - fix this - talk with Marcel
+            graph_data.push(flot_point);
+        }       
+    }
+    return graph_data;
+}
+
+function initialize() {
+		var data = {{graph_data|safe}}; // database query results
+		var site_IDs = {{site_IDs|safe}};
+		var graph_variables = {{graph_variables|safe}};
+
+// generates Flot plot for each pairing of site_ID and graph_variable and places it in a div with id="flotplot-site_ID-graph_variable"
+		for (var i=0; i < site_IDs.length; i++) {
+				for (var j=0; j < graph_variables.length; j++) {
+						loadFlot(data, site_IDs[i], graph_variables[j]);
+				}
+		}
+} // end initialize()
+
+window.onload = initialize;
+		</script>
+
+{% endblock %} <!-- end script block -->
+
+<title> {% block title %} QRAAT Site {% endblock %} </title>
+
+{% block sidebar%}
+
+    <div id = "text">
+
+        <div class = "sidebar-form">
+            <div id ="prefs">
+                <form id="form" action="{% url 'est_graphs' %}" name="settings" method="get">
+                    <font size="2">
+                        {% for field in form %}
+                            <b>{{field.label_tag}}</b> {{field}}<br>
+                        {% endfor %}
+                    </font>
+                </form> <!-- end form -->
+            </div><!-- end prefs -->
+
+            <div class="section_title">
+                <center><button onclick="submitForm()">Update Graphs</button></center>
+            </div> <!-- end section_title -->
+
+        </div> <!-- end sidebar-form -->
+    </div> <!-- end text -->
+
+{% endblock %} <!-- end sidebar block -->
+
+{% block content %}
+
+		{% if graph_data %}
+				<div class = "graph-display" class="table-responsive">
+						<table class="table" width="100%" height="100%">
+
+								<tr>
+										<th></th>
+
+										{% for graph_variable in graph_variables %}
+										<th> {{graph_variable}} </th>
+										{% endfor %}
+
+								</tr>
+
+								{% for site_ID, site_name in sites.items %}
+										<tr>
+												<th>{{site_name}}</th>
+												{% for graph_variable in graph_variables %}	
+														<td>
+																<!-- Flot plot -->
+																<div class="plot" id="flotplot-{{site_ID}}-{{graph_variable}}"></div>
+														</td>
+												{% endfor %}
+										</tr>
+								{% endfor %}
+
+						</table>
+				</div> <!-- end div graph-display -->
+		{% endif %}
+
+{% endblock %} <!-- end content block -->

@@ -67,8 +67,7 @@ project_patterns = patterns(
     url(
         r'^(?P<project_id>\d+)/location/(?P<location_id>\d+)/$',
         'show_location',
-        name='show-location'),
-
+        name='show-location'), 
     url(
         r'^(?P<project_id>\d+)/target/(?P<target_id>\d+)/$',
         'show_target',
@@ -103,15 +102,22 @@ project_patterns = patterns(
     url(
         r'^(?P<project_id>\d+)/edit-project/add-deployment/$',
         'add_deployment',
-        name='add-deployment')
+        name='add-deployment'),
 )
 
-
+graph_patterns = patterns(
+    'qraatview.views',
+    url(r'^$', 'graph_home', name='graph_home'),
+    url(r'telemetry/$', 'telemetry_graphs', name='telemetry_graphs'),
+    url(r'est/$', 'est_graphs', name='est_graphs'),
+    url(r'processing/$', 'processing_graphs', name='processing_graphs'),
+)
 urlpatterns = patterns(
     'qraatview.views',
     url(r'^ui/', include('qraat_ui.urls', namespace="ui")),
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^auth/', include('qraat_auth.urls', namespace="auth")),
+    url(r'^account/', include('qraat_account.urls', namespace="account")),
+    url(r'^graphs/', include(graph_patterns, namespace="graphs")),
     url(r'^jsi18n/$', javascript_catalog),
     url(r'^$', 'index', name="index"),
     url(r'^project/', include((project_patterns, 'qraat', 'qraatview'))),
