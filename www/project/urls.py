@@ -5,8 +5,8 @@ from django.views.i18n import javascript_catalog
 
 admin.autodiscover()
 
-project_patterns = patterns(
-    'qraatview.views',
+urlpatterns = patterns(
+    'project.views',
 
     url(r'^$', 'projects', name='projects'),
 
@@ -105,21 +105,3 @@ project_patterns = patterns(
         name='add-deployment'),
 )
 
-graph_patterns = patterns(
-    'qraatview.views',
-    url(r'^$', 'graph_home', name='graph_home'),
-    url(r'telemetry/$', 'telemetry_graphs', name='telemetry_graphs'),
-    url(r'est/$', 'est_graphs', name='est_graphs'),
-    url(r'processing/$', 'processing_graphs', name='processing_graphs'),
-)
-urlpatterns = patterns(
-    'qraatview.views',
-    url(r'^ui/', include('qraat_ui.urls', namespace="ui")),
-    url(r'^admin/', include(admin.site.urls)),
-    url(r'^account/', include('qraat_account.urls', namespace="account")),
-    url(r'^graphs/', include(graph_patterns, namespace="graphs")),
-    url(r'^jsi18n/$', javascript_catalog),
-    url(r'^$', 'index', name="index"),
-    url(r'^project/', include((project_patterns, 'qraat', 'qraatview'))),
-    url(r'^data', 'render_data', name="get-data"),
-)

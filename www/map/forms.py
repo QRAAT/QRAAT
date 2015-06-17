@@ -1,7 +1,7 @@
-# qraat_ui/forms.py
+# map/forms.py
 
 from django import forms
-from qraatview.models import Site, Deployment, Position
+from project.models import Site, Deployment, Position
 from django.shortcuts import render, redirect
 
 # Select position or track data.

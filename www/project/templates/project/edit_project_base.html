@@ -1,0 +1,54 @@
+{% extends "project/base_form.html" %}
+{% block sidebar %}
+{% if user.is_accountenticated %}
+<ul class="nav nav-pills nav-stacked">
+    <li class="dropdown-side-element">
+        <a class="dropdown-toggle" data-toggle="dropdown" href="#">Locations
+            <span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu" role="menu">  
+            <li>
+            <a href={%url 'project:add-location' project.ID %}>Add Location</a>
+            </li>
+        </ul>
+    </li>
+    <li class="dropdown-side-element">
+        <a class="dropdown-toggle" data-toggle="dropdown" href="#">Transmitters
+            <span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu" role="menu">  
+            <li>
+            <a href={%url 'project:add-transmitter' project.ID %}>Add Transmitter</a>
+            </li>
+        </ul>
+    </li>
+    <li class="dropdown-side-element">
+        <a class="dropdown-toggle" data-toggle="dropdown" href="#">Targets
+            <span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu">
+            <li>
+            <a href={% url 'project:add-target' project.ID %}>Add Target</a>
+            </li>
+        </ul>
+    </li>
+    <li class="dropdown-side-element">
+        <a href="#" data-toggle="dropdown" class="dropdown-toggle"> Deployments
+            <span class="caret"></span>
+        </a>
+        <ul class="dropdown-menu">
+            <li>
+            <a href={% url 'project:add-deployment' project.ID %}>Add Deployment</a>
+            </li>
+        </ul>
+    </li>
+</ul>
+
+{% endif %}
+
+{%endblock%}
+{% block content %}
+{%block form %}
+{{ block.super }}
+{% endblock %}
+{% endblock %}

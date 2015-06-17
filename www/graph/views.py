@@ -1,6 +1,6 @@
 import json
-import qraatview.utils
-import qraatview.rest_api
+import project.utils
+import project.rest_api
 from django.db.models import Q
 from django.db import connection
 from django.shortcuts import render, redirect
@@ -12,9 +12,9 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core import serializers
 from django.template import Context
-from qraatview.models import Site, Telemetry, Est
-from qraatview.forms import TelemetryGraphForm, EstGraphForm, ProcessingGraphForm
-from views import get_nav_options 
+from project.models import Site, Telemetry, Est
+from graph.forms import TelemetryGraphForm, EstGraphForm, ProcessingGraphForm
+from project.views.viewsutils import get_nav_options #TODO: change from ___
 
 import time
 from calendar import timegm
@@ -58,7 +58,7 @@ def graph_home(request):
     nav_options = get_nav_options(request)
 
     try:
-        return render(request, "qraat_site/graph_home.html", {'nav_options': nav_options})
+        return render(request, "graph/graph_home.html", {'nav_options': nav_options})
     except:
         return HttpResponse("Sorry, the graph home page didn't render correctly.") # what type of response should this be?
 
@@ -196,7 +196,7 @@ def telemetry_graphs(request):
     if not request.GET: # no parameters from user yet
         try:
                 telemetry_graph_form = TelemetryGraphForm() # unbound form - uses default initial form values
-                return render(request, "qraat_site/graphs_form.html", {'nav_options': nav_options, 'form': telemetry_graph_form})
+                return render(request, "graph/graphs_form.html", {'nav_options': nav_options, 'form': telemetry_graph_form})
         except:
                 return HttpResponseBadRequest("Sorry, something went wrong when trying to load the Telemetry Graphs page.")
 
@@ -208,7 +208,7 @@ def telemetry_graphs(request):
         context['nav_options'] = nav_options
         context['form'] = TelemetryGraphForm(data = request.GET)
     
-        return render(request, "qraat_site/graphs.html", context)
+        return render(request, "graph/graphs.html", context)
 
 
 def get_telemetry_graphs_context(request):
@@ -261,7 +261,7 @@ def est_graphs(request):
     if not request.GET: # no parameters from user yet
         try:
             est_graph_form = EstGraphForm() # unbound form - uses default initial form values
-            return render(request, "qraat_site/graphs_form.html", {'nav_options': nav_options, 'form': est_graph_form})
+            return render(request, "graph/graphs_form.html", {'nav_options': nav_options, 'form': est_graph_form})
         except:
             return HttpResponseBadRequest("Sorry, something went wrong when trying to load the Est Graphs page.")
 
@@ -274,7 +274,7 @@ def est_graphs(request):
         context['nav_options'] = nav_options
         context['form'] = est_graph_form
 
-        return render(request, "qraat_site/graphs.html", context)
+        return render(request, "graph/graphs.html", context)
 
 
 def get_est_graphs_context(request):
@@ -308,7 +308,7 @@ def processing_graphs(request):
     if not request.GET: # no parameters from user yet
         try:
                 processing_graph_form = ProcessingGraphForm() # unbound form - uses default initial form values
-                return render(request, "qraat_site/graphs_form.html", {'nav_options': nav_options, 'form': processing_graph_form})
+                return render(request, "graph/graphs_form.html", {'nav_options': nav_options, 'form': processing_graph_form})
         except:
                 return HttpResponseBadRequest("Sorry, something went wrong when trying to load the Processing Graphs page.")
 
@@ -319,7 +319,7 @@ def processing_graphs(request):
         context['nav_options'] = nav_options
         context['form'] = processing_graph_form
 
-        return render(request, "qraat_site/graphs.html", context)
+        return render(request, "graph/graphs.html", context)
 
 
 def get_processing_graphs_context(request):   

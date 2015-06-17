@@ -35,9 +35,9 @@ SECRET_KEY = base.key
 # SECURITY WARNING: don't run with debug turned on in production!
 # NOTE For testing purposes, this must be set to True in order 
 # to run 'python manage.py runserver'. 
-DEBUG = TEMPLATE_DEBUG = False 
+DEBUG = TEMPLATE_DEBUG = True 
 
-TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
+#TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
 
 
 ALLOWED_HOSTS = ['*']
@@ -46,15 +46,16 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = (
+    'map',
+    'account',
+    'graph',
+    'project',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.admin',
-    'qraat_ui',
-    'qraat_auth',
-    'qraatview'
 )
 
 MIDDLEWARE_CLASSES = (
@@ -66,9 +67,9 @@ MIDDLEWARE_CLASSES = (
 #    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
 
-ROOT_URLCONF = 'qraatview.urls'
+ROOT_URLCONF = 'gaat.urls'
 
-WSGI_APPLICATION = 'qraatview.wsgi.application'
+WSGI_APPLICATION = 'gaat.wsgi.application'
 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
@@ -82,13 +83,13 @@ DATABASES = {
         'USER': django_admin.user,
 	'PASSWORD': django_admin.password, 
         },
-	'qraat': {
+	'writer': {
 		'ENGINE': 'django.db.backends.mysql',
 		'NAME': 'qraat',
 		'USER': web_writer.user,
 		'PASSWORD': web_writer.password,
 	},
-	'qraat_ui': {
+	'reader': {
 		'ENGINE': 'django.db.backends.mysql',
 		'NAME': 'qraat',
 		'USER': web_reader.user,
@@ -96,8 +97,8 @@ DATABASES = {
 	},
 }
 
-DATABASE_ROUTERS = [ 'qraatview.router.DatabaseAppsRouter',]
-DATABASE_APPS_MAPPING = {'qraat_ui': 'qraat_ui', 'qraatview': 'qraat' }	
+DATABASE_ROUTERS = [ 'project.router.DatabaseAppsRouter',]
+DATABASE_APPS_MAPPING = {'map': 'reader', 'project': 'writer', 'graph': 'reader' }	
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/
@@ -117,4 +118,4 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.6/howto/static-files/
 
 STATIC_URL = "/static/"
-STATIC_ROOT = "/var/www/qraat_site/static/"
+STATIC_ROOT = "/var/www/project/static/"

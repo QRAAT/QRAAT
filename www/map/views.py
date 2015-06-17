@@ -1,4 +1,4 @@
-# File: qraat_ui/views.py
+# File: map/views.py
 #
 # TODO Cache last query (result of get_context()) for download.  
 #
@@ -11,13 +11,13 @@ from django.shortcuts import render, render_to_response, get_object_or_404, redi
 from django.core.urlresolvers import reverse
 from django.db.models import Q, Max, Min
 from django.contrib.auth.decorators import login_required
-from qraatview.views import get_nav_options, not_allowed_page, can_view
-from qraatview.utils import DateTimeEncoder
-import qraatview.rest_api as rest_api
+from project.views import get_nav_options, not_allowed_page, can_view
+from project.utils import DateTimeEncoder
+import project.rest_api as rest_api
 import qraat, time, datetime, json, utm, math, copy
 from pytz import utc, timezone
-from qraatview.models import Position, Deployment, Site, Project, Tx
-from qraat_ui.forms import Form
+from project.models import Position, Deployment, Site, Project, Tx
+from map.forms import Form
 from decimal import Decimal
 
 import csv
@@ -354,7 +354,7 @@ def index(request):
 
   context = get_context(request, deps, req_deps)
   context["nav_options"] = nav_options
-  return render(request, 'qraat_ui/index.html', context)
+  return render(request, 'map/index.html', context)
 
 def view_by_dep(request, project_id, dep_id):
   ''' Compile a list of deployments associated with `dep_id`. ''' 
@@ -407,7 +407,7 @@ def view_by_dep(request, project_id, dep_id):
   context["target_name"] = target_name
   context["transmitter_frequency"] = transmitter_frequency
 
-  return render(request, 'qraat_ui/index.html', context)
+  return render(request, 'map/index.html', context)
 
 
 def download_by_dep(request, project_id, dep_id): 
@@ -502,7 +502,7 @@ def system_status(
     else:
         content["data"] = json.dumps(rest_api.json_parse(data), cls=DateTimeEncoder)
 
-    return render(request, "qraat_ui/system_status.html", content)
+    return render(request, "map/system_status.html", content)
 
 
 @login_required(login_url="auth/login")
@@ -548,7 +548,7 @@ def est_status(
     else:
         content["data"] = json.dumps(rest_api.json_parse(data), cls=DateTimeEncoder)
 
-    return render(request, "qraat_ui/est_status.html", content)
+    return render(request, "map/est_status.html", content)
 
 
 @login_required(login_url="/auth/login")
@@ -558,7 +558,7 @@ def generic_graph(
                 excluded_fields=[
                     "siteID", "datetime", "timezone",
                     "utm_zone_number", "utm_zone_letter"],
-                template="qraat_ui/generic_graph.html"):
+                template="map/generic_graph.html"):
 
     nav_options = get_nav_options(request)
     content = {}

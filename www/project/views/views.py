@@ -1,6 +1,6 @@
 import json
-import qraatview.utils
-import qraatview.rest_api
+import project.utils
+import project.rest_api
 from django.db.models import Q
 from django.db import connection
 from django.shortcuts import render, redirect
@@ -12,15 +12,15 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core import serializers
 from django.template import Context
-from qraatview.models import Project, Tx, Location
-from qraatview.models import Target, Deployment
-from qraatview.models import Site, Telemetry, Est
-from qraatview.forms import ProjectForm, OwnersEditProjectForm, AddTransmitterForm
-from qraatview.forms import AddManufacturerForm, AddTargetForm
-from qraatview.forms import AddDeploymentForm, AddLocationForm
-from qraatview.forms import EditTargetForm, EditTransmitterForm, EditLocationForm
-from qraatview.forms import EditDeploymentForm, EditProjectForm
-from qraatview.forms import TelemetryGraphForm, EstGraphForm, ProcessingGraphForm
+from project.models import Project, Tx, Location
+from project.models import Target, Deployment
+#from project.models import Site, Telemetry, Est
+from project.forms import ProjectForm, OwnersEditProjectForm, AddTransmitterForm
+from project.forms import AddManufacturerForm, AddTargetForm
+from project.forms import AddDeploymentForm, AddLocationForm
+from project.forms import EditTargetForm, EditTransmitterForm, EditLocationForm
+from project.forms import EditDeploymentForm, EditProjectForm
+#from project.forms import TelemetryGraphForm, EstGraphForm, ProcessingGraphForm
 from viewsutils import *
 
 import time
@@ -48,7 +48,7 @@ def index(request):
             is_public=True, is_hidden=False)
 
         return render(
-            request, "qraat_site/index.html",
+            request, "project/index.html",
             {'nav_options': nav_options,
              'projects': public_projects})
 
@@ -221,7 +221,7 @@ def projects(request):
 
     nav_options = get_nav_options(request)
 
-    return render(request, 'qraat_site/projects.html',
+    return render(request, 'project/projects.html',
                   {'public_projects': public_projects,
                    'user_projects': user_projects,
                    'collaborate_with': collaborate_with,
@@ -286,7 +286,7 @@ def check_deletion(request, project_id):
             content["objs"] = get_objs_by_type(
                 obj_type, selected_objs)
 
-            return render(request, "qraat_site/check-deletion.html",
+            return render(request, "project/check-deletion.html",
                           content)
 
     return not_allowed_page(request)
@@ -315,7 +315,7 @@ def create_project(request):
     else:
         form = ProjectForm()
 
-    return render(request, 'qraat_site/create-project.html',
+    return render(request, 'project/create-project.html',
                   {'form': form,
                    'nav_options': nav_options})
 
@@ -349,7 +349,7 @@ def edit_project(request, project_id):
                 if form.is_valid():
                     form.save()
                     return render(
-                        request, 'qraat_site/edit-project.html',
+                        request, 'project/edit-project.html',
                         {'nav_options': nav_options,
                          'changed': True,
                          'form': form,
@@ -362,7 +362,7 @@ def edit_project(request, project_id):
                     form = EditProjectForm(instance=project)
 
             return render(
-                request, 'qraat_site/edit-project.html',
+                request, 'project/edit-project.html',
                 {'nav_options': nav_options,
                  'form': form,
                  'project': project})
@@ -400,7 +400,7 @@ def add_manufacturer(request, project_id):
                 manufacturer_form = AddManufacturerForm()
 
             return render(
-                request, "qraat_site/create-manufacturer.html",
+                request, "project/create-manufacturer.html",
                 {"nav_options": nav_options,
                  "manufacturer_form": manufacturer_form,
                  "transmitter_form": transmitter_form,
@@ -417,7 +417,7 @@ def add_location(request, project_id):
         project_id=project_id,
         post_form=AddLocationForm(data=request.POST),
         get_form=AddLocationForm(),
-        template_path="qraat_site/create-location.html",
+        template_path="project/create-location.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:manage-locations", args=(project_id,)))
 
@@ -429,7 +429,7 @@ def add_transmitter(request, project_id):
         project_id=project_id,
         post_form=AddTransmitterForm(data=request.POST),
         get_form=AddTransmitterForm(),
-        template_path="qraat_site/create-transmitter.html",
+        template_path="project/create-transmitter.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:manage-transmitters", args=(project_id,)))
 
@@ -441,7 +441,7 @@ def add_target(request, project_id):
         project_id=project_id,
         post_form=AddTargetForm(data=request.POST),
         get_form=AddTargetForm(),
-        template_path="qraat_site/create-target.html",
+        template_path="project/create-target.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:manage-targets", args=(project_id,))
         )
@@ -454,7 +454,7 @@ def add_deployment(request, project_id):
         project_id=project_id,
         post_form=AddDeploymentForm(data=request.POST),
         get_form=AddDeploymentForm(),
-        template_path="qraat_site/create-deployment.html",
+        template_path="project/create-deployment.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:manage-deployments", args=(project_id,))
         )
@@ -470,7 +470,7 @@ def show_project(request, project_id):
 
         if project.is_public:
             return render(
-                request, 'qraat_site/display-project.html',
+                request, 'project/display-project.html',
                 {'project': project,
                  'nav_options': nav_options})
 
@@ -478,11 +478,11 @@ def show_project(request, project_id):
             if project.is_owner(user)\
                     or ((project.is_collaborator(user)
                         or project.is_viewer(user))
-                        and user.has_perm("qraatview.can_view")):
+                        and user.has_perm("project.can_view")):
 
                     return render(
                         request,
-                        'qraat_site/display-project.html',
+                        'project/display-project.html',
                         {'project': project,
                          'nav_options': nav_options})
 
@@ -509,7 +509,7 @@ def manage_targets(request, project_id):
     return render_manage_page(
         request,
         project,
-        "qraat_site/manage_targets.html",
+        "project/manage_targets.html",
         content)
 
 
@@ -528,7 +528,7 @@ def manage_locations(request, project_id):
     return render_manage_page(
         request,
         project,
-        "qraat_site/manage_locations.html",
+        "project/manage_locations.html",
         context)
 
 
@@ -547,7 +547,7 @@ def manage_transmitters(request, project_id):
     return render_manage_page(
         request,
         project,
-        "qraat_site/manage_transmitters.html",
+        "project/manage_transmitters.html",
         content)
 
 
@@ -567,7 +567,7 @@ def manage_deployments(request, project_id):
     return render_manage_page(
         request,
         project,
-        "qraat_site/manage_deployments.html",
+        "project/manage_deployments.html",
         content)
 
 
@@ -581,7 +581,7 @@ def edit_transmitter(request, project_id, transmitter_id):
         project_id=project_id,
         post_form=EditTransmitterForm(data=request.POST, instance=transmitter),
         get_form=EditTransmitterForm(instance=transmitter),
-        template_path="qraat_site/edit-transmitter.html",
+        template_path="project/edit-transmitter.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:edit-transmitter", args=(project_id, transmitter_id)))
 
@@ -596,7 +596,7 @@ def edit_target(request, project_id, target_id):
         project_id=project_id,
         post_form=EditTargetForm(data=request.POST, instance=target),
         get_form=EditTargetForm(instance=target),
-        template_path="qraat_site/edit-target.html",
+        template_path="project/edit-target.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:edit-target", args=(project_id, target_id)))
 
@@ -611,7 +611,7 @@ def edit_location(request, project_id, location_id):
         project_id=project_id,
         post_form=EditLocationForm(data=request.POST, instance=location),
         get_form=EditLocationForm(instance=location),
-        template_path="qraat_site/edit-location.html",
+        template_path="project/edit-location.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:edit-location", args=(project_id, location_id)))
 
@@ -630,7 +630,7 @@ def edit_deployment(request, project_id, deployment_id):
             initial={'time_start':
                      utils.strfdate(
                          utils.timestamp_todate(deployment.time_start))}),
-        template_path="qraat_site/edit-deployment.html",
+        template_path="project/edit-deployment.html",
         success_url="%s?new_element=True" % reverse(
             "qraat:edit-deployment", args=(project_id, deployment_id)))
 

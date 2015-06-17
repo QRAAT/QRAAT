@@ -1,3 +1,6 @@
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+
+
 def not_allowed_page(request):
     """This view renders a page for forbidden action
     with HTTP 403 status and a message"""
@@ -123,7 +126,7 @@ def get_nav_options(request):
     user = request.user
 
     if user.is_authenticated():
-        nav_options.append({"url": "qraat:projects",
+        nav_options.append({"url": "project:projects",
                             "name": "Projects"})
 
         if user.is_superuser:
@@ -132,13 +135,13 @@ def get_nav_options(request):
                  "name": "Users"},
                 {"url": "admin:index",
                  "name": "Admin Pages"},
-                {"url": "ui:system-status",
+                {"url": "map:system-status",
                  "name": "System Status"}]
 
             for opt in super_user_opts:  # Add admin options
                 nav_options.append(opt)
 
-    nav_options.append({"url": "graphs:graph_home", 
+    nav_options.append({"url": "graph:graph_home", 
                          "name": "Graphs"}) # does this need a namespace like the others?
     return nav_options
 

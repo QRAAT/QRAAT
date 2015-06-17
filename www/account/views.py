@@ -8,8 +8,8 @@ from django.http import HttpResponse
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from qraat_auth.forms import AccountChangeForm
-from qraat_auth.forms import PasswordChangeForm
+from account.forms import AccountChangeForm
+from account.forms import PasswordChangeForm
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
 import re #regular expressions
@@ -66,7 +66,7 @@ def user_login(request):
         login_form = AuthenticationForm()
 
     return render(
-        request, 'qraat_auth/loginform.html', {'login_form': login_form,
+        request, 'account/loginform.html', {'login_form': login_form,
                                                'next': next_URL})
 
 
@@ -81,7 +81,7 @@ def show_users(request):
         if user.is_superuser:
             users = User.objects.all()
             return render(
-                request, 'qraat_auth/users.html',
+                request, 'account/users.html',
                 {'users': users})
         else:
 					  raise PermissionDenied #403
@@ -99,7 +99,7 @@ def user_account(request, user_id=None):
         user = request.user
 
     return render(
-        request, 'qraat_auth/user-account.html', {'user': user})
+        request, 'account/user-account.html', {'user': user})
 
 
 @login_required(login_url='/auth/login')
@@ -114,10 +114,10 @@ def edit_account(request):
         if form.is_valid():
             form.save()
             return render(
-                request, 'qraat_auth/edit-account.html',
+                request, 'account/edit-account.html',
                 {'form': form, 'changed': True})
 
-    return render(request, 'qraat_auth/edit-account.html', {'form': form})
+    return render(request, 'account/edit-account.html', {'form': form})
 
 
 @login_required(login_url='/auth/login')
@@ -132,7 +132,7 @@ def change_password(request):
         if form.is_valid():
             form.save()
             return render(
-                request, 'qraat_auth/change-password.html',
+                request, 'account/change-password.html',
                 {'form': form, 'changed': True})
 
-    return render(request, 'qraat_auth/change-password.html', {'form': form})
+    return render(request, 'account/change-password.html', {'form': form})

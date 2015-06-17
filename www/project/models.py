@@ -5,53 +5,13 @@ from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import ObjectDoesNotExist
 from utils import timestamp_todate, strfdate
 
-QRAAT_APP_LABEL = 'qraatview'
+QRAAT_APP_LABEL = 'project'
 COLLABORATOR_PERMISSIONS = (
     ("can_change", "Users can change the project data"),
     ("can_hide", "Users can hide a project"))
 VIEWER_PERMISSIONS = (
     ("can_view", "Users can view the project data"),)
 
-
-class Site(models.Model):
-    """ Site data (public)
-        only sites with receivers, admins are the only ones with write access
-    """
-
-    class Meta:
-        app_label = QRAAT_APP_LABEL
-        db_table = "site"
-
-    ID = models.AutoField(primary_key=True)
-
-    name = models.CharField(max_length=20)  # varchar(20)
-
-    location = models.CharField(max_length=100)  # varchar(100)
-
-    latitude = models.DecimalField(
-        max_digits=10, decimal_places=6)  # decimal(10, 6)
-
-    longitude = models.DecimalField(
-        max_digits=11, decimal_places=6)  # decimal(11,6)
-
-    easting = models.DecimalField(
-        max_digits=9, decimal_places=2, default=0.00)  # decimal(9,2)
-
-    northing = models.DecimalField(
-        max_digits=10, decimal_places=2, default=0.00)  # decimal(10, 2)
-
-    utm_zone_number = models.SmallIntegerField(
-        max_length=3, default=10)  # tinyint(3) default 10
-
-    utm_zone_letter = models.CharField(
-        max_length=1, default='S')  # char(1) default S
-
-    elevation = models.DecimalField(
-        max_digits=7, decimal_places=2,
-        default=0.00)  # decimal(7, 2) default 0.00
-
-    def __unicode__(self):
-        return u'%s' % self.name
 
 
 class Project(models.Model):
@@ -690,6 +650,45 @@ class Location(models.Model):
     def __unicode__(self):
         return u'%s' % self.name
 
+class Site(models.Model):
+    """ Site data (public)
+        only sites with receivers, admins are the only ones with write access
+    """
+
+    class Meta:
+        app_label = QRAAT_APP_LABEL
+        db_table = "site"
+
+    ID = models.AutoField(primary_key=True)
+
+    name = models.CharField(max_length=20)  # varchar(20)
+
+    location = models.CharField(max_length=100)  # varchar(100)
+
+    latitude = models.DecimalField(
+        max_digits=10, decimal_places=6)  # decimal(10, 6)
+
+    longitude = models.DecimalField(
+        max_digits=11, decimal_places=6)  # decimal(11,6)
+
+    easting = models.DecimalField(
+        max_digits=9, decimal_places=2, default=0.00)  # decimal(9,2)
+
+    northing = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0.00)  # decimal(10, 2)
+
+    utm_zone_number = models.SmallIntegerField(
+        max_length=3, default=10)  # tinyint(3) default 10
+
+    utm_zone_letter = models.CharField(
+        max_length=1, default='S')  # char(1) default S
+
+    elevation = models.DecimalField(
+        max_digits=7, decimal_places=2,
+        default=0.00)  # decimal(7, 2) default 0.00
+
+    def __unicode__(self):
+        return u'%s' % self.name
 
 class Telemetry(models.Model):
     class Meta:
@@ -804,3 +803,5 @@ class Est(models.Model):
     edsnr = models.FloatField()
 
     deploymentID = models.ForeignKey(Deployment, db_column="deploymentID")
+
+

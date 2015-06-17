@@ -1,0 +1,166 @@
+{% extends "map/base.html" %}
+
+{% block extrascript %}
+    <script src="/static/flot/jquery.min.js" type="text/javascript"></script>
+    <script src="/static/flot/jquery.flot.min.js" type="text/javascript"></script>
+    <!--[if lte IE 8]><script language="javascript" type="text/javascript" src="excanvas.min.js"></script><![endif]-->
+    <script type="text/javascript">
+        $(document).ready(function(){
+            {% if selected_obj %}
+                $("#obj-sel").val({{selected_obj|safe}});
+            {% endif %}
+
+            var selected_obj = $("#obj-sel option:selected").text();
+
+            var data = {{data|safe}};
+            var fields = {{fields|safe}};
+            var n_items = $("#n_items").val();
+            var offset = $("#offset").val();
+
+            if(data){
+                plotGraph(data, fields, n_items);
+            }
+
+            $("#obj-sel").change(function(){
+                    selected_obj = $("#obj-sel option:selected").text();
+                    createForm(selected_obj, fields);
+                });
+
+            createForm(selected_obj, fields);
+
+        });
+
+        function plotGraph(dataset, fields, n_items, offset){
+            var fields = fields;
+            var plotData = {};
+            plotData.label = "Test";
+            plotData.data = new Array();
+
+            for(var i=0; i<dataset.length; i++){
+                var set = new Array();
+                for(j=0; j<fields.length; j++){
+                    set.push(dataset[i][fields[j]]);
+                }
+                plotData.data.push(set);
+            }
+            var options = {};
+            options.series = {};
+            options.series.lines = {show: true};
+
+            $.plot($("#placeholder"), [plotData.data] , options);
+        }
+
+        function createForm(selected_obj, fields){
+            /*Dinamically creates a form for a selected object
+             Objects are passed by django's view*/
+            $("#axis").empty();
+            var excluded_fields = {{excluded_fields|safe}};
+
+            var request = $.ajax({
+                                    url: "{% url 'get-data'  %}",
+                                    data: {
+                                        "obj" : selected_obj, 
+                                        "n_items" : 1
+                                        } 
+                                });
+
+            request.done(function(raw_data){
+                    var data = JSON.parse(raw_data);
+                    var axis = ["x", "y"];
+                    if(data[0]){
+                        var axis_x_html = "<div class='col-md-4'> \
+                            <div class='input-group'>\
+                                <div class='input-group-addon'>Axis X</div>\
+                                <select id='axis_x' class='form-control' name='field'></select> \
+                            </div></div>";
+                        
+                        var axis_y_html = "<div class='col-md-offset-0 col-md-4'> \
+                            <div class='input-group'>\
+                                <div class='input-group-addon'>Axis Y</div>\
+                                <select id='axis_y' class='form-control' name='field'></select> \
+                            </div></div>";
+
+                        //Append forms for axis
+                        $("#axis").append($(axis_x_html));
+                        $("#axis").append($(axis_y_html));
+
+                        for(var key in data[0].fields){
+                            //Checks if fields dict has the key and if keys is not excluded
+                            if(data[0].fields.hasOwnProperty(key) && $.inArray(key, excluded_fields) == -1 ){ 
+                                //Dynamically fills options for axis
+                                $("#axis_x").append($("<option value="+ key  +">" + key + "</option>"));
+                                $("#axis_y").append($("<option value="+ key  +">" + key + "</option>"));
+                            }
+                        }
+                        for(var i=0; i<fields.length; i++){
+                            if(data[0].fields.hasOwnProperty(fields[i])){
+                                $("#axis_" + axis[i]).val(fields[i]);
+                            } 
+                        }
+                    }
+            });
+        }
+    </script>
+{% endblock %}
+
+{% block sidebar %} {% include "map/status_sidebar.html" %} {% endblock %}
+
+{% block content %}
+   <div class="row">
+        <h4>Generic Graph</h4>
+   </div>
+
+    <div class="container-fluid">
+        <form class="form-horizontal" method="get" role="form">
+
+            <div class="row">
+                <div class="col-md-4">
+                   <h5>
+                      Graph Controls 
+                   </h5>
+                </div>
+                <div class="col-md-4">
+                    <button type="submmit" class="btn btn-primary btn-sm">Plot</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <div class="input-group-addon">Table</div>
+                            <select id="obj-sel" class="form-control" name="obj">
+                                {% for obj in objs %}
+                                <option value={{obj}}>{{obj}}</option>
+                                {% endfor %}
+                            </select>
+                    </div>
+                </div>
+            </div>
+
+            <div id="axis" class="row"></div>
+           
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <div class="input-group-addon">Data size</div>
+                        <input id="n_items" class="form-control" type="number" name="n_items"\
+                            max="2500" value={% if n_items %} {{n_items}} {% else %} 300 {% endif %} />
+                    </div>
+                </div>
+
+                <div class="col-md-offset-0 col-md-4">
+                    <div class="input-group">
+                        <div class="input-group-addon">Offset</div>
+                        <input id="offset" class="form-control" type="number" name="offset" value={% if offset %} {{offset}} {% else %} 0 {% endif %} />
+                    </div>
+                </div>
+            </div>
+
+        </form>
+
+        <div class="row">
+            <div id="placeholder" class="col-md-8" style="width:600px; height:300px; margin-top:4%;"></div>
+        </div>
+    </div>
+{% endblock %}
+

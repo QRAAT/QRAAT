@@ -1,0 +1,30 @@
+{% block sidebar %}
+{% if user.is_accountenticated %}
+<ol class="nav nav-pills nav-stacked">  
+    <li class="active">
+    <a href={% url 'project:show-project' project.ID %}>Project</a>
+    </li>
+    <li>
+        <li class="side-bar-element">
+        <a href={%url 'project:manage-locations' project.ID %}>Manage Locations</a>
+        </li>
+    </li>
+    <li>
+        <li class="side-bar-element">
+        <a href={%url 'project:manage-transmitters' project.ID %}>Manage Transmitters</a>
+        </li>
+    </li>
+    <li>
+        <li class="side-bar-element">
+        <a href={% url 'project:manage-targets' project.ID %}>Manage Targets</a>
+        </li>
+    </li>
+    <li>
+        <li class="side-bar-element">
+        <a href={% url 'project:manage-deployments' project.ID %}>Manage Deployments</a>
+        </li>
+    </li>
+</ol>
+
+{% endif %}
+{%endblock%}

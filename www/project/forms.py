@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import pytz
 import utils
 
-from graph_forms import *
+#from graph_forms import *
 
 
 class ProjectForm(forms.ModelForm):

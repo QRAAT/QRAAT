@@ -1,0 +1,29 @@
+<!DOCTYPE HTML>
+<html>
+{% load i18n %}
+
+    <head>
+        <!-- Latest compiled and minified CSS -->
+        <script src="/static/project/js/jquery.min.js" type="text/javascript"></script>
+        <link rel='stylesheet' type='text/css' href='/static/project/css/style.css'/>
+        {% include "project/bootstrap" %}
+        {% block css %} {% endblock %}
+        {% block script %} {% endblock %}
+        <title> {% block title %} QRAAT Site {% endblock %} </title>
+    </head>
+
+    <body>
+        <div id="container" class="container">
+            {% block topbar %}
+                {% include "project/navbar.html" %}
+            {% endblock %}
+            <div class="sidebar">
+                {% block sidebar %}
+                {% endblock %}
+            </div>
+            <div style="margin-bottom:1%;" class="content">
+                {% block content %} {% endblock %}
+            </div>
+        </div>
+    </body>
+</html>
