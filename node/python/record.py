@@ -42,7 +42,7 @@ class record_baseband(run.detector_array):
       status_file.write(timestr)
       status_file.write(str(self.backend_param) + '\n')
 
+    self.start()
     for j in range(self.num_be):
-      self.start()
-      time.sleep(sleep_sec)
       self.next()
+      time.sleep(sleep_sec)

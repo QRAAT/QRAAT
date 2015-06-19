@@ -256,7 +256,7 @@ class record_backend(gr.hier_block2):
     def enable(self, bands=None):
         if bands:
           self.center_frequency = bands[0].cf
-          print "HERE", bands[0].cf, bands[0].band_num
+        print "Enabling frequency {} at {}".format(self.frequency, time.strftime("%Y%m%d%H%M%Z"))
         self.file_sink.open(os.path.join(self.directory, "{0:.0f}kHz_{1}.tdat".format(self.center_frequency/1000.0,time.strftime("%Y%m%d%H%M%Z"))))
 
     def disable(self):
