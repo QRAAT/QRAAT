@@ -3,7 +3,7 @@
     $.fn.spinner = function(options){
         var settings = $.extend({
             centered: true,
-            spinner_img: '/static/qraat_ui/css/ajax-loader.gif'
+            spinner_img: '/static/map/css/ajax-loader.gif'
         }, options);
 
         var spinner = $("<div id='spinner'></div>").addClass('spinner');

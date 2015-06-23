@@ -70,7 +70,7 @@ def user_login(request):
                                                'next': next_URL})
 
 
-@login_required(login_url='/auth/login')
+@login_required(login_url='/account/login')
 def show_users(request):
     """This view shows a list of registered users in the system.
     It is for admin use only"""
@@ -89,7 +89,7 @@ def show_users(request):
     return HttpResponse("Try a get!")
 
 
-@login_required(login_url='/auth/login')
+@login_required(login_url='/account/login')
 def user_account(request, user_id=None):
     """This view displays user account information"""
 
@@ -102,7 +102,7 @@ def user_account(request, user_id=None):
         request, 'account/user-account.html', {'user': user})
 
 
-@login_required(login_url='/auth/login')
+@login_required(login_url='/account/login')
 def edit_account(request):
     """This view is the entry for a form to edit user's information."""
 
@@ -120,7 +120,7 @@ def edit_account(request):
     return render(request, 'account/edit-account.html', {'form': form})
 
 
-@login_required(login_url='/auth/login')
+@login_required(login_url='/account/login')
 def change_password(request):
     """This view is the entry for users to change their password"""
 

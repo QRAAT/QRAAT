@@ -260,7 +260,7 @@ def get_model_type(model_type):
     :returns: Model -- qraatview Django's model instance
     """
 
-    app = get_app("qraatview")
+    app = get_app("project")
     if model_type is not None:
         for model in get_models(app):
             if model._meta.verbose_name.lower() == model_type.lower():

@@ -11,7 +11,7 @@ from django.shortcuts import render, render_to_response, get_object_or_404, redi
 from django.core.urlresolvers import reverse
 from django.db.models import Q, Max, Min
 from django.contrib.auth.decorators import login_required
-from project.views import get_nav_options, not_allowed_page, can_view
+from viewsutils import get_nav_options, not_allowed_page, can_view
 from project.utils import DateTimeEncoder
 import project.rest_api as rest_api
 import qraat, time, datetime, json, utm, math, copy
@@ -368,7 +368,7 @@ def view_by_dep(request, project_id, dep_id):
     if request.user.is_authenticated():
       user = request.user
       if project.is_owner(user)\
-           or (user.has_perm("qraatview.can_view")
+           or (user.has_perm("project.can_view")
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
         pass
@@ -377,7 +377,7 @@ def view_by_dep(request, project_id, dep_id):
         raise PermissionDenied #403
     
     else:
-            return redirect("/auth/login/?next=%s" % request.get_full_path())
+            return redirect("/account/login/?next=%s" % request.get_full_path())
 
   else: pass #public project
     
@@ -420,7 +420,7 @@ def download_by_dep(request, project_id, dep_id):
     if request.user.is_authenticated():
       user = request.user
       if project.is_owner(user)\
-           or (user.has_perm("qraatview.can_view")
+           or (user.has_perm("project.can_view")
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
 
@@ -429,7 +429,7 @@ def download_by_dep(request, project_id, dep_id):
         raise PermissionDenied #403
 
     else:
-            return redirect("/auth/login/?next=%s" % request.get_full_path())
+            return redirect("/account/login/?next=%s" % request.get_full_path())
 
 
   else:
@@ -459,7 +459,7 @@ def view_by_tx(request, tx_id):
   return HttpResponse('Not implemented yet. (txID=%s)' % tx_id)
 
 
-@login_required(login_url="auth/login")
+@login_required(login_url="account/login")
 def system_status(
             request,
             static_field="siteID",
@@ -505,7 +505,7 @@ def system_status(
     return render(request, "map/system_status.html", content)
 
 
-@login_required(login_url="auth/login")
+@login_required(login_url="account/login")
 def est_status(
             request,
             static_field="deploymentID",
@@ -551,7 +551,7 @@ def est_status(
     return render(request, "map/est_status.html", content)
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def generic_graph(
                 request,
                 objs=["telemetry", "position", "deployment", "est"],

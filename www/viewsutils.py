@@ -7,7 +7,7 @@ def not_allowed_page(request):
     if request.user.is_authenticated():
         raise PermissionDenied #403
     else:
-        return redirect("/auth/login/?next=%s" % request.get_full_path()) #redirect user to login page to see if they have access permission
+        return redirect("/account/login/?next=%s" % request.get_full_path()) #redirect user to login page to see if they have access permission
 
 
 def get_query(obj_type):
@@ -72,7 +72,7 @@ def can_delete(project, user):
     if the user is in the collaborators group and the group has permission
     to delete content on the project
 
-    :param project: qraatview.models Project instance.
+    :param project: project.models Project instance.
     :type project: models.Project.
     :param user: Django auth user instance.
     :type user: User.
@@ -83,7 +83,7 @@ def can_delete(project, user):
     # With has_perm we can have different permissions for group
     return project.is_owner(user) or\
         (project.is_collaborator(user) and
-            user.has_perm("qraatview.can_delete"))
+            user.has_perm("project.can_delete"))
 
 
 def can_change(project, user):
@@ -91,7 +91,7 @@ def can_change(project, user):
     if the user is in the collaborators group and the group has permission
     to change content in the project
 
-    :param project: qraatview.models Project instance.
+    :param project: project.models Project instance.
     :type project: models.Project.
     :param user: Django auth user instance.
     :type user: User.
@@ -100,7 +100,7 @@ def can_change(project, user):
 
     return project.is_owner(user) or\
         (project.is_collaborator(user)
-            and user.has_perm("qraatview.can_change"))
+            and user.has_perm("project.can_change"))
 
 
 def can_view(project, user):
@@ -108,7 +108,7 @@ def can_view(project, user):
     or the user is the project owner, or the user is a project collaborator
     or the user is a project viewer
 
-    :param project: qraatview.models Project instance.
+    :param project: project.models Project instance.
     :type project: models.Project
     :param user: Django auth user instance.
     :type user: User.
@@ -142,7 +142,7 @@ def get_nav_options(request):
                 nav_options.append(opt)
 
     nav_options.append({"url": "graph:graph_home", 
-                         "name": "Graphs"}) # does this need a namespace like the others?
+                         "name": "Graphs"}) 
     return nav_options
 
 

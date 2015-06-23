@@ -65,7 +65,7 @@
 
 
         function updateGraph(fields, static_field){
-            var url_state = "{% url 'ui:system-status' %}";
+            var url_state = "{% url 'map:system-status' %}";
             var form_data = $("#graph_form").serialize();
             var state = url_state + '?' + form_data;
             window.history.replaceState(null, null, state); 

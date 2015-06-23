@@ -12,7 +12,8 @@ import os
 import qraat
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+#BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+BASE_DIR = os.path.abspath(os.path.dirname(''))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.6/howto/deployment/checklist/
@@ -37,8 +38,7 @@ SECRET_KEY = base.key
 # to run 'python manage.py runserver'. 
 DEBUG = TEMPLATE_DEBUG = True 
 
-#TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
-
+TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
 
 ALLOWED_HOSTS = ['*']
 
@@ -118,4 +118,4 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.6/howto/static-files/
 
 STATIC_URL = "/static/"
-STATIC_ROOT = "/var/www/project/static/"
+STATIC_ROOT = "/var/www/static/"

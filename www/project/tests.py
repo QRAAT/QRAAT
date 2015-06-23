@@ -4,7 +4,7 @@ import pytz
 from dateutil.tz import tzlocal
 from dateutil import parser
 from models import Project, Target, Tx, TxMake
-from qraatview import utils
+from project import utils
 
 
 class ProjectTestCase(TestCase):

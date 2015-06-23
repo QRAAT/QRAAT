@@ -1,4 +1,4 @@
-{% extends "project/base.html" %}
+{% extends "base.html" %}
 <!-- File: map/templates/index.html -->
 {% block script %}
     <link rel="stylesheet" type="text/css" href="/static/map/css/style.css"/>
@@ -734,7 +734,7 @@
 <div id = "text">
 
 {% if project %}
-<a href={%url 'qraat:show-project' project.ID %}#deployments><h4><center>{{project.name}}</center></h4></a>
+<a href={%url 'project:show-project' project.ID %}#deployments><h4><center>{{project.name}}</center></h4></a>
 {% endif %}
 
 {% if target_name %}

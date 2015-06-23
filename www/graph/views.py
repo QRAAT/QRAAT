@@ -14,7 +14,7 @@ from django.core import serializers
 from django.template import Context
 from project.models import Site, Telemetry, Est
 from graph.forms import TelemetryGraphForm, EstGraphForm, ProcessingGraphForm
-from project.views.viewsutils import get_nav_options #TODO: change from ___
+from viewsutils import get_nav_options #TODO: change from ___
 
 import time
 from calendar import timegm

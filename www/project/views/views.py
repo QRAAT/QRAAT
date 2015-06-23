@@ -120,7 +120,7 @@ def show_deployment(request, project_id, deployment_id):
 
     if can_view(project, user):
         return redirect(
-            reverse("ui:view_by_dep", args=(project_id, deployment_id))
+            reverse("map:view_by_dep", args=(project_id, deployment_id))
             )
     else:
         return not_allowed_page(request)
@@ -186,7 +186,7 @@ def show_location(request, project_id, location_id):
         return not_allowed_page(request)
 
 
-@login_required(login_url='/auth/login')
+@login_required(login_url='/account/login')
 def projects(request):
     """This view renders a page with projects.
     For a user projects are displayed as public projects,
@@ -231,7 +231,7 @@ def projects(request):
 
 
 
-@login_required(login_url='auth/login')
+@login_required(login_url='account/login')
 def delete_objs(request, project_id):
     user = request.user
     project = get_project(project_id)
@@ -254,13 +254,13 @@ def delete_objs(request, project_id):
 
             return redirect(
                 "%s?deleted=%s" % (
-                    reverse("qraat:manage-%ss" % obj_type, args=(project_id,)),
+                    reverse("project:manage-%ss" % obj_type, args=(project_id,)),
                     deleted))
 
     return not_allowed_page(request)
 
 
-@login_required(login_url='/auth/login')
+@login_required(login_url='/account/login')
 def check_deletion(request, project_id):
     """View that receives from a form a list of objects to delete
     and asks the user to confirm deletion"""
@@ -280,7 +280,7 @@ def check_deletion(request, project_id):
             if len(selected_objs) == 0:
                 return redirect(
                     "%s?deleted=0" %
-                    reverse("qraat:manage-%ss" % obj_type,
+                    reverse("project:manage-%ss" % obj_type,
                             args=(project_id,)))
 
             content["objs"] = get_objs_by_type(
@@ -292,7 +292,7 @@ def check_deletion(request, project_id):
     return not_allowed_page(request)
 
 
-@login_required(login_url='/auth/login')
+@login_required(login_url='/account/login')
 def create_project(request):
 
     nav_options = get_nav_options(request)
@@ -320,7 +320,7 @@ def create_project(request):
                    'nav_options': nav_options})
 
 
-@login_required(login_url='/auth/login')
+@login_required(login_url='/account/login')
 def edit_project(request, project_id):
 
     nav_options = get_nav_options(request)
@@ -371,7 +371,7 @@ def edit_project(request, project_id):
             return not_allowed_page(request)
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def add_manufacturer(request, project_id):
     user = request.user
     nav_options = get_nav_options(request)
@@ -410,7 +410,7 @@ def add_manufacturer(request, project_id):
             return not_allowed_page(request)
 
 
-@login_required(login_url="auth/login")
+@login_required(login_url="account/login")
 def add_location(request, project_id):
     return render_project_form(
         request=request,
@@ -419,10 +419,10 @@ def add_location(request, project_id):
         get_form=AddLocationForm(),
         template_path="project/create-location.html",
         success_url="%s?new_element=True" % reverse(
-            "qraat:manage-locations", args=(project_id,)))
+            "project:manage-locations", args=(project_id,)))
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def add_transmitter(request, project_id):
     return render_project_form(
         request=request,
@@ -431,10 +431,10 @@ def add_transmitter(request, project_id):
         get_form=AddTransmitterForm(),
         template_path="project/create-transmitter.html",
         success_url="%s?new_element=True" % reverse(
-            "qraat:manage-transmitters", args=(project_id,)))
+            "project:manage-transmitters", args=(project_id,)))
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def add_target(request, project_id):
     return render_project_form(
         request=request,
@@ -443,11 +443,11 @@ def add_target(request, project_id):
         get_form=AddTargetForm(),
         template_path="project/create-target.html",
         success_url="%s?new_element=True" % reverse(
-            "qraat:manage-targets", args=(project_id,))
+            "project:manage-targets", args=(project_id,))
         )
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def add_deployment(request, project_id):
     return render_project_form(
         request=request,
@@ -456,7 +456,7 @@ def add_deployment(request, project_id):
         get_form=AddDeploymentForm(),
         template_path="project/create-deployment.html",
         success_url="%s?new_element=True" % reverse(
-            "qraat:manage-deployments", args=(project_id,))
+            "project:manage-deployments", args=(project_id,))
         )
 
 
@@ -467,7 +467,6 @@ def show_project(request, project_id):
 
     try:
         project = Project.objects.get(ID=project_id)
-
         if project.is_public:
             return render(
                 request, 'project/display-project.html',
@@ -479,7 +478,6 @@ def show_project(request, project_id):
                     or ((project.is_collaborator(user)
                         or project.is_viewer(user))
                         and user.has_perm("project.can_view")):
-
                     return render(
                         request,
                         'project/display-project.html',
@@ -494,7 +492,7 @@ def show_project(request, project_id):
 
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def manage_targets(request, project_id):
 
     project = get_project(project_id)
@@ -513,7 +511,7 @@ def manage_targets(request, project_id):
         content)
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def manage_locations(request, project_id):
 
     project = get_project(project_id)
@@ -532,7 +530,7 @@ def manage_locations(request, project_id):
         context)
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def manage_transmitters(request, project_id):
 
     project = get_project(project_id)
@@ -551,7 +549,7 @@ def manage_transmitters(request, project_id):
         content)
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def manage_deployments(request, project_id):
 
     project = get_project(project_id)
@@ -571,7 +569,7 @@ def manage_deployments(request, project_id):
         content)
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def edit_transmitter(request, project_id, transmitter_id):
     query = get_query("transmitter")
     transmitter = query(transmitter_id)
@@ -583,10 +581,10 @@ def edit_transmitter(request, project_id, transmitter_id):
         get_form=EditTransmitterForm(instance=transmitter),
         template_path="project/edit-transmitter.html",
         success_url="%s?new_element=True" % reverse(
-            "qraat:edit-transmitter", args=(project_id, transmitter_id)))
+            "project:edit-transmitter", args=(project_id, transmitter_id)))
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def edit_target(request, project_id, target_id):
     query = get_query("target")
     target = query(target_id)
@@ -598,10 +596,10 @@ def edit_target(request, project_id, target_id):
         get_form=EditTargetForm(instance=target),
         template_path="project/edit-target.html",
         success_url="%s?new_element=True" % reverse(
-            "qraat:edit-target", args=(project_id, target_id)))
+            "project:edit-target", args=(project_id, target_id)))
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def edit_location(request, project_id, location_id):
     query = get_query("location")
     location = query(location_id)
@@ -613,10 +611,10 @@ def edit_location(request, project_id, location_id):
         get_form=EditLocationForm(instance=location),
         template_path="project/edit-location.html",
         success_url="%s?new_element=True" % reverse(
-            "qraat:edit-location", args=(project_id, location_id)))
+            "project:edit-location", args=(project_id, location_id)))
 
 
-@login_required(login_url="/auth/login")
+@login_required(login_url="/account/login")
 def edit_deployment(request, project_id, deployment_id):
     query = get_query("deployment")
     deployment = query(deployment_id)
@@ -632,7 +630,7 @@ def edit_deployment(request, project_id, deployment_id):
                          utils.timestamp_todate(deployment.time_start))}),
         template_path="project/edit-deployment.html",
         success_url="%s?new_element=True" % reverse(
-            "qraat:edit-deployment", args=(project_id, deployment_id)))
+            "project:edit-deployment", args=(project_id, deployment_id)))
 
 
 
