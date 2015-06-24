@@ -1,6 +1,6 @@
 import json
-import project.utils
-import project.rest_api
+import utils
+import rest_api
 from django.db.models import Q
 from django.db import connection
 from django.shortcuts import render, redirect

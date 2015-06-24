@@ -1,14 +1,14 @@
-{% extends "base.html" %}
+{% extends "project/base.html" %}
 {% load class_tag %}
 
 {% block sidebar %} {% include "project/manage_side_bar.html" %} {% endblock %}
 
 {% block content %}
 
-    {% if changed %}
-        <div class="alert alert-success" role="alert">
-            {% block success_msg %} {% endblock %}
-        </div>
+ {% if changed %}
+    <div class="alert alert-success" role="alert">
+        {% block success_msg %} {% endblock %}
+    </div>
     {% endif %}
 
     <div class="page-header">
@@ -20,3 +20,4 @@
     {% include "project/base_form.html" %}
 
 {% endblock %} 
+

@@ -1,6 +1,6 @@
 import json
-import project.utils
-import project.rest_api
+import utils
+import rest_api
 from django.db.models import Q
 from django.db import connection
 from django.shortcuts import render, redirect
@@ -51,23 +51,6 @@ def index(request):
             request, "project/index.html",
             {'nav_options': nav_options,
              'projects': public_projects})
-
-
-def get_project(project_id):
-    """Function for intern use that queries a project by id
-
-    :param project_id: A valid project id
-    :type project_id: int.
-
-    :returns:  Project -- A Project Model instance
-    """
-
-    try:
-        project = Project.objects.get(ID=project_id)
-    except ObjectDoesNotExist:
-                raise Http404
-    else:
-        return project
 
 
 def show_transmitter(request, project_id, transmitter_id):

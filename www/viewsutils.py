@@ -1,5 +1,6 @@
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
-
+from django.shortcuts import render, redirect
+from project.models import Project
 
 def not_allowed_page(request):
     """This view renders a page for forbidden action
@@ -144,6 +145,23 @@ def get_nav_options(request):
     nav_options.append({"url": "graph:graph_home", 
                          "name": "Graphs"}) 
     return nav_options
+    
+    
+def get_project(project_id):
+    """Function for intern use that queries a project by id
+
+    :param project_id: A valid project id
+    :type project_id: int.
+
+    :returns:  Project -- A Project Model instance
+    """
+
+    try:
+        project = Project.objects.get(ID=project_id)
+    except ObjectDoesNotExist:
+                raise Http404
+    else:
+        return project
 
 
 def render_project_form(

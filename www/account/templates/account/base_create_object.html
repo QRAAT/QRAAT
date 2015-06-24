@@ -5,10 +5,10 @@
 
 {% block content %}
 
-    {% if changed %}
-        <div class="alert alert-success" role="alert">
-            {% block success_msg %} {% endblock %}
-        </div>
+ {% if changed %}
+    <div class="alert alert-success" role="alert">
+        {% block success_msg %} {% endblock %}
+    </div>
     {% endif %}
 
     <div class="page-header">
@@ -19,4 +19,5 @@
 
     {% include "project/base_form.html" %}
 
-{% endblock %} 
+{% endblock %}
+

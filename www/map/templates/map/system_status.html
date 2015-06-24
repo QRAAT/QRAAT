@@ -2,15 +2,15 @@
 
 {% block extracss %}
     <link rel="stylesheet" type="text/css" href="/static/map/css/status_pages.css"/>
-    <link rel="stylesheet" type="text/css" href="/static/project/css/jquery.datetimepicker.css"/>
+    <link rel="stylesheet" type="text/css" href="/static/css/jquery.datetimepicker.css"/>
     <link href="/static/map/css/ui-spinner.css" rel="stylesheet" />
 {% endblock %}
 
 {% block extrascript %}
-    <script src="/static/flot/jquery.min.js" type="text/javascript"></script>
+    <script src="/static/js/jquery.min.js" type="text/javascript"></script>
     <script src="/static/flot/jquery.flot.min.js" type="text/javascript"></script>
     <script src="/static/flot/jquery.flot.time.min.js" type="text/javascript"></script>
-    <script src="/static/project/js/jquery.datetimepicker.js" type="text/javascript"></script>
+    <script src="/static/js/jquery.datetimepicker.js" type="text/javascript"></script>
     <script src="/static/map/js/ui-spinner.js" type="text/javascript"></script>
     <script src="/static/map/js/date.js" type="text/javascript"></script>
     <!--[if lte IE 8]><script language="javascript" type="text/javascript" src="excanvas.min.js"></script><![endif]-->
@@ -30,7 +30,7 @@
 
             var _tz = timezoneJS.timezone;
             _tz.loadingScheme = _tz.loadingSchemes.MANUAL_LOAD;
-            _tz.loadZoneJSONData('/static/project/js/timezone.json', true);
+            _tz.loadZoneJSONData('/static/js/timezone.json', true);
 
             var selected_obj = $("#obj-sel").val();
 

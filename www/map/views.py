@@ -12,8 +12,8 @@ from django.core.urlresolvers import reverse
 from django.db.models import Q, Max, Min
 from django.contrib.auth.decorators import login_required
 from viewsutils import get_nav_options, not_allowed_page, can_view
-from project.utils import DateTimeEncoder
-import project.rest_api as rest_api
+from utils import DateTimeEncoder
+import rest_api as rest_api
 import qraat, time, datetime, json, utm, math, copy
 from pytz import utc, timezone
 from project.models import Position, Deployment, Site, Project, Tx
@@ -28,7 +28,6 @@ INITIAL_DATA_WINDOW = 60 * 60 * 4
 
 
 def get_context(request, deps=[], req_deps=[]):
-  
   if 'sites' in request.GET:
     site_checked = 1
   else:

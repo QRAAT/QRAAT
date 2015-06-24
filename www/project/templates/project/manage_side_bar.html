@@ -1,5 +1,5 @@
 {% block sidebar %}
-{% if user.is_accountenticated %}
+{% if user.is_authenticated %}
 <ol class="nav nav-pills nav-stacked">  
     <li class="active">
     <a href={% url 'project:show-project' project.ID %}>Project</a>
