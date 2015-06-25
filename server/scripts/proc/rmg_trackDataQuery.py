@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+# rmg_trackDataQuery.py
 ## Wrote by Gene Der Su for QRAAT project in summer 2015
 ##
 ## This script querys the movebank_export table as inputs.
@@ -11,24 +13,32 @@ import csv
 import time
 from time import strftime
 import sys
-import qraat
-import qraat.srv
+#import qraat
+#import qraat.srv
 
 ##def main(lastUploadTime):
 def main():
     ## Login to mysql database using my account
-#    db = MySQLdb.connect(host="127.0.0.1", # your host, usually localhost
-#                         port=13306,
-#                         user="gene", # your username
-#                         passwd="YVsNsE6B", # your password
-#                         db="qraat") # name of the data base
-    db=qraat.srv.util.get_db('web_reader')
+
+
+## Setup MySQL connector for later use
+    db = MySQLdb.connect(
+#                        host="127.0.0.1", # your host, usually localhost
+			host="localhost", # your host, usually localhost
+#                        port=13306,
+#                        user="gene", # your username
+                        user="writer", # your username
+#                        passwd="YVsNsE6B", # your password
+                        passwd="KJsBA!Zl", # your password
+                        db="qraat") # name of the data base
+
+#    db=qraat.srv.util.get_db('web_reader')
 
     ## Query on the information for export
     cur = db.cursor()
     currentTime=time.time()
     query=("SELECT * FROM movebank_export WHERE enable=1 AND "
-           "time_last_update+export_interval<=%s")%(currentTime)
+           "time_last_export+export_interval<=%s")%(currentTime)
     cur.execute(query)
 
     ## Initialize arrays
