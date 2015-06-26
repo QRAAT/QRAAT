@@ -1,11 +1,12 @@
 #!/usr/bin/env python2
 # rmg_trackDataQuery.py
-## Wrote by Gene Der Su for QRAAT project in summer 2015
-##
-## This script querys the movebank_export table as inputs.
-## It then queries the track data for each animal from the last upload time
-## to the current time and returns current time, deployment ID, studuy ID,
-## format ID, and file name for the movebankUpload.py to use.
+#
+# Written by Gene Der Su for QRAAT project in summer 2015
+#
+# This script querys the movebank_export table as inputs.
+# It then queries the track data for each animal from the last upload time
+# to the current time and returns current time, deployment ID, studuy ID,
+# format ID, and file name for the movebankUpload.py to use.
 
 
 import MySQLdb
@@ -13,26 +14,22 @@ import csv
 import time
 from time import strftime
 import sys
-#import qraat
-#import qraat.srv
+import os
+import qraat
+import qraat.srv
 
-##def main(lastUploadTime):
 def main():
-    ## Login to mysql database using my account
-
-
-## Setup MySQL connector for later use
-    db = MySQLdb.connect(
-#                        host="127.0.0.1", # your host, usually localhost
-			host="localhost", # your host, usually localhost
-#                        port=13306,
-#                        user="gene", # your username
-                        user="writer", # your username
-#                        passwd="YVsNsE6B", # your password
-                        passwd="KJsBA!Zl", # your password
-                        db="qraat") # name of the data base
-
-#    db=qraat.srv.util.get_db('web_reader')
+    ## Setup MySQL connector for later use
+#    db = MySQLdb.connect(
+##                     host="localhost", # your host, usually localhost
+##                     user="writer", # your username
+##                     passwd="KJsBA!Zl", # your password
+#                     host="127.0.0.1", # your host, usually localhost
+#                     port=13306,
+#                     user="gene", # your username
+#                     passwd="YVsNsE6B", # your password
+#                     db="qraat") # name of the data base
+    db=qraat.srv.util.get_db('web_reader')
 
     ## Query on the information for export
     cur = db.cursor()
@@ -67,8 +64,9 @@ def main():
         """, (exportRow[1], exportRow[2], currentTime))
 
         ## Creating the csv file and writing the content
-        fileName = 'Deployment%s_%s-%s.csv' %(exportRow[1],exportRow[2], currentTime)
+        fileName = '/tmp/Deployment%s_%s-%s.csv' %(exportRow[1],exportRow[2], currentTime)
         fileNameArray.append(fileName)
+        
         with open(fileName, 'wb') as csvfile:
             spamwriter = csv.writer(csvfile, delimiter=',',
                             quotechar=';', quoting=csv.QUOTE_MINIMAL)

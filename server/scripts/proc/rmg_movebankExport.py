@@ -1,32 +1,32 @@
 #!/usr/bin/env python2
 # rmg_movebankExport.py
 #
-## Written by Gene Der Su for QRAAT project in summer 2015
-##
-## This script uses the data that are pulled from query script
-## to upload them onto Movebank
+# Written by Gene Der Su for QRAAT project in summer 2015
+#
+# This script uses the data that are pulled from query script
+# to upload them onto Movebank
 
 import pycurl
 import rmg_trackDataQuery
 import MySQLdb
 import os
-#import qraat
-#import qraat.srv
+import qraat
+import qraat.srv
 
 ## Getting the all inputs from the script.
 [currentTime, deploymentIDArray, studyIDArray, formatIDArray, fileNameArray]= rmg_trackDataQuery.main()
 
 ## Setup MySQL connector for later use
-db = MySQLdb.connect(
+#db = MySQLdb.connect(
+##                        host="localhost", # your host, usually localhost
+##                        user="writer", # your username
+##                        passwd="KJsBA!Zl", # your password
 #                        host="127.0.0.1", # your host, usually localhost
-			host="localhost", # your host, usually localhost
 #                        port=13306,
 #                        user="gene", # your username
-                        user="writer", # your username
 #                        passwd="YVsNsE6B", # your password
-                        passwd="KJsBA!Zl", # your password
-                        db="qraat") # name of the data base
-#db=qraat.srv.util.get_db('web_reader')
+#                        db="qraat") # name of the data base
+db=qraat.srv.util.get_db('web_writer')
 
 ## Loop through the file names and upload each of them onto Movebank
 for idx, val in enumerate(fileNameArray):
@@ -36,10 +36,9 @@ for idx, val in enumerate(fileNameArray):
          ("study", str(studyIDArray[idx])),
          ("file-bytes", (pycurl.FORM_FILE, val))
     ]
-    currentCurl.setopt(currentCurl.URL, "https://www.movebank.org/movebank/service/import")
-    currentCurl.setopt(currentCurl.USERNAME, "gdsu")
-    currentCurl.setopt(currentCurl.PASSWORD, "1234Abc!")
-    currentCurl.setopt(currentCurl.HTTPPOST, values)
+    currentCurl.setopt(pycurl.URL, 'https://www.movebank.org/movebank/service/import')
+    currentCurl.setopt(pycurl.USERPWD, "gdsu:1234Abc!")
+    currentCurl.setopt(pycurl.HTTPPOST, values)
     currentCurl.perform()
     currentCurl.close()
     print "Deployment %s export complete."%(deploymentIDArray[idx])
