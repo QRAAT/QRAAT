@@ -81,18 +81,18 @@ function pingbrother {
   case $OP in
 
     ON) 
-      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$ON" &> /dev/null
+      curl --connect-timeout 10 -s -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$ON" &> /dev/null
     ;; 
 
     OFF)
-      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$OFF" &> /dev/null
+      curl --connect-timeout 10 -s -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$OFF" &> /dev/null
     ;;
 
     CYCLE) 
       echo "powerswitch: wait about 3 seconds for power to cycle." 1>&2
-      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$OFF" &> /dev/null && \
+      curl --connect-timeout 10 -s -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$OFF" &> /dev/null && \
       sleep 2 && \
-      curl -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$ON" &> /dev/null
+      curl --connect-timeout 10 -s -u admin:admin "http://$IP/protect/PBmanual.htm?Relay$OUTLET=$ON" &> /dev/null
    ;;
 
   esac
@@ -103,7 +103,7 @@ function pb_query {
   # Get status of PingBrother relays. Unfortunately we have to parse HTML.
   # Luckily this is relatively simple with Python! 
 
-  curl -u admin:admin "http://$IP/protect/PBmanual.htm" 2> /dev/null | \
+  curl --connect-timeout 10 -s -u admin:admin "http://$IP/protect/PBmanual.htm" 2> /dev/null | \
   python -c "
 from HTMLParser import HTMLParser
 import sys
@@ -163,7 +163,7 @@ function webpowerswitch {
    
   esac
   
-  curl --user admin:1234 "http://$IP/outlet?$OUTLET=$OP" > /dev/null
+  curl --connect-timeout 10 -s --user admin:1234 "http://$IP/outlet?$OUTLET=$OP" > /dev/null
   echo $? 
 
 }
