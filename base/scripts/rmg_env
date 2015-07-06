@@ -44,6 +44,9 @@ export RMG_SERVER_SITELIST="$RMG_SERVER_METADATA_DIR/sitelist.csv"
 # This file is used by server scripts to configure remote sites.
 export RMG_SERVER_TXLIST="$RMG_SERVER_METADATA_DIR/tx.csv"
 
+# The location of the directory to store the copy of the tx.csv file on each site
+export RMG_SERVER_TXDIR="$RMG_SERVER_METADATA_DIR/site_tx"
+
 # The location of the database authentication file
 # This file is used by server scripts to access the database.
 export RMG_SERVER_DB_AUTH="$RMG_SERVER_METADATA_DIR/db_auth"
