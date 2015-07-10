@@ -550,6 +550,7 @@ do
        else
         echo "error: Computer ping test wasn't successful" 1>&2
       fi
+    ;;
     
   esac
   let count=count+1

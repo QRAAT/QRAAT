@@ -126,19 +126,9 @@ then
   export RETRY_MAX=10
 fi 
 
-
-## Collect status information ##
-TYPE=$(rmg_csv --column powertype <$RMG_SITE_CSV)
-[[ "$TYPE" == "pingbrother" ]] && invert="--invert=true" 
-
-IP=$(rmg_csv --column power_ip <$RMG_SITE_CSV)
-RX_OUTLET=$(rmg_csv --column rx_outlet <$RMG_SITE_CSV)
-
-RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
-if [ $? -ne "0" ]; then
-  echo "Couldn't check powerswitch status.";
-  echo "Checking disk status";
-  TMPFILE=$(mktemp ~/tempfile.XXXXXXXX)
+function disk_status() {
+  #Check to see if disk is full or in read-only mode
+  TMPFILE=$(mktemp $RMG_SITE_METADATA_DIR/tempfile.XXXXXXXX)
   if [ $? -ne "0" ]; then
     echo "Couldn't make test file."
     AVAILABLE_BLOCKS=$(df -k / | tail -1 | awk '{print $4}')
@@ -153,9 +143,24 @@ if [ $? -ne "0" ]; then
     fi
   else
     rm $TMPFILE
-    echo "Could make test file. Unknown error. Exiting"
-    exit 1
+    echo "Could make test file."
   fi
+}
+
+## Collect status information ##
+TYPE=$(rmg_csv --column powertype <$RMG_SITE_CSV)
+[[ "$TYPE" == "pingbrother" ]] && invert="--invert=true" 
+
+IP=$(rmg_csv --column power_ip <$RMG_SITE_CSV)
+RX_OUTLET=$(rmg_csv --column rx_outlet <$RMG_SITE_CSV)
+
+RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
+if [ $? -ne "0" ]; then
+  echo "Couldn't check powerswitch status.";
+  echo "Checking disk status";
+  disk_status
+  echo "Unknown error. Exiting"
+  exit 1
 fi 
 
 SDR_PID=$(pgrep rmg_runretry)
@@ -164,6 +169,7 @@ read PREV_TIME PREV_STATUS <<< $((head -n 1 $RMG_SITE_STATUS_LOG && tail -n 1 $R
 
 ## Transition functions ##
 function up() {
+
   if [[ $RX_STATE -ne 1 ]] && [[ ! $SDR_PID ]]
     then
       if [[ $PREV_STATUS == *"down"* ]] || [[ $PREV_STATUS == "do_nothing" ]]
@@ -185,9 +191,11 @@ function up() {
       fi
       STATUS="Site stopped; is now up"
   fi
+
 }
 
 function down() {
+
   if [[ $RX_STATE -ne 1 ]] && [[ ! $SDR_PID ]] 
     then 
       STATUS="Site set to go down in $(($DELAY * 60)) seconds"
@@ -204,35 +212,48 @@ function down() {
       fi 
       STATUS="Site stopped; set to go down in $(($DELAY * 60)) seconds"
   fi
+
 }
 
 function active() {
    
   if [[ $RX_STATE -ne 0 ]] && [[ $SDR_PID ]]
-    then 
-      if [[ $PREV_STATUS == "do_nothing" ]]
-        then
-          STATUS="Site is running"
-        else
-          STATUS="Site already running"
-      fi
-    else
+   then 
+    if [[ $PREV_STATUS == "do_nothing" ]]
+     then
+      STATUS="Site is running"
+    elif [[ $PREV_STATUS == "Calibration" ]]
+     then
+      up
+      disk_status
       nohup rmg_runretry &> /dev/null < /dev/null & 
       SDR_PID=$!
       STATUS="Site started"
+    else
+      STATUS="Site already running"
+    fi
+  else
+    disk_status
+    nohup rmg_runretry &> /dev/null < /dev/null & 
+    SDR_PID=$!
+    STATUS="Site started"
   fi
+
 }
 
 function calibration() {
+
   if [[ "$PREV_STATUS" != "Calibration" ]]
    then
     up
+    disk_status
     nohup rmg_runretry cal &> /dev/null < /dev/null & 
     SDR_PID=$!
     STATUS="Calibration"
    else
     STATUS="Calibration already running"
   fi
+
 }
 
 function do_nothing() {
