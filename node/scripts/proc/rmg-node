@@ -172,20 +172,22 @@ function up() {
 
   if [[ $RX_STATE -ne 1 ]] && [[ ! $SDR_PID ]]
     then
-      if [[ $PREV_STATUS == *"down"* ]] || [[ $PREV_STATUS == "do_nothing" ]]
+      if [[ $PREV_STATUS != *"up"* ]]
         then
           STATUS="Site is now up"
         else
           STATUS="Site is already up"
       fi
     else
-      if [ $SDR_PID ]                          # Pulse detector stopped
+      if [ $SDR_PID ]
         then 
+          # Stop pulse detector
           kill -SIGTERM $SDR_PID `pgrep run_rmg`
           unset SDR_PID
       fi 
-      if [ $RX_STATE -eq 1 ]                   # RMG receiver off
+      if [ $RX_STATE -eq 1 ]
         then 
+          # RMG receiver off
           rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
           RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
       fi
@@ -200,13 +202,15 @@ function down() {
     then 
       STATUS="Site set to go down in $(($DELAY * 60)) seconds"
   else 
-      if [ $SDR_PID ]                          # Pulse detector stopped
+      if [ $SDR_PID ]
         then
+          # Stop pulse detector stopped
           kill -SIGTERM $SDR_PID `pgrep run_rmg`
           unset SDR_PID
       fi
-      if [ $RX_STATE -eq 1 ]                   # RMG receiver off
+      if [ $RX_STATE -eq 1 ]
         then
+          # RMG receiver off
           rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
           RX_STATE=$(rmg_powerswitch $TYPE $IP $RX_OUTLET QUERY $invert)
       fi 
@@ -219,11 +223,10 @@ function active() {
    
   if [[ $RX_STATE -ne 0 ]] && [[ $SDR_PID ]]
    then 
-    if [[ $PREV_STATUS == "do_nothing" ]]
+    if [[ $PREV_STATUS == "do_nothing" ]] || [[ $PREV_STATUS == "Calibration" ]]
      then
-      STATUS="Site is running"
-    elif [[ $PREV_STATUS == "Calibration" ]]
-     then
+      # site is running but might not be the right configuration
+      # restart for safety
       up
       disk_status
       nohup rmg_runretry &> /dev/null < /dev/null & 
