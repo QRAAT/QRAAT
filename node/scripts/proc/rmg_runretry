@@ -9,7 +9,7 @@ source rmg_env  # setup RMG environment variables
 
 if [ $1 ]
  then
-  if [ -e $1 ]
+  if [ -r $1 ]
    then
     tx_file=$1
   elif [ $1 == "cal" ]
@@ -24,7 +24,7 @@ else
   tx_file=$RMG_SITE_TX_CSV
 fi
 
-if [ -n $tx_file ]
+if [ ! -r $tx_file ]
  then
   echo "error: no tx.csv file $tx_file" 1>&2
   exit 1
