@@ -223,7 +223,7 @@ function active() {
    
   if [[ $RX_STATE -ne 0 ]] && [[ $SDR_PID ]]
    then 
-    if [[ $PREV_STATUS == "do_nothing" ]] || [[ $PREV_STATUS == "Calibration" ]]
+    if [[ $PREV_STATUS != *"start"* ]]
      then
       # site is running but might not be the right configuration
       # restart for safety
@@ -246,15 +246,23 @@ function active() {
 
 function calibration() {
 
-  if [[ "$PREV_STATUS" != "Calibration" ]]
+  if [[ $RX_STATE -ne 0 ]] && [[ $SDR_PID ]]
    then
-    up
+    if [[ "$PREV_STATUS" != "Calibration" ]]
+     then
+      up
+      disk_status
+      nohup rmg_runretry cal &> /dev/null < /dev/null & 
+      SDR_PID=$!
+      STATUS="Calibration"
+     else
+      STATUS="Calibration already running"
+    fi
+  else
     disk_status
     nohup rmg_runretry cal &> /dev/null < /dev/null & 
     SDR_PID=$!
     STATUS="Calibration"
-   else
-    STATUS="Calibration already running"
   fi
 
 }
