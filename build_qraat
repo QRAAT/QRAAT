@@ -70,6 +70,7 @@ function sudocheck {
     #  y|yes|YES|Y)
     case `groups | grep sudo` in
       '')
+        echo User is not in sudo group
         echo Exiting. Please ensure that you have sudo privileges 
         echo on this system to continue install. 
         exit
@@ -77,25 +78,26 @@ function sudocheck {
       *)
         #echo Continuing with script
         SUDOASKED=true
-        sudo grep timestamp_timeout /etc/sudoers >tmp$$
-        timeout=`cat tmp$$|awk '/./ {print $4}'`
-        rm -f tmp$$
-        if [ "@@" = "@$timeout@" ]
-        then
-          sudo cp /etc/sudoers tmp$$
-          sudo chown $USER tmp$$
-          sudo chmod 644 tmp$$
-          echo "Defaults  timestamp_timeout = 90" >>tmp$$
-          sudo cp tmp$$ /etc/sudoers
-          sudo chown root /etc/sudoers
-          sudo chmod 440 /etc/sudoers
-        elif [ $timeout -lt 90 ]
-          then
-          echo You need to have a timestamp_timout in /etc/sudoers 
-          echo of 90 or more echo Please ensure that your 
-          echo timestamp_timeout is 90 or more
-          exit
-        fi
+        sudo -v
+        #sudo grep timestamp_timeout /etc/sudoers >tmp$$
+        #timeout=`cat tmp$$|awk '/./ {print $4}'`
+        #rm -f tmp$$
+        #if [ "@@" = "@$timeout@" ]
+        #then
+        #  sudo cp /etc/sudoers tmp$$
+        #  sudo chown $USER tmp$$
+        #  sudo chmod 644 tmp$$
+        #  echo "Defaults  timestamp_timeout = 90" >>tmp$$
+        #  sudo cp tmp$$ /etc/sudoers
+        #  sudo chown root /etc/sudoers
+        #  sudo chmod 440 /etc/sudoers
+        #elif [ $timeout -lt 90 ]
+        #  then
+        #  echo You need to have a timestamp_timout in /etc/sudoers 
+        #  echo of 90 or more echo Please ensure that your 
+        #  echo timestamp_timeout is 90 or more
+        #  exit
+        #fi
       ;;
     esac
   fi
