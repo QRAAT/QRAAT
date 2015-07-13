@@ -77,6 +77,9 @@
 #
 #
 
+# ssh timeout in seconds
+ConnectTimeout=10
+
 function help() {
   cat <<!EOF!
 usage: rmg task [-options] {sites}/all  
@@ -118,6 +121,8 @@ usage: rmg task [-options] {sites}/all
 
     cyclerx      Power off the RMG receiver and power it back on.
 
+    calibration --file FILE Update cal_tx.csv and run calibration on site
+
     auto_on      Turn automatic scheduler on
 
     auto_off     Turn automatic scheduler off
@@ -146,7 +151,7 @@ function get_status() {
   if [ $? -eq 0 ]
     then
       ping_computer="success"
-      read site_goal timestamp site_status <<< `ssh $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+      read site_goal timestamp site_status <<< `ssh -o ConnectTimeout=$ConnectTimeout $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
     else
       ping_computer="failure"
       site_goal="unknown"
@@ -169,7 +174,7 @@ function get_status() {
               if [ $? -eq 0 ]
                 then
                   ping_computer="success"
-                  read site_goal timestamp site_status <<< `ssh $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+                  read site_goal timestamp site_status <<< `ssh -o ConnectTimeout=$ConnectTimeout $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
                 else
                   if [[ $serv_state == "down" ]]
                     then
@@ -197,7 +202,7 @@ function do_update() {
 # and run rmg-node check. 
   SITE=$1
   rmg_csv --row $SITE <$SITELIST | \
-  ssh $SITE "cat > site.csv; rmg-node check"  
+  ssh -o ConnectTimeout=$ConnectTimeout $SITE "cat > site.csv; rmg-node check"  
 
 }
   
@@ -246,6 +251,15 @@ case $TASK in
       rmg_txlist $RMG_SERVER_DB_AUTH -f $TX_FILE
     fi
     exit 0
+  ;;
+
+  calibration)
+    if [[ "$1" == "-f" ]] || [[ "$1" == "--file" ]] 
+    then
+      TX_FILE=$2
+      shift
+      shift
+    fi
   ;;
     
   status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing|die|down_now|auto_off|auto_on)
@@ -422,7 +436,7 @@ do
           touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
           rsync -az $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
           rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
-          ssh $SITE "rmg-node down -d 0; sleep 1; rmg-node check"
+          ssh -o ConnectTimeout=$ConnectTimeout $SITE "rmg-node down -d 0; sleep 1; rmg-node check"
         else
           echo "error: couldn't update; Computer ping test wasn't successful" 1>&2
      fi
@@ -467,20 +481,20 @@ do
       then
         if [[ ! -e $RMG_SERVER_DET_DIR/$SITE/fetching.site ]]
         then
-          DIRECTORIES_TO_COPY=$(ssh $SITE "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch)
+          DIRECTORIES_TO_COPY=$(ssh -o ConnectTimeout=$ConnectTimeout $SITE "cd $RMG_SITE_DET_DIR && find -type d" | rmg_fetch)
           if [[ $DIRECTORIES_TO_COPY ]]
           then
             mkdir -p $RMG_SERVER_DET_DIR/$SITE 
             touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
             for DIR in $DIRECTORIES_TO_COPY; do
-              echo "copying $DIR"
+              echo "$SITE copying $DIR"
               mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
               # download to RMG server and delete from site if xfer succeeds
               rsync -az --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
               if [ $? -ne 0 ]; then
                 echo "rsync error copying $DIR from $SITE"
               fi
-              ssh $SITE "find $RMG_SITE_DET_DIR -mindepth 1 -depth -empty -delete"
+              ssh -o ConnectTimeout=$ConnectTimeout $SITE "find $RMG_SITE_DET_DIR -mindepth 1 -depth -empty -delete"
               let ct=ct+1
             done
             rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
@@ -500,7 +514,9 @@ do
       if [[ "$ping_computer" == "success" ]]
         then
           scp $TX_FILE $SITE:$RMG_SITE_METADATA_DIR/tx.csv 
-          cp -f $TX_FILE $RMG_SERVER_METADATA_DIR/tx.csv 
+          cp -f $TX_FILE $RMG_SERVER_TXDIR/tx.csv.$SITE
+          date >> $RMG_SERVER_LOG_DIR/rmg_tx.log
+          echo "updating txlist on $SITE" >> $RMG_SERVER_LOG_DIR/rmg_tx.log
           cat $TX_FILE >>$RMG_SERVER_LOG_DIR/rmg_tx.log
         else
           echo "error: Computer ping test wasn't successful" 1>&2
@@ -517,6 +533,22 @@ do
           fi
         else
           echo "error: Router ping test wasn't successful" 1>&2
+      fi
+    ;;
+
+    calibration)
+      echo "calibration $SITE"
+      if [[ "$ping_computer" == "success" ]]
+       then
+        if [[ -e $TX_FILE ]]
+         then
+          scp $TX_FILE $SITE:$RMG_SITE_CAL_TX_CSV 
+          echo "updating cal_txlist on $SITE"
+        fi
+        rmg_csv $SITE state calibration < $SITELIST > /tmp/tmp_sitelist.csv && mv -f -b /tmp/tmp_sitelist.csv $SITELIST
+        do_update $SITE
+       else
+        echo "error: Computer ping test wasn't successful" 1>&2
       fi
     ;;
     
