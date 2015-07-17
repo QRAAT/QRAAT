@@ -98,10 +98,13 @@ def get_context(request, deps=[], req_deps=[]):
   #Site locations
   sites = []
   for s in Site.objects.all():
-    sites.append((
-      s.ID, s.name, s.location, float(s.latitude), float(s.longitude), 
-      float(s.easting), float(s.northing), s.utm_zone_number, 
-      s.utm_zone_letter, float(s.elevation)))
+    try:
+      sites.append((
+        s.ID, s.name, s.location, float(s.latitude), float(s.longitude), 
+        float(s.easting), float(s.northing), s.utm_zone_number, 
+        s.utm_zone_letter, float(s.elevation)))
+    except TypeError:
+      pass
   index_form = Form(deps=deps, req_deps=req_deps, data=request.GET or None)
   
   view_type = ""
@@ -158,7 +161,6 @@ def get_context(request, deps=[], req_deps=[]):
         datetime_from_initial = datetime_to_initial - INITIAL_DATA_WINDOW
         queried_objects = Position.objects.filter(deploymentID = req_deps[0].ID, 
                                                   timestamp__gte = datetime_from_initial)
-      
         datetime_to_str_initial = time.strftime('%Y-%m-%d %H:%M:%S',
                     time.localtime(float(datetime_to_initial-7*60*60))) # FIXME 
       
@@ -179,7 +181,7 @@ def get_context(request, deps=[], req_deps=[]):
         index_form.fields['likelihood_high'].initial = likelihood_high_initial
         index_form.fields['activity_low'].initial = activity_low_initial
         index_form.fields['activity_high'].initial = activity_high_initial
-
+        
         queried_data = sort_query_results(queried_objects)
 
         # Note: To pass strings to js using json, use |safe in template.
@@ -247,6 +249,7 @@ def get_context(request, deps=[], req_deps=[]):
         raise Exception("Something is wrong.")
    
       queried_data = sort_query_results(queried_objects)
+      
   
   context = {
             #public, deployment, project, etc.
@@ -294,7 +297,7 @@ def get_context(request, deps=[], req_deps=[]):
 def sort_query_results(queried_objects):
   ''' Choose highest likelihood position for each timestamp 
       and sort query data by timestamp. ''' 
-	
+    
   #use dictionary to remove duplicates (positions with same timestamp)
   query_dictionary = {} #key=timestamp, value=query_row
   for row in queried_objects:
@@ -304,32 +307,32 @@ def sort_query_results(queried_objects):
       query_dictionary[row.timestamp] = row #replaces existing value if new likelihood is greater
     else:
       pass #existing likelihood is greater
-	
+    
   timestamps = sorted(query_dictionary.keys())
 
   queried_data=[] #data ordered by timestamp
 
   for timestamp in timestamps:
-    row = query_dictionary[timestamp]			
+    row = query_dictionary[timestamp]
     date_string = time.strftime('%Y-%m-%d %H:%M:%S', #FIXME
-				time.localtime(float(row.timestamp-7*60*60)))
+                time.localtime(float(row.timestamp-7*60*60)))
 
     queried_data.append((row.ID, row.deploymentID,
-			float(row.timestamp), float(row.easting), 
-			float(row.northing), row.utm_zone_number, 
-			float(row.likelihood), float(row.activity), 
-			(float(row.latitude), float(row.longitude)), 
-			row.utm_zone_letter, date_string))
+            float(row.timestamp), float(row.easting), 
+            float(row.northing), row.utm_zone_number, 
+            float(row.likelihood), float(row.activity), 
+            (float(row.latitude), float(row.longitude)), 
+            row.utm_zone_letter, date_string))
 
   ''' For reference, the obsolete hardcoded query:
       pos_query = Position.objects.filter(
-											deploymentID = req_deps[0].ID,
-											timestamp__gte = datetime_start,
-											timestamp__lte = datetime_end,
-											likelihood__gte = likelihood_low,
-											likelihood__lte = likelihood_high,
-											activity__gte = activity_low,
-											activity__lte = activity_high) '''
+                                            deploymentID = req_deps[0].ID,
+                                            timestamp__gte = datetime_start,
+                                            timestamp__lte = datetime_end,
+                                            likelihood__gte = likelihood_low,
+                                            likelihood__lte = likelihood_high,
+                                            activity__gte = activity_low,
+                                            activity__lte = activity_high) '''
 
   return queried_data
 
@@ -358,7 +361,7 @@ def index(request):
 
 def view_by_dep(request, project_id, dep_id):
   ''' Compile a list of deployments associated with `dep_id`. ''' 
-  
+   
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
@@ -377,7 +380,7 @@ def view_by_dep(request, project_id, dep_id):
         raise PermissionDenied #403
     
     else:
-			return redirect("/auth/login/?next=%s" % request.get_full_path())
+            return redirect("/auth/login/?next=%s" % request.get_full_path())
 
   else: pass #public project
     
@@ -414,7 +417,7 @@ def download_by_dep(request, project_id, dep_id):
   try:
     project = Project.objects.get(ID=project_id)
   except ObjectDoesNotExist:
-		raise Http404
+        raise Http404
       
   if not project.is_public:
     if request.user.is_authenticated():
@@ -429,7 +432,7 @@ def download_by_dep(request, project_id, dep_id):
         raise PermissionDenied #403
 
     else:
-			return redirect("/auth/login/?next=%s" % request.get_full_path())
+            return redirect("/auth/login/?next=%s" % request.get_full_path())
 
 
   else:
@@ -582,3 +585,4 @@ def generic_graph(
 
     return render(
         request, template, content)
+        
