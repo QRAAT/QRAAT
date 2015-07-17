@@ -100,7 +100,7 @@ then
 fi
 
 # Path to backup directory on the frontend virtual machine
-export RMG_BACKUP_FRONTEND=qraat-frontend:/mnt/backup/backup/rmg_server
+export RMG_BACKUP_FRONTEND=qraat-frontend:/mnt/vm14/backup/backup/rmg_server
 
 # The number of days that files stay in RMG_SERVER_ARCHIVE_DIR
 # Used in rmg_clean
