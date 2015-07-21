@@ -542,9 +542,11 @@ do
        then
         if [[ -e $TX_FILE ]]
          then
-          scp $TX_FILE $SITE:$RMG_SITE_CAL_TX_CSV 
           echo "updating cal_txlist on $SITE"
+          scp $TX_FILE $SITE:$RMG_SITE_CAL_TX_CSV 
         fi
+        echo "Turning auto scheduler off for $SITE"
+        rmg auto_off $SITE
         rmg_csv $SITE state calibration < $SITELIST > /tmp/tmp_sitelist.csv && mv -f -b /tmp/tmp_sitelist.csv $SITELIST
         do_update $SITE
        else
