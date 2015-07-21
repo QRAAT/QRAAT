@@ -111,7 +111,7 @@ if ct > 0:
                            est_northing - site_northing)*180/np.pi
   est_2d_distance = np.sqrt((est_easting - site_easting)**2 + (est_northing - site_northing)**2)
   est_3d_distance = np.sqrt((est_easting - site_easting)**2 + (est_northing - site_northing)**2 + (est_elevation - site_elevation)**2)
-  est_elevation_angle = np.arctan2((est_elevation - site_elevation),est_2d_distance)
+  est_elevation_angle = np.arctan2((est_elevation - site_elevation),est_2d_distance)*180/np.pi
 
 
   # Insert into databse. 
