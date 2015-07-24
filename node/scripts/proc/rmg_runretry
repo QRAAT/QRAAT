@@ -5,46 +5,67 @@
 # Run the pulse detector. When a failure happens, attempt to restart. 
 #
 
-TYPE=$1
-IP=$2
-RX_OUTLET=$3
+source rmg_env  # setup RMG environment variables
 
-if [ ! $RX_OUTLET ]
-  then
-    echo "usage: rmg_runretry <pwr_type> <pwr_ip> <rx_outlet>" 1>&2
+if [ $1 ]
+ then
+  if [ -r $1 ]
+   then
+    tx_file=$1
+  elif [ $1 == "cal" ]
+   then
+    tx_file=$RMG_SITE_CAL_TX_CSV
+  else
+    echo "error: invalid argument \'$1\'" 1>&2
+    echo "usage: rmg_runretry [ cal | <path_to_tx_csv_file> ]" 1>&2
     exit 1
+  fi
+else
+  tx_file=$RMG_SITE_TX_CSV
 fi
 
+if [ ! -r $tx_file ]
+ then
+  echo "error: no tx.csv file $tx_file" 1>&2
+  exit 1
+fi
+
+
+
+TYPE=$(rmg_csv --column powertype <$RMG_SITE_CSV)
 [[ "$TYPE" == "pingbrother" ]] && invert="--invert=true" 
 
-source rmg_env  # setup RMG environment variables
-STATUS_LOG=$RMG_SITE_METADATA_DIR/status.log
+IP=$(rmg_csv --column power_ip <$RMG_SITE_CSV)
+RX_OUTLET=$(rmg_csv --column rx_outlet <$RMG_SITE_CSV)
+
+
 RETRY_CT=0
 
 if [ ! $RETRY_MAX ]
 then
-  echo "error: retry max not set." 1>&2
-  exit 1
+  echo "Warning: Retry max not set. Running once." 1>&2
+  RETRY_MAX=1
 fi
 
 sleep 1
 rmg_powerswitch $TYPE $IP $RX_OUTLET ON $invert
 
+mkdir -p $RMG_SITE_LOG_DIR
+
 while [ $RETRY_CT -lt $RETRY_MAX ]
 do 
-  mkdir -p $RMG_SITE_LOG_DIR
   run_rmg -d $RMG_SITE_DET_DIR \
-        -f $RMG_SITE_METADATA_DIR/tx.csv \
+        -f $tx_file \
         -p $RMG_SERIAL_PORT \
         -t $RMG_TUNE_TIME \
         1> /dev/null \
         2> $RMG_SITE_LOG_DIR/run_rmg_error$(date -d 'today' +'%Y.%m.%d_%H.%M').txt 
 #        1> $RMG_SITE_LOG_DIR/run_rmg$(date -d 'today' +'%Y.%m.%d_%H.%M').txt \
   let RETRY_CT=RETRY_CT+1
-  echo "$(date -u +%s),err_retry($RETRY_CT)" | cat >> $STATUS_LOG
+  echo "$(date -u +%s),err_retry($RETRY_CT)" >> $RMG_SITE_STATUS_LOG
   rmg_powerswitch $TYPE $IP $RX_OUTLET CYCLE $invert
-  echo "$(date -u +%s),Site started" | cat >> $STATUS_LOG
+  echo "$(date -u +%s),Site started" >> $RMG_SITE_STATUS_LOG
 done
 
 rmg_powerswitch $TYPE $IP $RX_OUTLET OFF $invert
-echo "$(date -u +%s),err_fatal" | cat >> $STATUS_LOG
+echo "$(date -u +%s),err_fatal" >> $RMG_SITE_STATUS_LOG

@@ -100,7 +100,7 @@ then
 fi
 
 # Path to backup directory on the frontend virtual machine
-export RMG_BACKUP_FRONTEND=qraat-frontend:/mnt/backup/backup/rmg_server
+export RMG_BACKUP_FRONTEND=qraat-frontend:/mnt/vm14/backup/backup/rmg_server
 
 # The number of days that files stay in RMG_SERVER_ARCHIVE_DIR
 # Used in rmg_clean
@@ -125,6 +125,18 @@ export RMG_SITE_DET_DIR="/tmp/ramdisk/det_files"
 
 # Log directory for remotes
 export RMG_SITE_LOG_DIR="$RMG_SITE_METADATA_DIR/log"
+
+# Status.log file on remote
+export RMG_SITE_STATUS_LOG="$RMG_SITE_METADATA_DIR/status.log"
+
+# site.csv file on remote
+export RMG_SITE_CSV="$RMG_SITE_METADATA_DIR/site.csv"
+
+# tx.csv file on remote
+export RMG_SITE_TX_CSV="$RMG_SITE_METADATA_DIR/tx.csv"
+
+# cal_tx.csv file on remote
+export RMG_SITE_CAL_TX_CSV="$RMG_SITE_METADATA_DIR/cal_tx.csv"
 
 # The maximum number of attempts to start the pulse detector before a
 # fatal error state is reached. This value is needed by the site.

@@ -121,6 +121,8 @@ usage: rmg task [-options] {sites}/all
 
     cyclerx      Power off the RMG receiver and power it back on.
 
+    calibration --file FILE Update cal_tx.csv and run calibration on site
+
     auto_on      Turn automatic scheduler on
 
     auto_off     Turn automatic scheduler off
@@ -249,6 +251,15 @@ case $TASK in
       rmg_txlist $RMG_SERVER_DB_AUTH -f $TX_FILE
     fi
     exit 0
+  ;;
+
+  calibration)
+    if [[ "$1" == "-f" ]] || [[ "$1" == "--file" ]] 
+    then
+      TX_FILE=$2
+      shift
+      shift
+    fi
   ;;
     
   status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing|die|down_now|auto_off|auto_on)
@@ -522,6 +533,24 @@ do
           fi
         else
           echo "error: Router ping test wasn't successful" 1>&2
+      fi
+    ;;
+
+    calibration)
+      echo "calibration $SITE"
+      if [[ "$ping_computer" == "success" ]]
+       then
+        if [[ -e $TX_FILE ]]
+         then
+          echo "updating cal_txlist on $SITE"
+          scp $TX_FILE $SITE:$RMG_SITE_CAL_TX_CSV 
+        fi
+        echo "Turning auto scheduler off for $SITE"
+        rmg auto_off $SITE
+        rmg_csv $SITE state calibration < $SITELIST > /tmp/tmp_sitelist.csv && mv -f -b /tmp/tmp_sitelist.csv $SITELIST
+        do_update $SITE
+       else
+        echo "error: Computer ping test wasn't successful" 1>&2
       fi
     ;;
     
