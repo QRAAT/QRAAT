@@ -609,7 +609,7 @@ def edit_deployment(request, project_id, deployment_id):
         get_form=EditDeploymentForm(
             instance=deployment,
             initial={'time_start':
-                     utils.strfdate(
+                     utils.strftime(
                          utils.timestamp_todate(deployment.time_start))}),
         template_path="project/edit-deployment.html",
         success_url="%s?new_element=True" % reverse(

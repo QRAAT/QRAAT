@@ -4,369 +4,932 @@
     <link rel="stylesheet" type="text/css" href="/static/map/css/style.css"/>
     <!-- Link google maps API with alisha's gmail key -->
     <script type="text/javascript" 
-        src="https://maps.googleapis.com/maps/api/js?key={% load google_maps_api %}&sensor=false">
+        src="https://maps.googleapis.com/maps/api/js?key={% load google_maps_api %}&libraries=visualization&sensor=true_or_false">
     </script>
     <!-- <link href="/static/flot/example.css" rel="stylesheet" type="text/css"> -->
-    <script src="/static/js/jquery.min.js"></script>
+    <!-- Already loaded in templates/bootstrap <script src="/static/js/jquery.min.js"></script> -->
     <script src="/static/flot/jquery.flot.min.js"></script>
     <script src ="/static/flot/jquery.flot.time.min.js"></script>
     <script src ="/static/flot/jquery.flot.selection.min.js"></script>
     <script src="/static/flot/jquery.flot.threshold.min.js"></script>
     <script src="/static/flot/jquery.flot.resize.min.js"></script>
-    <script src="/static/flot/jquery.flot.axislabels.js"></script>
-    <script src="/static/map/js/jquery-ui.min.js"></script>
+    <script src="/static/flot/jquery.flot.axislabels.js"></script> <!-- TODO: minify this -->
+    <script src="/static/map/js/date.js"></script>
+    <script src="/static/flot/jquery.flot.time.min.js"></script>
+    <!-- <script src="/static/map/js/jquery-ui.min.js"></script> -->
+    <!-- TODO: Ask about google hosting or not -->
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+
+   
 <script>
 
-    // Global variables
-    var highlightedPoly;
-    var map;
-    var mapCenter;
-    var markers = [];
-    first_dep = {{graph_dep}};
-    curr_dep = first_dep;
-    markers_querydata = new Array();
-    selectedMarkers = new Array();
+// Global variables
+var highlightedPoly;
+var map;
+var heatmap;
+var mapCenter;
+var markers = []; //TODO: This is never used. Change all markers_querydata to markers?
+var markers_sites = [];
+var flotPlotWidth; //So this doesn't have to be calculated for each point drawn
+var flotPlotXOffset; //To account for the offset when resized
+var flotSelectedRange = []; //X coordinates of start and end of selected range to color
+var flotSelctedWidth; //Width of the range
+var selectedTimeRange = []; //Start and end of time range selected (in seconds, not javascript milliseconds)
+var redGreenRamp;
+//The following are unix time in seconds
+var rawPosData = []; // Sorted position data straight from the database (with filtering/sorting done in the Django view). We'll 'cache' data in that if the user asks for data that is adjoined to the end of what we currently have, we'll append that, and if they ask for a subset of data, we'll just use data from this, and not fetch it again. If the user asks for data that is adjoining, but before the begining TODO: then what????? We just make a new array?
+var latlongData; // MVCArray with latlong that correspond to the rawPosData 
+var currPosDataIndex = []; // Indices of the start and end of requested data in rawPosData
+var userRequestedMaxTimeRange = []; // Keep track of this so that if there's chunks of missing data, we don't refetch data based on the time of the actual data previously retrieved. 
 
-    function addSelectedPos(marker, map){
-        /*Add a marker to a selected position point*/
-      for (var i =0; i < selectedMarkers.length; i++) {
+var graphTypeEnum = {'LIKELIHOOD': 6, 'ACTIVITY': 7,};// 'COVARIANCE': ?};
+var graphTypeIndex = [6,7];
+var graphFilters = []; // Data filter (likelihood, activity, ...) bounds [[low,high], [low,high], ...] 
+
+first_dep = {{graph_dep}};
+curr_dep = first_dep;
+markers_querydata = new Array();
+selectedMarkers = new Array();
+
+function addSelectedPos(marker, map){
+    /*Add a marker to a selected position point*/
+    for (var i =0; i < selectedMarkers.length; i++) {
         if(selectedMarkers[i].selected)
-          selectedMarkers[i].selected.setMap(null);
+        selectedMarkers[i].selected.setMap(null);
         else
-          selectedMarkers[i].setMap(null);
-      }
-
-      marker.selected = new google.maps.Marker({
+            selectedMarkers[i].setMap(null);
+    }
+    
+    marker.selected = new google.maps.Marker({
         position: new google.maps.LatLng
         (
-          marker.qraat_pos[8][0],
-          marker.qraat_pos[8][1]
+        marker.qraat_pos[8][0],
+        marker.qraat_pos[8][1]
         ),
         map: map,
         zIndex: google.maps.Marker.MAX_ZINDEX + 1
         // zIndex sets marker on top of all other markers
-      });
-
-      // Set on click infoWindow content for highlighted data marker
-      addInfoWindow(marker.selected, marker.qraat_pos, map);
-      
-      //Empty selectedMarkers array
-      selectedMarkers = new Array();
-
-      selectedMarkers.push(marker);
-
-      // Deployment changed need to reload flot
-      if(marker.qraat_pos[1] != curr_dep){
+    });
+    
+    // Set on click infoWindow content for highlighted data marker
+    addInfoWindow(marker.selected, marker.qraat_pos, map);
+    
+    //Empty selectedMarkers array
+    selectedMarkers = new Array();
+    
+    selectedMarkers.push(marker);
+    
+    // Deployment changed need to reload flot
+    if(marker.qraat_pos[1] != curr_dep){
         reloadFlot(markers_querydata, map, marker);
         curr_dep = marker.qraat_pos[1];
-      }
-      
-      selectFlotPoint(marker);
-        map.setCenter(marker.getPosition());
     }
+    
+    selectFlotPoint(marker);
+    map.setCenter(marker.getPosition());
+}
 
-    function getGraphData(markers, dep_id, sel_data){
+// What is the reason for this to use markers instead of the raw data
+function getGraphData(markers, dep_id, sel_data){
+    
+    var data = {}
+    data.graph = new Array();
+    data.markers = new Array();
+    data.deployments = new Array();
+    
+    // graph_data_index specifies column in pos_data to display in Flot.
+    if (sel_data ==2) { // activity
+        var graph_data_type = 'ACTIVITY';
+    }
+    else{ // likelihood (default)
+        var graph_data_type = 'LIKELIHOOD';
+    }
+    getGraphDataFor: for(var i = currPosDataIndex[0]; i <= currPosDataIndex[1]; i++) {
+    //for (var i=0; i < markers.length; i++) { 
+	// FIXME: Current rawPosData array incompatible with multiple deployments
+        // if (markers[i].qraat_pos[1] == dep_id && markers[i].getVisible()) {
+	    // Filter by likelihood, activity, etc FIXME: Repeated code from colorMarkers
+	    for(var j = 0; j < graphTypeIndex.length; j++) {
+		var val = rawPosData[i][graphTypeIndex[j]];
+		if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
+		    continue getGraphDataFor;
+		}
+	    }
+
+            var flot_point = [markers[i].qraat_pos[2]*1000, markers[i].qraat_pos[graphTypeEnum[graph_data_type]]];
+            markers[i].flot_point = flot_point;
+            data.graph.push(flot_point);
+            data.markers.push(markers[i]);
+            data.deployments.push(markers[i].qraat_pos[1]);
+        //}
+    }
+    return data;
+}
+
+function reloadFlot(markers, map, marker){
+    var dep_id = marker.qraat_pos[1];
+    // $("#placeholder2").data("plot").shutdown(); // Is this necessary?
+    loadFlot(markers, map, dep_id);
+}
+
+function loadFlot(pos_markers, map, dep_id){
+    //Loads flot graph
+    
+    var flot_clicked_series;
+    var flot_clicked_datapoint;
+    var graph_dep = dep_id;
+    var sel_data = {{graph_data}};
+    var label, min, max;
+    var deps = {{deps_list}};
+    
+    $("#dep_id").text(dep_id);
+    
+    var data = getGraphData(pos_markers, dep_id, sel_data);
+    
+    var graph_data =[ { data: data.graph, label: graph_dep, lines: {show:false} } ];
+    
+    var color = ["#8383FF", "yellow", "green", "#B00000"];
+    
+    for (i=0; i < deps.length; i++) {
+        if (graph_dep == deps[i]) { var colorIndex = i; };
+    }
+    
+    //determine graph type for y-axis label
+    var yaxis_label;
+    if (sel_data == 2) { // activity
+        yaxis_label = "Activity";
+    }
+    else{ // likelihood (default)
+        yaxis_label = "Likelihood";
+    }
+    
+    var plot;
+    var options = {
+        legend: { show: false },
+        //points: { show: true, fill: true, radius: 2 },
+        points: { show: true, symbol: drawFlotPoint},
+        grid: { hoverable: true, clickable: true },
+        xaxis: {
+            mode: "time",
+            timezone: "America/Los_Angeles", // TODO: Timezone is hardcoded
+            timeformat: "%m-%d %H:%M",
+            axisLabel: "Time (Los Angeles)",
+            axisLabelUseCanvas: true,
+            axisLabelFontSizePixels: 12,
+            axisLabelFontFamily: "Lucida Grande,Verdana,Arial,sans-serif",
+            axisLabelPadding: 15},
+        yaxis: {
+            axisLabel: yaxis_label,
+            axisLabelUseCanvas: true,
+            axisLabelFontSizePixels: 12,
+            axisLabelFontFamily: "Lucida Grande,Verdana,Arial,sans-serif",
+            axisLabelPadding: 10},
+        highlightColor: 'red',
+	shadowSize: 0,
+        selection: { mode: "x" },
+        colors: [ color[colorIndex] ]
+    };
+    
+    // Gets the gradient colors before drawing the flot plot
+    $.getJSON("/static/ramp255_0_0_0_255_0/values.json", function(data) {
+	redGreenRamp = data;
+        plot = $.plot("#placeholder2", graph_data, options);
+        flotPlotXOffset = plot.getPlotOffset().left + plot.getPlotOffset().right;
+        flotPlotWidth = $("#placeholder2").width() - (flotPlotXOffset);
+        flotSelectedRange[0] = 0;
+        flotSelectedRange[1] = flotPlotWidth;
+        flotSelectedWidth = flotPlotWidth;
+        plot.draw();
+    });
+    
+    
+    // Select marker in map when clicked on flot
+    $("#placeholder2").bind("plotclick", function (event, pos, item) {
+        if (item == undefined) return false;
+        //uncomment to have this show up after enablePosition2 in the html (perhaps clickdata2?)
+        //$("#clickdata2").text("Index " + item.dataIndex +', Date/Time:'+item.datapoint[0]+', '+item.series.label + ': ' + item.datapoint[1]);
         
-        data = {}
-        data.graph = new Array();
-        data.markers = new Array();
-        data.deployments = new Array();
-
-        // graph_data_index specifies column in pos_data to display in Flot. 
-        if (sel_data ==2) { // activity 
-            graph_data_index = 7;
-        }
-        else{ // likelihood (default)
-            graph_data_index = 6; 
-        }
-        //FIXME: bad smell hardcoded timestamp conversion
-        for (var i=0; i < markers.length; i++) {
-            if (markers[i].qraat_pos[1] == dep_id) {
-                var flot_point = [markers[i].qraat_pos[2]*1000-7*60*60*1000, markers[i].qraat_pos[graph_data_index]];
-                markers[i].flot_point = flot_point; 
-                data.graph.push(flot_point);
-                data.markers.push(markers[i]);
-                data.deployments.push(markers[i].qraat_pos[1]);
-            }       
-        }
-        return data;
-    }
-
-    function reloadFlot(markers, map, marker){
-      var dep_id = marker.qraat_pos[1];
-      $("#placeholder2").data("plot").shutdown();
-      loadFlot(markers, map, dep_id);
-    }
-
-    function loadFlot(pos_markers, map, dep_id){
-      //Loads flot graph
-
-        var flot_clicked_series;
-        var flot_clicked_datapoint;
-        var graph_dep = dep_id;
-        var sel_data = {{graph_data}};
-        var label, min, max;
-        var deps = {{deps_list}};
-          
-        $("#dep_id").text(dep_id);
-
-        data = getGraphData(pos_markers, dep_id, sel_data);
-
-        var graph_data =[ { data: data.graph, label: graph_dep, lines: {show:false} } ];
-
-        var color = ["#8383FF", "yellow", "green", "#B00000"];
-
-        for (i=0; i < deps.length; i++) {
-            if (graph_dep == deps[i]) { var colorIndex = i; };
-        }
-
-        //determine graph type for y-axis label
-        var yaxis_label;
-        if (sel_data == 2) { // activity 
-            yaxis_label = "Activity";
-        }
-        else{ // likelihood (default)
-            yaxis_label = "Likelihood";
-        }
-
-        var options = {
-            legend: { show: false },
-            points: { show: true, fill: true, radius: 2 },
-            grid: { hoverable: true, clickable: true },
-            xaxis: {
-              mode: "time",
-              timeformat: "%m-%d %H:%M",
-              axisLabel: "Time", 
-              axisLabelUseCanvas: true,
-              axisLabelFontSizePixels: 12, 
-              axisLabelFontFamily: "Lucida Grande,Verdana,Arial,sans-serif",
-              axisLabelPadding: 15},
-            yaxis: {
-              axisLabel: yaxis_label, 
-              axisLabelUseCanvas: true,
-              axisLabelFontSizePixels: 12, 
-              axisLabelFontFamily: "Lucida Grande,Verdana,Arial,sans-serif",
-              axisLabelPadding: 10},
-            highlightColor: 'red',
-            selection: { mode: "xy" },
-            colors: [ color[colorIndex] ]
-        };
+        //save clicked info in global variables
+        flot_clicked_series = item.series;
+        flot_clicked_datapoint = item.datapoint;
         
-        var plot = $.plot("#placeholder2", graph_data, options);
-
-        // Select marker in map when clicked on flot
-        $("#placeholder2").bind("plotclick", function (event, pos, item) {
-            if (item == undefined) return false;
-            //uncomment to have this show up after enablePosition2 in the html (perhaps clickdata2?) 
-            //$("#clickdata2").text("Index " + item.dataIndex +', Date/Time:'+item.datapoint[0]+', '+item.series.label + ': ' + item.datapoint[1]);
-
-            //save clicked info in global variables
-            flot_clicked_series = item.series;
-            flot_clicked_datapoint = item.datapoint;
-
-            clickedDateTime = item.dataIndex;
-            addSelectedPos(data.markers[item.dataIndex], map);
-
-        });
-    }
-
-    function selectFlotPoint(marker){
-        $("#placeholder2").data("plot").unhighlight();
-        $("#placeholder2").data("plot").highlight(0, marker.flot_point);
-    }
-
-    function addInfoWindow(marker, data, map){
-        /*Add given data info to a given marker*/
-        var content =   '<b>Deployment ID: </b>' + data[1] +
-          '<br><b>Data ID: </b>' + data[0] + 
-              '<br><b>Lat, Lon: </b> ' +
-            data[8][0].toFixed(6) + ', ' +
-        data[8][1].toFixed(6) +
-          '<br><b>Easting, Northing, Zone: </b> ' + 
-            data[3] + ', ' + 
-            data[4] + ', ' + 
-          data[5] +
-              data[9] +
-          '<br><b>Date & Time: </b>' + data[10] + 
-          '<br><b>Position Likelihood: </b>' + data[6].toFixed(2) + 
-            '<br><b>Animal Activity: </b>' + data[7].toFixed(2);
-
-        var infoWindow = new google.maps.InfoWindow({content: content});
+        clickedDateTime = item.dataIndex;
+        addSelectedPos(data.markers[item.dataIndex], map);
         
-        // click Listener for markers
-        google.maps.event.addListener(marker, 'click', 
-          function (event)
-            {
-              infoWindow.open(map, this);
-            } // end event function
-        ); // end click Listener
+    });
+    
+    $("#placeholder2").bind("plotselected",function (event, ranges) {
+	var timeframe = rawPosData[currPosDataIndex[1]][2] - rawPosData[currPosDataIndex[0]][2];
+	selectedTimeRange = [ranges.xaxis.from/1000, ranges.xaxis.to/1000];	
+	flotSelectedRange[0] = (ranges.xaxis.from/1000-(rawPosData[currPosDataIndex[0]][2]))/timeframe * flotPlotWidth;
+	flotSelectedRange[1] = (ranges.xaxis.to/1000-(rawPosData[currPosDataIndex[0]][2]))/timeframe * flotPlotWidth;
+	flotSelectedWidth = flotSelectedRange[1] - flotSelectedRange[0];
+	plot.draw();
+	colorMarkers();
+    });
 
+    $("#placeholder2").bind("plotunselected", function (event) {
+	flotSelectedRange = [0, flotPlotWidth];
+	flotSelectedWidth = flotPlotWidth;	
+	selectedTimeRange = [rawPosData[currPosDataIndex[0]][2], rawPosData[currPosDataIndex[1]][2]];
+	plot.draw();
+	colorMarkers();
+    });
+
+    $("#placeholder2").resize(function () {
+        var oldFlotPlotWidth = flotPlotWidth;
+        flotPlotWidth = $(this).width() - (flotPlotXOffset); //FIXME: does flotPlotXOffset change? It's only set during the initial plot
+        var oldSelectedWidth = flotSelectedWidth;
+        flotSelectedRange[1]=flotPlotWidth;
+        flotSelectedWidth = flotSelectedRange[1]-flotSelectedRange[0];
+	plot.draw();
+    });
+}
+
+function updateFlot(pos_markers, dep_id) {
+    var data = getGraphData(pos_markers, dep_id, {{graph_data}});
+    var graph_data =[ { data: data.graph, label: dep_id, lines: {show:false} } ];
+    $("#placeholder2").data("plot").setData(graph_data);
+    $("#placeholder2").data("plot").setupGrid();
+    $("#placeholder2").data("plot").draw();
+}
+
+function drawFlotPoint(ctx, x, y, radius, shadow){
+    ctx.strokeStyle = colorPoint(x,y);
+    ctx.arc(x, y, radius, 0, Math.PI*2, false); 
+}
+
+var prev = -100;
+function colorPoint(x,y) {
+    if(!document.getElementById('id_colorpoints').checked){
+	    return "";
     }
+    if(x > flotSelectedRange[0] && x < flotSelectedRange[1]) {
+        var i = (x-flotSelectedRange[0])/flotSelectedWidth * 99;
+	if(x<prev){
+		console.log("OUT OF ORDER: prev and x: ",prev," ",x);
+	}
+	prev = x;
+    	return redGreenRamp[(i | 0)]; //i|0 truncates i
+    }
+    else if(x>=flotPlotWidth) {
+	if(flotSelectedRange[1]>=flotPlotWidth)
+	    return redGreenRamp[99]; 
+	return "#CCCCCC"; 
+    }
+    else if(x<=0) {
+	if(flotSelectedRange[0]<=0)
+	    return redGreenRamp[0]
+    	return "#CCCCCC";
+    }
+    else{
+	return "#CCCCCC";
+    }
+}
 
-    function hideFormFields() {
-      if ({{view_type|safe}} == "deployment") {
+function colorMarkers() {
+    // TODO: This assumes a 1 to 1 correspondence b/w rawPosData and markers_querydata. This should be the case, but take care.
+    var timeframe = selectedTimeRange[1] - selectedTimeRange[0];
+    //This assumes that rawPosData and markers_querydata are in the same order, as it should be
+    alldatafor: for(var i = 0; i < rawPosData.length; i++) {
+    	if(rawPosData[i][2] >= selectedTimeRange[0] && rawPosData[i][2] <= selectedTimeRange[1]) {
+	    // Filter by likelihood, activity, etc
+	    for(var j = 0; j < graphTypeIndex.length; j++) {
+		var val = rawPosData[i][graphTypeIndex[j]];
+		if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
+		    markers_querydata[i].setVisible(false);
+		    continue alldatafor;
+		}
+	    }
+	    
+	if(!document.getElementById('id_colorpoints').checked){
+	    markers_querydata[i].icon.url = '/static/icons/basedotblue.png';
+	} else {
+	    var iconnum = (((rawPosData[i][2] - selectedTimeRange[0]) / timeframe)* 99) | 0;
+	    markers_querydata[i].icon.url = '/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png';
+	}
+	    markers_querydata[i].setVisible(true);
+	}		
+	else {
+	    markers_querydata[i].setVisible(false); //Hides marker
+	}
+    }
+}
+    
+function selectFlotPoint(marker){
+    $("#placeholder2").data("plot").unhighlight();
+    $("#placeholder2").data("plot").highlight(0, marker.flot_point);
+}
+
+function addInfoWindow(marker, data, map){
+    /*Add given data info to a given marker*/
+    var content =   '<b>Deployment ID: </b>' + data[1] +
+    '<br><b>Data ID: </b>' + data[0] +
+    '<br><b>Lat, Lon: </b> ' +
+    data[8][0].toFixed(6) + ', ' +
+    data[8][1].toFixed(6) +
+    '<br><b>Easting, Northing, Zone: </b> ' +
+    data[3] + ', ' +
+    data[4] + ', ' +
+    data[5] +
+    data[9] +
+    '<br><b>Date & Time: </b>' + data[10] +
+    '<br><b>Position Likelihood: </b>' + data[6].toFixed(2) +
+    '<br><b>Animal Activity: </b>' + data[7].toFixed(2);
+    
+    var infoWindow = new google.maps.InfoWindow({content: content});
+    
+    // click Listener for markers
+    google.maps.event.addListener(marker, 'click',
+    function (event)
+    {
+        infoWindow.open(map, this);
+    } // end event function
+    ); // end click Listener
+    
+}
+
+function hideFormFields() {
+    if ({{view_type|safe}} == "deployment") {
         document.getElementById('id_deployment').style.display = 'none';
         document.querySelector("label[for='id_deployment_0']").style.display = "none";
-      }
     }
+}
 
-    window.onload = function() {
-      hideFormFields();
-    };
+window.onload = function() {
+    hideFormFields();
+};
 
-
-    function submitForm() {
-      document.getElementById('form').action = "";
-      document.getElementById('form').submit();
+function getPosIndex(timestamp,searchDirection) {
+    // A binary search through rawPosData for index of position that has this timestamp
+    // searchDirection is 'gte' or 'lte' which will will return the index that is gte or lte 
+    var mid; // or'ing with 0 truncates. It's like floor
+    var min = 0;
+    var max = rawPosData.length-1;
+    var maxindex = rawPosData.length-1;
+    while(max >= min) {
+	mid = ((max + min)/2) | 0;
+	if(rawPosData[mid][2] == timestamp) 
+	    return mid;
+	else if(rawPosData[mid][2] > timestamp)
+	    max = mid - 1;
+	else
+	    min = mid + 1;
     }
-    function submitDownloadForm() {
-      // This happens to append "/download" to the base URL; then the
-      // GET form data is appended to the base URL + "/download". 
-      document.getElementById('form').action = "download";
-      document.getElementById('form').submit();
+    if(searchDirection == 'gte' && mid < maxindex)
+	return mid + 1;
+    else if(searchDirection == 'lte' && mid > 0)
+	return mid - 1;
+    else
+	return -1;
+}
+function updateData() {
+    setGraphFilters();
+
+    document.getElementById('form').action = "get_data/";
+    //document.getElementById('form').submit(); 
+
+    // timezoneJS Dates that are timezone aware
+    var reqTimeFrom = (new timezoneJS.Date(document.getElementById("id_datetime_from").value, TIMEZONE).getTime())/1000; 
+    var reqTimeTo = (new timezoneJS.Date(document.getElementById("id_datetime_to").value, TIMEZONE).getTime())/1000;
+    var dataEarliestTime = rawPosData[0][2];
+    var dataLatestTime = rawPosData[rawPosData.length-1][2];
+
+    // If the user wants data from before what we have, or non continguous
+    if(reqTimeTo < userRequestedMaxTimeRange[0] || reqTimeFrom > userRequestedMaxTimeRange[1]) { 
+	console.log("Case 1: new array");
+        // All new array
+	$.ajax({
+	    url: "get_data/",
+	    data: $("#form").serialize(),
+	    dataType: 'json',
+	    success: function(data){
+	    	rawPosData = $.parseJSON(data);
+		currPosDataIndex = [0, rawPosData.length-1];
+	        console.log("currposdataindex", currPosDataIndex); 
+		// Remove markers
+		for(var i = 0; i<markers_querydata.length; i++) {
+		    markers_querydata[i].setMap(null);
+		}
+		markers_querydata = [];
+		updateHelper();
+	    }
+	});
     }
+    // Otherwise, check if they want data past what we have.
+    // If not, find new indices.
+    else if(reqTimeFrom < userRequestedMaxTimeRange[0] || reqTimeTo > dataLatestTime) {	
+	function timeToString(time) {
+	    var theDate = new timezoneJS.Date(time*1000, TIMEZONE);
+	    // .getHours() returns the local hour for the specified timezone
+	    // TODO: You may be able to use .toLocaleString() which allows formating and returns the timezone time. Currently it returns undefined, which may be because we only have LA timezone data.
+	    // + 1 for month and date because it returns from 0-11, 0-30!!!
+	    var dT = {
+	        year: theDate.getFullYear(),
+		month: ("0" + (theDate.getMonth()+1)).slice(-2), 
+		day:  ("0" + (theDate.getDate()+1)).slice(-2),
+		hour:  ("0" + (theDate.getHours())).slice(-2),
+		minute: ("0" + (theDate.getMinutes())).slice(-2),
+		second: ("0" + (theDate.getSeconds())).slice(-2), 
+		// + 1 second so we dont get the last point we already have from this query
+	    };
+	    return dT.year+"/"+dT.month+"/"+dT.day+" "+dT.hour+":"+dT.minute+":"+dT.second;
+	}
 
-    // function setCenter is not working. FIXME
-    // It is intended to recenter the map on a button click.
-    function setCenter() { 
-      map.panTo(new google.maps.LatLng(38.487828027, -122.149419006));
-      //return false;
+	if(reqTimeFrom < userRequestedMaxTimeRange[0]) {
+	    console.log("Case 2.a: concatenating so stuff goes in front. (concatenating creates a whole new array");
+	    var dataEarliestTime = rawPosData[0][2];
+	    var oldDateString = $("#id_datetime_to").val();
+	    var dateEarliestString = timeToString(dataEarliestTime - 1); // -1 to not repeat a point
+	    
+	    $("#id_datetime_to").val(dateEarliestString);
+
+	    $.ajax({
+                url: "get_data/",
+		data: $("#form").serialize(),
+		dataType: 'json',
+		success: function(data) {
+		   data = $.parseJSON(data);
+		   var end = getPosIndex(reqTimeTo, 'lte');
+ 		   rawPosData = data.concat(rawPosData); // Q: How slow is this for large arrays
+		   var emptyArr = new Array(data.length);
+		   markers_querydata = emptyArr.concat(markers_querydata);
+
+		   currPosDataIndex = [0, end + data.length];
+		   console.log("currposdataindex", currPosDataIndex); 
+		   // Hide markers
+		   for( var i = end+1; i< rawPosData.length; i++) {
+		   	//markers_querydata[i].setVisible(false);
+		   }
+
+		   updateHelper(true);
+		},
+	    });
+	    $("#id_datetime_to").val(oldDateString);
+	}
+	if(reqTimeTo > dataLatestTime) {
+	    console.log("Case 2.b: appending to end");
+	    // Append data to end. Query for data starting from latest data timestamp
+	    // Weird way of doing it to reuse existing functions. Change the form so
+	    // you don't query for data you already have, get/query for data based 
+	    // on the changed form, change it back so user doesnt have to see
+	    // this behind the scenes stuff.
+	    var oldDateString = $("#id_datetime_from").val();
+	    var dateLatestString = timeToString(dataLatestTime + 1);	    
+	    console.log("plus 1??? ", timeToString(dataLatestTime), " ", dateLatestString, dataLatestTime);
+	    $("#id_datetime_from").val(dateLatestString);
+	    console.log("THE FORM ",$("#form").serialize());
+	    var prev = rawPosData[0][2];
+	    for(var i = 1; i < rawPosData.length; i++){
+	    	var curr = rawPosData[i][2];
+		if(curr<prev)
+		    console.log("not in order!!! curr and prev ",curr," ",prev);
+		prev = curr;
+	    }
+	    $.ajax({
+		url: "get_data/", 		    
+		data: $("#form").serialize(),
+		dataType: 'json',
+		success: function(data) {
+		    data = $.parseJSON(data);
+		    console.log("data ",data);
+		    console.log("data.length", data.length);
+		    var start = getPosIndex(reqTimeFrom,'gte');
+		    console.log("start: ", start);
+		    for(var i = 0; i < data.length; i++) {
+		    	rawPosData.push(data[i]);
+		    }
+		    currPosDataIndex = [start, rawPosData.length-1];
+		    console.log("currposdataindex", currPosDataIndex); 
+
+		    updateHelper();
+		}
+	    });
+	    $("#id_datetime_from").val(oldDateString); // Hopefully this doesn't cause flickering
+	}
+    }	
+    else {
+	console.log("case 3: all old data");
+	// New timeframe is within what we've already fetched, and there's no new data
+	var start = getPosIndex(reqTimeFrom, 'gte');
+	var end = getPosIndex(reqTimeTo, 'lte');
+	currPosDataIndex = [start,end];
+        console.log("currposdataindex", currPosDataIndex); 
+	//for(var i = 0; i < markers_querydata.length; i++) {// TODO: remove
+	//    if(i >= start && i <= end) {
+	//	markers_querydata[i].setVisible(true);
+	//    }
+	//    else {
+	//	markers_querydata[i].setVisible(false);
+	//    }
+	//}
+	updateHelper();
     }
+    
 
-    function initialize(){
-        
-        // Hard code the initial center latitude and longitude of the map 
-        self.lat = 38.487828027;
-        self.lng = -122.149419006;
-        var myLatLng = new google.maps.LatLng(self.lat, self.lng);
+    function updateHelper(prepend) {
+	if(prepend == null){ prepend = false; }
+	selectedTimeRange = [rawPosData[currPosDataIndex[0]][2], rawPosData[currPosDataIndex[1]][2]];
+	userRequestedMaxTimeRange = [reqTimeFrom, reqTimeTo];
+	loadMarkers(map, prepend);
+	colorMarkers(); // Extraneous when creating a whole new markers_querydata, but w/e
+	updateFlot(markers_querydata,curr_dep);
+    }
+    return true; // To make it submit when you press enter?
+}
+//TODO: Remove this after finishing updating-with-ajax
+function submitForm() {
+    document.getElementById('form').action = "";
+    document.getElementById('form').submit();
+}
+function submitDownloadForm() {
+    // This happens to append "/download" to the base URL; then the
+    // GET form data is appended to the base URL + "/download".
+    document.getElementById('form').action = "download";
+    document.getElementById('form').submit();
+}
 
+// function setCenter is not working. FIXME
+// It is intended to recenter the map on a button click.
+function setCenter() {
+    map.panTo(new google.maps.LatLng(38.487828027, -122.149419006));
+    //return false;
+}
 
-    // The following section saves the center and zoom for map reloads
-      // otherwise, map would reset back to intial default center
-      var reload_zoom;
-      var mapOptions;
+function loadMarkers(map, prepend) {
+    // If we are adding data to the beginning of rawPosData, we must add to the front of markers_querydata 
+    if(prepend == null){ prepend = false; } 
 
-      // If: Map has been loaded before and bounds have changed
-      // (this is when previous center and zoom are saved)...
-      // Then: Set options to the the previous/saved center and zoom.
-      if ((localStorage.mapLat != null) &&
-          (localStorage.mapLng !=null) &&
-          (localStorage.mapZoom !=null)) 
-        {
-          mapOptions = {
-            center: new google.maps.LatLng(
-              localStorage.mapLat, 
-              localStorage.mapLng),
-            zoom: parseInt(localStorage.mapZoom),
-            mapTypeId: google.maps.MapTypeId.SATELLITE,
+    // Display markers for the data points
+    // Adds new markers for all points in the current range if there's nothing in that position already
+    //var infoWindows_querydata = new Array(); // TODO: Remove this
+    var display_type = {{display_type}};
+    
+    // Display marker points if html pref is set to display them
+    //Uncommenting to show on public
+    var deps = {{deps_list}};
+    
+    if ( ((display_type != null) && (display_type==1) &&
+        (currPosDataIndex[1]-currPosDataIndex[0]> 0))
+    ||
+    ({{view_type|safe}} == "deployment") && (display_type!=2)) {
+        var timeframe = selectedTimeRange[1] - selectedTimeRange[0];
+        for (var i=currPosDataIndex[0]; i <= currPosDataIndex[1]; i++) {  
+	    /*
+            marker = new google.maps.Marker({
+                position: new google.maps.LatLng(
+                rawPosData[i][8][0], rawPosData[i][8][1]),
+                map: map,
+                //icon: 'http://www.geocodezip.com/mapIcons/small_blue_dot.png',
+                infoWindowIndex: i
+            });
+            */
+	    if(markers_querydata[i] != null) { 
+		// If this marker already exists
+		if(prepend) {
+		    // If we see an already existant mark, then we've finished adding new markers
+		    break;
+		}
+		else
+		    continue;
+	    }
+
+            //Hard code colors for markers. If dep in array == req_deps from views, display it as a marker of a certain color.
+            if ( ({{view_type|safe}} == "deployment") ||
+            ( (deps.length > 0) && (rawPosData[i][1] == deps[0]) ) ) {
+                var iconnum = (((rawPosData[i][2]-rawPosData[currPosDataIndex[0]][2])/timeframe)*(99)) | 0;
+                //console.log(iconnum);
+                //marker.setIcon('/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png');
+		// The size,origin,anchor make it so that the dot is centered.
+		// So instead of the center bottom of the marker/dot pointing at the
+		// intended location, the center of the dot is right on the spot.
+		// You can notice that the dots wouldn't be centered otherwise when
+		// using the heatmap
+		var image = {
+		    url: '/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png',
+	            size: new google.maps.Size(10,10),
+		    origin: new google.maps.Point(0,0),
+		    anchor: new google.maps.Point(5,5)
+		};
+		marker = new google.maps.Marker({
+                    position: new google.maps.LatLng(
+                    rawPosData[i][8][0], rawPosData[i][8][1]),
+                    map: map,
+		    icon: image,
+                    //icon: 'http://www.geocodezip.com/mapIcons/small_blue_dot.png',
+                    infoWindowIndex: i
+                });
+                //marker.setIcon('/static/icons/blue_dot_hard_round.png');//marker.setIcon('http://www.geocodezip.com/mapIcons/small_blue_dot.png')
+            }
+            if ((deps.length > 1) && (rawPosData[i][1] == deps[1])) {
+                marker.setIcon('http://www.geocodezip.com/mapIcons/small_yellow_dot.png')
+            }
+            if ((deps.length > 2) && (rawPosData[i][1] == deps[2])) {
+                marker.setIcon('http://www.geocodezip.com/mapIcons/small_green_dot.png')
+            }
+            if ((deps.length > 3) && (rawPosData[i][1] == deps[3])) {
+                marker.setIcon('http://www.geocodezip.com/mapIcons/small_red_dot.png')
+            }
             
-            panControl:true,
-            zoomControl:true,
-            mapTypeControl:true,
-            scaleControl:true,
-            streetViewControl:true,
-            overviewMapControl:true,
-            rotateControl:true
-          }; // end map options
-        } // end if map has been loaded before 
+            var content = '<b>DeploymentID: </b>' + rawPosData[0][1] +
+            '<br>' + rawPosData[i][8][0].toFixed(5)
+            + ', ' + rawPosData[i][8][1].toFixed(5)+
+            '<br><b>PosID:</b> ' + rawPosData[i][0] +
+            '<br><b>Time:</b> ' + rawPosData[i][10] +
+            '<br><b>Activity:</b> ' + rawPosData[i][7] +
+            '<br><b>Likelihood:</b> ' + rawPosData[i][6];
+            
+            var infoWindow = new google.maps.InfoWindow({ content: content,
+                //Uncomment the following lines for infoWindow options
+                //size: new google.maps.Size(150, 50),
+                disableAutoPan: true
+            });
+            
+            marker.qraat_pos = rawPosData[i];
+            google.maps.event.addListener(marker, 'click',
+            function(){
+                // WHEN MAP IS CLICKED, display another marker there to highlight point
+                addSelectedPos(this, map);
+            }); // end event function and marker event listener
+            
+            // on mousing over markers for data points, open them to show lat/lng
+            google.maps.event.addListener(marker, 'mouseover', function() {
+                $("<ul>" +
+                "<li><strong>Deployment ID: </strong>" + this.qraat_pos[1]  + "</li>" +
+                "<li><strong>Data ID: </strong>" + this.qraat_pos[0]  + "</li>" +
+                "<li><strong>Lat, Lon: </strong>" + this.qraat_pos[8]    + "</li>" +
+                "<li><strong>Easting, Northing, Zone: </strong>" + this.qraat_pos[3] + ", " +
+                this.qraat_pos[4] + ", " + this.qraat_pos[5]+this.qraat_pos[9] + "</li>"  +
+                "<li><strong>Date & Time: </strong>" + this.qraat_pos[10]  + "</li>" +
+                "<li><strong>Position Likelihood: </strong>" + this.qraat_pos[6].toFixed(2)  + "</li>" +
+                "<li><strong>Animal Activity: </strong>" + this.qraat_pos[7].toFixed(2)  + "</li>" +
+                "</ul>").appendTo(".mouse-over-info");
+                
+            }); // end mouseover event function
+            
+            google.maps.event.addListener(marker, 'mouseout', function() {
+                $(".mouse-over-info").empty();
+            }); // end mouseout event function
+            
+	    /*
+            // close infowindows on mousing out of marker TODO: Remove this
+            google.maps.event.addListener(marker, 'mouseout', function() {
+                infoWindows_querydata[this.infoWindowIndex].close();
+            }); // end mouseout event function
+	    */
+	    if(prepend){
+		//infoWindows_querydata.unshift(infoWindow); // TODO: Remove this unshift ugh
+		markers_querydata[i] = marker;
+	    }
+	    else{
+		//infoWindows_querydata.push(infoWindow);
+		markers_querydata.push(marker);
+	    }
+        } //end for loop for query data
+	
+    } //end if statement for displaying query data as points (not lines)
+}
 
+function setupSlider() {
+    $("#time-slider").slider({
+	range: true,
+	min: 0,
+	max: 100,
+	values: [0,100],
+	step: 0.1,
+	stop: function(event, ui) {
+	    $("#update_test").html($(this).slider("values",1));
+	},
+	change: function(event, ui) {
+	    console.log("changed");
+	    var arrt = [new google.maps.LatLng(rawPosData[0][8])];
+	    var currTimeRange = [rawPosData[currPosDataIndex[0]][2] , rawPosData[currPosDataIndex[1]][2]];
+	    var currTimeDelta = currTimeRange[1] - currTimeRange[0];
+	    var newSelectedIndex = [
+	    	getPosIndex(currTimeRange[0] + (currTimeDelta * $(this).slider("values",0) / 100), 'gte'),
+	    	getPosIndex(currTimeRange[0] + (currTimeDelta * $(this).slider("values",1) / 100), 'lte'),
+	    ];
+	    console.log(currTimeRange[1], currTimeRange[0] + (currTimeDelta * $(this).slider("values",1) / 100));
+	    var currSelectedIndex = [getPosIndex(selectedTimeRange[0]), getPosIndex(selectedTimeRange[1])];
+	    console.log("new and curr ", newSelectedIndex, currSelectedIndex);
+	    var temp = currSelectedIndex[0] - newSelectedIndex[0];
+	    if(temp < 0) {
+	    	for(var i = 0; i>temp; i--) {
+		    latlongData.removeAt(0);
+		}
+	    } else {
+		for(var i = 0; i<temp; i++) {
+		    latlongData.insertAt(i,new google.maps.LatLng(rawPosData[newSelectedIndex[0]+i][8]));
+		}
+	    }
 
-      // If: The map hasn't loaded before (nothing saved for center or zoom)...
-      // Then: Set some default map options.
-      else {
-          var mapOptions = {
-            center: myLatLng,
-            zoom: 14, // Scale of 1 to 20
-            mapTypeId: google.maps.MapTypeId.SATELLITE,
-       
-            panControl:true,
-            zoomControl:true,
-            mapTypeControl:true,
-            scaleControl:true,
-            streetViewControl:true,
-            overviewMapControl:true,
-            rotateControl:true
-        }; // end map options
-       } // end if map hasn't been loaded before
+	    var temp = newSelectedIndex[1] - currSelectedIndex[1]; // The order of subtraction is delibrately chosen
+	    console.log('temp',temp);
+	    if(temp < 0) {
+		for(var i = 0; i>temp; i--) {
+		    latlongData.pop();
+		}
+	    } else {
+		for(var i = 1; i<temp+1; i++) {
+		    latlongData.push(new google.maps.LatLng(rawPosData[currSelectedIndex[1]][8]));
+		}
+	    }
+	    console.log('latlongdata.length',latlongData.length);
+	},
+    });
+}
 
+function setGraphFilters() {
+    graphFilters = [
+	[parseFloat($("#id_likelihood_low").val()),
+    	parseFloat($("#id_likelihood_high").val())],
+	[parseFloat($("#id_activity_low").val()),
+	parseFloat($("#id_activity_high").val())],	
+    ];
+}
+
+function toggleSites() {
+    if(map != null) {
+	for(var i = 0; i < markers_sites.length; i++) {
+	    markers_sites[i].setVisible(!markers_sites[i].getVisible());
+	}
+    }
+}
+
+function loadHeatmap() {
+    latlongData.length = 0;
+    for(var i = currPosDataIndex[0]; i <= currPosDataIndex[1]; i++) {
+	latlongData.push(new google.maps.LatLng(rawPosData[i][8][0], rawPosData[i][8][1]));
+    }
+    if(heatmap == null) {
+	heatmap = new google.maps.visualization.HeatmapLayer({
+	    data: latlongData,
+	    options: {
+		radius: 20,
+		opacity: 0.7,
+	    },
+	});
+    } else {
+	heatmap.set('data', latlongData);
+    }
+}
+
+function toggleHeatmap() {
+    if(heatmap == null) {
+	loadHeatmap();
+    }
+    if(heatmap.getMap()){
+	heatmap.setMap(null);
+	colorMarkers();
+    } else {
+	hideMarkers();
+	heatmap.setMap(map);
+    }
+}
+
+function hideMarkers() {
+    for(var i = currPosDataIndex[0]; i <= currPosDataIndex[1]; i++) {
+	markers_querydata[i].setVisible(false);
+    }
+}
+
+function initialize(){
+    // Stops Firefox from using cached values of the form inputs if you press refresh
+    $('input').attr('autocomplete', 'off'); 
+
+    // Initialize timezoneJS which we use for the flot time axis
+    // Copied it from est_status.html. TODO: Should this be changed
+    // Note: We only have data in timezone.json for LA
+    var _tz = timezoneJS.timezone;
+    _tz.loadingScheme = _tz.loadingSchemes.MANUAL_LOAD;
+    _tz.loadZoneJSONData('/static/js/timezone.json', true);
+    
+    setGraphFilters();
+    //document.getElementById("id_sites").onclick = toggleSites;
+    $("#id_sites").on('click', toggleSites);
+    $("#id_heatmap").on('click', toggleHeatmap);
+    $(".sidebar-header").on('click', function(){$(this).next().collapse('toggle');});
+
+    // Hard code the initial center latitude and longitude of the map
+    self.lat = 38.487828027;
+    self.lng = -122.149419006;
+    var myLatLng = new google.maps.LatLng(self.lat, self.lng);
+    
+    
+    // The following section saves the center and zoom for map reloads
+    // otherwise, map would reset back to intial default center
+    var reload_zoom;
+    var mapOptions;
+    
+    // If: Map has been loaded before and bounds have changed
+    // (this is when previous center and zoom are saved)...
+    // Then: Set options to the the previous/saved center and zoom.
+    var mapOptions = {
+	center: myLatLng,
+	zoom: 14, // Scale of 1 to 20
+	mapTypeId: google.maps.MapTypeId.SATELLITE,
+	
+	panControl:true,
+	zoomControl:true,
+	mapTypeControl:true,
+	scaleControl:true,
+	streetViewControl:true,
+	overviewMapControl:true,
+	rotateControl:true
+    };
+    if ((localStorage.mapLat != null) &&
+        (localStorage.mapLng !=null) &&
+	(localStorage.mapZoom !=null)) {
+	mapOptions['center'] = new google.maps.LatLng(
+		localStorage.mapLat, 
+		localStorage.mapLng);
+	mapOptions['zoom'] = parseInt(localStorage.mapZoom);
+    } // end if map has been loaded before
+    
     // Creates the map object, using the mapOptions set above
-      var map = new google.maps.Map(document.getElementById("map-canvas"),
-          mapOptions);
+    map = new google.maps.Map(document.getElementById("map-canvas"),
+    mapOptions);
+    
+    // Create time slider
+    setupSlider();
 
     // Listen and store center & zoom changes, to be used in map options
-
-        google.maps.event.addListener(map, "center_changed", function(){
-          mapCenter = map.getCenter();
-          localStorage.mapLat = mapCenter.lat();
-          localStorage.mapLng = mapCenter.lng();
-          localStorage.mapZoom = map.getZoom();
-        });
-
-        google.maps.event.addListener(map, "zoom_changed", function (){
-          mapCenter = map.getCenter();
-          localStorage.mapLat = mapCenter.lat();
-          localStorage.mapLng = mapCenter.lng();
-          localStorage.mapZoom = map.getZoom();
-        });
-        
-        google.maps.event.addListener(map, "click", function(event) {
-        document.getElementById('clicked_lat_lng').value = 
+    
+    google.maps.event.addListener(map, "center_changed", function(){
+        mapCenter = map.getCenter();
+        localStorage.mapLat = mapCenter.lat();
+        localStorage.mapLng = mapCenter.lng();
+        localStorage.mapZoom = map.getZoom();
+    });
+    
+    google.maps.event.addListener(map, "zoom_changed", function (){
+        mapCenter = map.getCenter();
+        localStorage.mapLat = mapCenter.lat();
+        localStorage.mapLng = mapCenter.lng();
+        localStorage.mapZoom = map.getZoom();
+    });
+    
+    google.maps.event.addListener(map, "click", function(event) {
+        document.getElementById('clicked_lat_lng').value =
         event.latLng.lat().toFixed(6) + ', ' + event.latLng.lng().toFixed(6);
-        });
-
+    });
+    
     // SHOW CLICKED DATA POINT INFO
-      var django_position = {{pos_data|safe}}; // list of all queried data
-      //var selected_data = {{selected_data|safe}}; // data for clicked point
-      // Note: |safe enables strings to be passed from django/json to js
-
-      // When google maps loads/refreshes, click 'button' to highlight 
-      // Mousemove Listener to display lat, lng of mouse location
-      
-      google.maps.event.addListener(map,'mousemove',function(event){
+    //var django_position = {{pos_data|safe}}; // list of all queried data
+    //var selected_data = {{selected_data|safe}}; // data for clicked point
+    // Note: |safe enables strings to be passed from django/json to js
+    
+    // When google maps loads/refreshes, click 'button' to highlight
+    // Mousemove Listener to display lat, lng of mouse location
+    
+    google.maps.event.addListener(map,'mousemove',function(event){
         // Note:  Use '.value' for <input>, then data appears in a box
         //        Use '.innerHTML' for <span>
-        document.getElementById('latlong').value = 
-          event.latLng.lat().toFixed(6) + ', ' + 
-          event.latLng.lng().toFixed(6);
-      }); //end onemousemove event listener
-
-
-
-      // Idle Listener. Displays bounds, center, and zoom
-      
-      google.maps.event.addListener(map, 'idle', function(){    
+        document.getElementById('latlong').value =
+        event.latLng.lat().toFixed(6) + ', ' +
+        event.latLng.lng().toFixed(6);
+    }); //end onemousemove event listener
+    
+    
+    
+    // Idle Listener. Displays bounds, center, and zoom
+    
+    google.maps.event.addListener(map, 'idle', function(){
         
         // bounds
-        document.getElementById('bounds').innerHTML = 
-          'NE: '+this.getBounds().getNorthEast().lat().toFixed(6)+ ', ' +
-                this.getBounds().getNorthEast().lng().toFixed(6)+
-          ' | SW: '+this.getBounds().getSouthWest().lat().toFixed(6)+', '+
-                this.getBounds().getSouthWest().lng().toFixed(6);
-          
+        document.getElementById('bounds').innerHTML =
+        'NE: '+this.getBounds().getNorthEast().lat().toFixed(6)+ ', ' +
+        this.getBounds().getNorthEast().lng().toFixed(6)+
+        ' | SW: '+this.getBounds().getSouthWest().lat().toFixed(6)+', '+
+        this.getBounds().getSouthWest().lng().toFixed(6);
+        
         // center
-        document.getElementById('current_center').innerHTML = 
-          this.getCenter().lat().toFixed(6)+', ' + 
-          this.getCenter().lng().toFixed(6);
-          
+        document.getElementById('current_center').innerHTML =
+        this.getCenter().lat().toFixed(6)+', ' +
+        this.getCenter().lng().toFixed(6);
+        
         // zoom
-        document.getElementById('current_zoom').innerHTML = 
-          this.getZoom();
-      
-      }); // end idle Listener
-
-
-
+        document.getElementById('current_zoom').innerHTML =
+        this.getZoom();
+        
+    }); // end idle Listener
+    
+    
+    
     // If site markers are chosen to be shown...
-      // Then populate locations array with site data. Later used for markers
-      var site_checked = {{site_checked}};
-      var site_list = {{siteslist|safe}};
-      var locations = [];
-
-
-      // Show site markers if site is checked in preferences
-      if ((site_checked ==1) || ({{view_type|safe}} == "deployment")) {
+    // Then populate locations array with site data. Later used for markers
+    var sites_checked = {{sites_checked}};
+    var points_checked = {{points_checked}};
+    var lines_checked = {{lines_checked}};
+    var site_list = {{siteslist|safe}};
+    var locations = [];
+    
+    
+    // Show site markers if site is checked in preferences
+    if ((sites_checked ==1) || ({{view_type|safe}} == "deployment")) { // TODO: What is that second condition??? for??
         for (var i = 0; i < site_list.length; i++) {
-          locations.push([
+            locations.push([
             site_list[i][3],  // [0]: site location lat
             site_list[i][4],  // [1]: site location lng
             site_list[i][0],  // [2]: site ID
@@ -375,364 +938,287 @@
             site_list[i][9]   // [5]: site elevation
             ]);
         } // end if site checked
-      } // end looping through list of sites
-
-      else {  // if sites are not checked, just push an empty list
+    } // end looping through list of sites
+    
+    else {  // if sites are not checked, just push an empty list
         locations.push([]);
-      }
-
-    // SET MARKERS: 
-      var marker, i;
-      var markers_sites = new Array();
-      var infoWindows_sites = new Array();
-
-      // Display markers for site locations
-      for (i = 0; i < locations.length; i++) {
+    }
+    
+    // SET SITE MARKERS:
+    var marker, i;
+    markers_sites = [];
+    var infoWindows_sites = [];
+    
+    // Display markers for site locations
+    for (i = 0; i < locations.length; i++) {
         
         marker = new google.maps.Marker({
-          position: new google.maps.LatLng(locations[i][0], locations[i][1]),
-          map: map,
-          icon: 'http://maps.google.com/mapfiles/ms/micons/green-dot.png',
-          infoWindowIndex: i
+            position: new google.maps.LatLng(locations[i][0], locations[i][1]),
+            map: map,
+            icon: 'http://maps.google.com/mapfiles/ms/micons/green-dot.png',
+            infoWindowIndex: i
         });   // end the setting of marker data to be pushed to array
         
         // Set infoWindow content
         if (locations.length>0) {
-          var content = '<b>Site ID:</b> ' + locations[i][2] + 
-                        ' or "' + locations[i][3]+'"' + 
-                        '<br><b>Location:</b> ' + locations[i][4] + ', ' + 
-                        '(' + locations[i][0] + ', ' + locations[i][1] + 
-                        ')<b><br>Elevation:</b> ' + locations[i][5];
+            var content = '<b>Site ID:</b> ' + locations[i][2] +
+            ' or "' + locations[i][3]+'"' +
+            '<br><b>Location:</b> ' + locations[i][4] + ', ' +
+            '(' + locations[i][0] + ', ' + locations[i][1] +
+            ')<b><br>Elevation:</b> ' + locations[i][5];
         }
         var infoWindow = new google.maps.InfoWindow({content: content});
         
         // click Listener for markers
         var clickedInfoWindowIndex;
-        google.maps.event.addListener(marker, 'click', 
-          function (event)
-            {
-              // Note: The following pans to point:
-              // map.panTo(event.latLng);
-              
-              // If a site infoWindow is already open, close it.
-              if (clickedInfoWindowIndex != null) {
+        google.maps.event.addListener(marker, 'click',
+        function (event)
+        {
+            // Note: The following pans to point:
+            // map.panTo(event.latLng);
+            
+            // If a site infoWindow is already open, close it.
+            if (clickedInfoWindowIndex != null) {
                 infoWindows_sites[clickedInfoWindowIndex].close();
-              }
-              
-              // Open infoWindow for clicked site location
-              infoWindows_sites[this.infoWindowIndex].open(map, this);
-              clickedInfoWindowIndex = this.infoWindowIndex;
-            } // end event function
+            }
+            
+            // Open infoWindow for clicked site location
+            infoWindows_sites[this.infoWindowIndex].open(map, this);
+            clickedInfoWindowIndex = this.infoWindowIndex;
+        } // end event function
         ); // end click Listener
-
+        
         // push to the marker and infoWindow arrays for the site locations
         markers_sites.push(marker);
         infoWindows_sites.push(infoWindow);
-      
-      } //end for loop for site locations
-
-    // Display markers for the data points 
-     
-      var infoWindows_querydata = new Array();    
-      var position_data = {{pos_data|safe}};
-      var display_type = {{display_type}};
-
-      // Display marker points if html pref is set to display them
-     //Uncommenting to show on public
-      var deps = {{deps_list}};
-     
-     if ( ((display_type != null) && (display_type==1) && 
-          (position_data.length > 0))
-          ||
-          ({{view_type|safe}} == "deployment") && (display_type!=2)) {
         
-        for (i=0; i < position_data.length-1; i++) {
-          marker = new google.maps.Marker({
-            position: new google.maps.LatLng(
-              position_data[i][8][0], position_data[i][8][1]),
-            map: map,
-            //icon: 'http://www.geocodezip.com/mapIcons/small_blue_dot.png',
-            infoWindowIndex: i
-          });
+    } //end for loop for site locations
+    
+    rawPosData = {{pos_data|safe}};
+    currPosDataIndex = [0, rawPosData.length-1];
+    selectedTimeRange = [rawPosData[currPosDataIndex[0]][2],rawPosData[currPosDataIndex[1]][2]];
+    userRequestedMaxTimeRange = [{{datetime_from}}, {{datetime_to}}];
 
-    //Hard code colors for markers. If dep in array == req_deps from views, display it as a marker of a certain color.
-          if ( ({{view_type|safe}} == "deployment") || 
-            ( (deps.length > 0) && (position_data[i][1] == deps[0]) ) ) {
-        marker.setIcon('http://www.geocodezip.com/mapIcons/small_blue_dot.png')
-          }
-          if ((deps.length > 1) && (position_data[i][1] == deps[1])) {
-      marker.setIcon('http://www.geocodezip.com/mapIcons/small_yellow_dot.png')
-          }
-          if ((deps.length > 2) && (position_data[i][1] == deps[2])) {
-      marker.setIcon('http://www.geocodezip.com/mapIcons/small_green_dot.png')
-          }
-         if ((deps.length > 3) && (position_data[i][1] == deps[3])) {
-      marker.setIcon('http://www.geocodezip.com/mapIcons/small_red_dot.png')
-          }
-      
-          var content = '<b>DeploymentID: </b>' + position_data[0][1] + 
-                        '<br>' + position_data[i][8][0].toFixed(5)
-                        + ', ' + position_data[i][8][1].toFixed(5)+
-                        '<br><b>PosID:</b> ' + position_data[i][0] + 
-                        '<br><b>Time:</b> ' + position_data[i][10] +
-                        '<br><b>Activity:</b> ' + position_data[i][7] + 
-                        '<br><b>Likelihood:</b> ' + position_data[i][6];
-            
-          var infoWindow = new google.maps.InfoWindow({ content: content, 
-              //Uncomment the following lines for infoWindow options
-              //size: new google.maps.Size(150, 50),
-              disableAutoPan: true
-              });
-          
-        marker.qraat_pos = position_data[i];
-        google.maps.event.addListener(marker, 'click',
-            function(){ 
-            // WHEN MAP IS CLICKED, display another marker there to highlight point
-              addSelectedPos(this, map);
-          }); // end event function and marker event listener
-          
-        // on mousing over markers for data points, open them to show lat/lng
-        google.maps.event.addListener(marker, 'mouseover', function() {
-                $("<ul>" +
-                    "<li><strong>Deployment ID: </strong>" + this.qraat_pos[1]  + "</li>" +
-                    "<li><strong>Data ID: </strong>" + this.qraat_pos[0]  + "</li>" +
-                    "<li><strong>Lat, Lon: </strong>" + this.qraat_pos[8]    + "</li>" + 
-                    "<li><strong>Easting, Northing, Zone: </strong>" + this.qraat_pos[3] + ", " +
-                            this.qraat_pos[4] + ", " + this.qraat_pos[5]+this.qraat_pos[9] + "</li>"  +
-                    "<li><strong>Date & Time: </strong>" + this.qraat_pos[10]  + "</li>" +
-                    "<li><strong>Position Likelihood: </strong>" + this.qraat_pos[6].toFixed(2)  + "</li>" +
-                    "<li><strong>Animal Activity: </strong>" + this.qraat_pos[7].toFixed(2)  + "</li>" +
-                    "</ul>").appendTo(".mouse-over-info");
+	
+    var display_type = {{display_type}};
 
-        }); // end mouseover event function
-
-        google.maps.event.addListener(marker, 'mouseout', function() {
-            $(".mouse-over-info").empty();
-        }); // end mouseout event function
-
-        // close infowindows on mousing out of marker
-        google.maps.event.addListener(marker, 'mouseout', function() {
-          infoWindows_querydata[this.infoWindowIndex].close();
-        }); // end mouseout event function
-            infoWindows_querydata.push(infoWindow);
-            markers_querydata.push(marker);
-        } //end for loop for query data
-        loadFlot(markers_querydata, map, curr_dep);
-      } //end if statement for displaying query data as points (not lines)
+    if (display_type == null || display_type == 1){
+	loadMarkers(map);
+	loadFlot(markers_querydata, map, curr_dep);
+    }
 
     // DISPLAY MARKER / "HIGHLIGHT" SELECTED POINT (clicked in maps or in flot)
-
+    
     //FIXME: Took reloadflot from here
     // WHEN HTML PREF IS SET TO 'Lines':
-
-      if ((display_type != null) && (display_type == 2)) {
-      // Populate data for the Polyline
-        var position_data = {{pos_data|safe}};
+    
+    else if (display_type == 2) {
+        // Populate data for the Polyline
         var flightPlanCoordinates = new Array();
         
-        for (i=0; i < position_data.length-1; i++) {
-          var point = new google.maps.LatLng(
-            position_data[i][8][0], position_data[i][8][1]);
-          flightPlanCoordinates.push(point);
+        for (i=0; i < rawPosData.length-1; i++) {
+            var point = new google.maps.LatLng(
+            rawPosData[i][8][0], rawPosData[i][8][1]);
+            flightPlanCoordinates.push(point);
         } // end for loop through queried data points
-        
-     // Draw the polyline
+        // Draw the polyline
         var flightPath = new google.maps.Polyline({
-          path: flightPlanCoordinates,
-          infoWindowIndex: i,
-          geodesic: true,
-          strokeColor: '#8383FF',
-          strokeOpacity: 1.0,
-          strokeWeight: 2
+            path: flightPlanCoordinates,
+            infoWindowIndex: i,
+            geodesic: true,
+            strokeColor: '#8383FF',
+            strokeOpacity: 1.0,
+            strokeWeight: 2
         }); // end drawing the Polyline
-
-
+        
+        
         flightPath.setMap(map);
+	/*
+        google.maps.event.addListener(flightPath, 'mouseover', function(event) {
+            
+            //Attempt to get the index of the closest point to the mouse location
+            var vertex;
+            var i;
+            for (i=0; i < rawPosData.length; i ++) {
+                if ((event.latLng.lat().toFixed(3) == rawPosData[i][8][0].toFixed(3)) && (event.latLng.lng().toFixed(3) == rawPosData[i][8][1].toFixed(3))) { vertex = i; }
+            }
+            
+            if (vertex != null) {
+                document.getElementById('selected_point_latlon').innerHTML =
+                rawPosData[vertex][8][0].toFixed(6) + ', ' +
+                rawPosData[vertex][8][1].toFixed(6);
+                // lat, lng of actual point in db
+                document.getElementById('selected_point_eastingnorthing').innerHTML =
+                rawPosData[vertex][3] + ', ' +   // easting
+                rawPosData[vertex][4] + ', ' +   // northing
+                rawPosData[vertex][5] + ' ' +    // zone number
+                rawPosData[vertex][9];          // zone letter
+                document.getElementById('selected_point_date').innerHTML =
+                rawPosData[vertex][10];          // date string of timestamp
+                document.getElementById('selected_point_activity').innerHTML =
+                rawPosData[vertex][7].toFixed(6);  // activity
+                document.getElementById('selected_point_likelihood').innerHTML =
+                rawPosData[vertex][6].toFixed(6); // likelihood
+                document.getElementById('selected_point_positionID').innerHTML =
+                rawPosData[vertex][0];
+                document.getElementById('selected_point_deployment').innerHTML =
+                rawPosData[vertex][1];
+            } // end if vertex
+            
+        }); // end event mouseover eventListener
         
-      google.maps.event.addListener(flightPath, 'mouseover', function(event) {
         
-        //Attempt to get the index of the closest point to the mouse location
-        var vertex;
-        var i;
-        for (i=0; i < position_data.length; i ++) {
-          if ((event.latLng.lat().toFixed(3) == position_data[i][8][0].toFixed(3)) && (event.latLng.lng().toFixed(3) == position_data[i][8][1].toFixed(3))) { vertex = i; }
-        }
-
-        if (vertex != null) {
-        document.getElementById('selected_point_latlon').innerHTML = 
-          position_data[vertex][8][0].toFixed(6) + ', ' +
-          position_data[vertex][8][1].toFixed(6);          
-            // lat, lng of actual point in db
-        document.getElementById('selected_point_eastingnorthing').innerHTML = 
-          position_data[vertex][3] + ', ' +   // easting 
-          position_data[vertex][4] + ', ' +   // northing
-          position_data[vertex][5] + ' ' +    // zone number
-          position_data[vertex][9];          // zone letter
-        document.getElementById('selected_point_date').innerHTML = 
-          position_data[vertex][10];          // date string of timestamp
-        document.getElementById('selected_point_activity').innerHTML = 
-          position_data[vertex][7].toFixed(6);  // activity
-        document.getElementById('selected_point_likelihood').innerHTML = 
-          position_data[vertex][6].toFixed(6); // likelihood
-        document.getElementById('selected_point_positionID').innerHTML = 
-          position_data[vertex][0];
-        document.getElementById('selected_point_deployment').innerHTML = 
-          position_data[vertex][1];
-      } // end if vertex
-      
-      }); // end event mouseover eventListener
-
-
         google.maps.event.addListener(flightPath, 'mouseout', function() {
-        document.getElementById('selected_point_latlon').innerHTML = "" 
-        document.getElementById('selected_point_eastingnorthing').innerHTML = "" 
-        document.getElementById('selected_point_date').innerHTML = ""
-        document.getElementById('selected_point_activity').innerHTML = "" 
-        document.getElementById('selected_point_likelihood').innerHTML = ""
-        document.getElementById('selected_point_positionID').innerHTML = ""
-        document.getElementById('selected_point_deployment').innerHTML = ""
-      
+            document.getElementById('selected_point_latlon').innerHTML = ""
+            document.getElementById('selected_point_eastingnorthing').innerHTML = ""
+            document.getElementById('selected_point_date').innerHTML = ""
+            document.getElementById('selected_point_activity').innerHTML = ""
+            document.getElementById('selected_point_likelihood').innerHTML = ""
+            document.getElementById('selected_point_positionID').innerHTML = ""
+            document.getElementById('selected_point_deployment').innerHTML = ""
+            
         }); // end mouseout event function
         
-      google.maps.event.addListener(flightPath, 'click', function(event) {
-        //Attempt to get the index of the closest point to the mouse location
-        var vertex;
-        var i;
-        for (i=0; i < position_data.length-1; i ++) {
-          if ((event.latLng.lat().toFixed(2) == position_data[i][8][0].toFixed(2)) && (event.latLng.lng().toFixed(2) == position_data[i][8][1].toFixed(2))) { vertex = i; }
-      }
-
-      if (vertex != null) {
-              marker.setMap(null); 
-        
-        //if (marker){
-        //  marker.setMap(null);
-      
-          // There is a bug; when a point is clicked in flot, 
-          //the marker stays there when a point in google maps is clicked too. 
-          //The Lines click in maps doesn't get passed to flot either 
-          //because the html form input for lat_clicked and lng_clicked
-          //are not submitted to calculate index for selected_data
-          //Also, the map doesn't reload so the marker stays there.
-          //need to figure out how to set markers declared elsewhere to "null"
-
-          //selectedMarkers.setMap(null);
-       // }
-
-        marker = new google.maps.Marker({
-          position: new google.maps.LatLng
-            (
-            position_data[vertex][8][0], 
-            position_data[vertex][8][1]
-            ),
-          map: map,
-          zIndex: google.maps.Marker.MAX_ZINDEX + 1
-          // zIndex sets marker on top of all other markers
-          
-          // Note: When no icon, uses default large/red marker
-          // icon: 'http://maps.google.com/mapfiles/ms/micons/red-dot.png'
-        }); // end setting marker data
-
-
-        // Set on click infoWindow content for highlighted data marker
-        var content = '<b>Deployment ID: </b>' + position_data[vertex][1] +
-                '<br><b>Data ID: </b>' + position_data[vertex][0] + 
+        google.maps.event.addListener(flightPath, 'click', function(event) {
+            //Attempt to get the index of the closest point to the mouse location
+            var vertex;
+            var i;
+            for (i=0; i < rawPosData.length-1; i ++) {
+                if ((event.latLng.lat().toFixed(2) == rawPosData[i][8][0].toFixed(2)) && (event.latLng.lng().toFixed(2) == rawPosData[i][8][1].toFixed(2))) { vertex = i; }
+            }
+            
+            if (vertex != null) {
+                marker.setMap(null);
+                
+                //if (marker){
+                //  marker.setMap(null);
+                
+                // There is a bug; when a point is clicked in flot,
+                //the marker stays there when a point in google maps is clicked too.
+                //The Lines click in maps doesn't get passed to flot either
+                //because the html form input for lat_clicked and lng_clicked
+                //are not submitted to calculate index for selected_data
+                //Also, the map doesn't reload so the marker stays there.
+                //need to figure out how to set markers declared elsewhere to "null"
+                
+                //selectedMarkers.setMap(null);
+                // }
+                
+                marker = new google.maps.Marker({
+                    position: new google.maps.LatLng
+                    (
+                    rawPosData[vertex][8][0],
+                    rawPosData[vertex][8][1]
+                    ),
+                    map: map,
+                    zIndex: google.maps.Marker.MAX_ZINDEX + 1
+                    // zIndex sets marker on top of all other markers
+                    
+                    // Note: When no icon, uses default large/red marker
+                    // icon: 'http://maps.google.com/mapfiles/ms/micons/red-dot.png'
+                }); // end setting marker data
+                
+                
+                // Set on click infoWindow content for highlighted data marker
+                var content = '<b>Deployment ID: </b>' + rawPosData[vertex][1] +
+                '<br><b>Data ID: </b>' + rawPosData[vertex][0] +
                 '<br><b>Lat, Lon: </b> ' +
-                position_data[vertex][8][0].toFixed(6) + ', ' +
-                position_data[vertex][8][1].toFixed(6) +
-                '<br><b>Easting, Northing, Zone: </b> ' + 
-                position_data[vertex][3] + ', ' + 
-                position_data[vertex][4] + ', ' + 
-                position_data[vertex][5] +
-                position_data[vertex][10] +
-                '<br><b>Date/Time: </b>'  + position_data[vertex][9] + 
-                '<br><b>Activity: </b>' +  position_data[vertex][7] +
-                '<br><b>Likelihood: </b>' + position_data[vertex][6];
-
-        var infoWindow = new google.maps.InfoWindow({content: content});
+                rawPosData[vertex][8][0].toFixed(6) + ', ' +
+                rawPosData[vertex][8][1].toFixed(6) +
+                '<br><b>Easting, Northing, Zone: </b> ' +
+                rawPosData[vertex][3] + ', ' +
+                rawPosData[vertex][4] + ', ' +
+                rawPosData[vertex][5] +
+                rawPosData[vertex][10] +
+                '<br><b>Date/Time: </b>'  + rawPosData[vertex][9] +
+                '<br><b>Activity: </b>' +  rawPosData[vertex][7] +
+                '<br><b>Likelihood: </b>' + rawPosData[vertex][6];
+                
+                var infoWindow = new google.maps.InfoWindow({content: content});
+                
+                
+                // click Listener for markers
+                google.maps.event.addListener(marker, 'click',
+                function (event)
+                {
+                    infoWindow.open(map, this);
+                } // end event function
+                ); // end click Listener
+                
+                
+                //Populate the html sidebar with related data
+                
+                document.getElementById('selected_point_latlon').innerHTML =
+                rawPosData[vertex][8][0].toFixed(6) + ', ' + // lat of actual pt in db
+                rawPosData[vertex][8][1].toFixed(6);          // lng of point in db
+                document.getElementById('selected_point_eastingnorthing').innerHTML =
+                rawPosData[vertex][3] + ', ' +   // easting
+                rawPosData[vertex][4] + ', ' +   // northing
+                rawPosData[vertex][5] + ' ' +    // zone number
+                rawPosData[vertex][9];          // zone letter
+                document.getElementById('selected_point_date').innerHTML =
+                rawPosData[vertex][10];          // date string of timestamp
+                document.getElementById('selected_point_activity').innerHTML =
+                rawPosData[vertex][7].toFixed(6);  // activity
+                document.getElementById('selected_point_likelihood').innerHTML =
+                rawPosData[vertex][6].toFixed(6); // likelihood
+                document.getElementById('selected_point_positionID').innerHTML =
+                rawPosData[vertex][0];
+                document.getElementById('selected_point_deployment').innerHTML =
+                rawPosData[vertex][1];
+            } // end if vertex
+            
+        }); // end event mouseover eventListener
+        */
+        // Polyline for Deployment 2
         
         
-      // click Listener for markers
-        google.maps.event.addListener(marker, 'click', 
-          function (event)
-            {
-              infoWindow.open(map, this);
-            } // end event function
-        ); // end click Listener
-      
+    } // end if (html pref is set to show data as lines)
+    
+    // Example of addListeners for the flightPath
+    // On mouseover, the flightPath changes color
+    
+    //google.maps.event.addListener(flightPath, 'mouseover', function() {
+    //flightPath.setOptions({strokeColor: '#00FFaa'});
+    //});
+    //google.maps.event.addListener(flightPath, 'mouseout', function () {
+    //flightPath.setOptions({strokeColor: '#FF00FF'});
+    //});
+    
+    
+    // Attempt at 2nd Polyline
+    // var flight_track = {{track_list}};
+    // var flightPlanCoordinates2 = new Array();
+    // for (i=0; i < flight_track.length-1; i++)
+    // {
+    //   var point2 = new google.maps.LatLng(
+    //    flight_track[i][8][0], flight_track[i][8][1]);
+    //   flightPlanCoordinates2.push(point);
+    // }
+    
+    // Draw 2nd blue polyline
+    // var flightPath2 = new google.maps.Polyline({
+    //   path: flightPlanCoordinates2,
+    //   geodesic: true,
+    //   strokeColor: '#0000FF',
+    //   strokeOpacity: 1.0,
+    //   strokeWeight: 1});
+    
+    // flightPath2.setMap(map);
+    
+} //end function initialize
 
-        //Populate the html sidebar with related data
-
-        document.getElementById('selected_point_latlon').innerHTML = 
-          position_data[vertex][8][0].toFixed(6) + ', ' + // lat of actual pt in db
-          position_data[vertex][8][1].toFixed(6);          // lng of point in db
-        document.getElementById('selected_point_eastingnorthing').innerHTML = 
-          position_data[vertex][3] + ', ' +   // easting 
-          position_data[vertex][4] + ', ' +   // northing
-          position_data[vertex][5] + ' ' +    // zone number
-          position_data[vertex][9];          // zone letter
-        document.getElementById('selected_point_date').innerHTML = 
-          position_data[vertex][10];          // date string of timestamp
-        document.getElementById('selected_point_activity').innerHTML = 
-          position_data[vertex][7].toFixed(6);  // activity
-        document.getElementById('selected_point_likelihood').innerHTML = 
-          position_data[vertex][6].toFixed(6); // likelihood
-        document.getElementById('selected_point_positionID').innerHTML = 
-          position_data[vertex][0];
-        document.getElementById('selected_point_deployment').innerHTML = 
-          position_data[vertex][1];
-      } // end if vertex
-      
-      }); // end event mouseover eventListener
-
-                  // Polyline for Deployment 2
-
-
-      } // end if (html pref is set to show data as lines)
-     
-        // Example of addListeners for the flightPath
-          // On mouseover, the flightPath changes color
-          
-          //google.maps.event.addListener(flightPath, 'mouseover', function() {
-            //flightPath.setOptions({strokeColor: '#00FFaa'});
-          //});
-          //google.maps.event.addListener(flightPath, 'mouseout', function () {
-            //flightPath.setOptions({strokeColor: '#FF00FF'});
-          //});
-
-
-        // Attempt at 2nd Polyline 
-          // var flight_track = {{track_list}};
-          // var flightPlanCoordinates2 = new Array();
-          // for (i=0; i < flight_track.length-1; i++)
-          // {
-          //   var point2 = new google.maps.LatLng(
-          //    flight_track[i][8][0], flight_track[i][8][1]);
-          //   flightPlanCoordinates2.push(point);
-          // }
-
-        // Draw 2nd blue polyline
-          // var flightPath2 = new google.maps.Polyline({
-          //   path: flightPlanCoordinates2,
-          //   geodesic: true,
-          //   strokeColor: '#0000FF',
-          //   strokeOpacity: 1.0,
-          //   strokeWeight: 1});
-
-        // flightPath2.setMap(map);
-
-    } //end function initialize
-
-    // Load google maps on browser window load
-    google.maps.event.addDomListener(window, 'load', initialize);
-
+// Load google maps on browser window load
+google.maps.event.addDomListener(window, 'load', initialize);
+    
 </script>
 {% endblock %}
 
 {% block sidebar %}
 
 <div id = "text">
-
+<p id = "update_test"><b>YOOOOO Update Test!!!</b></p>
+<p id = "selected_point_latlon">SDFSDF</p>
 {% if project %}
 <a href={%url 'project:show-project' project.ID %}#deployments><h4><center>{{project.name}}</center></h4></a>
 {% endif %}
@@ -747,18 +1233,25 @@
 
 <div class = "sidebar-form">
 <div id ="prefs">
-<form id="form" action ="" name="settings" method="get">
+<form id="form" action ="" name="settings" method="get" onsubmit="updateData()">
   <!-- <input type="submit" value="SUBMIT PREFERENCES" /> -->
-  <font size="2">
-	{% for field in form %}
- 
+    <div class="sidebar-header">Data vv<hr></div>
+    <div class="collapse in" id="data-section">
+        {% for field in form %} 
 	  {% if field.auto_id = "id_deployment" %}
 		<!-- Do nothing currently - prevents an extra <br> being added -->
 
-    {% elif field.auto_id = "id_datetime_from" or field.auto_id = "id_datetime_to" %}
+	{% elif field.auto_id = "id_datetime_from" or field.auto_id = "id_datetime_to" %}
 		
 		<b>{{field.label_tag}}</b> <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="YYYY-MM-DD HH:MM:SS (24hr)"> {{field}} </div>
-
+	 {% elif field.auto_id = "id_data_type" %}
+	 	<b>{{field.label_tag}}</b> {{field}}<br>
+	   {% endif %}
+	 {% endfor %}
+    </div>
+    <div>
+	{% for field in form %}
+	{% if field.auto_id = "id_datetime_from" or field.auto_id = "id_datetime_to" or field.auto_id = "id_data_type" %}
 	  {% elif field.auto_id = "id_likelihood_low" %}
 	  <table>
 			<tr>
@@ -781,21 +1274,34 @@
 		{% elif field.auto_id = "id_activity_high" %}
 				<td>{{field}}</td>
 			</tr>
+        
+        	{% elif field.auto_id = "id_covariance_low" %}
+			<tr>
+				<th>Covariance</th>
+				<td>{{field}}</td>
+				
+		{% elif field.auto_id = "id_covariance_high" %}
+				<td>{{field}}</td>
+			</tr>
+            
 		</table>
-
+	</div>
 	  {% else %}
 		<b>{{field.label_tag}}</b> {{field}}<br>
 		
 	  {% endif %}
 	{% endfor %}
   
-  </font>
 </form>
 <!-- <font size="1">date range: 2013-08-13  13:57:16 to 2014-06-16 14:28:12</font> -->
+<div class="sidebar-header">Heatmap vv<hr></div>
+<form class="collapse" id="heatmap-form">
+    <b>Display Heatmap</b> <input id="id_heatmap" type="checkbox" name="heatmap">
+</form>
 </div><!-- end prefs -->
 
 <div class="section_title">
-  <center><button onclick="submitForm()">Update Map</button><button onclick="submitDownloadForm()">Download CSV</button></center>
+  <center><button onclick="updateData()">Update Map</button><button onclick="submitDownloadForm()">Download CSV</button></center>
 </div> <!-- end section_title -->
 </div> <!-- end sidebar-form -->
 
@@ -832,12 +1338,12 @@
 {% block content %}
 
 <div class="ui-content">
-	
-	<div class="row-3" id="map-canvas"></div> <!-- end row-3, map-canvas -->
-
-	{% if positions %}
-	<!-- FLOT CHART -->
-  <div class="row-4">
+    
+    <div class="row-3" id="map-canvas"></div> <!-- end row-3, map-canvas -->
+    <div class="row-5" id="time-slider"></div> <!-- TODO: What is the class for -->
+    {% if positions %}
+    <!-- FLOT CHART -->
+    <div class="row-4">
 	<center>
 	<!-- uncomment next line for small overview graph -->
   <!--   <div id="overview" class="demo-placeholder" style="float: right; width: 100px; height: 125px;"></div> -->

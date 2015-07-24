@@ -9,11 +9,11 @@ DATA_CHOICES = [('1', 'Raw positions'), ('2', 'Track')]
 #DATA_CHOICES = [('1', 'Position'), ('2', 'Track')]
 
 # Display data points as lines or as marker points.
-DISPLAY_CHOICES = [('1', 'Points')]
-#DISPLAY_CHOICES = [('1', 'Points'), ('2', 'Lines')]
+#DISPLAY_CHOICES = [('1', 'Points')]
+DISPLAY_CHOICES = [('1', 'Points'), ('2', 'Lines')]
 
 # Select whether the graph shows Likelihood or Activity data.
-GRAPH_CHOICES = [('1', 'Likelihood'), ('2', 'Activity')]
+GRAPH_CHOICES = [('1', 'Likelihood'), ('2', 'Activity'), ('3', 'Covariance')]
 
 # Choices for transmitter dropdown menu. Sorted by "Active", then number
 def get_choices(deps=[]):
@@ -104,6 +104,21 @@ class Form(forms.Form):
               'class': 'filter',
               'size': '4'}),
             initial=2.0)
+            
+  covariance_low = forms.FloatField(
+            required=True,
+            label="Min",
+            widget = forms.TextInput(attrs={
+              'class': 'filter',
+              'size': '4'}),
+            initial=0.0)
+  covariance_high = forms.FloatField(
+            required=True,
+            label="Max", 
+            widget = forms.TextInput(attrs={
+              'class': 'filter',
+              'size': '4'}),
+            initial=1.0)
 
 
   data_type = forms.ChoiceField(
@@ -136,3 +151,17 @@ class Form(forms.Form):
             label="View Site Locations",
             initial=True)
 
+  points = forms.BooleanField(
+            required=False,
+            label="Points",
+            initial=True)
+  
+  colorpoints = forms.BooleanField(
+            required=False,
+            label="Color Points",
+            initial=True)
+
+  lines = forms.BooleanField(
+            initial=False,
+            required=False,
+            label="Lines")

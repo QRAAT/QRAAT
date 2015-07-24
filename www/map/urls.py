@@ -18,4 +18,8 @@ urlpatterns = patterns('map.views',
     url(r'^generic_graph', 'generic_graph', name='generic-graph'),
     url(r'^system_status', 'system_status', name='system-status'),
     url(r'^est_status', 'est_status', name='est-status'),
+
+    url(
+        r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/get_data/$',
+        'get_data', name='get_data'),
 )
