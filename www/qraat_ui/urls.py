@@ -10,6 +10,9 @@ urlpatterns = patterns('qraat_ui.views',
         r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/download/$',
         'download_by_dep', name='download_by_dep'),
     url(
+        r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/downloadKML/(?P<kml_type>.+)/$',
+        'downloadKMLFile', name='downloadKMLFile'),
+    url(
         r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/$',
         'view_by_dep', name='view_by_dep'),
     # url(r'^deployment/(?P<dep_id>\d+)/$', 'view_by_dep'),

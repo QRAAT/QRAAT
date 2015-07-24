@@ -22,6 +22,7 @@ from decimal import Decimal
 
 import csv
 import qraat
+import kmlGeneratorModule
 
 # For view /ui/project/X/deployment/Y, initial time range for data to display.
 INITIAL_DATA_WINDOW = 60 * 60 * 4
@@ -409,6 +410,59 @@ def view_by_dep(request, project_id, dep_id):
 
   return render(request, 'qraat_ui/index.html', context)
 
+## modify the script from here
+def downloadKMLFile(request, project_id, dep_id, kml_type): 
+  print kml_type
+  trackPath='No'
+  trackLocation='No'
+  histogram='No'
+  if ((kml_type=='trackOnly')|(kml_type=='track+point')|(kml_type=='track+histogram')|(kml_type=='allData')):
+    trackPath='Yes'
+  if ((kml_type=='pointOnly')|(kml_type=='track+point')|(kml_type=='point+histogram')|(kml_type=='allData')):
+    trackLocation='Yes'
+  if ((kml_type=='histogramOnly')|(kml_type=='track+histogram')|(kml_type=='point+histogram')|(kml_type=='allData')):
+    histogram='Yes'
+
+  try:
+    project = Project.objects.get(ID=project_id)
+  except ObjectDoesNotExist:
+		raise Http404
+      
+  if not project.is_public:
+    if request.user.is_authenticated():
+      user = request.user
+      if project.is_owner(user)\
+           or (user.has_perm("qraatview.can_view")
+               and (project.is_collaborator(user)
+                    or project.is_viewer(user))):
+
+        deps = project.get_deployments().filter(ID=dep_id)
+      else:
+        raise PermissionDenied #403
+
+    else:
+			return redirect("/auth/login/?next=%s" % request.get_full_path())
+
+
+  else:
+    deps = project.get_deployments().filter(ID=dep_id)
+  
+  context = get_context(request, deps, deps)
+
+  response = HttpResponse(content_type='application/vnd.google-earth.kml+xml')
+  response['Content-Disposition'] = 'attachement; filename="Deployment%s%s.kml"' % (dep_id,kml_type)
+
+  timeArray=[] 
+  latitudeArray=[] 
+  longitudeArray=[]
+  for row in json.loads(context['pos_data']):
+    timeArray.append(row[2]) 
+    latitudeArray.append(row[8][0])
+    longitudeArray.append(row[8][1])
+
+  kmlDoc = kmlGeneratorModule.main(dep_id, trackPath, trackLocation, histogram, timeArray, latitudeArray, longitudeArray)
+  response.write(kmlDoc)
+  return response
 
 def download_by_dep(request, project_id, dep_id): 
   try:
@@ -446,6 +500,7 @@ def download_by_dep(request, project_id, dep_id):
   for row in json.loads(context['pos_data']):
     writer.writerow([ row[0], row[1], row[2], row[3], row[4], str(row[5]) + row[9], 
                       row[10], row[8][0], row[8][1], row[6], row[7] ])
+  print response
   return response
   
 
