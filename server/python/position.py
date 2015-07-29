@@ -58,7 +58,9 @@ POS_EST_S = 10
 # The subsplines are computed in `aggregate_window()`. Disabling this 
 # will improve performance of position estimation when the covariance is 
 # not needed. 
-ENABLE_BOOTSTRAP = True
+ENABLE_BOOTSTRAP = False
+ENABLE_BOOTSTRAP2 = False
+ENABLE_BOOTSTRAP3 = False
 
 # Enable asymptotic covariance (compute Position.all_splines). 
 ENABLE_ASYMPTOTIC = False
@@ -178,8 +180,15 @@ def WindowedCovarianceEstimator(pos, sites, max_resamples=BOOT_MAX_RESAMPLES):
   ''' 
   cov = []
   for P in pos:
-    C = BootstrapCovariance(P, sites, max_resamples)
-    cov.append(C)
+    if ENABLE_BOOTSTRAP:
+      C = BootstrapCovariance(P, sites, max_resamples)
+      cov.append(C)
+    if ENABLE_BOOTSTRAP2:
+      C = BootstrapCovariance2(P, sites, max_resamples)
+      cov.append(C)
+    if ENABLE_BOOTSTRAP3:
+      C = BootstrapCovariance3(P, sites, max_resamples)
+      cov.append(C)
   return cov
 
 
@@ -886,6 +895,21 @@ class Ellipse:
 
 ### Covariance. ###############################################################
 
+class likelihood_function:
+  def __init__(self, sites, splines):
+    self.sites = sites
+    self.splines = splines
+
+  def evaluate(self, x):
+    ''' Compute the likelihood of position `x`. ''' 
+    likelihood = 0
+    for siteID in self.splines.keys():
+      bearing = np.angle(x - self.sites[siteID]) * 180 / np.pi
+      likelihood += self.splines[siteID](bearing)
+    return likelihood
+
+
+
 class Covariance:
   
   def __init__(self, *args, **kwargs):
@@ -924,21 +948,24 @@ class Covariance:
       p = pos.p
     x = np.array([half_span, half_span])
    
+    likelihood = likelihood_function(sites, pos.splines)
+
     # Hessian
-    (positions, likelihoods) = compute_likelihood_grid(
-                             sites, pos.splines, p, scale, half_span)
-    J = lambda (x) : likelihoods[x[0], x[1]]
-    H = nd.Hessian(J)(x)
+    #(positions, likelihoods) = compute_likelihood_grid(
+    #                         sites, pos.splines, p, scale, half_span)
+    #J = lambda (x) : likelihoods[x[0], x[1]]
+    H = nd.Hessian(likelihood.evaluate)(p)
     A = np.linalg.inv(H)
 
-    # Gradient
+    # Gradient TODO TAB
     B = np.zeros((2,2), dtype=np.float64)
     for i in range(self.m):
       splines = { id : p[i] for (id, p) in pos.all_splines.iteritems() }
-      (positions, likelihoods) = compute_likelihood_grid(
-                               sites, splines, p, scale, half_span)
-      J = lambda (x) : likelihoods[x[0], x[1]]
-      b = np.array([nd.Gradient(J)(x)]).T
+      likelihood = likelihood_function(sites, splines)
+      #(positions, likelihoods) = compute_likelihood_grid(
+      #                         sites, splines, p, scale, half_span)
+      #J = lambda (x) : likelihoods[x[0], x[1]]
+      b = np.array([nd.Gradient(likelihood.evaluate)(x)]).T
       B += np.dot(b, b.T)
     B = B / self.m
     
@@ -1102,7 +1129,7 @@ class BootstrapCovariance2 (BootstrapCovariance):
       self.calc(*args, **kwargs)
 
   def calc(self, pos, sites, max_resamples=BOOT_MAX_RESAMPLES):
-    assert ENABLE_BOOTSTRAP
+    assert ENABLE_BOOTSTRAP2
     self.p_hat = pos.p
 
     # Generate sub samples.
@@ -1142,11 +1169,68 @@ class BootstrapCovariance2 (BootstrapCovariance):
     else: # not enough samples
       self.status = 'undefined'
 
+class BootstrapCovariance3 (BootstrapCovariance):
+
+  def __init__(self, *args, **kwargs):
+    ''' Bootstrap method from Todd.
+
+      Resample with replacement such that resample has same size as original. 
+    '''
+    self.method = 'boot3'
+    self.C = None
+    self.W = {}
+    self.p_hat = None
+    if len(args) >= 2: 
+      self.calc(*args, **kwargs)
+
+  def calc(self, pos, sites, max_resamples=BOOT_MAX_RESAMPLES):
+    assert ENABLE_BOOTSTRAP3
+    self.p_hat = pos.p
+
+    # Generate sub samples.
+    resampled_positions = np.array(bootstrap_case_resample(pos, sites, max_resamples, pos.obj))
+    num_resampled_positions = len(resampled_positions)
+    if num_resampled_positions > 0:
+      if num_resampled_positions > 100:
+        A = np.array(resampled_positions[num_resampled_positions/2:])
+        B = np.array(resampled_positions[:num_resampled_positions/2])
+      else:
+        A = np.array(resampled_positions)
+        B = np.array(resampled_positions)
+      
+      # Estimate covariance. 
+      self.C = np.cov(np.imag(A), np.real(A)) 
+      #n = sum(map(lambda l : len(l), pos.sub_splines.values())) 
+      #self.m = float(n) / pos.num_sites
+      
+      # Mahalanobis distance of remaining estimates. 
+      try:
+        distances = []
+        inv_C = np.linalg.inv(self.C)
+        p_bar = np.mean(B)
+        x_bar = np.array([p_bar.imag, p_bar.real])
+        for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
+          y = x - x_bar
+          w = np.dot(np.transpose(y), np.dot(inv_C, y)) 
+          distances.append(w)
+       
+        # Store just a few distances. 
+        sorted_distances = np.array(sorted(distances))
+        self.W = {}
+        for level in BOOT_CONF_LEVELS:
+          self.W[level] = sorted_distances[int(len(sorted_distances) * level)]
+        self.status = 'ok'
+        
+      except np.linalg.linalg.LinAlgError: # Singular 
+        self.status = "singular"
+    
+    else: # not enough samples
+      self.status = 'undefined'
 
 
 ### Low level calls. ##########################################################
 
-def aggregate_window(P, signal, obj, t_start, t_end):
+def aggregate_window(bearing_spectrum_per_site_dict, signal_per_site_dict, obj, t_start, t_end):
   ''' Aggregate site data, compute splines for pos. estimation. 
   
     Site data includes the most likely bearing to each site, 
@@ -1159,45 +1243,47 @@ def aggregate_window(P, signal, obj, t_start, t_end):
   bearings = {}
   sub_splines = {}
 
-  if ENABLE_ASYMPTOTIC: 
+  if ENABLE_BOOTSTRAP3 or ENABLE_ASYMPTOTIC: 
     all_splines = {}
   else: all_splines = None
 
-  if ENABLE_BOOTSTRAP:
+  if ENABLE_BOOTSTRAP or ENABLE_BOOTSTRAP2:
     sub_splines = {}
   else: sub_splines = None
 
-  for (id, L) in P.iteritems():
-    mask = (t_start <= signal[id].t) & (signal[id].t < t_end)
-    est_ids = signal[id].est_ids[mask]
-    edsp = signal[id].edsp[mask]
+  for (siteID, bearing_spectrum) in bearing_spectrum_per_site_dict.iteritems():
+    mask = (t_start <= signal_per_site_dict[siteID].t) & (signal_per_site_dict[siteID].t < t_end)
+    est_ids = signal_per_site_dict[siteID].est_ids[mask]
+    edsp = signal_per_site_dict[siteID].edsp[mask]
     if edsp.shape[0] > 0:
-      l = L[mask]
+      likelihoods = bearing_spectrum[mask]
       # Aggregated bearing spectrum spline per site.
-      p = aggregate_spectrum(l)
-      splines[id] = compute_bearing_spline(p) 
+      p = aggregate_spectrum(likelihoods)
+      splines[siteID] = compute_bearing_spline(p) 
       
       # Sub sample splines.
-      if ENABLE_BOOTSTRAP:
-        sub_splines[id] = []
-        if len(l) == 1: 
-          sub_splines[id].append(compute_bearing_spline(l[0]))
-        elif len(l) == 2:
-          sub_splines[id].append(compute_bearing_spline(l[0]))
-          sub_splines[id].append(compute_bearing_spline(l[1]))
+      if ENABLE_BOOTSTRAP or ENABLE_BOOTSTRAP2:
+        sub_splines[siteID] = []
+        if len(likelihoods) == 1: 
+          sub_splines[siteID].append(compute_bearing_spline(likelihoods[0]))
+        elif len(likelihoods) == 2:
+          sub_splines[siteID].append(compute_bearing_spline(likelihoods[0]))
+          sub_splines[siteID].append(compute_bearing_spline(likelihoods[1]))
         else:
-          for index in itertools.combinations(range(len(l)), len(l)-1):
-            p = aggregate_spectrum(l[np.array(index)])
-            sub_splines[id].append(compute_bearing_spline(p)) 
+          #HUH? TAB 2015-07-27
+          #For N records build all N-1 sized spectra? 
+          for index in itertools.combinations(range(len(likelihoods)), len(likelihoods)-1):
+            p = aggregate_spectrum(likelihoods[np.array(index)])
+            sub_splines[siteID].append(compute_bearing_spline(p)) 
       
       # All splines.
-      if ENABLE_ASYMPTOTIC: 
-        all_splines[id] = []
-        for i in range(len(l)):
-          all_splines[id].append(compute_bearing_spline(l[i]))
+      if ENABLE_BOOTSTRAP3 or ENABLE_ASYMPTOTIC: 
+        all_splines[siteID] = []
+        for i in range(len(likelihoods)):
+          all_splines[siteID].append(compute_bearing_spline(likelihoods[i]))
 
       # Aggregated data per site. 
-      bearings[id] = Bearing(edsp, p, len(edsp), obj, est_ids)
+      bearings[siteID] = Bearing(edsp, p, len(edsp), obj, est_ids)
 
       num_est += edsp.shape[0]
   
@@ -1226,29 +1312,32 @@ def compute_bearing_spline(l):
 
 def compute_likelihood_grid(sites, splines, center, scale, half_span):
   ''' Compute a grid of candidate points and their likelihoods. '''
-   
   # Generate a grid of positions with center at the center. 
   positions = np.zeros((half_span*2+1, half_span*2+1),np.complex)
   for e in range(-half_span,half_span+1):
     for n in range(-half_span,half_span+1):
       positions[e + half_span, n + half_span] = center + np.complex(n * scale, e * scale)
-
   # Compute the likelihood of each position as the sum of the likelihoods 
   # of bearing to each site. 
   likelihoods = np.zeros(positions.shape, dtype=float)
-  for id in splines.keys():
-    bearing_to_positions = np.angle(positions - sites[id]) * 180 / np.pi
-    likelihoods += splines[id](bearing_to_positions.flat).reshape(bearing_to_positions.shape)
-  
+  for siteID in splines.keys():
+    bearing_to_positions = np.angle(positions - sites[siteID]) * 180 / np.pi
+    try:
+      spline_iter = iter(splines[siteID])
+    except TypeError:
+      likelihoods += splines[siteID](bearing_to_positions.flat).reshape(bearing_to_positions.shape)
+    else:
+      for s in spline_iter:
+        likelihoods += s(bearing_to_positions.flat).reshape(bearing_to_positions.shape)
   return (positions, likelihoods)
 
-
+#not called TAB 2015-07-27
 def compute_likelihood(sites, splines, p):
   ''' Compute the likelihood of position `p`. ''' 
   likelihood = 0
-  for id in splines.keys():
-    bearing = np.angle(p - sites[id]) * 180 / np.pi
-    likelihood += splines[id](bearing)
+  for siteID in splines.keys():
+    bearing = np.angle(p - sites[siteID]) * 180 / np.pi
+    likelihood += splines[siteID](bearing)
   return likelihood
 
 
@@ -1293,13 +1382,11 @@ def compute_position(sites, splines, center, obj, s, m, n, delta):
     while ct < 3 and (a == 0 or a == span-1 or b == 0 or b == span-1): 
       (positions, likelihoods) = compute_likelihood_grid(
                              sites, splines, p_hat, scale, s)
-      
       index = obj(likelihoods)
       p_hat = positions.flat[index]
       likelihood = likelihoods.flat[index]
       a = index / span; b = index % span
       ct += 1
-
   return p_hat, likelihood
 
 
@@ -1339,6 +1426,60 @@ def bootstrap_resample_sites(pos, sites, resamples, obj, site_ids):
     P.append(p)
   return P
 
+def bootstrap_case_resample(pos, sites, max_resamples, obj):
+  ''' Bootstrap case resampling:
+        https://en.wikipedia.org/wiki/Bootstrapping_(statistics)#Case_resampling '''
+
+  bootstrap_resampled_positions = []
+  site_list = pos.splines.keys()
+  number_of_ests_dict = {}
+
+  #number of exhaustive combinations
+  N=1
+  for siteid in site_list:
+    number_of_ests_dict[siteid] = len(pos.all_splines[siteid])
+    N *= np.math.factorial(2*number_of_ests_dict[siteid]-1)/np.math.factorial(number_of_ests_dict[siteid])/np.math.factorial(number_of_ests_dict[siteid]-1)
+
+  #combinator generator
+  combinator_iter_list = []
+  for siteid in site_list:
+    combinator_iter_list.append(
+        itertools.combinations_with_replacement(
+          [ (siteid, j) for j in range(number_of_ests_dict[siteid]) ], number_of_ests_dict[siteid]
+            )
+              )
+  combinator_generator = itertools.product(*combinator_iter_list)
+
+
+  if (N < max_resamples): #exhaustive search
+    for site_spline_tuple_list in combinator_generator:
+      spline_dict = {}
+      for siteid in site_list:
+        spline_dict[siteid] = []
+      for site_spline_tuples in site_spline_tuple_list:
+        for site, est_index in site_spline_tuples:
+          spline_dict[site].append(pos.all_splines[site][est_index])
+      (p, _) = compute_position(sites, spline_dict, pos.p, obj,
+              s=POS_EST_S, m=POS_EST_M-1, n=POS_EST_N, delta=POS_EST_DELTA)
+      bootstrap_resampled_positions.append(p)
+
+    
+  else: #monte carlo
+    combo_pool = tuple(combinator_generator)
+    number_of_combos = len(combo_pool)
+    indices = sorted(random.sample(xrange(number_of_combos), max_resamples))
+    for index in indices:
+      spline_dict = {}
+      for siteid in site_list:
+        spline_dict[siteid] = []
+      for site_spline_tuples in combo_pool[index]:
+        for site, est_index in site_spline_tuples:
+          spline_dict[site].append(pos.all_splines[site][est_index])
+      (p, _) = compute_position(sites, spline_dict, pos.p, obj,
+              s=POS_EST_S, m=POS_EST_M-1, n=POS_EST_N, delta=POS_EST_DELTA)
+      bootstrap_resampled_positions.append(p)
+
+  return bootstrap_resampled_positions
 
 def compute_conf(C, Qt, scale=1):
   ''' Compute confidence region from covariance matrix.
