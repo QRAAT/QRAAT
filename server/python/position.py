@@ -1465,14 +1465,19 @@ def bootstrap_case_resample(pos, sites, max_resamples, obj):
 
     
   else: #monte carlo
-    combo_pool = tuple(combinator_generator)
-    number_of_combos = len(combo_pool)
+    #combo_pool = tuple(combinator_generator)
+    number_of_combos = N#len(combo_pool)
     indices = sorted(random.sample(xrange(number_of_combos), max_resamples))
+    count = 0
+    current_combo = combinator_generator.next()
     for index in indices:
       spline_dict = {}
       for siteid in site_list:
         spline_dict[siteid] = []
-      for site_spline_tuples in combo_pool[index]:
+      while count < index:
+        count +=1
+        current_combo = combinator_generator.next()
+      for site_spline_tuples in current_combo:#combo_pool[index]:
         for site, est_index in site_spline_tuples:
           spline_dict[site].append(pos.all_splines[site][est_index])
       (p, _) = compute_position(sites, spline_dict, pos.p, obj,
