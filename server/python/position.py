@@ -1430,8 +1430,13 @@ def bootstrap_case_resample(pos, sites, max_resamples, obj):
   ''' Bootstrap case resampling:
         https://en.wikipedia.org/wiki/Bootstrapping_(statistics)#Case_resampling '''
 
+
+  #N = reduce(int.__mul__, [1] + map(lambda S : len(S), pos.all_splines.values()))
+  if pos.p is None or pos.num_sites < 2: # Number of pulse combinations
+    return []
+
   bootstrap_resampled_positions = []
-  site_list = pos.splines.keys()
+  site_list = pos.all_splines.keys()  
   number_of_ests_dict = {}
 
   #number of exhaustive combinations
