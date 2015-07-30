@@ -1445,18 +1445,19 @@ def bootstrap_case_resample(pos, sites, max_resamples, obj):
     number_of_ests_dict[siteid] = len(pos.all_splines[siteid])
     N *= np.math.factorial(2*number_of_ests_dict[siteid]-1)/np.math.factorial(number_of_ests_dict[siteid])/np.math.factorial(number_of_ests_dict[siteid]-1)
 
-  #combinator generator
-  combinator_iter_list = []
-  for siteid in site_list:
-    combinator_iter_list.append(
-        itertools.combinations_with_replacement(
-          [ (siteid, j) for j in range(number_of_ests_dict[siteid]) ], number_of_ests_dict[siteid]
-            )
-              )
-  combinator_generator = itertools.product(*combinator_iter_list)
 
 
   if (N < max_resamples): #exhaustive search
+    #combinator generator
+    combinator_iter_list = []
+    for siteid in site_list:
+      combinator_iter_list.append(
+          itertools.combinations_with_replacement(
+            [ (siteid, j) for j in range(number_of_ests_dict[siteid]) ], number_of_ests_dict[siteid]
+              )
+                )
+    combinator_generator = itertools.product(*combinator_iter_list)
+
     for site_spline_tuple_list in combinator_generator:
       spline_dict = {}
       for siteid in site_list:
@@ -1472,23 +1473,55 @@ def bootstrap_case_resample(pos, sites, max_resamples, obj):
   else: #monte carlo
     #combo_pool = tuple(combinator_generator)
     number_of_combos = N#len(combo_pool)
-    indices = sorted(random.sample(xrange(number_of_combos), max_resamples))
-    count = 0
-    current_combo = combinator_generator.next()
-    for index in indices:
+    
+    uniqueness_dict = {}
+    for j in range(max_resamples):
       spline_dict = {}
-      for siteid in site_list:
-        spline_dict[siteid] = []
-      while count < index:
-        count +=1
-        current_combo = combinator_generator.next()
-      for site_spline_tuples in current_combo:#combo_pool[index]:
-        for site, est_index in site_spline_tuples:
-          spline_dict[site].append(pos.all_splines[site][est_index])
+      for site in site_list:
+        spline_dict[site] = []
+
+      unique = False
+      while not unique:
+        #pick random sample
+        current_combo = []
+        for site in site_list:
+          current_est_choices = []
+          for k in range(number_of_ests_dict[site]):
+            current_est_choices.append(random.randrange(number_of_ests_dict[site]))
+          current_est_choices.sort()
+          current_combo.append(tuple(current_est_choices))
+        #test if chosen before
+        if not tuple(current_combo) in uniqueness_dict:
+          uniqueness_dict[tuple(current_combo)]=1
+          unique = True
+          
+
+      #build splines
+      for k, site in enumerate(site_list):
+        est_choices = current_combo[k]
+        for m in est_choices:
+          spline_dict[site].append(pos.all_splines[site][m])
+      #for site_spline_tuples in current_combo:#combo_pool[index]:
+        #for site, est_index in site_spline_tuples:
+        #  spline_dict[site].append(pos.all_splines[site][est_index])
+      #compute position
       (p, _) = compute_position(sites, spline_dict, pos.p, obj,
               s=POS_EST_S, m=POS_EST_M-1, n=POS_EST_N, delta=POS_EST_DELTA)
       bootstrap_resampled_positions.append(p)
 
+
+
+
+
+
+    #indices = sorted(random.sample(xrange(number_of_combos), max_resamples))
+    #count = 0
+    #current_combo = combinator_generator.next()
+    #for index in indices:
+    #  while count < index:
+    #    count +=1
+    #    current_combo = combinator_generator.next()
+      
   return bootstrap_resampled_positions
 
 def compute_conf(C, Qt, scale=1):

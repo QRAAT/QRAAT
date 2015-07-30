@@ -28,7 +28,7 @@ if os.environ["RMG_POS_ENABLE_COV"].lower() == 'true':
   position.ENABLE_BOOTSTRAP3 = True
 else: 
   print "position_auto: no covariance"
-  position.ENABLE_BOOTSTRAP = False
+  #position.ENABLE_BOOTSTRAP = False
 
 if os.environ["RMG_POS_NORMALIZE_SPECTRUM"].lower() == 'true':
   position.NORMALIZE_SPECTRUM = True
