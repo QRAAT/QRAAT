@@ -86,7 +86,7 @@ def get_context(request, deps=[], req_deps=[]):
         activity_high = None
     #dictionary.get(key, default=None), returns None if the key isn't
     #in the dictionary instead of throwing an exception
-    #TODO: Change above
+    # TODO: Change above
     covariance_low = request.GET.get('covariance_low')
     covariance_high = request.GET.get('covariance_high')
 
@@ -481,7 +481,6 @@ def view_by_dep(request, project_id, dep_id):
     return render(request, 'map/index.html', context)
     
 def get_data(request, project_id, dep_id):
-    print "in get data"
     try:
         project = Project.objects.get(ID=project_id)
     except ObjectDoesNotExist:
@@ -507,9 +506,6 @@ def get_data(request, project_id, dep_id):
         deps = project.get_deployments().filter(ID=dep_id)
 
     context = get_context(request, deps, deps)
-    print "before.."
-    print "get_data context!! ", context['form']
-    print "after context['form'"
     response = HttpResponse(json.dumps(context['pos_data']), content_type="application/json")
     return response
 
