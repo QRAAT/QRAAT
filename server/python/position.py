@@ -1190,7 +1190,7 @@ class BootstrapCovariance3 (BootstrapCovariance):
     # Generate sub samples.
     resampled_positions = np.array(bootstrap_case_resample(pos, sites, max_resamples, pos.obj))
     num_resampled_positions = len(resampled_positions)
-    if num_resampled_positions > 0:
+    if num_resampled_positions > 1:
       if num_resampled_positions > 100:
         A = np.array(resampled_positions[num_resampled_positions/2:])
         B = np.array(resampled_positions[:num_resampled_positions/2])
@@ -1204,9 +1204,12 @@ class BootstrapCovariance3 (BootstrapCovariance):
       #self.m = float(n) / pos.num_sites
       
       # Mahalanobis distance of remaining estimates. 
+      distances = []
       try:
-        distances = []
         inv_C = np.linalg.inv(self.C)
+      except np.linalg.linalg.LinAlgError: # Singular 
+        self.status = "singular"
+      else:
         p_bar = np.mean(B)
         x_bar = np.array([p_bar.imag, p_bar.real])
         for x in map(lambda p: np.array([p.imag, p.real]), iter(B)): 
@@ -1221,9 +1224,7 @@ class BootstrapCovariance3 (BootstrapCovariance):
           self.W[level] = sorted_distances[int(len(sorted_distances) * level)]
         self.status = 'ok'
         
-      except np.linalg.linalg.LinAlgError: # Singular 
-        self.status = "singular"
-    
+          
     else: # not enough samples
       self.status = 'undefined'
 
