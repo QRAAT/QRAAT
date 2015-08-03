@@ -14,7 +14,7 @@
     <script src ="/static/flot/jquery.flot.selection.min.js"></script>
     <script src="/static/flot/jquery.flot.threshold.min.js"></script>
     <script src="/static/flot/jquery.flot.resize.min.js"></script>
-    <!--    <script src="/static/flot/jquery.flot.axislabels.js"></script> <!-- TODO: minify this --> This script is ass. One of the callbacks, which is called by draw, calls draw again. Thus doubling the time it takes, which is important considering draw takes ~200ms See for axis view-source:http://www.flotcharts.org/javascript/flot.demo.js-->
+    <!--    <script src="/static/flot/jquery.flot.axislabels.js"></script>  TODO: minify this  This script is ass. One of the callbacks, which is called by draw, calls draw again. Thus doubling the time it takes, which is important considering draw takes ~200ms See for axis view-source:http://www.flotcharts.org/javascript/flot.demo.js-->
     <script src="/static/map/js/date.js"></script>
     <script src="/static/flot/jquery.flot.time.min.js"></script>
     <!-- <script src="/static/map/js/jquery-ui.min.js"></script> -->
@@ -47,9 +47,11 @@ var oldLatLngIndex = []; // Save the indices when we disable the polyline/heatma
 var currPosDataIndex = []; // Indices of the start and end of requested data in rawPosData
 var userRequestedMaxTimeRange = []; // Keep track of this so that if there's chunks of missing data, we don't refetch data based on the time of the actual data previously retrieved. 
 
+var dataType = "Raw";
 var graphTypeEnum = {'LIKELIHOOD': 6, 'ACTIVITY': 7,};// 'COVARIANCE': ?};
 var graphTypeIndex = [6,7];
 var graphFilters = []; // Data filter (likelihood, activity, ...) bounds [[low,high], [low,high], ...] 
+var interactiveFilters = []; // Like graphFilters, but for a 2nd filtering where points are still visible but grayed out on the graph
 
 first_dep = {{graph_dep}};
 curr_dep = first_dep;
@@ -113,6 +115,7 @@ function getGraphData(markers, dep_id, sel_data){
     //for (var i=0; i < markers.length; i++) { 
 	// FIXME: Current rawPosData array incompatible with multiple deployments
         // if (markers[i].qraat_pos[1] == dep_id && markers[i].getVisible()) {
+
 	    // Filter by likelihood, activity, etc FIXME: Repeated code from colorMarkers
 	    for(var j = 0; j < graphTypeIndex.length; j++) {
 		var val = rawPosData[i][graphTypeIndex[j]];
@@ -184,6 +187,8 @@ function loadFlot(pos_markers, map, dep_id){
             axisLabelFontFamily: "Lucida Grande,Verdana,Arial,sans-serif",
             axisLabelPadding: 15},
         yaxis: {
+	    min: 0,
+	    max: 1,
             axisLabel: yaxis_label,
             axisLabelUseCanvas: true,
             axisLabelFontSizePixels: 12,
@@ -246,6 +251,8 @@ function loadFlot(pos_markers, map, dep_id){
 
 	$("#time-slider")[0].style.marginLeft = plot.getPlotOffset().left + "px";
 	$("#time-slider")[0].style.marginRight = plot.getPlotOffset().right + "px";
+	$("#filter-slider")[0].style.marginTop = plot.getPlotOffset().top + "px";
+	$("#filter-slider")[0].style.marginBottom = plot.getPlotOffset().bottom + "px";
         flotPlotWidth = plot.width();
         flotSelectedRange[0] = 0;
         flotSelectedRange[1] = flotPlotWidth;
@@ -269,8 +276,7 @@ function loadFlot(pos_markers, map, dep_id){
         flot_clicked_series = item.series;
         flot_clicked_datapoint = item.datapoint;
         
-        clickedDateTime = item.dataIndex;
-	var tempmarker = data.markers[item.dataIndex];
+	var tempmarker = markers_querydata[currPosDataIndex[0]+item.dataIndex];
         addSelectedPos(tempmarker, map);
     });
     
@@ -284,8 +290,8 @@ function loadFlot(pos_markers, map, dep_id){
 	    selectedTimeRange = [ranges.xaxis.from/1000, ranges.xaxis.to/1000];	
 	    selectedOldNew[1] = [getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')];
 	    $('#time-slider').slider("values", 
-		[(selectedTimeRange[0]-timeframearr[0])/timeframe * 100, 
-		(selectedTimeRange[1]-timeframearr[0])/timeframe * 100]);
+		[(selectedTimeRange[0]-timeframearr[0])/timeframe, 
+		(selectedTimeRange[1]-timeframearr[0])/timeframe]);
 	    changeSelectionHelper(selectedOldNew);
 	}
 
@@ -309,7 +315,7 @@ function loadFlot(pos_markers, map, dep_id){
 	var selectedOldNew = [[getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')],
 	    currPosDataIndex.slice(0)];
 	selectedTimeRange = [rawPosData[currPosDataIndex[0]][2], rawPosData[currPosDataIndex[1]][2]];
-	resetSlider();
+	resetTimeSlider();
 	changeSelectionHelper(selectedOldNew);
 	if(boundingRect) {
 	    boundingRect.setMap(null);
@@ -323,8 +329,8 @@ function loadFlot(pos_markers, map, dep_id){
     $("#placeholder2").resize(function () {
         var oldFlotPlotWidth = flotPlotWidth;
         flotPlotWidth = $(this).width();
-	$("#time-slider")[0].style.marginLeft = $(this).getPlotOffset().left + "px";
-	$("#time-slider")[0].style.marginRight = $(this).getPlotOffset().right + "px";
+	$("#time-slider")[0].style.marginLeft = $(this).data("plot").getPlotOffset().left + "px";
+	$("#time-slider")[0].style.marginRight = $(this).data("plot").getPlotOffset().right + "px";
         flotSelectedRange[1]=flotPlotWidth;
         flotSelectedWidth = flotSelectedRange[1]-flotSelectedRange[0];
 	plot.draw();
@@ -332,7 +338,8 @@ function loadFlot(pos_markers, map, dep_id){
 }
 
 function updateFlot(pos_markers, dep_id) {
-    var data = getGraphData(pos_markers, dep_id, {{graph_data}});
+    console.log("updateFlot, graphdata", $("#id_graph_data").val());
+    var data = getGraphData(pos_markers, dep_id, $("#id_graph_data").val());
     var graph_data =[ { data: data.graph, label: dep_id, lines: {show:false} } ];
     $("#placeholder2").data("plot").setData(graph_data);
     $("#placeholder2").data("plot").setupGrid();
@@ -345,20 +352,34 @@ function drawFlotPoint(ctx, x, y, radius, shadow){
 }
 
 function colorPoint(x,y) {
-    if(!document.getElementById('id_colorpoints').checked){
-	    return "";
+    var xaxis = $("#placeholder2").data("plot").getAxes().xaxis;
+    var i = getPosIndex(xaxis.c2p(x)/1000);
+    if(i == -1)
+	console.log("xaxis.c2p(x) not returning exact timestamp?", x, xaxis.c2p(x));
+    // Filter by likelihood, activity, etc
+    for(var j = 0; j < graphTypeIndex.length; j++) {
+	var val = rawPosData[i][graphTypeIndex[j]];
+	if(val < interactiveFilters[j][0] || val > interactiveFilters[j][1]) {
+	    return "#CCCCCC";
+	}
     }
+
+    var cChecked = document.getElementById('id_colorpoints').checked;
     if(x > flotSelectedRange[0] && x < flotSelectedRange[1]) {
-        var i = (x-flotSelectedRange[0])/flotSelectedWidth * 99;
-    	return redGreenRamp[(i | 0)]; //i|0 truncates i
+	if(!cChecked)
+	    return "";
+	else {
+	    var i = (x-flotSelectedRange[0])/flotSelectedWidth * 99;
+	    return redGreenRamp[(i | 0)]; //i|0 truncates i
+	}
     }
     else if(x>=flotPlotWidth) {
-	if(flotSelectedRange[1]>=flotPlotWidth)
+	if(!cChecked && flotSelectedRange[1]>=flotPlotWidth)
 	    return redGreenRamp[99]; 
 	return "#CCCCCC"; 
     }
     else if(x<=0) {
-	if(flotSelectedRange[0]<=0)
+	if(!cChecked && flotSelectedRange[0]<=0)
 	    return redGreenRamp[0]
     	return "#CCCCCC";
     }
@@ -383,7 +404,7 @@ function colorMarkers() {
 	    // Filter by likelihood, activity, etc
 	    for(var j = 0; j < graphTypeIndex.length; j++) {
 		var val = rawPosData[i][graphTypeIndex[j]];
-		if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
+		if(val < interactiveFilters[j][0] || val > interactiveFilters[j][1]) {
 		    markers_querydata[i].setVisible(false);
 		    continue alldatafor;
 		}
@@ -465,6 +486,8 @@ function getPosIndex(timestamp,searchDirection) {
     }
     if(max == min && rawPosData[mid][2] == timestamp) 
 	return mid;
+    else if(rawPosData[mid-1][2] == timestamp)
+	return mid -1; // TODO: This else if is just a bandage. Fix this whole thing lmao
     else {
 	if(searchDirection == 'gte') {
 	    if(rawPosData[mid][2] > timestamp)
@@ -497,7 +520,7 @@ function updateData() {
     var dataLatestTime = rawPosData[rawPosData.length-1][2];
 
     // If the user wants data from before what we have, or non continguous
-    if(reqTimeTo < userRequestedMaxTimeRange[0] || reqTimeFrom > userRequestedMaxTimeRange[1]) { 
+    if($("#id_data_type option:selected").text() == "Track" || reqTimeTo < userRequestedMaxTimeRange[0] || reqTimeFrom > userRequestedMaxTimeRange[1]) { 
 	console.log("Case 1: new array");
         // All new array
 	$.ajax({
@@ -659,21 +682,22 @@ function updateData() {
 	    }
 	}
 	currPosDataIndex = [start,end];
-	resetSlider();
+	resetTimeSlider();
         console.log("currposdataindex", currPosDataIndex); 
 	updateHelper();
     }
     
 
     function updateHelper(prepend) {
-	oldLatLngIndex = currPosDataIndex.splice();
+	oldLatLngIndex = currPosDataIndex.slice();
 	if(prepend == null){ prepend = false; }
 	selectedTimeRange = [rawPosData[currPosDataIndex[0]][2], rawPosData[currPosDataIndex[1]][2]];
 	userRequestedMaxTimeRange = [reqTimeFrom, reqTimeTo];
 	$("#placeholder2").data("plot").clearSelection();
-	resetSlider();
+	resetTimeSlider();
 	loadMarkers(map, prepend);
-	colorMarkers(); // Extraneous when creating a whole new markers_querydata, but w/e
+	$("#filter-slider").slider("values",[0,1]);
+	//colorMarkers(); // Extraneous when creating a whole new markers_querydata, but w/e. Changing the filter-slider calls colorMarkers
 	updateFlot(markers_querydata,curr_dep);
     }
     return true; // To make it submit when you press enter?
@@ -874,16 +898,16 @@ function changeSelectionHelper(oldAndNewIndices) {
     }
     console.log("ending changeSelectionHelper", cscount);
 }
-function resetSlider() {
-    $('#time-slider').slider("values", [0,100]);
+function resetTimeSlider() {
+    $('#time-slider').slider("values", [0,1]);
 }
 function setupSlider() {
     $("#time-slider").slider({
 	range: true,
 	min: 0,
-	max: 100,
-	values: [0,100],
-	step: 1,
+	max: 1,
+	values: [0,1],
+	step: 0.01,
 	stop: function(event, ui) {
 	    $("#update_test").html($(this).slider("values",1));
 	},
@@ -897,12 +921,12 @@ function setupSlider() {
 	    var currTimeDelta = currTimeRange[1] - currTimeRange[0];
 	    
 	    var oldSelectedIndex = [
-	    	getPosIndex(currTimeRange[0] + (currTimeDelta * $(this).slider('values',0) / 100), 'gte'),
-	    	getPosIndex(currTimeRange[0] + (currTimeDelta * $(this).slider('values',1) / 100), 'lte'),
+	    	getPosIndex(currTimeRange[0] + (currTimeDelta * $(this).slider('values',0)), 'gte'),
+	    	getPosIndex(currTimeRange[0] + (currTimeDelta * $(this).slider('values',1)), 'lte'),
 	    ];
 	    var newSelectedTime = [
-		currTimeRange[0] + (currTimeDelta * ui.values[0] / 100),
-		currTimeRange[0] + (currTimeDelta * ui.values[1] / 100),
+		currTimeRange[0] + (currTimeDelta * ui.values[0]),
+		currTimeRange[0] + (currTimeDelta * ui.values[1]),
 	    ];
 	    var newSelectedIndex = [
 	    	getPosIndex(newSelectedTime[0], 'gte'),
@@ -922,6 +946,41 @@ function setupSlider() {
 	    console.log("setSelection to", {from: rawPosData[newSelectedIndex[0]][2] * 1000, to: rawPosData[newSelectedIndex[1]][2] * 1000});
        },
     });
+
+
+    $("#filter-slider").slider({
+	orientation: "vertical",
+	range: true,
+	min: 0,
+	max: 1,
+	values: [0,1],
+	step: 0.01,
+	change: function(event, ui) {
+	    // Finding the delta is pointless if we bound the yaxis to [0,1] in the plot options
+	    var yaxis = $("#placeholder2").data("plot").getAxes().yaxis;	    
+	    var delta = yaxis.max - yaxis.min;
+	    interactiveFilters[$("#id_graph_data").val()-1] = [yaxis.min + delta*ui.values[0], yaxis.min + delta*ui.values[1]];
+
+	    if(polyline || heatmap) {
+		// Create new latlongData
+		latlongData = [];
+	    	outsideloop: for(var i = currPosDataIndex[0]; i<currPosDataIndex[1]; i++) {
+		    for(var j = 0; j < graphTypeIndex.length; j++) {
+			var val = rawPosData[i][graphTypeIndex[j]];
+			if(val < interactiveFilters[j][0] || val > interactiveFilters[j][1]) {
+			    continue outsideloop;
+			}
+		    }
+		    latlongData.push(new google.maps.LatLng(rawPosData[i][8][0], rawPosData[i][8][1]));
+		}
+		if(polyline) polyline.setPath(latlongData);
+		if(heatmap) heatmap.setData(latlongData);
+	    }
+	    
+	    $("#placeholder2").data("plot").draw();
+	    colorMarkers();
+	},
+    });
 }
 
 function setGraphFilters() {
@@ -931,10 +990,10 @@ function setGraphFilters() {
 	[parseFloat($("#id_activity_low").val()),
 	parseFloat($("#id_activity_high").val())],	
     ];
+    interactiveFilters = graphFilters.slice(0);
 }
 
 function toggleSites() {
-    console.log("in togglesites");
     if(map != null) {
 	for(var i = 0; i < markers_sites.length; i++) {
 	    markers_sites[i].setVisible(!markers_sites[i].getVisible());
@@ -1178,6 +1237,13 @@ function initialize(){
     
     setGraphFilters();
     //document.getElementById("id_sites").onclick = toggleSites;
+    $("#id_data_type").on('change', updateData);
+    $("#id_graph_data").on('change', function(){
+	updateFlot(markers_querydata, curr_dep);
+	var yaxis = $("#placeholder2").data("plot").getAxes().yaxis;
+	var delta = yaxis.max - yaxis.min;
+	$("#filter-slider").slider("values",[(interactiveFilters[$(this).val()-1][0] - yaxis.min)/delta, (interactiveFilters[$(this).val()-1][1] - yaxis.min)/delta]);
+    })
     $("#id_sites").on('click', toggleSites);
     $("#id_heatmap").on('click', function(){
 	if($(this)[0].checked) {
@@ -1659,11 +1725,12 @@ google.maps.event.addDomListener(window, 'load', initialize);
     <div class="row-5" id="time-slider"></div> <!-- TODO: What is the class for -->
     {% if positions %}
     <!-- FLOT CHART -->
-    <div class="row-4">
+    <div class="row-4 flex">
 	<center>
 	<!-- uncomment next line for small overview graph -->
   <!--   <div id="overview" class="demo-placeholder" style="float: right; width: 100px; height: 125px;"></div> -->
 	</center>
+	<div id="filter-slider" style="height: 100%"></div>
 	<div class="row-2" id="placeholder2"></div> <!-- end row-2, placeholder2 -->
 	</div>  <!-- end row-4 -->
 </div> <!-- end ui-content -->
