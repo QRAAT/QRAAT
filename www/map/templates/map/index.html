@@ -51,7 +51,6 @@ var dataType = "Raw";
 var graphTypeEnum = {'LIKELIHOOD': 6, 'ACTIVITY': 7,};// 'COVARIANCE': ?};
 var graphTypeIndex = [6,7];
 var graphFilters = []; // Data filter (likelihood, activity, ...) bounds [[low,high], [low,high], ...] 
-var interactiveFilters = []; // Like graphFilters, but for a 2nd filtering where points are still visible but grayed out on the graph
 
 first_dep = {{graph_dep}};
 curr_dep = first_dep;
@@ -111,25 +110,13 @@ function getGraphData(markers, dep_id, sel_data){
     else{ // likelihood (default)
         var graph_data_type = 'LIKELIHOOD';
     }
-    getGraphDataFor: for(var i = currPosDataIndex[0]; i <= currPosDataIndex[1]; i++) {
-    //for (var i=0; i < markers.length; i++) { 
+    for(var i = currPosDataIndex[0]; i <= currPosDataIndex[1]; i++) {
 	// FIXME: Current rawPosData array incompatible with multiple deployments
-        // if (markers[i].qraat_pos[1] == dep_id && markers[i].getVisible()) {
-
-	    // Filter by likelihood, activity, etc FIXME: Repeated code from colorMarkers
-	    for(var j = 0; j < graphTypeIndex.length; j++) {
-		var val = rawPosData[i][graphTypeIndex[j]];
-		if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
-		    continue getGraphDataFor;
-		}
-	    }
-
-            var flot_point = [markers[i].qraat_pos[2]*1000, markers[i].qraat_pos[graphTypeEnum[graph_data_type]]];
-            markers[i].flot_point = flot_point;
-            data.graph.push(flot_point);
-            data.markers.push(markers[i]);
-            data.deployments.push(markers[i].qraat_pos[1]);
-        //}
+	var flot_point = [markers[i].qraat_pos[2]*1000, markers[i].qraat_pos[graphTypeEnum[graph_data_type]]];
+	markers[i].flot_point = flot_point;
+	data.graph.push(flot_point);
+	data.markers.push(markers[i]);
+	data.deployments.push(markers[i].qraat_pos[1]);
     }
     return data;
 }
@@ -359,7 +346,7 @@ function colorPoint(x,y) {
     // Filter by likelihood, activity, etc
     for(var j = 0; j < graphTypeIndex.length; j++) {
 	var val = rawPosData[i][graphTypeIndex[j]];
-	if(val < interactiveFilters[j][0] || val > interactiveFilters[j][1]) {
+	if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
 	    return "#CCCCCC";
 	}
     }
@@ -404,7 +391,7 @@ function colorMarkers() {
 	    // Filter by likelihood, activity, etc
 	    for(var j = 0; j < graphTypeIndex.length; j++) {
 		var val = rawPosData[i][graphTypeIndex[j]];
-		if(val < interactiveFilters[j][0] || val > interactiveFilters[j][1]) {
+		if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
 		    markers_querydata[i].setVisible(false);
 		    continue alldatafor;
 		}
@@ -956,25 +943,38 @@ function setupSlider() {
 	values: [0,1],
 	step: 0.01,
 	change: function(event, ui) {
-	    // Finding the delta is pointless if we bound the yaxis to [0,1] in the plot options
+	    console.log($(this).slider('values'), ui.values, ui, event);
+	    
+	    // Return if plot hasn't been created yet
+	    if(!$("#placeholder2").data("plot")) return; 
+
+	    if($("#id_graph_data option:selected").text() == "Likelihood") {
+		$("#id_likelihood_low").val(ui.values[0]);
+		$("#id_likelihood_high").val(ui.values[1]);
+	    }
+	    else if ($("#id_graph_data option:selected").text() == "Activity") {
+		$("#id_activity_low").val(ui.values[0]);
+		$("#id_activity_high").val(ui.values[1]);
+	    }
+	    // TODO: Finding the delta is pointless if we bound the yaxis to [0,1] in the plot options
 	    var yaxis = $("#placeholder2").data("plot").getAxes().yaxis;	    
 	    var delta = yaxis.max - yaxis.min;
-	    interactiveFilters[$("#id_graph_data").val()-1] = [yaxis.min + delta*ui.values[0], yaxis.min + delta*ui.values[1]];
+	    graphFilters[$("#id_graph_data").val()-1] = [yaxis.min + delta*ui.values[0], yaxis.min + delta*ui.values[1]];
 
 	    if(polyline || heatmap) {
-		// Create new latlongData
-		latlongData = [];
+		// Change latlongData
+		latlongData.clear();
 	    	outsideloop: for(var i = currPosDataIndex[0]; i<currPosDataIndex[1]; i++) {
 		    for(var j = 0; j < graphTypeIndex.length; j++) {
 			var val = rawPosData[i][graphTypeIndex[j]];
-			if(val < interactiveFilters[j][0] || val > interactiveFilters[j][1]) {
+			if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
 			    continue outsideloop;
 			}
 		    }
 		    latlongData.push(new google.maps.LatLng(rawPosData[i][8][0], rawPosData[i][8][1]));
 		}
-		if(polyline) polyline.setPath(latlongData);
-		if(heatmap) heatmap.setData(latlongData);
+		//if(polyline) polyline.setPath(latlongData);
+		//if(heatmap) heatmap.setData(latlongData);
 	    }
 	    
 	    $("#placeholder2").data("plot").draw();
@@ -990,7 +990,6 @@ function setGraphFilters() {
 	[parseFloat($("#id_activity_low").val()),
 	parseFloat($("#id_activity_high").val())],	
     ];
-    interactiveFilters = graphFilters.slice(0);
 }
 
 function toggleSites() {
@@ -1237,12 +1236,37 @@ function initialize(){
     
     setGraphFilters();
     //document.getElementById("id_sites").onclick = toggleSites;
-    $("#id_data_type").on('change', updateData);
+    $("#id_data_type").on('change', updateData); // Raw vs tracks
+
+    // Bind filter form inputs to filter slider
+    $("#id_likelihood_low").on('change', function(e) {
+	    console.log(e);
+	setGraphFilters();
+	if($("#id_graph_data option:selected").text() == "Likelihood")
+	    $("#filter-slider").slider("values",0,$(this).val());
+    });
+    $("#id_likelihood_high").on('change', function() {
+	setGraphFilters();
+	if($("#id_graph_data option:selected").text() == "Likelihood")
+	    $("#filter-slider").slider("values",1,$(this).val());
+    });
+    $("#id_activity_low").on('change', function() {
+	setGraphFilters();
+	if($("#id_graph_data option:selected").text() == "Activity")
+	    $("#filter-slider").slider("values",0,$(this).val());
+    });
+    $("#id_activity_high").on('change', function() {
+	setGraphFilters();
+	if($("#id_graph_data option:selected").text() == "Activity")
+	    $("#filter-slider").slider("values",1,$(this).val());
+    });
+
+
     $("#id_graph_data").on('change', function(){
 	updateFlot(markers_querydata, curr_dep);
 	var yaxis = $("#placeholder2").data("plot").getAxes().yaxis;
 	var delta = yaxis.max - yaxis.min;
-	$("#filter-slider").slider("values",[(interactiveFilters[$(this).val()-1][0] - yaxis.min)/delta, (interactiveFilters[$(this).val()-1][1] - yaxis.min)/delta]);
+	$("#filter-slider").slider("values",[(graphFilters[$(this).val()-1][0] - yaxis.min)/delta, (graphFilters[$(this).val()-1][1] - yaxis.min)/delta]);
     })
     $("#id_sites").on('click', toggleSites);
     $("#id_heatmap").on('click', function(){
@@ -1322,7 +1346,7 @@ function initialize(){
     map = new google.maps.Map(document.getElementById("map-canvas"),
     mapOptions);
     
-    // Create time slider
+    // Create time and filter slider
     setupSlider();
     
     // Listen and store center & zoom changes, to be used in map options
@@ -1555,6 +1579,15 @@ function initialize(){
        loadPolyline();
        loadFlot(); 
     } // end if (html pref is set to show data as lines)
+
+    // Update filter slider appropriately
+    if($("#id_graph_data option:selected").text() == "Likelihood") {
+	console.log("sdfsdf",$("#id_likelihood_low").val(),$("#id_likelihood_high").val());
+	$("#filter-slider").slider("values",[$("#id_likelihood_low").val(),$("#id_likelihood_high").val()]);
+    }
+    else if ($("#id_graph_data option:selected").text() == "Activity") {
+	$("#filter-slider").slider("values",[$("#id_activity_low").val(),$("#id_activity_high").val()]);
+    }
     
     // Example of addListeners for the flightPath
     // On mouseover, the flightPath changes color
