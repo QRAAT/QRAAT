@@ -10,8 +10,11 @@ urlpatterns = patterns('map.views',
         r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/download/$',
         'download_by_dep', name='download_by_dep'),
     url(
-        r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/$',
+        r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>[0-9]+(\+[0-9]+)*)/$',
         'view_by_dep', name='view_by_dep'),
+    #url(
+    #    r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/$',
+    #    'view_by_dep', name='view_by_dep'),
     # url(r'^deployment/(?P<dep_id>\d+)/$', 'view_by_dep'),
     url(r'^target/(?P<target_id>\d+)/$', 'view_by_target'),
     url(r'^transmitter/(?P<tx_id>\d+)/$', 'view_by_tx'),
@@ -20,6 +23,6 @@ urlpatterns = patterns('map.views',
     url(r'^est_status', 'est_status', name='est-status'),
 
     url(
-        r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/get_data/$',
+        r'^project/(?P<project_id>\d+)/deployment/([0-9]+(\+[0-9]+)*)/get_data/$',
         'get_data', name='get_data'),
 )

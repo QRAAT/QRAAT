@@ -182,21 +182,30 @@ def get_context(request, deps=[], req_deps=[]):
         # IE, if you're starting with no data parameters
         # Try to get the latest data, going back INITIAL_DATA_WINDOW time.
         if datetime_from == None and datetime_to == None: 
-            req_deps_int.append(req_deps[0].ID)  # /ui/project/X/deployment/Y
+            for i in range(len(req_deps)):
+                req_deps_int.append(req_deps[i].ID)  # /ui/project/X/deployment/Y
 
-            queried_data = []
-
-            q = Position.objects.filter(deploymentID=req_deps[0].ID).aggregate(Max('timestamp'))['timestamp__max']
-
+            maxq = None
             # If there are positions for this deployment at all, q has the max timestamp
-            if q != None:
-                datetime_to_initial = float(q)
+            for i in range(len(req_deps)):
+                q = Position.objects.filter(deploymentID=req_deps[i].ID).aggregate(Max('timestamp'))['timestamp__max']
+                if q != None: 
+                    if float(q) > maxq:
+                        maxq = float(q)
+
+            queried_objects = []
+
+            if maxq != None:
+                datetime_to_initial = maxq
                 datetime_from_initial = datetime_to_initial - INITIAL_DATA_WINDOW
                 
-                queried_objects = \
-                    Position.objects.filter(deploymentID=req_deps[0].ID,
-                        timestamp__gte=datetime_from_initial)
-
+                for i in range(len(req_deps)):
+                    print "data for each deployment!!!"
+                    queried_objects.append([])
+                    queried_objects[i] = \
+                        Position.objects.filter(deploymentID=req_deps[i].ID,
+                            timestamp__gte=datetime_from_initial)
+                
                 datetime_to_str_initial = \
                     utils.strftime(utils.timestamp_todate(datetime_to_initial))
                 # Used to use time.strftime, but switched to our own version so we don't have to specify the pattern repeatedly
@@ -210,22 +219,23 @@ def get_context(request, deps=[], req_deps=[]):
 
                 index_form.fields['likelihood_low'].initial = \
                     likelihood_low if likelihood_low != None else \
-                    round(queried_objects.aggregate(Min('likelihood'))['likelihood__min'], 2)
+                    round(queried_objects[0].aggregate(Min('likelihood'))['likelihood__min'], 2)
                 index_form.fields['likelihood_high'].initial = \
                     likelihood_hi if likelihood_high != None else \
-                    round(queried_objects.aggregate(Max('likelihood'))['likelihood__max'], 2)
+                    round(queried_objects[0].aggregate(Max('likelihood'))['likelihood__max'], 2)
                 index_form.fields['activity_low'].initial = \
                     activity_low if activity_low != None else \
-                    round(queried_objects.aggregate(Min('activity'))['activity__min'], 2)
+                    round(queried_objects[0].aggregate(Min('activity'))['activity__min'], 2)
                 index_form.fields['activity_high'].initial = \
                     activity_high if activity_high != None else \
-                    round(queried_objects.aggregate(Max('activity'))['activity__max'], 2)
+                    round(queried_objects[0].aggregate(Max('activity'))['activity__max'], 2)
 
                 queried_data = sort_query_results(queried_objects)
                 
         # There are some data parameters
         # TODO: Deal with missing parameters, if we care about it.
         else:
+        # TODO: Multiple deployments
         # Note: To pass strings to js using json, use |safe in template.
 
             print '---------- public or deployment GET'
@@ -355,6 +365,7 @@ def get_context(request, deps=[], req_deps=[]):
     else:
         context['datetime_to'] = datetime_to_initial
 
+    print "CONTEXT :", context['pos_data']
     return context
 
 
@@ -363,38 +374,38 @@ def sort_query_results(queried_objects):
       and sort query data by timestamp. '''
 
   # use dictionary to remove duplicates (positions with same timestamp)
-
-    query_dictionary = {}  # key=timestamp, value=query_row
-    for row in queried_objects:
-        if row.timestamp not in query_dictionary:
-            query_dictionary[row.timestamp] = row
-        elif row.likelihood \
-            > query_dictionary[row.timestamp].likelihood:
-            query_dictionary[row.timestamp] = row  # replaces existing value if new likelihood is greater
-        else:
-            pass  # existing likelihood is greater
-
-    timestamps = sorted(query_dictionary.keys())
-
     queried_data = []  # data ordered by timestamp
+    for i in range(0,len(queried_objects)):
+        query_dictionary = {}  # key=timestamp, value=query_row
+        for row in queried_objects[i]:
+            if row.timestamp not in query_dictionary:
+                query_dictionary[row.timestamp] = row
+            elif row.likelihood \
+                > query_dictionary[row.timestamp].likelihood:
+                query_dictionary[row.timestamp] = row  # replaces existing value if new likelihood is greater
+            else:
+                pass  # existing likelihood is greater
 
-    for timestamp in timestamps:
-        row = query_dictionary[timestamp]
-        date_string = utils.strftime(utils.timestamp_todate(row.timestamp))
+        timestamps = sorted(query_dictionary.keys())
 
-        queried_data.append((
-            row.ID,
-            row.deploymentID,
-            float(row.timestamp),
-            float(row.easting),
-            float(row.northing),
-            row.utm_zone_number,
-            float(row.likelihood),
-            float(row.activity),
-            (float(row.latitude), float(row.longitude)),
-            row.utm_zone_letter,
-            date_string,
-            ))
+        queried_data.append([]);
+        for timestamp in timestamps:
+            row = query_dictionary[timestamp]
+            date_string = utils.strftime(utils.timestamp_todate(row.timestamp))
+
+            queried_data[i].append((
+                row.ID,
+                row.deploymentID,
+                float(row.timestamp),
+                float(row.easting),
+                float(row.northing),
+                row.utm_zone_number,
+                float(row.likelihood),
+                float(row.activity),
+                (float(row.latitude), float(row.longitude)),
+                row.utm_zone_letter,
+                date_string,
+                ))
 
     return queried_data
 
@@ -428,6 +439,9 @@ def index(request):
 def view_by_dep(request, project_id, dep_id):
     ''' Compile a list of deployments associated with `dep_id`. '''
 
+    dep_id = dep_id.split("+")
+    dep_id = [int(i) for i in dep_id]
+
     try:
         project = Project.objects.get(ID=project_id)
     except ObjectDoesNotExist:
@@ -452,7 +466,6 @@ def view_by_dep(request, project_id, dep_id):
 
         pass  # public project
 
-    deps = project.get_deployments().filter(ID=dep_id)
 
     print '-----------------------------------------------------'
     print request.GET
@@ -460,14 +473,17 @@ def view_by_dep(request, project_id, dep_id):
     print '-----------------------------------------------------'
 
     try:
-        deployment = Deployment.objects.get(ID=dep_id)
+        q = Q()
+        for dep in dep_id:
+            q = q | Q(ID = str(dep))
+        deps = project.get_deployments().filter(q)
     except ObjectDoesNotExist:
         raise Http404
 
-    target = deployment.targetID
+    target = deps[0].targetID
     target_name = target.name
 
-    transmitter = deployment.txID
+    transmitter = deps[0].txID
     transmitter_frequency = transmitter.frequency
 
     context = get_context(request, deps, deps)
@@ -480,7 +496,11 @@ def view_by_dep(request, project_id, dep_id):
 
     return render(request, 'map/index.html', context)
     
-def get_data(request, project_id, dep_id):
+def get_data(request, project_id):
+    dep_id = request.GET['deployment']; 
+    print "in get_data, dep_id is ", dep_id
+    dep_id = dep_id.split("+")
+    dep_id = [int(i) for i in dep_id]
     try:
         project = Project.objects.get(ID=project_id)
     except ObjectDoesNotExist:
@@ -502,8 +522,13 @@ def get_data(request, project_id, dep_id):
             return redirect('/account/login/?next=%s'
                             % request.get_full_path())
     else:
-
-        deps = project.get_deployments().filter(ID=dep_id)
+        try:
+            q = Q()
+            for dep in dep_id:
+                q = q | Q(ID = str(dep))
+            deps = project.get_deployments().filter(q)
+        except ObjectDoesNotExist:
+            raise Http404
 
     context = get_context(request, deps, deps)
     response = HttpResponse(json.dumps(context['pos_data']), content_type="application/json")
