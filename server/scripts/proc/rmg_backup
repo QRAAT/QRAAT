@@ -103,24 +103,25 @@ fi
 # Copy log files
 #TODO
 
-echo Checking for backup database directory: $RMG_BACKUP_DIR/database
-if [ ! -e $RMG_BACKUP_DIR/database ]
+RMG_BACKUP_DIR_DATABASE=$RMG_BACKUP_DIR/database
+echo Checking for backup database directory: $RMG_BACKUP_DIR_DATABASE
+if [ ! -e $RMG_BACKUP_DIR_DATABASE ]
 then
-	echo WARNING: creating backup directory $RMG_BACKUP_DIR/database
-	mkdir $RMG_BACKUP_DIR/database
-	if [ ! -e $RMG_BACKUP_DIR/database ]
+	echo WARNING: creating backup directory $RMG_BACKUP_DIR_DATABASE
+	mkdir $RMG_BACKUP_DIR_DATABASE
+	if [ ! -e $RMG_BACKUP_DIR_DATABASE ]
 	then
-		echo ERROR: cannot create backup directory $RMG_BACKUP_DIR/database
+		echo ERROR: cannot create backup directory $RMG_BACKUP_DIR_DATABASE
 		exit 1
 	fi
 fi
 
-# Extract tables from the qraat database to $RMG_BACKUP_DIR/database
+# Extract tables from the qraat database to $RMG_BACKUP_DIR_DATABASE
 echo Dumping database tables
 echo $0 starting database dump `date`
-rmg_dbarchive $RMG_BACKUP_DIR/database
+rmg_dbarchive $RMG_BACKUP_DIR_DATABASE
 # Make an explicit dump of the archive_log table, so that it contains a record of the other dump files
-rmg_dbarchive archive_log $RMG_BACKUP_DIR/database
+rmg_dbarchive archive_log $RMG_BACKUP_DIR_DATABASE
 echo $0 finished database dump `date`
 
 # Check for secondary backup
@@ -178,11 +179,13 @@ else
 		echo ERROR: backup directory $RMG_BACKUP_DIR2 not found
 		exit 1
 	fi
-	echo Copying database files from $RMG_BACKUP_DIR2/database/ to $RMG_BACKUP_FRONTEND/database
+	RMG_BACKUP_DIR2_DATABASE=$RMG_BACKUP_DIR2/database
+	RMG_BACKUP_FRONTEND_DATABASE=$RMG_BACKUP_FRONTEND/database
+	echo Copying database files from $RMG_BACKUP_DIR2_DATABASE/ to $RMG_BACKUP_FRONTEND_DATABASE
 	BACKUP_FRONTEND_RSYNCLOG=/var/log/rmg/rmg_backup_frontend_rsynclog
 	echo Logging to $BACKUP_FRONTEND_RSYNCLOG
 	echo $0 starting frontend backup `date`
-	rsync -ravz --bwlimit=80 $RMG_BACKUP_DIR2/database/ $RMG_BACKUP_FRONTEND/database >$BACKUP_FRONTEND_RSYNCLOG
+	rsync -ravz --bwlimit=80 $RMG_BACKUP_DIR2_DATABASE/ $RMG_BACKUP_FRONTEND_DATABASE >$BACKUP_FRONTEND_RSYNCLOG
 	echo $0 finished frontend backup `date`
 	if [ $? -ne 0 ]
 	then
