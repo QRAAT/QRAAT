@@ -701,6 +701,11 @@ function submitDownloadForm() {
     document.getElementById('form').submit();
 }
 
+function submitDownloadFormKML() {
+    document.getElementById('form').action = "downloadKML";
+    document.getElementById('form').submit();
+}
+
 // function setCenter is not working. FIXME
 // It is intended to recenter the map on a button click.
 function setCenter() {
@@ -895,9 +900,6 @@ function setupSlider() {
 	max: 1,
 	values: [0,1],
 	step: 0.01,
-	stop: function(event, ui) {
-	    $("#update_test").html($(this).slider("values",1));
-	},
 	change: function(event, ui) {
 	    //console.log("changed",ui);
 	// TODO: remove
@@ -1631,8 +1633,6 @@ google.maps.event.addDomListener(window, 'load', initialize);
 {% block sidebar %}
 
 <div id = "text">
-<p id = "update_test"><b>YOOOOO Update Test!!!</b></p>
-<p id = "selected_point_latlon">SDFSDF</p>
 {% if project %}
 <a href={%url 'project:show-project' project.ID %}#deployments><h4><center>{{project.name}}</center></h4></a>
 {% endif %}
@@ -1716,6 +1716,19 @@ google.maps.event.addDomListener(window, 'load', initialize);
 
 <div class="section_title">
   <center><button onclick="updateData()">Update Map</button><button onclick="submitDownloadForm()">Download CSV</button></center>
+<h6></h6>
+  <b>&nbsp;&nbsp;Download KML File</b>
+<h6></h6>
+<select id="KMLtype">
+           				<option value="trackOnly">Track Only</option>
+           				<option value="pointOnly">Point only</option>
+						<option value="histogramOnly">Histogram Only</option>
+           				<option value="track+point"  selected="selected">Track + Point</option>
+						<option value="track+histogram">Track + Histogram</option>
+           				<option value="point+histogram">Point + Histogram</option>
+						<option value="allData">All</option>
+        			</select>
+<button onclick="submitDownloadFormKML()">Download KML</button>
 </div> <!-- end section_title -->
 </div> <!-- end sidebar-form -->
 
