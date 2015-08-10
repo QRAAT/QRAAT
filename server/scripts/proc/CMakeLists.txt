@@ -10,6 +10,8 @@ INSTALL(PROGRAMS
   rmg_schedule
   rmg_txlist
   rmg_zapflags
+  rmg_movebankExport.py
+  rmg_trackDataQuery.py
   DESTINATION bin)
 
 

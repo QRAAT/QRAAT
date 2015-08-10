@@ -12,6 +12,9 @@ urlpatterns = patterns('map.views',
     url(
         r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>[0-9]+(\+[0-9]+)*)/$',
         'view_by_dep', name='view_by_dep'),
+    url(
+        r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/downloadKML/(?P<kml_type>.+)/$',
+        'downloadKMLFile', name='downloadKMLFile'),
     #url(
     #    r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/$',
     #    'view_by_dep', name='view_by_dep'),

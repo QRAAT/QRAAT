@@ -58,7 +58,7 @@ print "true_position: start time:", time.asctime(time.localtime(start))
 cur = db_con.cursor()
 
 # Get GPS data for calibration run. 
-if not cur.execute("SELECT timestamp, easting, northing FROM gps_data WHERE deploymentID = %s", options.dep_id):
+if not cur.execute("SELECT timestamp, easting, northing, elevation FROM gps_data WHERE deploymentID = %s", options.dep_id):
   print >>sys.stderr, "true_position: error: no GPS data found for specified deployment."
   sys.exit(1)
 
@@ -66,12 +66,13 @@ gps_data = np.array(cur.fetchall(), dtype=float)
 gps_timestamp = gps_data[:,0]
 gps_easting = gps_data[:,1]
 gps_northing = gps_data[:,2]
+gps_elevation = gps_data[:,3]
 
 # Get start and end times. 
 (t_start, t_end) = min(gps_data[:,0]), max(gps_data[:,0])
 
 print "true_position: getting site data"
-cur.execute("SELECT ID, easting, northing from site")
+cur.execute("SELECT ID, easting, northing, elevation from site")
 site_data = np.array(cur.fetchall(), dtype=float)
 
 print "true_position: getting est data ..."
@@ -86,32 +87,39 @@ ct = est_data.shape[0]
 est_timestamp = est_data[:,0]
 est_ID = est_data[:,1]
 est_siteid = est_data[:,2]
-print "processing %d records." % ct
+print "processing {} records.".format(ct)
 
 if ct > 0: 
 
   # calculate pulse position from time, linear interpolation 
   est_easting = np.interp(est_timestamp, gps_timestamp, gps_easting)
   est_northing = np.interp(est_timestamp, gps_timestamp, gps_northing)
+  est_elevation = np.interp(est_timestamp, gps_timestamp, gps_elevation)
 
   site_easting = np.zeros(est_easting.shape,dtype=est_easting.dtype)
   site_northing = np.zeros(est_northing.shape,dtype=est_northing.dtype)
+  site_elevation = np.zeros(est_elevation.shape,dtype=est_elevation.dtype)
 
   for j in range(site_data.shape[0]):
     indexes = np.where(est_siteid == site_data[j,0])
     site_easting[indexes] = site_data[j,1]
     site_northing[indexes] = site_data[j,2]
+    site_elevation[indexes] = site_data[j,3]
 
   # Calculate pulse bearing
   est_bearing = np.arctan2(est_easting - site_easting, 
                            est_northing - site_northing)*180/np.pi
+  est_2d_distance = np.sqrt((est_easting - site_easting)**2 + (est_northing - site_northing)**2)
+  est_3d_distance = np.sqrt((est_easting - site_easting)**2 + (est_northing - site_northing)**2 + (est_elevation - site_elevation)**2)
+  est_elevation_angle = np.arctan2((est_elevation - site_elevation),est_2d_distance)*180/np.pi
+
 
   # Insert into databse. 
   cur.executemany('''INSERT INTO true_position 
-                            (estID, easting, northing, bearing) 
-                     VALUES (%s, %s, %s, %s)''', 
+                            (estID, easting, northing, elevation, 2d_distance, 3d_distance, bearing, elevation_angle) 
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''', 
          [ (est_ID[j], est_easting[j], 
-            est_northing[j], est_bearing[j]) for j in range(ct) ])
+            est_northing[j], est_elevation[j], est_2d_distance[j], est_3d_distance[j], est_bearing[j], est_elevation_angle[j]) for j in range(ct) ])
 
 
-print "true_position: finished in %.2f seconds." % (time.time() - start)
+print "true_position: finished in {0:.2f} seconds.".format(time.time() - start)
