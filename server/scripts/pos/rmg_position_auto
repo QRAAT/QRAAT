@@ -23,14 +23,14 @@ cursor = db_con.cursor()
 EST_SCORE_THRESHOLD = float(os.environ["RMG_POS_EST_THRESHOLD"])
 
 # Compute covariances? 
-if os.environ["RMG_POS_ENABLE_COV"] == 'true':
+if os.environ["RMG_POS_ENABLE_COV"].lower() == 'true':
   print "position_auto: running with covariance estimator"
-  position.ENABLE_BOOTSTRAP = True
+  position.ENABLE_BOOTSTRAP3 = True
 else: 
   print "position_auto: no covariance"
-  position.ENABLE_BOOTSTRAP = False
+  #position.ENABLE_BOOTSTRAP = False
 
-if os.environ["RMG_POS_NORMALIZE_SPECTRUM"] == 'true':
+if os.environ["RMG_POS_NORMALIZE_SPECTRUM"].lower() == 'true':
   position.NORMALIZE_SPECTRUM = True
 else:
   position.NORMALIZE_SPECTRUM = False
@@ -110,7 +110,7 @@ for deployment in deployment_list:
     sig = signal.Signal(db_con, deployment_id, time_range[0], time_range[1], EST_SCORE_THRESHOLD)
     temp_max_id = max(temp_max_id, sig.max_id)
     pos = position.WindowedPositionEstimator(sig, sites, center, sv, time_delta, time_window)
-    if position.ENABLE_BOOTSTRAP:
+    if position.ENABLE_BOOTSTRAP or position.ENABLE_BOOTSTRAP2 or position.ENABLE_BOOTSTRAP3:
       cov = position.WindowedCovarianceEstimator(pos, sites)
       position.InsertPositionsCovariances(db_con, deployment_id, cal_id, zone, pos, cov)
     else:
