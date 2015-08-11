@@ -562,7 +562,7 @@ def downloadKMLFile(request, project_id, dep_id, kml_type):
     if request.user.is_authenticated():
       user = request.user
       if project.is_owner(user)\
-           or (user.has_perm("qraatview.can_view")
+           or (user.has_perm("project.can_view")
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
 
