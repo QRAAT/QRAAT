@@ -248,8 +248,8 @@ case $TASK in
       shift
     else     
       TX_FILE=$RMG_SERVER_TXLIST
-      rmg_txlist $RMG_SERVER_DB_AUTH -f $TX_FILE
     fi
+    rmg_txlist $RMG_SERVER_DB_AUTH -f $TX_FILE
     exit 0
   ;;
 
