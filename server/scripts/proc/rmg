@@ -241,15 +241,7 @@ case $TASK in
 
   exporttx) # Export transmitter config file 
             # from DB and exit. 
-    if [[ "$1" == "-f" ]] || [[ "$1" == "--file" ]] 
-    then
-      TX_FILE=$2
-      shift
-      shift
-    else     
-      TX_FILE=$RMG_SERVER_TXLIST
-    fi
-    rmg_txlist $RMG_SERVER_DB_AUTH -f $TX_FILE
+    rmg_txlist "$*"
     exit 0
   ;;
 
