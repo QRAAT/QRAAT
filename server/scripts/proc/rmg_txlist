@@ -45,7 +45,7 @@ else:
                                   FROM deployment
                                   JOIN tx ON tx.ID = txID
                                   JOIN tx_make ON tx_make.ID = tx.tx_makeID
-                                 WHERE deplyment.ID = %s
+                                 WHERE deployment.ID = %s
                                    AND demod_type = %s ''', (args.deploymentID, default_type))
   if (num_returned == 0):
     print "deploymentID {} not found".format(args.deploymentID)

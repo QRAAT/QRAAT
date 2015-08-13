@@ -241,7 +241,7 @@ case $TASK in
 
   exporttx) # Export transmitter config file 
             # from DB and exit. 
-    rmg_txlist "$*"
+    rmg_txlist "$@"
     exit 0
   ;;
 
