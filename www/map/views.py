@@ -577,8 +577,9 @@ def generic_graph(
         data = rest_api.get_model_data(request) 
     except Exception, e:
         print e
+        content["data"] = json.dumps(None)
+    else:
         content["data"] = json.dumps(rest_api.json_parse(data), cls=DateTimeEncoder)
 
-    return render(
-        request, template, content)
+    return render(request, template, content)
         

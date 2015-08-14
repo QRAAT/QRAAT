@@ -6,4 +6,5 @@ urlpatterns = patterns(
     url(r'telemetry/$', 'telemetry_graphs', name='telemetry_graphs'),
     url(r'est/$', 'est_graphs', name='est_graphs'),
     url(r'processing/$', 'processing_graphs', name='processing_graphs'),
+    url(r'dashboard/$', 'dashboard_page', name='dashboard_page'),
 )
