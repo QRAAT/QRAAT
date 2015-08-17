@@ -22,37 +22,25 @@
 import qraat.srv
 import utm
 import time, os, sys
-#import MySQLdb as mdb
-from optparse import OptionParser
+from argparse import ArgumentParser
 
-parser = OptionParser()
-
-parser.description = '''\
+program_description = '''\
 Insert GPS information into the database. The data is interpolated 
 with the pulses produced during a calibration run to produce steering 
 vectors for the direction finding algorithm. This program is part of
 QRAAT, an automated animal tracking system based on GNU Radio.   
 '''
 
-parser.add_option('-f', '--gpx-file', type='string', metavar='FILE',
-                  help="GPS data, typically with extension `.gpx`.")
+parser = ArgumentParser(description=program_description)
 
-parser.add_option('--dep-id', type='int', metavar='INT',
+parser.add_argument('gpx_file', type=str,
+                  help="GPS data in gpx format, typically with extension `.gpx`.")
+
+parser.add_argument('dep_id', type=int,
                   help="Deployment ID, the serial identifier in the database "
                        "context identifying a calibration run.")
 
-#parser.add_option('--hemisphere', type='string', default='N', metavar='{N,S}',
-#                  help="Hemisphere in which the GPS data were collected. "
-#                       "Choices are 'N'orth and 'S'outh (default is 'N').")
-
-(options, args) = parser.parse_args()
-
-if options.dep_id == None:
-  print >>sys.stderr, "insert_gps: erorr: need to provide a deployment ID via `--dep-id`."
-  sys.exit(1)
-
-
-
+options = parser.parse_args()
 
 start = time.time()
 print "insert_gps: start time:", time.asctime(time.localtime(start))
@@ -75,7 +63,7 @@ if cur.execute("SELECT (1) FROM gps_data WHERE deploymentID=%s limit 1", options
                          "specified cal run. Would you like to replace it? [y,n,a(=append)] "), 
   ans = raw_input().strip()
   if ans in ['y', 'Y', 'yes', 'YES']: 
-    cur.execute("DELETE FROM GPS_Calibration_Data WHERE cal_infoid = %s",options.dep_id)
+    cur.execute("DELETE FROM gps_data WHERE deploymentID = %s",options.dep_id)
   elif ans in ['a', 'A', 'append', 'APPEND', 'Append']:
     pass
   else:

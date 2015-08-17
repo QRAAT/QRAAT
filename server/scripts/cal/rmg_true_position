@@ -24,28 +24,22 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import qraat.srv
-import time, os, sys
+import qraat.csv
+import time, sys
 import numpy as np
-#import MySQLdb as mdb
-from optparse import OptionParser
+from argparse import ArgumentParser
 
-parser = OptionParser()
-
-parser.description = '''\
+program_description = '''\
 Interpolate GPS and pulse data and calculate a bearing for each 
 time indexed pulse per site for a calibration run. This program is part of
 QRAAT, an automated animal tracking system based on GNU Radio.   
 '''
 
-parser.add_option('--dep-id', type='int', metavar='INT',
-                  help="Deployment ID, the serial identifier in the database "
-                       "context identifying a calibration run.")
+parser = ArgumentParser(description=program_description)
+parser.add_argument('dep_id',type=int, help="Deployment ID, the serial identifier in the database context identifying a calibration run.")
+parser.add_argument('--sitecsv', type=str, help="CSV file with alternative site locations")
+options = parser.parse_args()
 
-(options, args) = parser.parse_args()
-
-if options.dep_id == None:
-  print >>sys.stderr, "true_position: erorr: need to provide a deployment ID via `--dep-id`."
-  sys.exit(1)
 
 # Get database credentials.
 db_con = qraat.srv.util.get_db('writer')
@@ -72,11 +66,21 @@ gps_elevation = gps_data[:,3]
 (t_start, t_end) = min(gps_data[:,0]), max(gps_data[:,0])
 
 print "true_position: getting site data"
-cur.execute("SELECT ID, easting, northing, elevation from site")
-site_data = np.array(cur.fetchall(), dtype=float)
+if options.sitecsv is None:
+  cur.execute("SELECT ID, easting, northing, elevation from site")
+  site_data = np.array(cur.fetchall(), dtype=float)
+else:
+  site_csv = qraat.csv.csv(fn=options.sitecsv)
+  site_data = np.zeros((len(site_csv),4), dtype=float)
+  index = 0
+  for row in site_csv:
+    #format of output from qraat.srv.gps.gpx_waypoints.write_csv()
+    site_data[index,:] = [row.ID, row.__dict__[' Easting'], row.__dict__[' Northing'], row.__dict__[' Elevation']]
+    index += 1
+
 
 print "true_position: getting est data ..."
-cur.execute('''SELECT timestamp, ID, siteid 
+cur.execute('''SELECT timestamp, ID, siteID 
                    FROM est 
                   WHERE deploymentID=%s 
                     AND timestamp >= %s 
@@ -109,6 +113,7 @@ if ct > 0:
   # Calculate pulse bearing
   est_bearing = np.arctan2(est_easting - site_easting, 
                            est_northing - site_northing)*180/np.pi
+  est_bearing += 360*(est_bearing<0)
   est_2d_distance = np.sqrt((est_easting - site_easting)**2 + (est_northing - site_northing)**2)
   est_3d_distance = np.sqrt((est_easting - site_easting)**2 + (est_northing - site_northing)**2 + (est_elevation - site_elevation)**2)
   est_elevation_angle = np.arctan2((est_elevation - site_elevation),est_2d_distance)*180/np.pi
