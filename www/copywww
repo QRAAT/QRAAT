@@ -106,11 +106,8 @@ fi # End of 'complete-install'
 # Installs rsync
 dpkg -l | grep -qw rsync || apt-get install rsync
 
-# Copy only modified files from www to /usr/local/share/qraat_site/
-# And then remove the static folder 
-# TODO: Don't copy the static folder in the first place
-rsync -av $BASE_DIR/ $SITE_DIR
-rm -rf $SITE_DIR/static/
+# Copy only modified files from www to /usr/local/share/qraat_site/, excluding static
+rsync -av $BASE_DIR/ $SITE_DIR --exclude 'static'
 
 # Run collectstatic to gather static files to where Apache expects them
 python $BASE_DIR/manage.py collectstatic
