@@ -22,6 +22,17 @@ echo "Type the name of the user that will run collectstatic"
 read USER
 
 # --------------------------------
+# Build QRAAT
+# --------------------------------
+# Pkgs required for build_qraat
+dpkg -l | grep -qw g++ || apt-get install g++ 
+dpkg -l | grep -qw cmake || apt-get install cmake 
+dpkg -l | grep -qw swig || apt-get install swig 
+dpkg -l | grep -qw python-dev || apt-get python-dev # Maybe optional if you add -I/usr/include/python2.7 -lpython2.7 flas to gcc command in build_qraat
+
+$(dirname $BASE_DIR)/build_qraat install base
+
+# --------------------------------
 # Installs Mysql if necessary
 # --------------------------------
 dpkg -l | grep -qw mysql-server || apt-get install mysql-server
@@ -42,8 +53,8 @@ sudo pip install utm
 # --------------------------------
 # Install and configure Apache and Apache modules
 # --------------------------------
-# Intalls Apache
-dpkg -l | grep -qw apache2 || apt-get install apache2
+# Intalls Apache (It will install a2ensite/a2enmod if your distribution comes without it)
+apt-get install apache2
 
 # IMPORTANT NOTE: If you install Apache 2.4 (check with (sudo) apache2ctl -V) 
 # then replace the two lines "Order allow,deny Allow from all" with 
@@ -62,13 +73,25 @@ done
 # Enable modules
 a2enmod auth-mysql wsgi rewrite ssl socache_shmcb
 
-# Copy rmg_env
-cp $(dirname $BASE_DIR)/base/scripts/rmg_env /usr/local/bin/ 
 # Append to Apache's environment variables
 echo '. /usr/local/bin/rmg_env' /etc/apache2/envvars
 
 # Give Apache permission to read /var/www/
 chown $USER:www-data /var/www/
+
+# --------------------------------
+# SSL certificate for HTTPS
+# --------------------------------
+SERVER_KEY_PATH=/etc/ssl
+if [ ! -f "$SERVER_KEY_PATH/certs/server.crt" ]; then
+# Create a self-signed SSL certificate that lasts for a year. 
+# This is not from any certificate authority
+# If you change the paths/names, you will have to change the qraat-sites.conf in the sites-available folder
+dpkg -l | grep openssl ||  apt-get install openssl
+sudo genrsa -out $SERVER_KEY_PATH/private/server.key 2048
+sudo openssl req -new -key $SERVER_KEY_PATH/private/server.key -out /tmp/server.csr
+sudo openssl x509 -req -days 356 -in /tmp/server.csr -signkey $SERVER_KEY_PATH/private/server.key -out $SERVER_KEY_PATH/certs/server.crt
+fi
 
 # Restart Apache
 sudo services apache2 restart
