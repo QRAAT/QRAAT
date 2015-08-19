@@ -46,15 +46,6 @@ class Form(forms.Form):
   #    raise forms.ValidationError('Select no more than 3.')
   #  return self.cleaned_data['deployment']
   
-  deployment = forms.MultipleChoiceField(
-            #choices = get_choices(),
-            #widget = forms.SelectMultiple(), #hold down CTRL to select all
-            widget = forms.CheckboxSelectMultiple(),
-            required = True,
-            label = 'Deployment IDs (displays first 4)')
-            #Note: initial doesn't work. it sets choices to '6' and '3'
-            #In views.py: instance_of_form.fields['deployment'].initial = ['63']
- 
   datetime_from = forms.DateTimeField(
             required = True, 
             label="Start Date & Time",
@@ -146,6 +137,15 @@ class Form(forms.Form):
             label='Graph Type', 
             initial="1")
 
+  deployment = forms.MultipleChoiceField(
+            #choices = get_choices(),
+            #widget = forms.SelectMultiple(), #hold down CTRL to select all
+            widget = forms.CheckboxSelectMultiple(),
+            required = True,
+            label = 'Deployment IDs (displays first 4)')
+            #Note: initial doesn't work. it sets choices to '6' and '3'
+            #In views.py: instance_of_form.fields['deployment'].initial = ['63']
+ 
   sites = forms.BooleanField(
             required=True, 
             label="View Site Locations",

@@ -21,6 +21,7 @@
     <!-- TODO: Ask about google hosting or not -->
     <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+    <script src"/static/maps/test1.js"></script>
 
    
 <script>
@@ -28,8 +29,8 @@
 // Global variables
 var highlightedPoly;
 var map;
-var heatmap;
-var polyline;
+var heatmaps;
+var polylines;
 var mapCenter;
 var markers = []; //TODO: This is never used. Change all markers_querydata to markers?
 var markers_sites = [];
@@ -40,22 +41,25 @@ var selectedTimeRange = []; //Start and end of time range selected (in seconds, 
 var selMapTimes = []; //[[[start,end],...],[[start,end]...]] in seconds
 var boundingRect;
 var redGreenRamp;
-//The following are unix time in seconds
+// Timestamps are unix time in seconds
 var rawPosData = []; // Sorted position data straight from the database (with filtering/sorting done in the Django view). We'll 'cache' data in that if the user asks for data that is adjoined to the end of what we currently have, we'll append that, and if they ask for a subset of data, we'll just use data from this, and not fetch it again. If the user asks for data that is adjoining, but before the begining TODO: then what????? We just make a new array?
-var latlongData; // MVCArray with latlong that correspond to the rawPosData[0] 
+var latlongData; // MVCArray with latlong that correspond to the rawPosData 
 var oldLatLngIndex = []; // Save the indices when we disable the polyline/heatmap so that we can defer updating latlongData for when those options are selected
 var currPosDataIndex = []; // Indices of the start and end of requested data in rawPosData [[start,end],[start,end],...]
 var userRequestedMaxTimeRange = []; // Keep track of this so that if there's chunks of missing data, we don't refetch data based on the time of the actual data previously retrieved. 
 
+var colors = ["#6666FF", "#A73737", "#71A737", "#6E37A6"];
 var dataType = "Raw";
 var graphTypeEnum = {'LIKELIHOOD': 6, 'ACTIVITY': 7,};// 'COVARIANCE': ?};
 var graphTypeIndex = [6,7];
 var graphFilters = []; // Data filter (likelihood, activity, ...) bounds [[[low,high], [low,high], ...],[[low,high], [low,high], ...]] 
 
-deps = {{deps_list}};
-curr_dep = deps[0];
-markers_querydata = new Array();
-selectedMarkers = new Array();
+var seriesDepInd;
+var deps = {{deps_list}};
+var activeDeps = deps;
+var curr_dep = deps[0];
+var markers_querydata = [];
+var selectedMarkers = [];
 
 function addSelectedPos(marker, map){
     /*Add a marker to a selected position point*/
@@ -96,13 +100,13 @@ function addSelectedPos(marker, map){
 }
 
 // What is the reason for this to use markers instead of the raw data
-function getGraphData(markers, dep_id, sel_data){
-    var data = {}
-    data.graph = new Array();
-    data.markers = new Array();
-    data.deployments = new Array();
+// TODO: Change to active deps
+// TODO: Make colors not hardcoded, or at least changes colors past 4 deployments
+function getGraphData(markers, sel_data){
+    var graph_data = [{label: "-1", data: [], color: "#CCCCCC", markers: [], deployments: []}]; 
+    //$.each(deps, function(i,dep) {graph_data.push({data: []})});
+
     var dep_ind;
-    for(var i = 0; i < deps.length; i++) {if(dep_id==deps[i]) {dep_ind = i; break}}
     
     // graph_data_index specifies column in pos_data to display in Flot.
     if (sel_data ==2) { // activity
@@ -111,15 +115,39 @@ function getGraphData(markers, dep_id, sel_data){
     else{ // likelihood (default)
         var graph_data_type = 'LIKELIHOOD';
     }
-    for(var i = currPosDataIndex[0]; i <= currPosDataIndex[1]; i++) {
-	// FIXME: Current rawPosData[0] array incompatible with multiple deployments
-	var flot_point = [rawPosData[dep_ind][i][2]*1000, rawPosData[dep_ind][i][graphTypeEnum[graph_data_type]]];
-	markers[i].flot_point = flot_point;
-	data.graph.push(flot_point);
-	data.markers.push(markers[i]);
-	data.deployments.push(markers[i].qraat_pos[1]);
+    for(var j=0; j<deps.length; j++) {
+	// Skip non active deps
+	if(activeDeps.indexOf(deps[j]) == -1)
+	    continue;
+
+	var data = {};
+	data.data = [];
+	data.markers = [];
+	data.deployments = [];
+	outerloop: for(var i = currPosDataIndex[j][0]; i <= currPosDataIndex[j][1]; i++) {
+	    var flot_point = [rawPosData[j][i][2]*1000, rawPosData[j][i][graphTypeEnum[graph_data_type]]];
+	    for(var k=0; k<graphTypeIndex.length; k++) {
+		var val = rawPosData[j][i][graphTypeIndex[k]];
+
+		if(val < graphFilters[k][0] || val > graphFilters[k][1]) {
+		    markers[j][i].flot_point = flot_point;
+		    graph_data[0].data.push(flot_point);
+		    graph_data[0].markers.push(markers[i]);
+		    graph_data[0].deployments.push(markers[j][i].qraat_pos[1]);
+		    continue outerloop;
+		}
+	    }
+
+	    markers[j][i].flot_point = flot_point;
+	    data.data.push(flot_point);
+	    data.markers.push(markers[i]);
+	    data.deployments.push(markers[j][i].qraat_pos[1]);
+	    data.label = deps[j];
+	    data.color = colors[j%4];
+	}
+	graph_data.push(data);
     }
-    return data;
+    return graph_data;
 }
 
 function reloadFlot(markers, map, marker){
@@ -130,6 +158,7 @@ function reloadFlot(markers, map, marker){
 
 function loadFlot(pos_markers, map, dep_id){
     var xaxis,
+	yaxis,
 	depInd;
     for(var i=0; i<deps.length; i++) {if(deps[i]==dep_id){depInd = i; break;}}
 
@@ -140,22 +169,71 @@ function loadFlot(pos_markers, map, dep_id){
 
     function colorPoint(x,y) {
 	if(xaxis == null) return; // The first time $.plot() is called, xaxis hasn't been initialized yet
+	var time = xaxis.c2p(x)/1000;
 
-	var i = getPosIndex(xaxis.c2p(x)/1000);
-	if(i == -1)
-	    console.log("xaxis.c2p(x) not returning exact timestamp?", x, xaxis.c2p(x));
+	// Grey out point if not selected
+	if(time < selectedTimeRange[0] || time > selectedTimeRange[1])
+	    return "#CCCCCC";
+
+	if($("#id_colorpoints")[0].checked) {
+	    var i = (x-flotSelectedRange[0])/flotSelectedWidth * 99;
+	    return redGreenRamp[(i | 0)]; //i|0 truncates i
+	}
+	else {
+	    return colors[seriesDepInd];
+	}
+
+	/*
+	var i = getPosIndex(xaxis.c2p(x)/1000,seriesDepInd);
+	if(i == -1){
+	    console.log("xaxis.c2p(x) not returning exact timestamp?", x, xaxis.c2p(x), "and seriesDepInd", seriesDepInd, i)
+	    // Literally the world's ugliest bandadge. 
+	    // When plots drawOverlay is called, it calls drawPointHighlight
+	    // which then ends up calling drawFlotPoint and then colorPoint
+	    // And now we have no knowledge about which series/deployment it is
+	    for(var j=0; j<deps.length; j++) {
+		if(j != seriesDepInd) {
+		    console.log("HERE");
+		    var ind = getPosIndex(xaxis.c2p(x)/1000,j) 
+		    if(ind != -1) {
+			console.log("HERE2");
+			// TODO: Change when add covariance filter
+			if($("#id_graph_data option:selected").text() == 'Likelihood') {
+			    console.log("HERE3",yaxis.c2p(y) , rawPosData[j][ind][6], rawPosData[j][ind][7]);
+			    if(yaxis.c2p(y) == rawPosData[j][ind][6]) {
+				i = ind;
+				seriesDepInd = j;
+				console.log('found match');
+				break;
+			    }
+			}
+			else {
+			    if(yaxis.c2p(y) == rawPosData[j][ind][7]) {
+				i = ind;
+				seriesDepInd = j;
+				console.log('found match');
+				break;
+			    }
+			}
+		    }
+		}
+	    }
+	}
+
 	// Filter by likelihood, activity, etc
 	for(var j = 0; j < graphTypeIndex.length; j++) {
-	    var val = rawPosData[0][i][graphTypeIndex[j]];
-	    if(val < graphFilters[depInd][0] || val > graphFilters[depInd][1]) {
+	    var val = rawPosData[seriesDepInd][i][graphTypeIndex[j]];
+	    // TODO: FIX
+	    if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
 		return "#CCCCCC";
 	    }
 	}
 
 	var cChecked = document.getElementById('id_colorpoints').checked;
 	if(x > flotSelectedRange[0] && x < flotSelectedRange[1]) {
-	    if(!cChecked)
-		return "";
+	    if(!cChecked || deps.length > 1){ 
+		return colors[seriesDepInd];
+	    }
 	    else {
 		var i = (x-flotSelectedRange[0])/flotSelectedWidth * 99;
 		return redGreenRamp[(i | 0)]; //i|0 truncates i
@@ -174,7 +252,9 @@ function loadFlot(pos_markers, map, dep_id){
 	else{
 	    return "#CCCCCC";
 	}
+	*/
     }
+    
     //Loads flot graph
     
     var flot_clicked_series;
@@ -183,15 +263,7 @@ function loadFlot(pos_markers, map, dep_id){
     var sel_data = {{graph_data}};
     var label, min, max;
     
-    $("#dep_id").text(dep_id);
-    
-    var data = getGraphData(pos_markers, dep_id, sel_data);
-    
-    var graph_data =[ { data: data.graph, label: graph_dep, lines: {show:false} } ];
-    
-    var color = ["#8383FF", "yellow", "green", "#B00000"];
-    
-    for (i=0; i < deps.length; i++) {
+    for (var i=0; i < deps.length; i++) {
         if (graph_dep == deps[i]) { var colorIndex = i; };
     }
     
@@ -230,13 +302,14 @@ function loadFlot(pos_markers, map, dep_id){
         highlightColor: 'red',
 	shadowSize: 0,
         selection: { mode: "x", minSize: 1},
-        colors: [ color[colorIndex] ]
+        //colors: color, 
     };
     
     // Gets the gradient colors before drawing the flot plot
     $.getJSON("/static/ramp255_0_0_0_255_0/values.json", function(data) {
 	redGreenRamp = data;
-        plot = $.plot("#plot-div"+dep_id, graph_data, options);
+       	var graph_data = getGraphData(pos_markers, sel_data);
+        plot = $.plot("#plot-div", graph_data, options);
 	console.log("after $.plot??");
 	// TODO: Move this into another js file of appearance customization maybe
 	/*
@@ -261,8 +334,20 @@ function loadFlot(pos_markers, map, dep_id){
             }
         };
 	*/
+	// Gets the index of the series currently being drawn
+	plot.hooks.drawSeries.push(function(plot, ctx, series) {
+	console.log('in drawSeries hook');
+ 	    for(var i = 0; i<deps.length; i++) {
+		if(deps[i] == series.label){
+		    seriesDepInd = i;
+		    console.log("seriesDepInd changed to", seriesDepInd);
+		    break;
+		}
+	    }
+	});
 	// Highlights the flot plot based on selecting the map
 	plot.hooks.drawOverlay.push(function(plot, ctx) {
+	    console.log("in a drawoverlay hook");
 	    var plotOffset = plot.getPlotOffset();
 	    var o = plot.getOptions();
 	    ctx.save();
@@ -281,15 +366,15 @@ function loadFlot(pos_markers, map, dep_id){
 		ctx.strokeRect(x,y,w,h);
 	    }
 	    ctx.restore()
+	    console.log("going out of a drawoverlay hook");
 	});
 
-	console.log("before getAxes??");
-	xaxis = $("#plot-div"+dep_id).data("plot").getAxes().xaxis;
-	console.log("xaxis is",xaxis);
+	xaxis = $("#plot-div").data("plot").getAxes().xaxis;
+	yaxis = $("#plot-div").data("plot").getAxes().yaxis;
 	$("#time-slider")[0].style.marginLeft = plot.getPlotOffset().left + "px";
 	$("#time-slider")[0].style.marginRight = plot.getPlotOffset().right + "px";
-	$("#filter-slider"+dep_id)[0].style.marginTop = plot.getPlotOffset().top + "px";
-	$("#filter-slider"+dep_id)[0].style.marginBottom = plot.getPlotOffset().bottom + "px";
+	$("#filter-slider")[0].style.marginTop = plot.getPlotOffset().top + "px";
+	$("#filter-slider")[0].style.marginBottom = plot.getPlotOffset().bottom + "px";
         flotPlotWidth = plot.width();
         flotSelectedRange[0] = 0;
         flotSelectedRange[1] = flotPlotWidth;
@@ -301,7 +386,7 @@ function loadFlot(pos_markers, map, dep_id){
     // Select marker in map when clicked on flot
     $("#plot-div").bind("plotclick", function (event, pos, item) {
 	if (item == undefined) {
-	// TODO: Make it remove the marker of the previously selected point when you click nothing
+	// Make it remove the marker of the previously selected point when you click nothing
 	    if(selectedMarkers.length > 0 && selectedMarkers[0].selected)
 		selectedMarkers[0].selected.setMap(null);
 	    return false;
@@ -312,28 +397,52 @@ function loadFlot(pos_markers, map, dep_id){
         //save clicked info in global variables
         flot_clicked_series = item.series;
         flot_clicked_datapoint = item.datapoint;
-        
-	var tempmarker = markers_querydata[currPosDataIndex[0]+item.dataIndex];
+        console.log("plotclicked event", event); 
+	var s = item.series.label;
+	for(var i=0; i<deps.length; i++){
+	    if(s==deps[i]){
+	    	seriesDepInd = i;
+		break;
+	    }
+	}
+	var tempmarker = markers_querydata[seriesDepInd][currPosDataIndex[seriesDepInd][0]+item.dataIndex];
         addSelectedPos(tempmarker, map);
+    });
+
+    $("#plot-div").bind("plothover", function(event, pos, item) {
+	if(item){
+	    var sl = item.series.label;
+	    for(var i=0; i<deps.length; i++){
+		if(sl==deps[i]){
+		    seriesDepInd = i;
+		    break;
+		}
+	    }
+	}
     });
     
     $("#plot-div").bind("plotselected",function (event, ranges) {
-	var timeframearr = [rawPosData[0][currPosDataIndex[0]][2], rawPosData[0][currPosDataIndex[1]][2]];
+	    // TODO: fix dependence on currPosDataIndex[0] being current
+	var timeframearr = [rawPosData[0][currPosDataIndex[0][0]][2], rawPosData[0][currPosDataIndex[0][1]][2]];
 	var timeframe = timeframearr[1] - timeframearr[0];
 
-	// If the selection isn't the same as before (IE, if selected by the slider)
+	// If the selection isn't the same as before (IE, if it wasn't selected by the slider)
 	if(selectedTimeRange[0] != ranges.xaxis.from/1000 || selectedTimeRange[1] != ranges.xaxis.to/1000) {
-	    var selectedOldNew = [[getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')]];
+	    //var selectedOldNew = [[getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')]];
 	    selectedTimeRange = [ranges.xaxis.from/1000, ranges.xaxis.to/1000];	
-	    selectedOldNew[1] = [getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')];
+	    //selectedOldNew[1] = [getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')];
 	    $('#time-slider').slider("values", 
 		[(selectedTimeRange[0]-timeframearr[0])/timeframe, 
 		(selectedTimeRange[1]-timeframearr[0])/timeframe]);
-	    changeSelectionHelper(selectedOldNew);
+	    //changeSelectionHelper(selectedOldNew);
+	    for(var i=0; i<deps.length; i++) {
+		if(activeDeps.indexOf(deps[i]) != -1) 
+		    setLatLongData(i);
+	    }
 	}
 
-	flotSelectedRange[0] = (ranges.xaxis.from/1000-(rawPosData[0][currPosDataIndex[0]][2]))/timeframe * flotPlotWidth;
-	flotSelectedRange[1] = (ranges.xaxis.to/1000-(rawPosData[0][currPosDataIndex[0]][2]))/timeframe * flotPlotWidth;
+	flotSelectedRange[0] = xaxis.p2c(ranges.xaxis.from); //(ranges.xaxis.from/1000-(rawPosData[0][currPosDataIndex[0][0]][2]))/timeframe * flotPlotWidth;
+	flotSelectedRange[1] = xaxis.p2c(ranges.xaxis.to); //(ranges.xaxis.to/1000-(rawPosData[0][currPosDataIndex[0][0]][2]))/timeframe * flotPlotWidth;
 	flotSelectedWidth = flotSelectedRange[1] - flotSelectedRange[0];
 
 	if(boundingRect) {
@@ -344,16 +453,23 @@ function loadFlot(pos_markers, map, dep_id){
     });
 
     $("#plot-div").bind("plotunselected", function (event) {
-	console.log("plot unselected");
+	console.log("plot unselected event", event);
 	if(flotSelectedRange[0]==0 && flotSelectedRange[1]==flotPlotWidth)
 	    return;
 	flotSelectedRange = [0, flotPlotWidth];
 	flotSelectedWidth = flotPlotWidth;	
-	var selectedOldNew = [[getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')],
-	    currPosDataIndex.slice(0)];
-	selectedTimeRange = [rawPosData[0][currPosDataIndex[0]][2], rawPosData[0][currPosDataIndex[1]][2]];
+	//var selectedOldNew = [[getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')],
+	 //   currPosDataIndex.slice(0)];
+	  
+	var xaxis = $(this).data("plot").getAxes().xaxis;
+	selectedTimeRange = [xaxis.min/1000, xaxis.max/1000];
 	resetTimeSlider();
-	changeSelectionHelper(selectedOldNew);
+	//changeSelectionHelper(selectedOldNew);
+	for(var i=0; i<deps.length; i++) {
+	    if(activeDeps.indexOf(deps[i]) != -1) 
+		setLatLongData(i);
+	}
+
 	if(boundingRect) {
 	    boundingRect.setMap(null);
 	    boundingRect = null;
@@ -374,18 +490,18 @@ function loadFlot(pos_markers, map, dep_id){
     });
 }
 
-function updateFlot(pos_markers, dep_id) {
-    console.log("updateFlot, graphdata", $("#id_graph_data").val());
-    var data = getGraphData(pos_markers, dep_id, $("#id_graph_data").val());
-    var graph_data =[ { data: data.graph, label: dep_id, lines: {show:false} } ];
-    $("#plot-div"+dep_id).data("plot").setData(graph_data);
-    $("#plot-div"+dep_id).data("plot").setupGrid();
-    $("#plot-div"+dep_id).data("plot").draw();
+function updateFlot(pos_markers) {
+    var sel_data = $("#id_graph_data").val()
+    var graph_data = getGraphData(pos_markers, sel_data);
+    $("#plot-div").data("plot").setData(graph_data);
+    $("#plot-div").data("plot").setupGrid();
+    $("#plot-div").data("plot").draw();
 }
 
 function setMarkerVisibility(bool) {
-    for(var i = currPosDataIndex[0]; i <= currPosDataIndex[1]; i++) 
-	markers_querydata[i].setVisible(bool);
+    for(var j=0; j<currPosDataIndex.length; j++)
+	for(var i = currPosDataIndex[j][0]; i <= currPosDataIndex[j][1]; i++) 
+	markers_querydata[j][i].setVisible(bool);
 }
 
 function colorMarkers() {
@@ -393,37 +509,60 @@ function colorMarkers() {
 	return;
 
     // Note: This assumes a 1 to 1 correspondence b/w rawPosData[0] and markers_querydata. This should be the case, but take care.
-    var timeframe = selectedTimeRange[1] - selectedTimeRange[0];
-    alldatafor: for(var i = 0; i < rawPosData[0].length; i++) {
-    	if(rawPosData[0][i][2] >= selectedTimeRange[0] && rawPosData[0][i][2] <= selectedTimeRange[1]) {
-	    // Filter by likelihood, activity, etc
-	    for(var j = 0; j < graphTypeIndex.length; j++) {
-		var val = rawPosData[0][i][graphTypeIndex[j]];
-		if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
-		    markers_querydata[i].setVisible(false);
-		    continue alldatafor;
+    for(var k = 0; k<deps.length; k++) {
+	// Skip non active deps
+	if(activeDeps.indexOf(deps[j]) == -1)
+	    continue;
+
+	var colorInd = k % 4,
+	    url;
+	if(colorInd==0)
+	    url = '/static/icons/basedotblue.png';
+	else if(colorInd==1)
+	    url = '/static/icons/basedotred.png';
+	else if(colorInd==2)
+	    url = '/static/icons/basedotgreen.png';
+	else
+	    url = '/static/icons/basedotpurple.png';
+	var timeframe = selectedTimeRange[1] - selectedTimeRange[0];
+
+	alldatafor: for(var i = 0; i < rawPosData[k].length; i++) {
+	    if(rawPosData[k][i][2] >= selectedTimeRange[0] && rawPosData[k][i][2] <= selectedTimeRange[1]) {
+		// Filter by likelihood, activity, etc
+		for(var j = 0; j < graphTypeIndex.length; j++) {
+		    var val = rawPosData[k][i][graphTypeIndex[j]];
+		    if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
+			markers_querydata[k][i].setVisible(false);
+			continue alldatafor;
+		    }
 		}
+		
+		if( !document.getElementById('id_colorpoints').checked){
+		    markers_querydata[k][i].icon.url = url;
+		} else {
+		    var iconnum = (((rawPosData[k][i][2] - selectedTimeRange[0]) / timeframe)* 99) | 0;
+		    markers_querydata[k][i].icon.url = '/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png';
+		}
+		    markers_querydata[k][i].setVisible(true);
+		}		
+	    else {
+		markers_querydata[k][i].setVisible(false); //Hides marker
 	    }
-	    
-	    if( !document.getElementById('id_colorpoints').checked){
-		markers_querydata[i].icon.url = '/static/icons/basedotblue.png';
-	    } else {
-		var iconnum = (((rawPosData[0][i][2] - selectedTimeRange[0]) / timeframe)* 99) | 0;
-		markers_querydata[i].icon.url = '/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png';
-	    }
-		markers_querydata[i].setVisible(true);
-	    }		
-	else {
-	    markers_querydata[i].setVisible(false); //Hides marker
 	}
     }
 }
     
 function selectFlotPoint(marker){
-    // TODO: dep
+    // TODO: Remove dependency on qraat_pos[1]. Find dep another way
+    // (or only save dep)
     var dep = marker.qraat_pos[1]
-    $("#plot-div"+dep).data("plot").unhighlight();
-    $("#plot-div"+dep).data("plot").highlight(0, marker.flot_point);
+    for(var i=0; i<deps.length; i++)
+	if(dep==deps[i]){
+	    seriesDepInd = i;
+	    break;
+	}
+    $("#plot-div").data("plot").unhighlight();
+    $("#plot-div").data("plot").highlight(seriesDepInd, marker.flot_point);
 }
 
 function addInfoWindow(marker, data, map){
@@ -465,29 +604,29 @@ window.onload = function() {
     //hideFormFields();
 };
 
-function getPosIndex(timestamp,searchDirection) {
+function getPosIndex(timestamp,depInd,searchDirection) {
     // A binary search through rawPosData[0] for index of position that has this timestamp
     // searchDirection is 'gte' or 'lte' which will will return the index that is gte or lte 
     var mid; // or'ing with 0 truncates. It's like floor
     var min = 0;
-    var max = rawPosData[0].length;
-    var maxindex = rawPosData[0].length-1;
+    var max = rawPosData[depInd].length;
+    var maxindex = rawPosData[depInd].length-1;
     while(max > min) {
 	mid = ((max + min)/2) | 0;
-	if(rawPosData[0][mid][2] > timestamp) {
+	if(rawPosData[depInd][mid][2] > timestamp) {
 	    max = mid;
 	}
 	else {
 	    min = mid + 1;
 	}
     }
-    if(max == min && rawPosData[0][mid][2] == timestamp) 
+    if(max == min && rawPosData[depInd][mid][2] == timestamp) 
 	return mid;
-    else if(rawPosData[0][mid-1][2] == timestamp)
+    else if(rawPosData[depInd][mid-1][2] == timestamp)
 	return mid -1; // TODO: This else if is just a bandage. Fix this whole thing lmao
     else {
 	if(searchDirection == 'gte') {
-	    if(rawPosData[0][mid][2] > timestamp)
+	    if(rawPosData[depInd][mid][2] > timestamp)
 		return mid;
 	    else if(mid != maxindex)
 		return mid + 1;
@@ -495,7 +634,7 @@ function getPosIndex(timestamp,searchDirection) {
 		return -1;
 	}
 	else if(searchDirection == 'lte') {
-	    if(rawPosData[0][mid][2] < timestamp)
+	    if(rawPosData[depInd][mid][2] < timestamp)
 		return mid;
 	    else
 		return mid - 1;
@@ -711,7 +850,7 @@ function updateData(depId) {
 	if(prepend == null){ prepend = false; }
 	selectedTimeRange = [rawPosData[depI][currPosDataIndex[0]][2], rawPosData[depI][currPosDataIndex[1]][2]];
 	userRequestedMaxTimeRange = [reqTimeFrom, reqTimeTo];
-	$("#plot-div"+depId).data("plot").clearSelection();
+	$("#plot-div").data("plot").clearSelection();
 	resetTimeSlider();
 	loadMarkers(map, prepend);
 
@@ -727,7 +866,7 @@ function updateData(depId) {
 	}
 	//$("#filter-slider").slider("values",[0,1]);
 	//colorMarkers(); // Extraneous when creating a whole new markers_querydata, but w/e. Changing the filter-slider calls colorMarkers
-	updateFlot(markers_querydata,depId);
+	updateFlot(markers_querydata);
     }
     return true; // To make it submit when you press enter?
 }
@@ -793,8 +932,23 @@ function loadMarkers(map, prepend) {
 		/*if ( ({{view_type|safe}} == "deployment") ||
 		( (deps.length > 0) && (rawPosData[j][i][1] == deps[0]) ) ) {
 		*/
-		    var iconnum = (((rawPosData[j][i][2]-rawPosData[j][currPosDataIndex[j][0]][2])/timeframe)*(99)) | 0;
-		   
+		    if ((rawPosData[j][i][1] == deps[0])) {
+			var url = ('/static/icons/basedotblue.png');
+		    }
+		    else if ((rawPosData[j][i][1] == deps[1])) {
+			var url = ('/static/icons/basedotred.png');
+		    }
+		    else if ((rawPosData[j][i][1] == deps[2])) {
+			var url = ('/static/icons/basedotgreen.png');
+		    }
+		    else if ((rawPosData[j][i][1] == deps[3])) {
+			var url = ('static/cons/basedotpurple.png');
+		    }
+		    if(deps.length==1) { // TODO: Change this to allow multiple deployments to be colored by time?
+			var iconnum = (((rawPosData[j][i][2]-rawPosData[j][currPosDataIndex[j][0]][2])/timeframe)*(99)) | 0;
+			var url = '/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png';
+		    }
+		       
 		    //marker.setIcon('/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png');
 		    // The size,origin,anchor make it so that the dot is centered.
 		    // So instead of the center bottom of the marker/dot pointing at the
@@ -802,7 +956,7 @@ function loadMarkers(map, prepend) {
 		    // You can notice that the dots wouldn't be centered otherwise when
 		    // using the heatmap
 		    var image = {
-			url: '/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png',
+			url: url,
 			size: new google.maps.Size(10,10),
 			origin: new google.maps.Point(0,0),
 			anchor: new google.maps.Point(5,5)
@@ -817,16 +971,6 @@ function loadMarkers(map, prepend) {
 		    });
 		    //marker.setIcon('/static/icons/blue_dot_hard_round.png');//marker.setIcon('http://www.geocodezip.com/mapIcons/small_blue_dot.png')
 		//}
-		if ((deps.length > 1) && (rawPosData[j][i][1] == deps[1])) {
-		    console.log("bluedot yeh");
-		    marker.setIcon('http://www.geocodezip.com/mapIcons/small_blue_dot.png')
-		}
-		if ((deps.length > 2) && (rawPosData[j][i][1] == deps[2])) {
-		    marker.setIcon('http://www.geocodezip.com/mapIcons/small_green_dot.png')
-		}
-		if ((deps.length > 3) && (rawPosData[j][i][1] == deps[3])) {
-		    marker.setIcon('http://www.geocodezip.com/mapIcons/small_red_dot.png')
-		}
 		
 		var content = '<b>DeploymentID: </b>' + rawPosData[j][0][1] +
 		'<br>' + rawPosData[j][i][8][0].toFixed(5)
@@ -935,22 +1079,22 @@ function changeSelectionHelper(oldAndNewIndices) {
     setLatLongData();
 }
 
-function setLatLongData() {
-    if(polyline || heatmap) {
-    // Change latlongData
-    latlongData.clear();
-    var selectedIndex = [getPosIndex(selectedTimeRange[0], 'gte'), getPosIndex(selectedTimeRange[1], 'lte')];
-    outsideloop: for(var i = selectedIndex[0]; i<selectedIndex[1]; i++) {
-	for(var j = 0; j < graphTypeIndex.length; j++) {
-	    var val = rawPosData[0][i][graphTypeIndex[j]];
-	    if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
-		continue outsideloop;
+function setLatLongData(depInd) {
+    if(polylines || heatmaps) {
+	// Change latlongData
+	latlongData[depInd].clear();
+	var selectedIndex = [getPosIndex(selectedTimeRange[0], depInd, 'gte'), getPosIndex(selectedTimeRange[1], depInd, 'lte')];
+	outsideloop: for(var i = selectedIndex[0]; i<selectedIndex[1]; i++) {
+	    for(var j = 0; j < graphTypeIndex.length; j++) {
+		var val = rawPosData[depInd][i][graphTypeIndex[j]];
+		if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
+		    continue outsideloop;
+		}
 	    }
+	    latlongData[depInd].push(new google.maps.LatLng(rawPosData[depInd][i][8][0], rawPosData[depInd][i][8][1]));
 	}
-	latlongData.push(new google.maps.LatLng(rawPosData[0][i][8][0], rawPosData[0][i][8][1]));
-    }
-    //if(polyline) polyline.setPath(latlongData);
-    //if(heatmap) heatmap.setData(latlongData);
+	//if(polyline) polyline.setPath(latlongData);
+	//if(heatmap) heatmap.setData(latlongData);
     }
 }
 function resetTimeSlider() {
@@ -969,85 +1113,105 @@ function setupSlider() {
 	},
 	slide: function(event, ui) {
 	    console.log("changed or sliding idk whatever", ui);
-	    var currTimeRange = [rawPosData[0][currPosDataIndex[0]][2] , rawPosData[0][currPosDataIndex[1]][2]];
+	    var currTimeRange;
+	    for(var i=0; i<deps.length; i++) {
+		if(rawPosData[i].length > 0) {
+		    currTimeRange = [rawPosData[i][currPosDataIndex[i][0]][2] , rawPosData[i][currPosDataIndex[i][1]][2]];
+		    break;
+		}
+	    }
+	    if(!currTimeRange)
+	    	return;
 	    var currTimeDelta = currTimeRange[1] - currTimeRange[0];
 	    
+	    /*
 	    var oldSelectedIndex = [
 		getPosIndex(currTimeRange[0] + (currTimeDelta * $(this).slider('values',0)), 'gte'),
 		getPosIndex(currTimeRange[0] + (currTimeDelta * $(this).slider('values',1)), 'lte'),
 	    ];
+	    */
 	    var newSelectedTime = [
 		currTimeRange[0] + (currTimeDelta * ui.values[0]),
 		currTimeRange[0] + (currTimeDelta * ui.values[1]),
 	    ];
+	    /*
 	    var newSelectedIndex = [
 		getPosIndex(newSelectedTime[0], 'gte'),
 		getPosIndex(newSelectedTime[1], 'lte'),
 	    ];
-	    console.log("old new", oldSelectedIndex, newSelectedIndex);
-	    if(selectedTimeRange[0] != rawPosData[0][newSelectedIndex[0]][8] || selectedTimeRange[1] != rawPosData[0][newSelectedIndex[1]][8]) {
+	    */
+	    //console.log("old new", oldSelectedIndex, newSelectedIndex);
+	    var xaxis = $("#plot-div").data("plot").getAxes().xaxis;
+	    //if(selectedTimeRange[0] != rawPosData[0][newSelectedIndex[0]][8] || selectedTimeRange[1] != rawPosData[0][newSelectedIndex[1]][8]) {
+	    if(selectedTimeRange[0] * 1000 != xaxis.min || selectedTimeRange[1] * 1000 != xaxis.max) {
 		selectedTimeRange = newSelectedTime;
-		changeSelectionHelper([oldSelectedIndex, newSelectedIndex]);
+	    //	changeSelectionHelper([oldSelectedIndex, newSelectedIndex]);
+		for(var i=0; i<deps.length; i++) {
+		    if(activeDeps.indexOf(deps[i]) != -1) 
+			setLatLongData(i);
+		}
 	    }
 
-	    // Change the flot plot selection. (And also thus also change the marker coloring) (TODO: Seperate the flot selection/marker color functionality?)
-	    $("#plot-div"+dep).data("plot").setSelection({
+	    // Change the flot plot selection. (And also thus also change the marker coloring) (TODO: Remove colormarkers call from plotselected?)
+	    $("#plot-div").data("plot").setSelection({
 		//xaxis: {from: rawPosData[0][newSelectedIndex[0]][2] * 1000, to: rawPosData[0][newSelectedIndex[1]][2] * 1000},
 		xaxis: {from: newSelectedTime[0] * 1000, to: newSelectedTime[1] * 1000},
 	    });
-	    console.log("setSelection to", {from: rawPosData[0][newSelectedIndex[0]][2] * 1000, to: rawPosData[0][newSelectedIndex[1]][2] * 1000});
+	    //console.log("setSelection to", {from: rawPosData[0][newSelectedIndex[0]][2] * 1000, to: rawPosData[0][newSelectedIndex[1]][2] * 1000});
        },
     });
 
 
-    $.each(deps, function(i, dep) {
-	$("#filter-slider"+dep).slider({
-	    orientation: "vertical",
-	    range: true,
-	    min: 0,
-	    max: 1,
-	    values: [0,1],
-	    step: 0.01,
-	    change: function(event, ui) {
-		console.log($(this).slider('values'), ui.values, ui, event);
-		
-		// Return if plot hasn't been created yet
-		if(!$("#plot-div"+dep).data("plot")) return; 
+    $("#filter-slider").slider({
+	orientation: "vertical",
+	range: true,
+	min: 0,
+	max: 1,
+	values: [0,1],
+	step: 0.01,
+	change: function(event, ui) {
+	    console.log($(this).slider('values'), ui.values, ui, event);
+	    
+	    // Return if plot hasn't been created yet
+	    if(!$("#plot-div").data("plot")) return; 
 
-		if($("#id_graph_data option:selected").text() == "Likelihood") {
-		    $("#id_likelihood_low").val(ui.values[0]);
-		    $("#id_likelihood_high").val(ui.values[1]);
-		}
-		else if ($("#id_graph_data option:selected").text() == "Activity") {
-		    $("#id_activity_low").val(ui.values[0]);
-		    $("#id_activity_high").val(ui.values[1]);
-		}
-		// TODO: Finding the delta is pointless if we bound the yaxis to [0,1] in the plot options
-		var yaxis = $("#plot-div"+dep).data("plot").getAxes().yaxis;	    
-		var delta = yaxis.max - yaxis.min;
-		graphFilters[$("#id_graph_data").val()-1] = [yaxis.min + delta*ui.values[0], yaxis.min + delta*ui.values[1]];
+	    if($("#id_graph_data option:selected").text() == "Likelihood") {
+	    	var fi = 0;
+		$("#id_likelihood_low").val(ui.values[0]);
+		$("#id_likelihood_high").val(ui.values[1]);
+	    }
+	    else if ($("#id_graph_data option:selected").text() == "Activity") {
+	   	var fi = 1; 
+		$("#id_activity_low").val(ui.values[0]);
+		$("#id_activity_high").val(ui.values[1]);
+	    }
+	    // TODO: Finding the delta is pointless if we bound the yaxis to [0,1] in the plot options
+	    var yaxis = $("#plot-div").data("plot").getAxes().yaxis;	    
+	    var delta = yaxis.max - yaxis.min;
+	    
+	    graphFilters[fi] = [yaxis.min + delta*ui.values[0], yaxis.min + delta*ui.values[1]];
 
-		if(polyline || heatmap) {
-		    setLatLongData();
+	    if(polylines || heatmaps) {
+		for(var i=0; i<deps.length; i++) {
+		    if(activeDeps.indexOf(deps[i]) != -1) 
+			setLatLongData(i);
 		}
-		
-		$("#plot-div"+dep).data("plot").draw();
-		colorMarkers();
-	    },
-	});
-	});
+	    }
+	    
+	    $("#plot-div").data("plot").setData(getGraphData(markers_querydata, fi));
+	    $("#plot-div").data("plot").draw();
+	    colorMarkers();
+	},
+    });
 }
 
 function setGraphFilters() {
-    graphFilters = [];
-    for(var i = 0; i < deps.length; i++) {
-	graphFilters.push([
-	    [parseFloat($("#id_likelihood_low").val()),
-	    parseFloat($("#id_likelihood_high").val())],
-	    [parseFloat($("#id_activity_low").val()),
-	    parseFloat($("#id_activity_high").val())],	
-	]);
-    }
+    graphFilters= [
+	[parseFloat($("#id_likelihood_low").val()),
+	parseFloat($("#id_likelihood_high").val())],
+	[parseFloat($("#id_activity_low").val()),
+	parseFloat($("#id_activity_high").val())],	
+    ];
 }
 
 function toggleSites() {
@@ -1059,48 +1223,69 @@ function toggleSites() {
 }
 
 function loadHeatmap() {
-    if(latlongData == null)
-	latlongData = new google.maps.MVCArray();
+    if(latlongData == null) {
+	latlongData = [];
+	for(var j = 0; j<activeDeps.length; j++) {
+	    for(var k=0; k<deps.length; k++) {
+	        if(activeDeps[j] == deps[k])
+		    break;
+	    }
+	    latlongData[k] = new google.maps.MVCArray();
 
-    var ind = oldLatLngIndex.length == 0 ? currPosDataIndex : oldLatLngIndex; 
-    for(var i = ind[0]; i <= ind[1]; i++) {
-	latlongData.push(new google.maps.LatLng(rawPosData[0][i][8][0], rawPosData[0][i][8][1]));
+	    var ind = oldLatLngIndex.length == 0 ? currPosDataIndex[k] : oldLatLngIndex[k]; 
+	    for(var i = ind[0]; i <= ind[1]; i++) {
+		latlongData[k].push(new google.maps.LatLng(rawPosData[k][i][8][0], rawPosData[k][i][8][1]));
+	    }
+	}
     }
-    if(heatmap == null) {
-	heatmap = new google.maps.visualization.HeatmapLayer({
-	    data: latlongData,
+
+    for(var i = 0; i<latlongData; i++) {
+	if(latlongData[i] == null)
+	    continue;
+	var heatmap = new google.maps.visualization.HeatmapLayer({
+	    data: latlongData[i],
 	    options: {
-		radius: 15,
+	    	radius: 15,
 		opacity: 0.7,
 	    },
 	});
-    } else {
-	heatmap.set('data', latlongData);
+	heatmap.set('data', latlongData[i]);
+	heatmaps[i] = heatmap;
     }
 }
 
 function loadPolyline() {
     // Populate data for the Polyline
     if(latlongData == null) {
-	latlongData = new google.maps.MVCArray();
+	latlongData = [];
+	for(var j = 0; j<activeDeps.length; j++) {
+	    for(var k=0; k<deps.length; k++) {
+	        if(activeDeps[j] == deps[k])
+		    break;
+	    }
+	    latlongData[k] = new google.maps.MVCArray();
 
-	var ind = oldLatLngIndex.length == 0 ? currPosDataIndex : oldLatLngIndex; 
-	for(var i = ind[0]; i <= ind[1]; i++) {
-	    latlongData.push(new google.maps.LatLng(rawPosData[0][i][8][0], rawPosData[0][i][8][1]));
+	    var ind = oldLatLngIndex.length == 0 ? currPosDataIndex[k] : oldLatLngIndex[k]; 
+	    for(var i = ind[0]; i <= ind[1]; i++) {
+		latlongData[k].push(new google.maps.LatLng(rawPosData[k][i][8][0], rawPosData[k][i][8][1]));
+	    }
 	}
     }
-    // Draw the polyline
-    polyline = new google.maps.Polyline({
-	path: latlongData,
-	infoWindowIndex: i,
-	geodesic: true,
-	strokeColor: '#8383FF',
-	strokeOpacity: 1.0,
-	strokeWeight: 2
-    }); // end drawing the Polyline
+
+    for(var i = 0; i<latlongData; i++) {
+	if(latlongData[i] == null)
+	    continue;
+	var polyline = new google.maps.Polyline({
+	    path: latlongData[i],
+	    geodesic: true,
+	    strokeColor: colors[i%4],
+	    strokeOpacity: 1.0,
+	    strokeWeight: 2
+	});
+	polyline.setMap(map);
+	polylines[i] = polyline;
+    }
     
-    
-    polyline.setMap(map);
     /*
     google.maps.event.addListener(flightPath, 'mouseover', function(event) {
 	
@@ -1280,6 +1465,24 @@ function selectMap(bounds) {
 function initialize(){
     // Stops Firefox from using cached values of the form inputs if you press refresh. Maybe.
     $('input').attr('autocomplete', 'off'); 
+    /*
+    $.each($("#id_deployments inputs"), function(i, box) {
+ 	box[0].checked="checked";
+    });
+    */
+    $("input[name='deployment']").on('click', function(e){
+	activeDeps = [];
+	$("input[name='deployment']").each(function(i, dep) {
+	    if($(this)[0].checked)
+		activeDeps.push(parseFloat($(dep).prop('value')));
+	});
+	updateFlot(markers_querydata);
+	colorMarkers();
+	e.stopPropagation(); // To stop it from collapsing "it's" contents
+    });
+    $("input[name='deployment']").prop('checked', true);
+    $("[id^=id_points_]").prop('checked', true);
+    $(".sidebar-header").on('click', function(){$(this).next().collapse('toggle');});
 
     // Initialize timezoneJS which we use for the flot time axis
     // Copied it from est_status.html. TODO: Should this be changed
@@ -1293,8 +1496,7 @@ function initialize(){
     $("#id_data_type").on('change', updateData); // Raw vs tracks
 
     // Bind filter form inputs to filter slider
-    $("#id_likelihood_low").on('change', function(e) {
-	    console.log(e);
+    $("#id_likelihood_low").on('change', function() {
 	setGraphFilters();
 	if($("#id_graph_data option:selected").text() == "Likelihood")
 	    $("#filter-slider").slider("values",0,$(this).val());
@@ -1317,7 +1519,7 @@ function initialize(){
 
 
     $("#id_graph_data").on('change', function(){
-	updateFlot(markers_querydata, curr_dep);
+	updateFlot(markers_querydata);
 	var yaxis = $("#plot-div").data("plot").getAxes().yaxis;
 	var delta = yaxis.max - yaxis.min;
 	$("#filter-slider").slider("values",[(graphFilters[$(this).val()-1][0] - yaxis.min)/delta, (graphFilters[$(this).val()-1][1] - yaxis.min)/delta]);
@@ -1326,40 +1528,45 @@ function initialize(){
     $("#id_sites").on('click', toggleSites);
     $("#id_heatmap").on('click', function(){
 	if($(this)[0].checked) {
-	    if(heatmap == null) {
+	    if(oldLatLngIndex.length == 0)
+		oldLatLngIndex = currPosDataIndex.slice();
+
+	    if(heatmaps == null) {
 		loadHeatmap();
 	    }
-	    if(oldLatLngIndex.length == 0)
-		oldLatLngIndex = currPosDataIndex.slice(0);
 
 	    changeSelectionHelper([oldLatLngIndex, [getPosIndex(selectedTimeRange[0], 'gte'), getPosIndex(selectedTimeRange[1], 'lte')]]);
 	    setMarkerVisibility(false);
 	    document.getElementById('id_points').checked = false;
-	    heatmap.setMap(map);
+	    $.each(heatmaps, function(i, h) {if(h) h.setMap(map)});
 	}
 	else if(heatmap != null)
-	    heatmap.setMap(null);
+	$.each(heatmaps, function(i, h) {if(h) h.setMap(null)});
     });
     $("#id_points").on('click', function() {
         setMarkerVisibility($(this)[0].checked);
     });
     $("#id_lines").on('click', function() {
 	if($(this)[0].checked) {
-	    if(polyline == null) {
+	    if(oldLatLngIndex.length == 0)
+		oldLatLngIndex = currPosDataIndex.slice();
+
+	    if(polylines == null) {
 		loadPolyline();
 	    }
-	    if(oldLatLngIndex.length == 0)
-		oldLatLngIndex = currPosDataIndex.slice(0);
 
-	    changeSelectionHelper([oldLatLngIndex, [getPosIndex(selectedTimeRange[0], 'gte'), getPosIndex(selectedTimeRange[1], 'lte')]]);
+	    //changeSelectionHelper([oldLatLngIndex, [getPosIndex(selectedTimeRange[0], 'gte'), getPosIndex(selectedTimeRange[1], 'lte')]]);
+	    for(var i=0; i<deps.length; i++) {
+	    	if(activeDeps.indexOf(deps[i]) != -1)
+		    setLatLongData(i);
+	    }
 	    
-	    polyline.setVisible(true);
+	    $.each(polylines, function(i,p){if(p) p.setVisible(true); });
 	}
-	else if(polyline != null)
-	    polyline.setVisible(false);
+	else if(polylines != null)
+	    $.each(polylines, function(i,p){if(p) p.setVisible(true); });
     });
 
-    $(".sidebar-header").on('click', function(){$(this).next().collapse('toggle');});
 
     // Hard code the initial center latitude and longitude of the map
     self.lat = 38.487828027;
@@ -1614,8 +1821,13 @@ function initialize(){
     
     rawPosData = {{pos_data|safe}};
     console.log("rawposdata", rawPosData);
-    for(var i = 0; i<deps.length; i++) currPosDataIndex[i] = [0, rawPosData[i].length-1];
-    selectedTimeRange = [rawPosData[0][currPosDataIndex[0][0]][2],rawPosData[0][currPosDataIndex[0][1]][2]];
+    for(var i = 0; i<deps.length; i++) currPosDataIndex[i] = [0, rawPosData[i].length-1]; // = [0, rawPosData[i].length-1 > 0 ? rawPosData[i].length-1 : 0];
+    for(var i=0; i<deps.length; i++) {
+	if(rawPosData[i].length > 0) {
+	    selectedTimeRange = [rawPosData[i][currPosDataIndex[i][0]][2] , rawPosData[i][currPosDataIndex[i][1]][2]];
+	    break;
+	}
+    }
     userRequestedMaxTimeRange = [{{datetime_from}}, {{datetime_to}}];
 
 	
@@ -1723,6 +1935,31 @@ google.maps.event.addDomListener(window, 'load', initialize);
             
 		</table>
 	</div>
+		{% elif field.auto_id = "id_deployment" %}
+	  	{% for dep in field %}
+		    <div class="sidebar-header">
+			<!-- TODO: Make clicking the label toggle the checkbox, maybe by giving it the right for. This is easy to do in Django 1.7+ -->
+		    <label for="id_deployment_{{dep.choice_label}}" style="font-weight: normal">
+			Deployment {{dep.choice_label}} 
+		    </label>
+		    <span>{{dep.tag}}</span>
+		    <hr>
+		    </div>
+		    <div class="collapse in">
+			<label for="id_points_{{dep.choice_label}}">
+			    Points
+			    <input type="checkbox" id="id_points_{{dep.choice_label}}" value="{{dep.choice_label}}"></input>
+			<label for="id_lines_{{dep.choice_label}}">
+			    Lines
+			    <input type="checkbox" id="id_lines_{{dep.choice_label}}" value="{{dep.choice_label}}"></input>
+			</label>
+			</label>
+			<label for="id_heatmap_{{dep.choice_label}}">
+			    Heatmap
+			    <input type="checkbox" id="id_heatmap_{{dep.choice_label}}" value="{{dep.choice_label}}"></input>
+			</label>
+		    </div>
+		{% endfor %}
 	  {% else %}
 		<b>{{field.label_tag}}</b> {{field}}<br>
 		
@@ -1795,17 +2032,15 @@ google.maps.event.addDomListener(window, 'load', initialize);
     {% if positions %}
     <!-- FLOT CHART -->
     <div id="flot-div">
-    {% for dep in deps%}
     <div class="row-4 flex">
 	<center>
 	<!-- uncomment next line for small overview graph -->
   <!--   <div id="overview" class="demo-placeholder" style="float: right; width: 100px; height: 125px;"></div> -->
 	</center>
-	<div id="filter-slider{{dep}}" style="height: 100%"></div>
-	<div class="row-2" id="plot-div{{dep}}"></div> <!-- end row-2, plot-div -->
+	<div id="filter-slider" style="height: 100%"></div>
+	<div class="row-2" id="plot-div"></div> <!-- end row-2, plot-div -->
 	</div>  <!-- end row-4 -->
     </div>
-    {% endfor %}
 </div> <!-- end ui-content -->
 {% endif %} <!-- end if positions (if there is query data) -->
 {% endblock %} <!-- end content block -->

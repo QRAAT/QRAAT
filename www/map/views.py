@@ -178,7 +178,6 @@ def get_context(request, deps=[], req_deps=[]):
 
     if len(req_deps) > 0:
         print '------- req deps exists'
-        print datetime_from
         
         # IE, if you're starting with no data parameters
         # Try to get the latest data, going back INITIAL_DATA_WINDOW time.
@@ -188,6 +187,7 @@ def get_context(request, deps=[], req_deps=[]):
 
             maxq = None
             # If there are positions for this deployment at all, q has the max timestamp
+            # TODO: Make this into one query with Q's
             for i in range(len(req_deps)):
                 q = Position.objects.filter(deploymentID=req_deps[i].ID).aggregate(Max('timestamp'))['timestamp__max']
                 if q != None: 
@@ -200,12 +200,30 @@ def get_context(request, deps=[], req_deps=[]):
                 datetime_to_initial = maxq
                 datetime_from_initial = datetime_to_initial - INITIAL_DATA_WINDOW
                 
+                filter_values = [[],[],[],[]]
                 for i in range(len(req_deps)):
-                    print "data for each deployment!!!"
                     queried_objects.append([])
                     queried_objects[i] = \
                         Position.objects.filter(deploymentID=req_deps[i].ID,
                             timestamp__gte=datetime_from_initial)
+                    if likelihood_low == None:
+                        temp = queried_objects[i].aggregate(Min('likelihood'))['likelihood__min']
+                        if temp != None:
+                            filter_values[0].append(temp)
+                    if likelihood_high == None:
+                        temp = queried_objects[i].aggregate(Max('likelihood'))['likelihood__max']
+                        if temp != None:
+                            filter_values[1].append(temp)
+                    if activity_low == None:
+                        temp = queried_objects[i].aggregate(Min('activity'))['activity__min']
+                        if temp != None:
+                            filter_values[2].append(temp)
+                    if activity_high == None:
+                        temp = queried_objects[i].aggregate(Max('activity'))['activity__max']
+                        if temp != None:
+                            filter_values[3].append(temp)
+
+                
                 
                 datetime_to_str_initial = \
                     utils.strftime(utils.timestamp_todate(datetime_to_initial))
@@ -218,18 +236,21 @@ def get_context(request, deps=[], req_deps=[]):
                 index_form.fields['datetime_to'].initial = \
                     datetime_to_str_initial
 
+                # Get the ceiling/floor to 2 decimal places. 
+                # TODO: Check if this breaks when argument to min() is an empty list
+                print "likelihood_low", likelihood_low
                 index_form.fields['likelihood_low'].initial = \
                     likelihood_low if likelihood_low != None else \
-                    round(queried_objects[0].aggregate(Min('likelihood'))['likelihood__min'], 2)
+                    round(math.floor(min(filter_values[0])*100),2)/100
                 index_form.fields['likelihood_high'].initial = \
-                    likelihood_hi if likelihood_high != None else \
-                    round(queried_objects[0].aggregate(Max('likelihood'))['likelihood__max'], 2)
+                    likelihood_high if likelihood_high != None else \
+                    round(math.ceil(max(filter_values[1])*100),2)/100
                 index_form.fields['activity_low'].initial = \
                     activity_low if activity_low != None else \
-                    round(queried_objects[0].aggregate(Min('activity'))['activity__min'], 2)
+                    round(math.floor(min(filter_values[2])*100),2)/100
                 index_form.fields['activity_high'].initial = \
                     activity_high if activity_high != None else \
-                    round(queried_objects[0].aggregate(Max('activity'))['activity__max'], 2)
+                    round(math.ceil(max(filter_values[3])*100),2)/100
 
                 queried_data = sort_query_results(queried_objects)
                 
@@ -366,7 +387,6 @@ def get_context(request, deps=[], req_deps=[]):
     else:
         context['datetime_to'] = datetime_to_initial
 
-    print "CONTEXT :", context['pos_data']
     return context
 
 
@@ -499,7 +519,6 @@ def view_by_dep(request, project_id, dep_id):
     
 def get_data(request, project_id):
     dep_id = request.GET['deployment']; 
-    print "in get_data, dep_id is ", dep_id
     dep_id = dep_id.split("+")
     dep_id = [int(i) for i in dep_id]
     try:
@@ -587,7 +606,7 @@ def downloadKMLFile(request, project_id, dep_id, kml_type):
     if request.user.is_authenticated():
       user = request.user
       if project.is_owner(user)\
-           or (user.has_perm("qraatview.can_view")
+           or (user.has_perm("project.can_view")
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
 
