@@ -91,7 +91,7 @@ sudo apt-get install apache2
 # "Require all granted" everywhere that they occur
 
 # Copy site config file to Apache, then enable it (sym links it)
-sudo cp $WWW_DIR/apache/qraat-site.conf /etc/apache2/sites-available/
+sudo cp $WWW_DIR/websiteconfig/qraat-site.conf /etc/apache2/sites-available/
 sudo a2ensite qraat-site
 
 # Installs Apache modules: mysql, wsgi
@@ -120,7 +120,7 @@ if [ ! -f "$SERVER_KEY_PATH/certs/server.crt" ]; then
 # This is not from any certificate authority
 # If you change the paths/names, you will have to change the qraat-sites.conf in the sites-available folder
 dpkg -l | grep openssl || sudo apt-get install openssl
-sudo genrsa -out $SERVER_KEY_PATH/private/server.key 2048
+sudo openssl genrsa -out $SERVER_KEY_PATH/private/server.key 2048
 sudo openssl req -new -key $SERVER_KEY_PATH/private/server.key -out /tmp/server.csr
 sudo openssl x509 -req -days 356 -in /tmp/server.csr -signkey $SERVER_KEY_PATH/private/server.key -out $SERVER_KEY_PATH/certs/server.crt
 fi
