@@ -1,0 +1,114 @@
+#!/bin/bash
+
+BASE_DIR=$(dirname $0)
+# Where the contents of www/ will be copied to
+# If you change this, you must change qraat-site.conf
+SITE_DIR="/usr/local/share/qraat_site/"
+DJANGO_VERSION=1.6.5
+
+case $1 in
+    complete-install) COMPLETE_INSTALL=true ;;
+    update) ;;
+    *) echo "Please use the argument 'complete-install' or 'update'"
+	echo "'complete-install' will check for and install all applications required to run the website, setup some files and folders, and run 'update'. Choose this this is a fresh install of the site"
+	echo "'update' will copy folders from the www folder to another location and run collect static"
+        exit ;;
+esac
+
+if [ "$COMPLETE_INSTALL" = true ]; then
+    
+# The user that runs collectstatic
+echo "Type the name of the user that will run collectstatic"
+read USER
+
+# --------------------------------
+# Build QRAAT
+# --------------------------------
+# Pkgs required for build_qraat
+dpkg -l | grep -qw g++ || apt-get install g++ 
+dpkg -l | grep -qw cmake || apt-get install cmake 
+dpkg -l | grep -qw swig || apt-get install swig 
+dpkg -l | grep -qw python-dev || apt-get python-dev # Maybe optional if you add -I/usr/include/python2.7 -lpython2.7 flas to gcc command in build_qraat
+
+$(dirname $BASE_DIR)/build_qraat install base
+
+# --------------------------------
+# Installs Mysql if necessary
+# --------------------------------
+dpkg -l | grep -qw mysql-server || apt-get install mysql-server
+dpkg -l | grep -qw python-mysqldb || apt-get install python-mysqldb
+
+# --------------------------------
+# Installs Django if necessary
+# --------------------------------
+
+# Pip is is a package management system for Python. You can install these python modules some other way.
+
+dpkg -l | grep -qw python-pip || apt-get install python-pip
+sudo pip install Django==$DJANGO_VERSION
+sudo pip install pytz
+sudo pip install python-dateutil # May remove in the future if we only use pytz
+sudo pip install utm
+
+# --------------------------------
+# Install and configure Apache and Apache modules
+# --------------------------------
+# Intalls Apache (It will install a2ensite/a2enmod if your distribution comes without it)
+apt-get install apache2
+
+# IMPORTANT NOTE: If you install Apache 2.4 (check with (sudo) apache2ctl -V) 
+# then replace the two lines "Order allow,deny Allow from all" with 
+# "Require all granted" everywhere that they occur
+
+# Copy site config file to Apache, then enable it (sym links it)
+cp $BASE_DIR/apache/qraat-site.conf /etc/apache2/sites-available/
+a2ensite qraat-site
+
+# Installs Apache modules: mysql, wsgi
+MODS="libapache2-mod-auth-mysql libapache2-mod-wsgi"
+for mod in $MODS; do
+    dpkg -l | grep -qw $mod || apt-get install $mod 
+done
+
+# Enable modules
+a2enmod auth-mysql wsgi rewrite ssl socache_shmcb
+
+# Append to Apache's environment variables
+echo '. /usr/local/bin/rmg_env' /etc/apache2/envvars
+
+# Give Apache permission to read /var/www/
+chown $USER:www-data /var/www/
+
+# --------------------------------
+# SSL certificate for HTTPS
+# --------------------------------
+SERVER_KEY_PATH=/etc/ssl
+if [ ! -f "$SERVER_KEY_PATH/certs/server.crt" ]; then
+# Create a self-signed SSL certificate that lasts for a year. 
+# This is not from any certificate authority
+# If you change the paths/names, you will have to change the qraat-sites.conf in the sites-available folder
+dpkg -l | grep openssl ||  apt-get install openssl
+sudo genrsa -out $SERVER_KEY_PATH/private/server.key 2048
+sudo openssl req -new -key $SERVER_KEY_PATH/private/server.key -out /tmp/server.csr
+sudo openssl x509 -req -days 356 -in /tmp/server.csr -signkey $SERVER_KEY_PATH/private/server.key -out $SERVER_KEY_PATH/certs/server.crt
+fi
+
+# Restart Apache
+sudo services apache2 restart
+
+fi # End of 'complete-install'
+
+# Start of 'update'
+
+# --------------------------------
+# Copies the website files and runs collectstatic
+# --------------------------------
+# Installs rsync
+dpkg -l | grep -qw rsync || apt-get install rsync
+
+# Copy only modified files from www to /usr/local/share/qraat_site/, excluding static
+rsync -av $BASE_DIR/ $SITE_DIR --exclude 'static'
+
+# Run collectstatic to gather static files to where Apache expects them
+python $BASE_DIR/manage.py collectstatic
+
