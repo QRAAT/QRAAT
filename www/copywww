@@ -101,7 +101,7 @@ for mod in $MODS; do
 done
 
 # Enable modules
-sudo a2enmod auth-mysql wsgi rewrite ssl socache_shmcb
+sudo a2enmod auth_mysql wsgi rewrite ssl socache_shmcb
 
 # Disable default site
 sudo a2dissite 000-default
