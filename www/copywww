@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BASE_DIR=$(dirname $0)
+WWW_DIR=$(dirname $0)
 # Where the contents of www/ will be copied to
 # If you change this, you must change qraat-site.conf
 SITE_DIR="/usr/local/share/qraat_site/"
@@ -15,100 +15,151 @@ case $1 in
         exit ;;
 esac
 
+# Redirect stdout and stderr to log
+LOG="$(basename $0)""_log.txt"
+
+exec > >(tee "$HOME/$LOG") 2>&1
+echo "Starting script $(date)"
+
 if [ "$COMPLETE_INSTALL" = true ]; then
     
 # The user that runs collectstatic
-echo "Type the name of the user that will run collectstatic"
+echo "Enter the name of the user that will run collectstatic"
 read USER
 
-# --------------------------------
+# ------------------------------------------------------------
+# Copying metadata templates
+# ------------------------------------------------------------
+# Create the metadata directory
+echo "Enter the path for the metadata direcotory (for example, '/rmg_server', or '/usr/local/rmg_server')"
+read METADATA_DIR
+METADATA_DIR=$(dirname $METADATA_DIR)/$(basename $METADATA_DIR)
+if [ ! -d $(dirname $METADATA_DIR) ]; then
+    printf "\nWarning: the parent directory $(dirname $METADATA_DIR) did not exist before\n\n"
+elif [ -e $METADATA_DIR ]; then
+    printf "\nWarning: the folder $METADATA_DIR already exists\n\n"
+fi
+sudo mkdir -p $METADATA_DIR || exit
+
+# Copy files
+sudo cp $WWW_DIR/websiteconfig/ui_keys $METADATA_DIR
+sudo cp $WWW_DIR/websiteconfig/db_auth $METADATA_DIR
+
+printf "\nNote: You must alter db_auth in $METADATA_DIR appropriately after you set up those users\n\n"
+
+# ------------------------------------------------------------
 # Build QRAAT
-# --------------------------------
+# ------------------------------------------------------------
 # Pkgs required for build_qraat
-dpkg -l | grep -qw g++ || apt-get install g++ 
-dpkg -l | grep -qw cmake || apt-get install cmake 
-dpkg -l | grep -qw swig || apt-get install swig 
-dpkg -l | grep -qw python-dev || apt-get python-dev # Maybe optional if you add -I/usr/include/python2.7 -lpython2.7 flas to gcc command in build_qraat
+dpkg -l | grep -qw g++ || sudo apt-get install g++ 
+dpkg -l | grep -qw cmake || sudo apt-get install cmake 
+dpkg -l | grep -qw swig || sudo apt-get install swig 
+dpkg -l | grep -qw python-dev || sudo apt-get python-dev # Maybe optional if you add -I/usr/include/python2.7 -lpython2.7 flas to gcc command in build_qraat. We need it so python.h exists
 
-$(dirname $BASE_DIR)/build_qraat install base
+MYPWD=$(pwd)
+cd $(dirname $WWW_DIR)
+./build_qraat install base
+cd $MYPWD
 
-# --------------------------------
+# ------------------------------------------------------------
 # Installs Mysql if necessary
-# --------------------------------
-dpkg -l | grep -qw mysql-server || apt-get install mysql-server
-dpkg -l | grep -qw python-mysqldb || apt-get install python-mysqldb
+# ------------------------------------------------------------
+dpkg -l | grep -qw mysql-server || sudo apt-get install mysql-server
+dpkg -l | grep -qw python-mysqldb || sudo apt-get install python-mysqldb
 
-# --------------------------------
+# ------------------------------------------------------------
 # Installs Django if necessary
-# --------------------------------
+# ------------------------------------------------------------
 
 # Pip is is a package management system for Python. You can install these python modules some other way.
 
-dpkg -l | grep -qw python-pip || apt-get install python-pip
+dpkg -l | grep -qw python-pip || sudo apt-get install python-pip
 sudo pip install Django==$DJANGO_VERSION
 sudo pip install pytz
 sudo pip install python-dateutil # May remove in the future if we only use pytz
 sudo pip install utm
+sudo pip install numpy
 
-# --------------------------------
+# ------------------------------------------------------------
 # Install and configure Apache and Apache modules
-# --------------------------------
-# Intalls Apache (It will install a2ensite/a2enmod if your distribution comes without it)
-apt-get install apache2
+# ------------------------------------------------------------
+# Intalls Apache (It should install a2ensite/a2enmod if your distribution comes without it)
+sudo apt-get install apache2
 
 # IMPORTANT NOTE: If you install Apache 2.4 (check with (sudo) apache2ctl -V) 
 # then replace the two lines "Order allow,deny Allow from all" with 
 # "Require all granted" everywhere that they occur
 
 # Copy site config file to Apache, then enable it (sym links it)
-cp $BASE_DIR/apache/qraat-site.conf /etc/apache2/sites-available/
-a2ensite qraat-site
+sudo cp $WWW_DIR/apache/qraat-site.conf /etc/apache2/sites-available/
+sudo a2ensite qraat-site
 
 # Installs Apache modules: mysql, wsgi
 MODS="libapache2-mod-auth-mysql libapache2-mod-wsgi"
 for mod in $MODS; do
-    dpkg -l | grep -qw $mod || apt-get install $mod 
+    dpkg -l | grep -qw $mod || sudo apt-get install $mod 
 done
 
 # Enable modules
-a2enmod auth-mysql wsgi rewrite ssl socache_shmcb
+sudo a2enmod auth-mysql wsgi rewrite ssl socache_shmcb
+
+# Disable default site
+sudo a2dissite 000-default
 
 # Append to Apache's environment variables
-echo '. /usr/local/bin/rmg_env' /etc/apache2/envvars
-
+echo '. /usr/local/bin/rmg_env' | sudo tee -a /etc/apache2/envvars
 # Give Apache permission to read /var/www/
-chown $USER:www-data /var/www/
+sudo chown $USER:www-data /var/www/
 
-# --------------------------------
+# ------------------------------------------------------------
 # SSL certificate for HTTPS
-# --------------------------------
+# ------------------------------------------------------------
 SERVER_KEY_PATH=/etc/ssl
 if [ ! -f "$SERVER_KEY_PATH/certs/server.crt" ]; then
 # Create a self-signed SSL certificate that lasts for a year. 
 # This is not from any certificate authority
 # If you change the paths/names, you will have to change the qraat-sites.conf in the sites-available folder
-dpkg -l | grep openssl ||  apt-get install openssl
+dpkg -l | grep openssl || sudo apt-get install openssl
 sudo genrsa -out $SERVER_KEY_PATH/private/server.key 2048
 sudo openssl req -new -key $SERVER_KEY_PATH/private/server.key -out /tmp/server.csr
 sudo openssl x509 -req -days 356 -in /tmp/server.csr -signkey $SERVER_KEY_PATH/private/server.key -out $SERVER_KEY_PATH/certs/server.crt
 fi
 
 # Restart Apache
-sudo services apache2 restart
+sudo service apache2 restart
 
 fi # End of 'complete-install'
 
 # Start of 'update'
 
-# --------------------------------
+# ------------------------------------------------------------
 # Copies the website files and runs collectstatic
-# --------------------------------
+# ------------------------------------------------------------
 # Installs rsync
-dpkg -l | grep -qw rsync || apt-get install rsync
+dpkg -l | grep -qw rsync || sudo apt-get install rsync
 
 # Copy only modified files from www to /usr/local/share/qraat_site/, excluding static
-rsync -av $BASE_DIR/ $SITE_DIR --exclude 'static'
+sudo rsync -av $WWW_DIR/ $SITE_DIR --exclude 'static'
 
 # Run collectstatic to gather static files to where Apache expects them
-python $BASE_DIR/manage.py collectstatic
+# stdbuf -o0 makes stdout not buffer
+source rmg_env
+stdbuf -o0 python $WWW_DIR/manage.py collectstatic
 
+printf "\nNote: Edit db_auth in $METADATA_DIR appropriately after you set up those users\n"
+
+printf "\nNote: Edit rmg_env in /usr/local/bin/
+change line 'export RMG_SERVER_METADATA_DIR='\$RMG_SERVER_DIR'' to
+export RMG_SERVER_METADATA_DIR=$METADATA_DIR"
+
+printf "\nTo create the mysql databases and users:
+$ mysql -u root -p
+> CREATE DATABASE qraat;
+> CREATE DATABASE django;
+> CREATE USER web_reader identified by '<web_reader_password>'
+> CREATE USER web_writer identified by '<web_writer_password>'
+> CREATE USER django_admin identified by '<django_admin_password>'"
+
+printf "It's suggested that you source rmg_env in your bash profile"
+
+printf "\nYou can look at https://github.com/QRAAT/QRAAT-doc/blob/master/database/dev/dev_setup_instructions for more instructions\n"
