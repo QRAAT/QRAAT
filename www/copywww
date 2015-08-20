@@ -54,7 +54,7 @@ printf "\nNote: You must alter db_auth in $METADATA_DIR appropriately after you 
 dpkg -l | grep -qw g++ || sudo apt-get install g++ 
 dpkg -l | grep -qw cmake || sudo apt-get install cmake 
 dpkg -l | grep -qw swig || sudo apt-get install swig 
-dpkg -l | grep -qw python-dev || sudo apt-get python-dev # Maybe optional if you add -I/usr/include/python2.7 -lpython2.7 flas to gcc command in build_qraat. We need it so python.h exists
+dpkg -l | grep -qw python-dev || sudo apt-get install python-dev # Maybe optional if you add -I/usr/include/python2.7 -lpython2.7 flas to gcc command in build_qraat. We need it so python.h exists
 
 MYPWD=$(pwd)
 cd $(dirname $WWW_DIR)
