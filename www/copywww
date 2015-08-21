@@ -58,6 +58,8 @@ dpkg -l | grep -qw python-dev || sudo apt-get install python-dev # Maybe optiona
 
 MYPWD=$(pwd)
 cd $(dirname $WWW_DIR)
+echo "where i should've cd'd into $(dirname $WWW_DIR)"
+echo "Running build_qraat in directory $(pwd)"
 ./build_qraat install base
 cd $MYPWD
 
