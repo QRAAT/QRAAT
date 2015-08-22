@@ -31,6 +31,7 @@ LOG="$(basename $0)""_log.txt"
 
 exec > >(tee "$HOME/$LOG") 2>&1
 echo "Starting script $(date)"
+echo "A complete install will take around 25 minutes, with installing numpy taking up a large portion of that time"
 
 if [ "$COMPLETE_INSTALL" = true ]; then
 
@@ -45,9 +46,10 @@ if (test "$SKIP_ALL_CHECK" != true && test "$SKIP_APACHE_CHECK" != true) && dpkg
     if [[ $APACHEVS != 2.2* ]]; then
 	echo
 	echo "Apache is already installed and is not version 2.2"
+	echo "You can check which version you have with (sudo) apache2ctl -V"
 	echo "Please install version 2.2, the instructions for which can be found here"
 	echo "http://wildlifedamage.unl.edu/manual/install.html"
-	echo "Alternatively, change the qraat-site.conf file, replacing the two lines"
+	echo "Alternatively, if you have 2.4, change the qraat-site.conf file, replacing the two lines"
 	echo "Order allow,deny"
 	echo "Allow from all"
 	echo "to 'Require all granted' everywhere they appear"
@@ -120,7 +122,6 @@ dpkg -l | grep -qw python-mysqldb || sudo apt-get install python-mysqldb
 
 # Create the mysql users, and update db_auth
 MYSQL_USERS=(web_reader web_writer django_admin)
-tmpfile=$(mktemp)
 echo
 echo "In the following portion you'll set up users for the mysql database"
 echo "To continue press enter, to skip this step enter 'skip', to quit enter 'quit'"
@@ -131,6 +132,10 @@ elif [[ $foo != 'skip' ]]; then
 	echo "Enter the password for mysql's root account: "
 	read ROOT_PSWD
 	echo "Just press enter to use the defaults"
+
+	tmpfile=$(mktemp)
+	echo "CREATE DATABASE qraat;
+CREATE DATABASE django;" >> $tmpfile
 	for user in "${MYSQL_USERS[@]}"; do
 	    echo "Enter the name of the $user [default = '$user']: "
 	    read NAME
@@ -190,8 +195,10 @@ if [ -f $METADATA_DIR/ui_keys ]; then
     fi
 fi
 if [[ $foo = "new-key" ]]; then
-    SKEY=`< /dev/urandom tr -dc '!@#$%^&*()-=+_A-Z-a-z-0-9' | head -c 32`
-    printf "name,secret,key\ndjango_base,yes,$SKEY" | sudo tee $METADATA_DIR/ui_keys > /dev/null
+    # Random string, replace ',' with '.' so the csv reader works
+    SKEY=`< /dev/random tr -dc '!@#$%^&*()-=+_A-Z-a-z-0-9' | head -c 32 | sed 's/,/./g'`
+    echo "name,secret,key
+django_base,yes,$SKEY" | sudo tee $METADATA_DIR/ui_keys > /dev/null
 fi
 
 # ------------------------------------------------------------
@@ -199,10 +206,6 @@ fi
 # ------------------------------------------------------------
 # Intalls Apache (It should install a2ensite/a2enmod if your distribution comes without it)
 sudo apt-get install apache2
-
-# IMPORTANT NOTE: If you install Apache 2.4 (check with (sudo) apache2ctl -V) 
-# then replace the two lines "Order allow,deny Allow from all" with 
-# "Require all granted" everywhere that they occur
 
 # Copy site config file to Apache, then enable it (sym links it)
 sudo cp $WWW_DIR/etc/qraat-site.conf /etc/apache2/sites-available/
@@ -258,7 +261,7 @@ echo "static
 etc
 copywww
 *.pyc
-" > mktemp
+" > $tmpfile
 
 sudo rsync -av $WWW_DIR/ $SITE_DIR --exclude-from=$tmpfile
 rm $tmpfile
@@ -269,21 +272,9 @@ source rmg_env
 stdbuf -o0 python $WWW_DIR/manage.py collectstatic
 
 echo
-printf "\nNote: Edit db_auth in $METADATA_DIR appropriately after you set up those users\n"
-
-printf "\nNote: Edit rmg_env in /usr/local/bin/
-change line 'export RMG_SERVER_METADATA_DIR='\$RMG_SERVER_DIR'' to
-export RMG_SERVER_METADATA_DIR=$METADATA_DIR"
-
-printf "\nTo create the mysql databases and users:
-$ mysql -u root -p
-> CREATE DATABASE qraat;
-> CREATE DATABASE django;
-> CREATE USER web_reader identified by '<web_reader_password>'
-> CREATE USER web_writer identified by '<web_writer_password>'
-> CREATE USER django_admin identified by '<django_admin_password>'"
 
 printf "\nIt's suggested that you source rmg_env in your bash profile"
 
 printf "\nYou can look at https://github.com/QRAAT/QRAAT-doc/blob/master/database/dev/dev_setup_instructions for more instructions\n"
+
 echo "Finished script $(date)"
