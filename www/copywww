@@ -1,7 +1,6 @@
 #!/bin/bash
 
-
-WWW_DIR=$(dirname $0)
+WWW_DIR=$( cd $(dirname $0); pwd -P)
 # Where the contents of www/ will be copied to
 # If you change this, you must change qraat-site.conf
 SITE_DIR="/usr/local/share/qraat_site/"
@@ -18,7 +17,7 @@ if [[ $# == 0 ]]; then
 fi
 
 for arg in "$@"; do
-    case $1 in
+    case $arg in
 	skip-apache-check) SKIP_APACHE_CHECK=true ;;
 	skip-django-check) SKIP_DJANDO_CHECK=true ;;
 	skip-all-check) SKIP_ALL_CHECK=true ;;
@@ -34,6 +33,7 @@ exec > >(tee "$HOME/$LOG") 2>&1
 echo "Starting script $(date)"
 
 if [ "$COMPLETE_INSTALL" = true ]; then
+
 # ------------------------------------------------------------
 # Version control
 # ------------------------------------------------------------
@@ -43,6 +43,7 @@ if (test "$SKIP_ALL_CHECK" != true && test "$SKIP_APACHE_CHECK" != true) && dpkg
     APACHEVS=($APACHEVS)
     APACHEVS=${APACHEVS[1]}
     if [[ $APACHEVS != 2.2* ]]; then
+	echo
 	echo "Apache is already installed and is not version 2.2"
 	echo "Please install version 2.2, the instructions for which can be found here"
 	echo "http://wildlifedamage.unl.edu/manual/install.html"
@@ -56,7 +57,7 @@ if (test "$SKIP_ALL_CHECK" != true && test "$SKIP_APACHE_CHECK" != true) && dpkg
 fi
 
 # Check Django
-if (test "$SKIP_ALL_CHECK" != true && test "$SKIP_DJANGO_CHECK" != true) && (dpkg -l | grep -qw python-django || pip list | grep -qw Django); then
+if (test "$SKIP_ALL_CHECK" != true && test "$SKIP_DJANGO_CHECK" != true) && (dpkg -l | grep -qw python-django || ( pip list | grep -qw Django ) > /dev/null 2>&1); then
     if dpkg -l | grep -qw python-django; then
 	DJANGOVS=`dpkg -s python-django | grep Version`
     else
@@ -65,6 +66,7 @@ if (test "$SKIP_ALL_CHECK" != true && test "$SKIP_DJANGO_CHECK" != true) && (dpk
     DJANGOVS=($DJANGOVS)
     DJANGOVS=${DJANGOVS[1]}
     if [[ $DJANGOVS != 1.6* ]]; then
+	echo
 	echo "Django is already installed and is not version 1.6"
 	echo "Install version 1.6, or run this script again with skip-django-check"
 	exit
@@ -77,6 +79,7 @@ if dpkg -l | grep -qw mysql-server; then
     MYSQLVS=($MYSQLVS)
     MYSQLVS=${MYSQLVS[1]}
     if [[ $MYSQLVS != 5.5* ]]; then
+	echo
 	echo "Warning, this setup has only been tested with Mysql 5.5"
 	echo "Enter 'quit' to quit, anything else to continue"
 	read foo
@@ -85,12 +88,15 @@ if dpkg -l | grep -qw mysql-server; then
 	fi
     fi
 fi
+
 # ------------------------------------------------------------
 # Some prompts
 # ------------------------------------------------------------
 # The user that runs collectstatic
+echo
 echo "Enter the name of the user that will run collectstatic"
 read USER
+
 # ------------------------------------------------------------
 # Copying metadata templates
 # ------------------------------------------------------------
@@ -103,7 +109,6 @@ fi
 sudo mkdir -p $METADATA_DIR || exit
 
 # Copy files
-sudo cp $WWW_DIR/etc/ui_keys $METADATA_DIR
 sudo cp $WWW_DIR/etc/db_auth $METADATA_DIR
 
 # ------------------------------------------------------------
@@ -116,30 +121,36 @@ dpkg -l | grep -qw python-mysqldb || sudo apt-get install python-mysqldb
 # Create the mysql users, and update db_auth
 MYSQL_USERS=(web_reader web_writer django_admin)
 tmpfile=$(mktemp)
+echo
 echo "In the following portion you'll set up users for the mysql database"
-echo "Enter the password for mysql's root account: "
-read ROOT_PSWD
-echo "Just press enter to use the defaults"
-for user in "${MYSQL_USERS[@]}"; do
-    echo "Enter the name of the $user [default = $user]: "
-    read NAME
-    if [ -z $NAME ]; then
-	$NAME=$user
-    fi
-    DEF_PSWD=`date +%s | sha256sum | base64 | head -c 8`
-    echo "Enter the password [default = $DEF_PSWD]: " 
-    read PSWD
-    if [ -z PSWD ]; then
-	PSWD=$DEF_PSWD
-    fi
-    sudo sed "s/$user/$NAME" $METADATA_DIR/db_auth -i
-    sudo sed "/$NAME/s/password/$PSWD" $METADATA_DIR/db_auth -i
-    echo "CREATE USER $NAME identified by '$PSWD'" >> $tmpfile
-done 
-
-mysql -u root --password=$ROOT_PSWD < $tmpfile
-rm $tmpfile
-
+echo "To continue press enter, to skip this step enter 'skip', to quit enter 'quit'"
+read foo
+if [[ $foo = 'quit' ]]; then 
+    exit
+elif [[ $foo != 'skip' ]]; then
+	echo "Enter the password for mysql's root account: "
+	read ROOT_PSWD
+	echo "Just press enter to use the defaults"
+	for user in "${MYSQL_USERS[@]}"; do
+	    echo "Enter the name of the $user [default = '$user']: "
+	    read NAME
+	    if [ -z $NAME ]; then
+		NAME=$user
+	    fi
+	    DEF_PSWD=`date +%s | sha256sum | base64 | head -c 8`
+	    echo "Enter the password [default = '$DEF_PSWD']: " 
+	    read PSWD
+	    if [ -z $PSWD ]; then
+		PSWD=$DEF_PSWD
+	    fi
+	    sudo sed "s/$user/$NAME/2" $METADATA_DIR/db_auth -i
+	    sudo sed "/$NAME/s/password/$PSWD/" $METADATA_DIR/db_auth -i
+	    echo "CREATE USER $NAME identified by '$PSWD';" >> $tmpfile
+	done 
+	cat $tmpfile
+	mysql -u root --password=$ROOT_PSWD < $tmpfile
+	rm $tmpfile
+fi
 # ------------------------------------------------------------
 # Build QRAAT
 # ------------------------------------------------------------
@@ -151,8 +162,6 @@ dpkg -l | grep -qw python-dev || sudo apt-get install python-dev # Maybe optiona
 
 MYPWD=$(pwd)
 cd $(dirname $WWW_DIR)
-echo "where i should've cd'd into $(dirname $WWW_DIR)"
-echo "Running build_qraat in directory $(pwd)"
 ./build_qraat install base
 cd $MYPWD
 
@@ -173,18 +182,17 @@ sudo pip install numpy
 # Show a warning if that already exists
 foo="new-key"
 if [ -f $METADATA_DIR/ui_keys ]; then
+    echo
     echo "$METADATA_DIR/ui_keys already exists. Press enter to skip creating a new SECRET_KEY for Django, or enter 'new-key' for overwrite it, or quit to quit"
     read foo
-    if [[ foo = "quit" ]]; then 
+    if [[ $foo = "quit" ]]; then 
 	exit 
     fi
 fi
-if [[ foo != "new-key" ]]; then
+if [[ $foo = "new-key" ]]; then
     SKEY=`< /dev/urandom tr -dc '!@#$%^&*()-=+_A-Z-a-z-0-9' | head -c 32`
-    echo "name,secret,key
-    django_base,yes,$SKEY" > $METADATA_DIR/ui_keys
+    printf "name,secret,key\ndjango_base,yes,$SKEY" | sudo tee $METADATA_DIR/ui_keys > /dev/null
 fi
-
 
 # ------------------------------------------------------------
 # Install and configure Apache and Apache modules
@@ -225,7 +233,7 @@ if [ ! -f "$SERVER_KEY_PATH/certs/server.crt" ]; then
 # Create a self-signed SSL certificate that lasts for a year. 
 # This is not from any certificate authority
 # If you change the paths/names, you will have to change the qraat-sites.conf in the sites-available folder
-dpkg -l | grep openssl || sudo apt-get install openssl
+dpkg -l | grep -qw openssl || sudo apt-get install openssl
 sudo openssl genrsa -out $SERVER_KEY_PATH/private/server.key 2048
 sudo openssl req -new -key $SERVER_KEY_PATH/private/server.key -out /tmp/server.csr
 sudo openssl x509 -req -days 356 -in /tmp/server.csr -signkey $SERVER_KEY_PATH/private/server.key -out $SERVER_KEY_PATH/certs/server.crt
@@ -260,6 +268,7 @@ rm $tmpfile
 source rmg_env
 stdbuf -o0 python $WWW_DIR/manage.py collectstatic
 
+echo
 printf "\nNote: Edit db_auth in $METADATA_DIR appropriately after you set up those users\n"
 
 printf "\nNote: Edit rmg_env in /usr/local/bin/
@@ -274,6 +283,7 @@ $ mysql -u root -p
 > CREATE USER web_writer identified by '<web_writer_password>'
 > CREATE USER django_admin identified by '<django_admin_password>'"
 
-printf "It's suggested that you source rmg_env in your bash profile"
+printf "\nIt's suggested that you source rmg_env in your bash profile"
 
 printf "\nYou can look at https://github.com/QRAAT/QRAAT-doc/blob/master/database/dev/dev_setup_instructions for more instructions\n"
+echo "Finished script $(date)"

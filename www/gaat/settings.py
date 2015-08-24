@@ -20,10 +20,10 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__),os.pardir))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 try:
-  base = qraat.csv.csv(os.environ['RMG_SERVER_UI_KEYS']).get(name='django_base')
-  web_writer= qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='web_writer')
-  web_reader = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='web_reader')
-  django_admin = qraat.csv.csv(os.environ['RMG_SERVER_DB_AUTH']).get(view='admin')
+  base = qraat.csv.csv(os.environ['RMG_WEB_SERVER_UI_KEYS']).get(name='django_base')
+  web_writer= qraat.csv.csv(os.environ['RMG_WEB_SERVER_DB_AUTH']).get(view='web_writer')
+  web_reader = qraat.csv.csv(os.environ['RMG_WEB_SERVER_DB_AUTH']).get(view='web_reader')
+  django_admin = qraat.csv.csv(os.environ['RMG_WEB_SERVER_DB_AUTH']).get(view='admin')
 
 except KeyError:
   raise qraat.error.QraatError("undefined environment variables. Try `source rmg_env`")
