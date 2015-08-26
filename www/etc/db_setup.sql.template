@@ -1,0 +1,6 @@
+CREATE DATABASE IF NOT EXISTS qraat;
+CREATE DATABASE IF NOT EXISTS django;
+
+CREATE USER web_reader identified by 'password';
+CREATE USER web_writer identified by 'password';
+CREATE USER django_admin identified by 'password';

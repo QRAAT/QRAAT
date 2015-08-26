@@ -133,9 +133,8 @@ elif [[ $foo != 'skip' ]]; then
 	read ROOT_PSWD
 	echo "Just press enter to use the defaults"
 
-	tmpfile=$(mktemp)
-	echo "CREATE DATABASE qraat;
-CREATE DATABASE django;" >> $tmpfile
+	cp $WWW_DIR/etc/db_user_grants.sql.template $WWW_DIR/etc/db_user_grants.sql
+	cp $WWW_DIR/etc/db_create.sql.template $WWW_DIR/etc/db_create.sql
 	for user in "${MYSQL_USERS[@]}"; do
 	    echo "Enter the name of the $user [default = '$user']: "
 	    read NAME
@@ -148,13 +147,13 @@ CREATE DATABASE django;" >> $tmpfile
 	    if [ -z $PSWD ]; then
 		PSWD=$DEF_PSWD
 	    fi
-	    sudo sed "s/$user/$NAME/2" $METADATA_DIR/db_auth -i
-	    sudo sed "/$NAME/s/password/$PSWD/" $METADATA_DIR/db_auth -i
-	    echo "CREATE USER $NAME identified by '$PSWD';" >> $tmpfile
+	    sudo sed "s/$user/$NAME/2;/$NAME/s/password/$PSWD/" $METADATA_DIR/db_auth -i
+	    sudo sed "s/$user/$NAME/2" $WWW_DIR/etc/db_user_grants.sql -i
+	    sudo sed "s/$user/$NAME/2;/$NAME/s/password/$PSWD/" $WWW_DIR/etc/db_create.sql -i
 	done 
-	cat $tmpfile
-	mysql -u root --password=$ROOT_PSWD < $tmpfile
-	rm $tmpfile
+	mysql -u root --password=$ROOT_PSWD < $WWW_DIR/etc/db_create.sql
+	mysql -u root --password=$ROOT_PSWD < $WWW_DIR/etc/db_user_grants.sql
+	mysql -u root --password=$ROOT_PSWD < $WWW_DIR/../server/etc/db_schema.sql
 fi
 # ------------------------------------------------------------
 # Build QRAAT
