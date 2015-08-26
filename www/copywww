@@ -124,6 +124,7 @@ dpkg -l | grep -qw python-mysqldb || sudo apt-get install python-mysqldb
 MYSQL_USERS=(web_reader web_writer django_admin)
 echo
 echo "In the following portion you'll set up users for the mysql database"
+echo "This will overwrite existing accounts with the same name"
 echo "To continue press enter, to skip this step enter 'skip', to quit enter 'quit'"
 read foo
 if [[ $foo = 'quit' ]]; then 
@@ -142,6 +143,7 @@ elif [[ $foo != 'skip' ]]; then
 		NAME=$user
 	    fi
 	    DEF_PSWD=`date +%s | sha256sum | base64 | head -c 8`
+	    sleep 1
 	    echo "Enter the password [default = '$DEF_PSWD']: " 
 	    read PSWD
 	    if [ -z $PSWD ]; then
@@ -149,11 +151,11 @@ elif [[ $foo != 'skip' ]]; then
 	    fi
 	    sudo sed "s/$user/$NAME/2;/$NAME/s/password/$PSWD/" $METADATA_DIR/db_auth -i
 	    sudo sed "s/$user/$NAME/2" $WWW_DIR/etc/db_user_grants.sql -i
-	    sudo sed "s/$user/$NAME/2;/$NAME/s/password/$PSWD/" $WWW_DIR/etc/db_create.sql -i
+	    sudo sed "s/$user/$NAME/;/$NAME/s/password/$PSWD/" $WWW_DIR/etc/db_create.sql -i
 	done 
-	mysql -u root --password=$ROOT_PSWD < $WWW_DIR/etc/db_create.sql
+	mysql -u root --password=$ROOT_PSWD -f < $WWW_DIR/etc/db_create.sql
+	mysql -u root --password=$ROOT_PSWD qraat < $WWW_DIR/../server/etc/db_schema.sql
 	mysql -u root --password=$ROOT_PSWD < $WWW_DIR/etc/db_user_grants.sql
-	mysql -u root --password=$ROOT_PSWD < $WWW_DIR/../server/etc/db_schema.sql
 fi
 # ------------------------------------------------------------
 # Build QRAAT
@@ -195,11 +197,10 @@ if [ -f $METADATA_DIR/ui_keys ]; then
 fi
 if [[ $foo = "new-key" ]]; then
     # Random string, replace ',' with '.' so the csv reader works
-    SKEY=`< /dev/random tr -dc '!@#$%^&*()-=+_A-Z-a-z-0-9' | head -c 32 | sed 's/,/./g'`
+    SKEY=`< /dev/urandom tr -dc '!@#$%^&*()-=+_A-Z-a-z-0-9' | head -c 32 | sed 's/,/./g'`
     echo "name,secret,key
-django_base,yes,$SKEY" | sudo tee $METADATA_DIR/ui_keys > /dev/null
+django_base,yes,$SKEY" | sudo tee $METADATA_DIR/ui_keys #> /dev/null
 fi
-
 # ------------------------------------------------------------
 # Install and configure Apache and Apache modules
 # ------------------------------------------------------------
