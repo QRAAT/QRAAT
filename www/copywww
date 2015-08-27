@@ -153,6 +153,7 @@ elif [[ $foo != 'skip' ]]; then
 	    sudo sed "s/$user/$NAME/2" $WWW_DIR/etc/db_user_grants.sql -i
 	    sudo sed "s/$user/$NAME/;/$NAME/s/password/$PSWD/" $WWW_DIR/etc/db_create.sql -i
 	done 
+	echo "(Errors saying a user cannot be dropped just means it didn't exist before)"
 	mysql -u root --password=$ROOT_PSWD -f < $WWW_DIR/etc/db_create.sql
 	mysql -u root --password=$ROOT_PSWD qraat < $WWW_DIR/../server/etc/db_schema.sql
 	mysql -u root --password=$ROOT_PSWD < $WWW_DIR/etc/db_user_grants.sql
@@ -270,6 +271,10 @@ rm $tmpfile
 # stdbuf -o0 makes stdout not buffer
 source rmg_env
 stdbuf -o0 python $WWW_DIR/manage.py collectstatic
+# syncdb creates the tables in the django db. (It seems like a bug that it doesn't create ones for the apps in qraat)
+echo
+echo "When asked to create a superuser, say yes to create an admin account for your site. If you want to create one later, use 'manage.py createsuperuser'"
+stdbuf -o0 python $WWW_DIR/manage.py syncdb
 
 echo
 
