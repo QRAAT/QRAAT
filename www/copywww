@@ -43,7 +43,7 @@ if (test "$SKIP_ALL_CHECK" != true && test "$SKIP_APACHE_CHECK" != true) && dpkg
     APACHEVS=`dpkg -s apache2 | grep Version`
     APACHEVS=($APACHEVS)
     APACHEVS=${APACHEVS[1]}
-    if [[ $APACHEVS != 2.2* ]]; then
+    if [[ $APACHEVS != 2.4* ]]; then
 	echo
 	echo "Apache is already installed and is not version 2.2"
 	echo "You can check which version you have with (sudo) apache2ctl -V"
