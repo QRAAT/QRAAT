@@ -45,14 +45,14 @@ if (test "$SKIP_ALL_CHECK" != true && test "$SKIP_APACHE_CHECK" != true) && dpkg
     APACHEVS=${APACHEVS[1]}
     if [[ $APACHEVS != 2.4* ]]; then
 	echo
-	echo "Apache is already installed and is not version 2.2"
+	echo "Apache is already installed and is not version 2.4"
 	echo "You can check which version you have with (sudo) apache2ctl -V"
-	echo "Please install version 2.2, the instructions for which can be found here"
+	echo "Please install version 2.4, the instructions for which can be found here"
 	echo "http://wildlifedamage.unl.edu/manual/install.html"
-	echo "Alternatively, if you have 2.4, change the qraat-site.conf file, replacing the two lines"
+	echo "Alternatively, if you have 2.2 change the qraat-site.conf file, replacing"
+	echo "'Require all granted' with"
 	echo "Order allow,deny"
 	echo "Allow from all"
-	echo "to 'Require all granted' everywhere they appear"
 	echo "Then run this script again with skip-apache-check"
 	exit
     fi
@@ -275,6 +275,18 @@ stdbuf -o0 python $WWW_DIR/manage.py collectstatic
 echo
 echo "When asked to create a superuser, say yes to create an admin account for your site. If you want to create one later, use 'manage.py createsuperuser'"
 stdbuf -o0 python $WWW_DIR/manage.py syncdb
+    
+if [ "$COMPLETE_INSTALL" = true ]; then
+    echo
+    echo "Log in as the admin account you created, go to 'Admin Pages' and if you'd like, create another user"
+    echo "To create projects, you have two options:"
+    echo "The recommended option is to go to the 'Projects' and create a project there."
+    echo "The second option is to do it from the admin interface. The steps are:"
+    echo "1) Create a project"
+    echo "2) Create two groups named projectID_viewers and projectID_collaborators, where projectID is the ID of the project you created. Give those groups the corresponding permissions (can change, can hide, can view for collaborators, and can view for viewers)"
+    echo "3) Select the users you want to be viewers/collaborators, and add them to those groups"
+    echo "4) Create auth_project_viewer and auth_project_collaborator, where the projectID is the ID of the project you made, and groupID is the ID of the corresponding group you made."
+fi
 
 echo
 
