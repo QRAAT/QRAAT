@@ -18,6 +18,10 @@ try:
   # Get viewer and collaborator group IDs for each projectID. 
   viewers = qraat.csv.csv(db_con=db_con, db_table='auth_project_viewer')
   collaborators = qraat.csv.csv(db_con=db_con, db_table='auth_project_collaborator')
+  projects = qraat.csv.csv(db_con=db_con, db_table='project')
+  projectIDs = []
+  for project in projects:
+    projectIDs.append(int(project.ID))
   
   print "--- auth_project_view ------------"
   print viewers
@@ -42,16 +46,17 @@ try:
   for (user_id, group_name) in cur.fetchall(): 
     (proj_id, proj_perm) = group_name_regex.match(group_name).groups()
     proj_id = int(proj_id); user_id = int(user_id)
-    if proj_perm == 'viewers': 
-      if proj_view_users.get(proj_id):
-        proj_view_users[proj_id].append(user_id)
-      else: 
-        proj_view_users[proj_id] = [user_id]
-    if proj_perm == 'collaborators': 
-      if proj_collaborate_users.get(proj_id):
-        proj_collaborate_users[proj_id].append(user_id)
-      else: 
-        proj_collaborate_users[proj_id] = [user_id]
+    if proj_id in projectIDs:
+      if proj_perm == 'viewers' or proj_perm == 'viewer': 
+        if proj_view_users.get(proj_id):
+          proj_view_users[proj_id].append(user_id)
+        else: 
+          proj_view_users[proj_id] = [user_id]
+      if proj_perm == 'collaborators' or proj_perm == 'collaborator': 
+        if proj_collaborate_users.get(proj_id):
+          proj_collaborate_users[proj_id].append(user_id)
+        else: 
+          proj_collaborate_users[proj_id] = [user_id]
  
   print "--- Users in groups --------------"
   print "view:       ", proj_view_users
