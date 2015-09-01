@@ -456,7 +456,7 @@ def init_color_values():
 # current position per deployment -
 #   some gradient representing distance from the center of the reserve (in location table), possibly closer to center being green and furthest out being red
     
-    file_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'colors.data'))
+    file_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'colors.dat'))
     colors = []
     return_dict = {}
     f = open(file_path)
