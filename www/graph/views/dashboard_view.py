@@ -105,7 +105,7 @@ def get_interval_and_start_time(request):
     if not datetime_start or datetime_start.lower() == 'now':
         datetime_start = utils.strftime(utils.get_local_now(), "%Y-%m-%d %H:%M:%S")
 
-    start_timestamp = utils.datelocal_totimestamp(datetime_start)
+    start_timestamp = utils.datelocal_totimestamp(utils.strptime(datetime_start, "%Y-%m-%d %H:%M:%S"))
 
     if move_interval and move_interval == 'back':
         start_timestamp -= interval
@@ -120,6 +120,8 @@ def get_interval_and_start_time(request):
 def get_data_for_tables(tables, start_timestamp, interval, colors):
     data = LastUpdatedOrderedDict()
     cursor = connection.cursor()
+
+    print "in get_data_for_tables, start_timestamp:", start_timestamp, "tables", tables
 
     for table in tables:
         query = ""
