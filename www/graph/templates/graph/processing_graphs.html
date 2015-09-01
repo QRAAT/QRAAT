@@ -1,0 +1,25 @@
+{% extends "graph/graphs.html" %}
+
+{% block sidebar%}
+
+    <div id = "text">
+
+        <div class = "sidebar-form">
+            <div id ="prefs">
+                <form id="form" action="{% url 'graph:processing_graphs' %}" name="settings" method="get">
+                    <font size="2">
+                        {% for field in form %}
+                            <b>{{field.label_tag}}</b> {{field}}<br>
+                        {% endfor %}
+                    </font>
+                </form> <!-- end form -->
+            </div><!-- end prefs -->
+
+            <div class="section_title">
+                <center><button onclick="submitForm()">Update Graphs</button></center>
+            </div> <!-- end section_title -->
+
+        </div> <!-- end sidebar-form -->
+    </div> <!-- end text -->
+
+{% endblock %} <!-- end sidebar block -->

@@ -1,7 +1,7 @@
 import json
 import utils
 import rest_api
-from django.db.models import Q
+from django.db.models import Q, Avg
 from django.db import connection
 from django.shortcuts import render, redirect
 from django.core.urlresolvers import reverse
@@ -12,11 +12,12 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core import serializers
 from django.template import Context
-from project.models import Site, Telemetry, Est
+from project.models import Site, Telemetry, Est, Deployment
 from graph.forms import TelemetryGraphForm, EstGraphForm, ProcessingGraphForm
 from viewsutils import get_nav_options #TODO: change from ___
 
 import time
+import datetime
 from calendar import timegm
 from itertools import chain
 
@@ -74,6 +75,8 @@ def get_graphs_context(request):
     datetime_to = request.GET.get('datetime_end', None)
     interval = request.GET.get('interval', None)
 
+    move_interval = request.GET.get('move_interval', None)
+
     graph_variables = request.GET.getlist('graph_variables', None) # variables to plot
     
     # make a list of site names from user
@@ -90,30 +93,42 @@ def get_graphs_context(request):
         site_ASCII_name = site_ASCII_name[:4] + " " + site_ASCII_name[4:]
         sites_dict[int(sites[i].ID)] = site_ASCII_name #can lookup site.name by site.ID
     
-    start_timestamp, end_timestamp = set_time_parameters(start_timestamp, end_timestamp, datetime_from, datetime_to, interval)
+    start_timestamp, end_timestamp, update_form_time = set_time_parameters(start_timestamp, end_timestamp, datetime_from, datetime_to, interval, move_interval)
+    
     if ((start_timestamp==0) and (end_timestamp==0)):
         return HttpResponseBadRequest("Please double check your date/time values.") # this doesn't work - what to do instead?
 
     for i in range(len(graph_variables)):
         graph_variables[i] = str(graph_variables[i]) #convert graph_variables from Unicode to ASCII strings
-                                                      
+
     context = {
         'sites': sites_dict,
         'site_IDs': site_IDs, #used in query
         'graph_variables': graph_variables,
         'start_timestamp': start_timestamp, #used in query
-        'end_timestamp': end_timestamp #used in query
+        'end_timestamp': end_timestamp, #used in query
+        'update_form_time': update_form_time
     }
     
     return context
 
 
 """Used by telemetry_graphs() to set start_timestamp and end_timestamp before querying the database"""
-def set_time_parameters(start_timestamp, end_timestamp, datetime_from, datetime_to, interval):
+def set_time_parameters(start_timestamp, end_timestamp, datetime_from, datetime_to, interval, move_interval):
+
+    # dictionary used to update time fields in form submited with back or forward buttons
+    update_form_time = {}
+    update_form_time['datetime_start'] = None
+    update_form_time['datetime_end'] = None
+    update_form_time['start_timestamp'] = None
+    update_form_time['end_timestamp'] = None
+
     # data type conversions
     if start_timestamp:
+        update_form_time['start_timestamp'] = start_timestamp
         start_timestamp = int(start_timestamp)
     if end_timestamp:
+        update_form_time['end_timestamp'] = end_timestamp
         if end_timestamp.lower() == "now":
                 end_timestamp = int(time.time()) # set end_timestamp to now
         else:
@@ -121,7 +136,7 @@ def set_time_parameters(start_timestamp, end_timestamp, datetime_from, datetime_
     if interval:
         interval = int(interval)
     if datetime_to.lower() == "now":
-        datetime_to = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # set datetime_to to current datetime
+        datetime_to = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") # set datetime_to to current datetime
                         
     # datetime format trumps UNIX timestamp format if both are given
     # datetimes
@@ -130,10 +145,12 @@ def set_time_parameters(start_timestamp, end_timestamp, datetime_from, datetime_
         end_timestamp = timegm(time.strptime(datetime_to, '%Y-%m-%d %H:%M:%S')) + 7*60*60 # used to get PDT to UTC - fix this - talk with Marcel
 
     elif datetime_from and interval:
+        update_form_time['datetime_start'] = datetime_from
         start_timestamp = timegm(time.strptime(datetime_from, '%Y-%m-%d %H:%M:%S')) + 7*60*60 # used to get PDT to UTC - fix this - talk with Marcel
         end_timestamp = start_timestamp + interval
 
     elif datetime_to and interval:
+        update_form_time['datetime_end'] = datetime_to
         end_timestamp = timegm(time.strptime(datetime_to, '%Y-%m-%d %H:%M:%S')) + 7*60*60 # used to get PDT to UTC - fix this - talk with Marcel
         start_timestamp = end_timestamp - interval
 
@@ -151,7 +168,25 @@ def set_time_parameters(start_timestamp, end_timestamp, datetime_from, datetime_
         return (0,0)
         #return HttpResponseBadRequest("Please double check your date/time values.") # this doesn't work - what to do instead?
 
-    return (start_timestamp, end_timestamp)
+    # back or forward buttons
+    if move_interval and interval:
+        if move_interval == 'back':
+            start_timestamp -= interval
+            end_timestamp -= interval
+        elif move_interval == 'forward':
+            start_timestamp += interval
+            end_timestamp += interval
+
+        if update_form_time['datetime_start'] and interval:
+            update_form_time['datetime_start'] = datetime.datetime.fromtimestamp(start_timestamp).strftime('%Y-%m-%d %H:%M:%S')
+        elif update_form_time['datetime_end'] and interval:
+            update_form_time['datetime_end'] = datetime.datetime.fromtimestamp(end_timestamp).strftime('%Y-%m-%d %H:%M:%S')
+        elif update_form_time['start_timestamp'] and interval:
+            update_form_time['start_timestamp'] = start_timestamp
+        elif update_form_time['end_timestamp'] and interval:
+            update_form_time['end_timestamp'] = end_timestamp
+
+    return (start_timestamp, end_timestamp, update_form_time)
 
 
 def create_data_list_from_QuerySet(query_results, requested_fields):
@@ -190,25 +225,45 @@ def create_data_list_from_dict(query_results, requested_fields): #remove table_n
     return data
 
 
+def update_form_time_and_date(requestGET, context):
+    # used to change the time/date in requested form
+    update_form_time = context['update_form_time']
+
+    if update_form_time['datetime_start']:
+        requestGET['datetime_start'] = update_form_time['datetime_start']
+    elif update_form_time['datetime_end']:
+        requestGET['datetime_end'] = update_form_time['datetime_end']
+    elif update_form_time['start_timestamp']:
+        requestGET['start_timestamp'] = update_form_time['start_timestamp']
+    elif update_form_time['end_timestamp']:
+        requestGET['end_timestamp'] = update_form_time['end_timestamp']
+
+    return requestGET
+
+
 def telemetry_graphs(request):
     nav_options = get_nav_options(request)
 
     if not request.GET: # no parameters from user yet
         try:
                 telemetry_graph_form = TelemetryGraphForm() # unbound form - uses default initial form values
-                return render(request, "graph/graphs_form.html", {'nav_options': nav_options, 'form': telemetry_graph_form})
+                return render(request, "graph/telemetry_graphs_form.html", {'nav_options': nav_options, 'form': telemetry_graph_form})
         except:
                 return HttpResponseBadRequest("Sorry, something went wrong when trying to load the Telemetry Graphs page.")
 
     else: # user has already filled out the form or entered parameters via the URL
-        telemetry_graph_form = TelemetryGraphForm(data = request.GET)
+        requestGET = request.GET.copy()
        
         context = get_telemetry_graphs_context(request) # gets all the info from URL, runs query, formats data
 
+        requestGET = update_form_time_and_date(requestGET, context)
+        
+        telemetry_graph_form = TelemetryGraphForm(data = requestGET)
+
         context['nav_options'] = nav_options
-        context['form'] = TelemetryGraphForm(data = request.GET)
+        context['form'] = telemetry_graph_form
     
-        return render(request, "graph/graphs.html", context)
+        return render(request, "graph/telemetry_graphs.html", context)
 
 
 def get_telemetry_graphs_context(request):
@@ -223,6 +278,7 @@ def get_telemetry_graphs_context(request):
         graph_variables[i] = str(graph_variables[i]) #convert graph_variables from Unicode to ASCII strings
 
     # query the database for the data
+    #select avg(intemp) as intemp_avg, avg(extemp) as extemp_avg, avg(voltage) as voltage_avg, avg(ping_power) as ping_power_avg, avg(ping_computer) as ping_computer_avg, avg(site_status) as site_status_avg from telemetry where timestamp >= 1371408002 and timestamp <= 1371408602 group by siteID order by siteID;
     query_results = Telemetry.objects.filter(siteID__in = context["site_IDs"]).filter(timestamp__gte = context["start_timestamp"]).filter(timestamp__lte = context["end_timestamp"]).order_by('timestamp')
     data = create_data_list_from_QuerySet(query_results, graph_variables) #doesn't work because Flot needs numbers not strings?
 
@@ -261,20 +317,23 @@ def est_graphs(request):
     if not request.GET: # no parameters from user yet
         try:
             est_graph_form = EstGraphForm() # unbound form - uses default initial form values
-            return render(request, "graph/graphs_form.html", {'nav_options': nav_options, 'form': est_graph_form})
+            return render(request, "graph/est_graphs_form.html", {'nav_options': nav_options, 'form': est_graph_form})
         except:
             return HttpResponseBadRequest("Sorry, something went wrong when trying to load the Est Graphs page.")
 
     else: # user has already filled out the form or entered parameters via the URL
-        est_graph_form = EstGraphForm(data = request.GET)
+        requestGET = request.GET.copy()
 
         #context = get_graphs_context(request) # gets all the info from URL, runs query, formats data      
         context = get_est_graphs_context(request) # gets all the info from URL, runs query, formats data
 
+        requestGET = update_form_time_and_date(requestGET, context)
+        est_graph_form = EstGraphForm(data = requestGET)
+
         context['nav_options'] = nav_options
         context['form'] = est_graph_form
 
-        return render(request, "graph/graphs.html", context)
+        return render(request, "graph/est_graphs.html", context)
 
 
 def get_est_graphs_context(request):
@@ -308,18 +367,22 @@ def processing_graphs(request):
     if not request.GET: # no parameters from user yet
         try:
                 processing_graph_form = ProcessingGraphForm() # unbound form - uses default initial form values
-                return render(request, "graph/graphs_form.html", {'nav_options': nav_options, 'form': processing_graph_form})
+                return render(request, "graph/processing_graphs_form.html", {'nav_options': nav_options, 'form': processing_graph_form})
         except:
                 return HttpResponseBadRequest("Sorry, something went wrong when trying to load the Processing Graphs page.")
 
     else: # user has already filled out the form or entered parameters via the URL
-        processing_graph_form = ProcessingGraphForm(data = request.GET)
-
+        requestGET = request.GET.copy()
+        
         context = get_processing_graphs_context(request) # gets all the info from URL, runs query, formats data
+        
+        requestGET = update_form_time_and_date(requestGET, context)
+        processing_graph_form = ProcessingGraphForm(data = requestGET)
+        
         context['nav_options'] = nav_options
         context['form'] = processing_graph_form
 
-        return render(request, "graph/graphs.html", context)
+        return render(request, "graph/processing_graphs.html", context)
 
 
 def get_processing_graphs_context(request):   

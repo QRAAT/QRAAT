@@ -26,7 +26,7 @@ function submitForm() {
 
         <div class = "sidebar-form">
             <div id ="prefs">
-                <form id="form" action="{% url 'est_graphs' %}" name="settings" method="get">
+                <form id="form" action="{% url 'graph:processing_graphs' %}" name="settings" method="get">
                     <font size="2">
                         {% for field in form %}
                             <b>{{field.label_tag}}</b> {{field}}<br>
