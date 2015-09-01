@@ -498,7 +498,7 @@ def manage_targets(request, project_id):
 def manage_locations(request, project_id):
 
     project = get_project(project_id)
-    context = Context() 
+    context = {} # Context() created a problem (no csrf token) in Django 1.8
     context["nav_options"] = get_nav_options(request)
     context["project"] = project
     context["objects"] = project.get_locations()

@@ -5,7 +5,7 @@ WWW_DIR=$( cd $(dirname $0); pwd -P)
 # If you change this, you must change qraat-site.conf
 SITE_DIR="/usr/local/share/qraat_site/"
 METADATA_DIR="/etc/qraat_site"
-DJANGO_VERSION=1.6.5
+DJANGO_VERSION=1.8
 
 
 if [[ $# == 0 ]]; then
@@ -67,10 +67,10 @@ if (test "$SKIP_ALL_CHECK" != true && test "$SKIP_DJANGO_CHECK" != true) && (dpk
     fi
     DJANGOVS=($DJANGOVS)
     DJANGOVS=${DJANGOVS[1]}
-    if [[ $DJANGOVS != 1.6* ]]; then
+    if [[ $DJANGOVS != 1.8* ]]; then
 	echo
-	echo "Django is already installed and is not version 1.6"
-	echo "Install version 1.6, or run this script again with skip-django-check"
+	echo "Django is already installed and is not version 1.8"
+	echo "Install version 1.8, or run this script again with skip-django-check"
 	exit
     fi
 fi
@@ -291,6 +291,8 @@ fi
 echo
 
 printf "\nIt's suggested that you source rmg_env in your bash profile"
+
+printf "\n NOTE: Please change the timezone in gaat/timezoneinfo to the timezone where your data will come from. You can refer to https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for your timezone\n"
 
 printf "\nYou can look at https://github.com/QRAAT/QRAAT-doc/blob/master/database/dev/dev_setup_instructions for more instructions\n"
 
