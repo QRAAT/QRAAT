@@ -3,6 +3,7 @@
 
 -- django admin controls django database
 GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON django.* TO django_admin@'localhost';
+GRANT SELECT ON qraat.* TO django_admin@'localhost';
 
 
 -- web_reader has read-only access to both databases
