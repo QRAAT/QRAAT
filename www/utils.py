@@ -43,7 +43,11 @@ def strptime(date_string, PATTERN = "%Y/%m/%d %H:%M:%S"):
     except Exception, e:
         raise e
 
+def get_local_now():
+    return DATA_TIMEZONE.normalize(pytz.utc.localize(datetime.datetime.utcnow()))
+
 ''' UTC timestamp to Los Angeles (DATA_TIMEZONE) datetime
+
 Use tz.localize(datetime) instead of datetime.replace(tzinfo=tz) for naive datetime to get the right result with pytz timezones
 You can use datetime.astimezone(tz) or tz.normalize(datetime) to convert an aware datetime to another timezone
 Using replace() seems to give the wrong result, b/c many timezones in pytz use the old LMT timezones which is 7/8 minutes off of todays. http://www.gossamer-threads.com/lists/python/python/1189541#1189541
@@ -57,6 +61,10 @@ def timestamp_todate(timestamp):
     except Exception, e:
         raise e
 
+''' Converts a local datetime to a timestamp. 
+If a naive datetime is passed in, it assumes it is in local time, and gives it tz info.
+If an aware date is passed in, it checks if it's the right locale
+'''
 def datelocal_totimestamp(date):
     if(date.tzinfo == None): # Naive time: timegm expects UTC/GMT time
         try:

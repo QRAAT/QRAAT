@@ -103,20 +103,15 @@ def get_interval_and_start_time(request):
         interval = int(interval)*60 #converting minutes (more suitable) to seconds
     
     if not datetime_start or datetime_start.lower() == 'now':
-        datetime_start = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        datetime_start = utils.strftime(utils.get_local_now(), "%Y-%m-%d %H:%M:%S")
 
-    start_timestamp = timegm(time.strptime(datetime_start, '%Y-%m-%d %H:%M:%S')) + 7*60*60 # used to get PDT to UTC - fix this - talk with Marcel
+    start_timestamp = utils.datelocal_totimestamp(datetime_start)
 
     if move_interval and move_interval == 'back':
         start_timestamp -= interval
     elif move_interval and move_interval == 'forward':
         start_timestamp += interval
     
-    try:
-        datetime_start = datetime.datetime.fromtimestamp(start_timestamp).strftime('%Y-%m-%d %H:%M:%S')
-    except ValueError:
-        pass # value out of range
-
     context['datetime_start'] = datetime_start
     context['start_timestamp'] = start_timestamp
     context['interval'] = interval
@@ -461,7 +456,7 @@ def init_color_values():
 # current position per deployment -
 #   some gradient representing distance from the center of the reserve (in location table), possibly closer to center being green and furthest out being red
     
-    file_path = 'graph/colors.dat'
+    file_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__), 'colors.data')))
     colors = []
     return_dict = {}
     f = open(file_path)
