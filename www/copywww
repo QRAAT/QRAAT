@@ -31,9 +31,10 @@ LOG="$(basename $0)""_log.txt"
 
 exec > >(tee "$HOME/$LOG") 2>&1
 echo "Starting script $(date)"
-echo "A complete install will take around 25 minutes, with installing numpy taking up a large portion of that time"
 
 if [ "$COMPLETE_INSTALL" = true ]; then
+
+echo "A complete install will take around 25 minutes, with installing numpy taking up a large portion of that time"
 
 # ------------------------------------------------------------
 # Version control
@@ -290,9 +291,9 @@ fi
 
 echo
 
-printf "\nIt's suggested that you source rmg_env in your bash profile"
+printf "\nIt's suggested that you source rmg_env in your bash profile\n"
 
-printf "\n NOTE: Please change the timezone in gaat/timezoneinfo to the timezone where your data will come from. You can refer to https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for your timezone\n"
+printf "\nNOTE: Please change the timezone in gaat/timezoneinfo to the timezone where your data will come from. You can refer to https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for your timezone\n"
 
 printf "\nYou can look at https://github.com/QRAAT/QRAAT-doc/blob/master/database/dev/dev_setup_instructions for more instructions\n"
 
