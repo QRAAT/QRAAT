@@ -44,7 +44,7 @@ def strptime(date_string, PATTERN = "%Y/%m/%d %H:%M:%S"):
         raise e
 
 def get_local_now():
-    return DATA_TIMEZONE.normalize(pytz.utc.localize(datetime.datetime.utcnow()))
+    return DATA_TIMEZONE.normalize(pytz.utc.localize(datetime.utcnow()))
 
 ''' UTC timestamp to Los Angeles (DATA_TIMEZONE) datetime
 
@@ -72,7 +72,7 @@ def datelocal_totimestamp(date):
         except Exception, e:
             raise e
     else: # Aware: must be in the DATA_TIMEZONE
-        if date.tzinfo != DATA_TIMEZONE:
+        if date.tzinfo.zone != DATA_TIMEZONE.zone:
             raise ValueError('Aware datetime timezone is not DATA_TIMEZONE')
         else: 
             try:
