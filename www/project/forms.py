@@ -143,12 +143,15 @@ class AddManufacturerForm(forms.ModelForm):
     """Django's ModelForm to add tx_make"""
     class Meta:
         model = TxMake
+        fields = '__all__' # NOTE: __all__ might not be what we want here
         labels = {"demod_type": ("Demodulation type")}
 
 
 class ProjectElementForm(forms.ModelForm):
     """Django's ModelForm base class to add Project's
        elements i.e Locations, Transmitters, etc..."""
+    class Meta:
+        fields = '__all__' # NOTE: __all__ might not be what we want here
 
     def __init__(self, project=None, *args, **kwargs):
         super(ProjectElementForm, self).__init__(*args, **kwargs)

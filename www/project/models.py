@@ -574,10 +574,16 @@ class Deployment(models.Model):
         return self._meta.verbose_name
 
     def get_start(self):
-        return strftime(timestamp_todate(self.time_start))
+        if(self.time_start != None):
+            return strftime(timestamp_todate(self.time_start))
+        else:
+            return ""
 
     def get_end(self):
-        return strftime(timestamp_todate(self.time_end))
+        if(self.time_end != None):
+            return strftime(timestamp_todate(self.time_end))
+        else:
+            return ""
 
     def __unicode__(self):
         return u'%s active %s' % (self.name, self.is_active)

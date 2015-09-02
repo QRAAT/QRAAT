@@ -1,6 +1,6 @@
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.shortcuts import render, redirect
-from project.models import Project
+from project.models import Project, Tx, Target, Location, Deployment
 
 def not_allowed_page(request):
     """This view renders a page for forbidden action

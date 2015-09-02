@@ -116,4 +116,19 @@ hr {
 
 #time-slider {
     margin-top: 7px;
+.headcol {
+	position:absolute; 
+	/*width:8em;*/
+	/*left:19em;*/
+	background-color:white;
+	top:auto;
+
+	border-right:0px none black; 
+	border-top-width:3px; /*only relevant for first row*/
+	/*margin-top:-3px; compensate for top border*/
+	margin-left: -1px;
+}
+
+.scroll_x {
+	overflow-x: auto;
 }

@@ -1,0 +1,29 @@
+COLORS - INDEXES
+RED - 0
+#FE7070
+YELLOW - 1
+#FFFF66
+GREEN - 2
+#66FF66
+
+VARIABLES
+Each variable $var_name has its tuples (limit_value:color_index).
+Each limit represents the max value for that color. All fields with value lower than or equal to limit will have that color.
+MAX will be replaced in code by sys.maxint.
+All these limits were determined based in a 10min interval window. If you select a different interval, the colors and limits probably will no more make sense.
+
+$intemp,0:0,10:1,50:2,60:1,MAX:0
+$extemp,0:0,10:1,50:2,60:1,MAX:0
+$voltage,11:0,12:1,14.5:2,MAX:0
+$last_ping_power,0:0,1:2
+$last_ping_computer,0:0,1:2
+$site_status,4:0,5:2
+$time_offset,50:2,150:1,MAX:0
+$est_records,30:1,300:2,600:1,MAX:0
+$num_of_bearings,5:1,40:2,60:1,MAX:0
+$bearing_likelihood,0.4:0,0.6:1,MAX:2
+$bearing_activity,0.1:0,0.3:1,MAX:2
+$num_of_pos,5:1,40:2,60:1,MAX:0
+$position_likelihood,0.1:0,0.3:1,MAX:2
+$position_activity,0.1:0,0.3:1,MAX:2
+$num_of_track_pos,5:1,40:2,60:1,MAX:0
