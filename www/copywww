@@ -265,7 +265,7 @@ copywww
 *.pyc
 " > $tmpfile
 
-sudo rsync -av $WWW_DIR/ $SITE_DIR --exclude-from=$tmpfile
+sudo rsync -av $WWW_DIR/ $SITE_DIR --exclude-from=$tmpfile --delete
 rm $tmpfile
 
 # Run collectstatic to gather static files to where Apache expects them
