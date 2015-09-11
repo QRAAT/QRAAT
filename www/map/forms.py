@@ -78,7 +78,7 @@ class Form(forms.Form):
             widget = forms.TextInput(attrs={
               'class': 'filter',
               'size': '4'}),
-            initial=2000.0)
+            initial=1.0)
 
   activity_low = forms.FloatField(
             required=True, 
@@ -94,7 +94,7 @@ class Form(forms.Form):
             widget = forms.TextInput(attrs={
               'class': 'filter',
               'size': '4'}),
-            initial=2.0)
+            initial=1.0)
             
   covariance_low = forms.FloatField(
             required=True,

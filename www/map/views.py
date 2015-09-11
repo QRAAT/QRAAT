@@ -39,6 +39,12 @@ INITIAL_DATA_WINDOW = 60 * 60 * 4
 
 
 def get_context(request, deps=[], req_deps=[]):
+    print "in get_context"
+    req_deps_list = req_deps.values_list('ID', flat=True)
+    req_deps_IDs = []
+    for dep in req_deps_list:
+        req_deps_IDs.append(int(dep))
+
     if 'sites' in request.GET:
         sites_checked = 1
     else:
@@ -58,17 +64,19 @@ def get_context(request, deps=[], req_deps=[]):
     if 'data_type' in request.GET:
         data_type = request.GET['data_type']
     else:
-        data_type = None
-    if 'datetime_from' in request.GET:
-        datetime_from = request.GET['datetime_from']
+        data_type = 1
+    if 'likelihood_low' in request.GET:
+        likelihood_low = request.GET['likelihood_low']
     else:
-        datetime_from = None
-        datetime_from_sec = None
-    if 'datetime_to' in request.GET:
-        datetime_to = request.GET['datetime_to']
+        likelihood_low = None
+    if 'lines' in request.GET:
+        lines_checked = 0 # Not on by default TODO: currently does nothing?
     else:
-        datetime_to = None
-        datetime_to_sec = None
+        lines_checked = None
+    if 'data_type' in request.GET:
+        data_type = request.GET['data_type']
+    else:
+        data_type = 1
     if 'likelihood_low' in request.GET:
         likelihood_low = request.GET['likelihood_low']
     else:
@@ -85,6 +93,18 @@ def get_context(request, deps=[], req_deps=[]):
         activity_high = request.GET['activity_high']
     else:
         activity_high = None
+    if 'lines' in request.GET:
+        lines_checked = 0 # Not on by default TODO: currently does nothing?
+    else:
+        lines_checked = None
+    if 'data_type' in request.GET:
+        data_type = request.GET['data_type']
+    else:
+        data_type = 1
+    if 'likelihood_low' in request.GET:
+        likelihood_low = request.GET['likelihood_low']
+    else:
+        likelihood_low = None
     #dictionary.get(key, default=None), returns None if the key isn't
     #in the dictionary instead of throwing an exception
     # TODO: Change above
@@ -96,21 +116,24 @@ def get_context(request, deps=[], req_deps=[]):
     else:
         graph_data = None
 
-  # if 'graph_dep' in request.GET and request.GET['graph_dep'] != "":
-  #  graph_dep = int(request.GET['graph_dep'])
-  # elif len(deps) > 0:
-  #  graph_dep = deps[0].ID
-
     if 'display_type' in request.GET and request.GET['display_type'] \
         != '':
         display_type = int(request.GET['display_type'])
     else:
         display_type = None
-
-    if 'flot_index' in request.GET and request.GET['flot_index'] != '':
-        flot_index = int(request.GET['flot_index'])
+    if 'lines' in request.GET:
+        lines_checked = 0 # Not on by default TODO: currently does nothing?
     else:
-        flot_index = None
+        lines_checked = None
+    if 'data_type' in request.GET:
+        data_type = request.GET['data_type']
+    else:
+        data_type = 1
+    if 'likelihood_low' in request.GET:
+        likelihood_low = request.GET['likelihood_low']
+    else:
+        likelihood_low = None
+
     if 'flot_dep' in request.GET and request.GET['flot_dep'] != '':
         flot_dep = int(request.GET['flot_dep'])
     else:
@@ -125,7 +148,74 @@ def get_context(request, deps=[], req_deps=[]):
         lng_clicked = request.GET['lng_clicked']
     else:
         lng_clicked = None
+    # If datetime_to doesn't exist, try to get the latest time from all deployments. Set it to 0 otherwise.
+    # If there's no datetime_from, set it some interval before datetime_to
+    if 'lines' in request.GET:
+        lines_checked = 0 # Not on by default TODO: currently does nothing?
+    else:
+        lines_checked = None
+    if 'data_type' in request.GET:
+        data_type = request.GET['data_type']
+    else:
+        data_type = 1
+    if 'likelihood_low' in request.GET:
+        likelihood_low = request.GET['likelihood_low']
+    else:
+        likelihood_low = None
+    if 'lines' in request.GET:
+        lines_checked = 0 # Not on by default TODO: currently does nothing?
+    else:
+        lines_checked = None
+    if 'data_type' in request.GET:
+        data_type = request.GET['data_type']
+    else:
+        data_type = 1
+    if 'likelihood_low' in request.GET:
+        likelihood_low = request.GET['likelihood_low']
+    else:
+        likelihood_low = None
+    if 'lines' in request.GET:
+        lines_checked = 0 # Not on by default TODO: currently does nothing?
+    else:
+        lines_checked = None
+    if 'data_type' in request.GET:
+        data_type = request.GET['data_type']
+    else:
+        data_type = 1
+    if 'likelihood_low' in request.GET:
+        likelihood_low = request.GET['likelihood_low']
+    else:
+        likelihood_low = None
+    if 'datetime_to' in request.GET:
+        datetime_to = request.GET['datetime_to']
+    else:
+        args = Q()
+        for dep in req_deps_IDs:
+            args = args | Q(deploymentID=str(dep))
+        datetime_to = Position.objects.filter(args).aggregate(Max('timestamp'))['timestamp__max']
+        if datetime_to != None:
+            datetime_to = utils.strftime(utils.timestamp_todate(datetime_to))
+    if 'lines' in request.GET:
+        lines_checked = 0 # Not on by default TODO: currently does nothing?
+    else:
+        lines_checked = None
+    if 'data_type' in request.GET:
+        data_type = request.GET['data_type']
+    else:
+        data_type = 1
+    if 'likelihood_low' in request.GET:
+        likelihood_low = request.GET['likelihood_low']
+    else:
+        likelihood_low = None
+    if 'datetime_from' in request.GET:
+        datetime_from = request.GET['datetime_from']
+    else:
+        if datetime_to != None:
+            datetime_from = utils.strftime(utils.timestamp_todate(utils.datelocal_totimestamp(utils.strptime(datetime_to)) - INITIAL_DATA_WINDOW))
+        else:
+            datetime_from = None 
 
+    print 'in get_context datetimefrom and to', datetime_from, datetime_to
   # Site locations
 
     sites = []
@@ -147,8 +237,6 @@ def get_context(request, deps=[], req_deps=[]):
 
     view_type = ''
     queried_data = []
-    req_deps_int = []  # dep_id's
-    req_deps_IDs = []
 
   # selected_data = []
 
@@ -169,223 +257,140 @@ def get_context(request, deps=[], req_deps=[]):
     print 'len deps', len(deps)
     print 'len req_deps', len(req_deps)
 
-    if flot_index == None and lat_clicked == None and lng_clicked \
-        == None:
-        if len(req_deps) > 0:
-            graph_dep = req_deps[0].ID
-        else:
-            graph_dep = deps[0].ID
+    print '------- req deps exists'
 
-    if len(req_deps) > 0:
-        print '------- req deps exists'
-        
-        # IE, if you're starting with no data parameters
-        # Try to get the latest data, going back INITIAL_DATA_WINDOW time.
-        if datetime_from == None and datetime_to == None: 
+    queried_objects = []
+    kwargs = {}
+    if datetime_to != None: # There is at least one datapoint
+        kwargs['timestamp__gte'] = utils.datelocal_totimestamp(utils.strptime(datetime_from))
+        kwargs['timestamp__lte'] = utils.datelocal_totimestamp(utils.strptime(datetime_to))
+        if int(data_type) == 1: # Raw positions
             for i in range(len(req_deps)):
-                req_deps_int.append(req_deps[i].ID)  # /ui/project/X/deployment/Y
-
-            maxq = None
-            # If there are positions for this deployment at all, q has the max timestamp
-            # TODO: Make this into one query with Q's
+                queried_objects.append([])
+                print '----~~~~~ here, kwargs and ID', kwargs, req_deps[i].ID
+                queried_objects[i] = \
+                    Position.objects.filter(deploymentID=req_deps[i].ID,
+                        **kwargs)
+        elif int(data_type) == 2: # Tracks
+            print '~~~~....... here, tracks'
             for i in range(len(req_deps)):
-                q = Position.objects.filter(deploymentID=req_deps[i].ID).aggregate(Max('timestamp'))['timestamp__max']
-                if q != None: 
-                    if float(q) > maxq:
-                        maxq = float(q)
-
-            queried_objects = []
-
-            if maxq != None:
-                datetime_to_initial = maxq
-                datetime_from_initial = datetime_to_initial - INITIAL_DATA_WINDOW
-                
-                filter_values = [[],[],[],[]]
-                for i in range(len(req_deps)):
-                    queried_objects.append([])
-                    queried_objects[i] = \
-                        Position.objects.filter(deploymentID=req_deps[i].ID,
-                            timestamp__gte=datetime_from_initial)
-                    if likelihood_low == None:
-                        temp = queried_objects[i].aggregate(Min('likelihood'))['likelihood__min']
-                        if temp != None:
-                            filter_values[0].append(temp)
-                    if likelihood_high == None:
-                        temp = queried_objects[i].aggregate(Max('likelihood'))['likelihood__max']
-                        if temp != None:
-                            filter_values[1].append(temp)
-                    if activity_low == None:
-                        temp = queried_objects[i].aggregate(Min('activity'))['activity__min']
-                        if temp != None:
-                            filter_values[2].append(temp)
-                    if activity_high == None:
-                        temp = queried_objects[i].aggregate(Max('activity'))['activity__max']
-                        if temp != None:
-                            filter_values[3].append(temp)
-
-                
-                
-                datetime_to_str_initial = \
-                    utils.strftime(utils.timestamp_todate(datetime_to_initial))
-                # Used to use time.strftime, but switched to our own version so we don't have to specify the pattern repeatedly
-                datetime_from_str_initial = \
-                    utils.strftime(utils.timestamp_todate(datetime_from_initial))
-
-                index_form.fields['datetime_from'].initial = \
-                    datetime_from_str_initial
-                index_form.fields['datetime_to'].initial = \
-                    datetime_to_str_initial
-
-                # Get the ceiling/floor to 2 decimal places. 
-                # TODO: Check if this breaks when argument to min() is an empty list
-                print "likelihood_low", likelihood_low
-                index_form.fields['likelihood_low'].initial = \
-                    likelihood_low if likelihood_low != None else \
-                    round(math.floor(min(filter_values[0])*100),2)/100
-                index_form.fields['likelihood_high'].initial = \
-                    likelihood_high if likelihood_high != None else \
-                    round(math.ceil(max(filter_values[1])*100),2)/100
-                index_form.fields['activity_low'].initial = \
-                    activity_low if activity_low != None else \
-                    round(math.floor(min(filter_values[2])*100),2)/100
-                index_form.fields['activity_high'].initial = \
-                    activity_high if activity_high != None else \
-                    round(math.ceil(max(filter_values[3])*100),2)/100
-
-                queried_data = sort_query_results(queried_objects)
-                
-        # There are some data parameters
-        # TODO: Deal with missing parameters, if we care about it.
-        else:
-        # TODO: Multiple deployments
-        # Note: To pass strings to js using json, use |safe in template.
-
-            print '---------- public or deployment GET'
-
-            req_deps_list = req_deps.values_list('ID', flat=True)
-            for dep in req_deps_list:
-                req_deps_int.append(int(dep))
-
-            kwargs = {}
-            if datetime_from:
-                kwargs['timestamp__gte'] = \
-                    float(utils.datelocal_totimestamp(utils.strptime(datetime_from)))
-            if datetime_to:
-                kwargs['timestamp__lte'] = \
-                    float(utils.datelocal_totimestamp(utils.strptime(datetime_to)))
-            # if likelihood_low:
-            #     kwargs['likelihood__gte'] = likelihood_low
-            # if likelihood_high:
-            #     kwargs['likelihood__lte'] = likelihood_high
-            # if activity_low:
-            #     kwargs['activity__gte'] = activity_low
-            # if activity_high:
-            #     kwargs['activity__lte'] = activity_high
-
-            req_deps_ID = req_deps.values_list('ID', flat=True)
-            
-      # uncomment to stop limiting list to 4
-      # req_deps_IDs = req_deps.values_list('ID', flat=True)
-      # Delete the following 4 lines to stop limiting the list
-
-            req_deps_IDs = []
-            for dep in req_deps_ID:
-                if len(req_deps_IDs) < 4:
-                    req_deps_IDs.append(int(dep))
-
-            print 'req_depsIDs', req_deps_IDs
-            args_deps = []
-            for dep in req_deps_IDs:
-                args_deps.append(Q(deploymentID=str(dep)))
-            args = Q()
-            for each_args in args_deps:
-                args = args | each_args
-
-      # Query data.
-
-            if int(data_type) == 1:  # raw positions
-                queried_objects = Position.objects.filter(*(args, ),
-                        **kwargs) # Why is this unpacking a tuple with one element?
-                                  # It seems to work with just args instead of *(args,)
-            elif int(data_type) == 2:
-
-                                # track
-
-                # It seems like it's okay for params to raw() to be None
-                # and it is interpreted like 0? It's not NULL at least
-                # b/c it doesn't return the empty set
-           #     queried_objects = \
-           #         Position.objects.raw('''SELECT * FROM position
-           #     JOIN track_pos ON track_pos.positionID = position.ID
-           #    WHERE position.deploymentID = %s
-           #      AND position.timestamp >= %s AND position.timestamp <= %s
-           #      AND likelihood >= %s AND likelihood <= %s
-           #      AND activity >= %s AND activity <= %s''',
-           #         ( 
-           #         req_deps[0].ID,
-           #         utils.datelocal_totimestamp(utils.strptime(datetime_from)),
-           #         utils.datelocal_totimestamp(utils.strptime(datetime_to)),
-           #         likelihood_low,
-           #         likelihood_high,
-           #         activity_low,
-           #         activity_high,
-           #         ))
-                queried_objects = \
+                print '~~~....~~' ,req_deps[i].ID, kwargs['timestamp__gte'], kwargs['timestamp__lte']
+                queried_objects.append([])
+                queried_objects[i] = \
                     Position.objects.raw('''SELECT * FROM position
                 JOIN track_pos ON track_pos.positionID = position.ID
                WHERE position.deploymentID = %s
                  AND position.timestamp >= %s AND position.timestamp <= %s''',
                     ( 
-                    req_deps[0].ID,
-                    utils.datelocal_totimestamp(utils.strptime(datetime_from)),
-                    utils.datelocal_totimestamp(utils.strptime(datetime_to)),
+                    req_deps[i].ID,
+                    kwargs['timestamp__gte'],
+                    kwargs['timestamp__lte'],
                     ))
+            print 'here.....~~~~'
+        else:
+            raise Exception("data_type isn't 1 or 2")
+
+        filter_values = [[],[],[],[]] # Having inner arrays instead of just a min/max value is a remnant  of wanting to know the min/max for each deployment
+        for i in range(len(req_deps)):
+            # Get the max/min filter values of each deployment
+            if likelihood_low == None:
+                temp = queried_objects[i].aggregate(Min('likelihood'))['likelihood__min']
+                if temp != None:
+                    filter_values[0].append(temp)
+            if likelihood_high == None:
+                temp = queried_objects[i].aggregate(Max('likelihood'))['likelihood__max']
+                if temp != None:
+                    filter_values[1].append(temp)
+            if activity_low == None:
+                temp = queried_objects[i].aggregate(Min('activity'))['activity__min']
+                if temp != None:
+                    filter_values[2].append(temp)
+            if activity_high == None:
+                temp = queried_objects[i].aggregate(Max('activity'))['activity__max']
+                if temp != None:
+                    filter_values[3].append(temp)
+
+        index_form.fields['datetime_from'].initial = datetime_from
+        index_form.fields['datetime_to'].initial = datetime_to
+
+        # Get the ceiling/floor to 2 decimal places. 
+        if likelihood_low != None:
+            index_form.fields['likelihood_low'].initial = likelihood_low
+        else:
+            if len(filter_values[0]) != 0:
+                index_form.fields['likelihood_low'].initial = round(math.floor(min(filter_values[0])*100),2)/100
             else:
+                index_form.fields['likelihood_low'].initial = 0
+        if likelihood_low != None:
+            index_form.fields['likelihood_high'].initial = likelihood_high
+        else:
+            if len(filter_values[1]) != 0:
+                index_form.fields['likelihood_high'].initial = round(math.ceil(min(filter_values[1])*100),2)/100
+            else:
+                index_form.fields['likelihood_high'].initial = 1
+        if activity_low != None:
+            index_form.fields['activity_low'].initial = activity_low
+        else:
+            if len(filter_values[2]) != 0:
+                index_form.fields['activity_low'].initial = round(math.floor(min(filter_values[2])*100),2)/100
+            else:
+                index_form.fields['activity_low'].initial = 0
+        if activity_low != None:
+            index_form.fields['activity_high'].initial = activity_high
+        else:
+            if len(filter_values[3]) != 0:
+                index_form.fields['activity_high'].initial = round(math.ceil(min(filter_values[3])*100),2)/100
+            else:
+                index_form.fields['activity_high'].initial = 1
+    else: # No data at all
+        kwargs['timestamp__gte'] = None
+        kwargs['timestamp__lte'] = None
 
-                raise Exception('Something is wrong.')
+    print '-========================'
+    #print queried_objects
+    print '-========================'
+    queried_data = sort_query_results(queried_objects)
+    print '-========================'
+    #print queried_data
+    print '-========================'
+            
 
-            queried_data = sort_query_results(queried_objects)
-        context = {  # public, deployment, project, etc.
-                     # plot & related data
-                     # for getting the no. of positions
-                     # for plotting the site markers
-                     # for displaying html form
-                     # 'form': Form(deps=deps, data=request.GET or None),
-                     # if sites should be shown
-                     # points
-                     # lines
-                     # clicked point's data, note: string
-                     # 'selected_data': json.dumps(selected_data),
-                     # Flag, either likelihood (1, default) or activity data (2)
-                     # Deployment selected for graph
-                     # graph queried data as lines or points on map
-                     # position vs. track
-            'view_type': json.dumps(view_type),
-            'deps_list': json.dumps(req_deps_int),
-            'deps': req_deps_int,
-            'deps_limit4': req_deps_IDs,
-            'pos_data': json.dumps(queried_data),
-            'positions': queried_data,
-            'siteslist': json.dumps(sites),
-            'form': index_form,
-            'sites_checked': json.dumps(sites_checked),
-            'points_checked': json.dumps(points_checked),
-            'colorpoints_checked': json.dumps(colorpoints_checked),
-            'lines_checked': json.dumps(lines_checked),
-            'graph_data': json.dumps(graph_data),
-            'graph_dep': json.dumps(graph_dep),
-            'graph_dep_django': graph_dep,
-            'display_type': json.dumps(display_type),
-            'data_type': json.dumps(data_type),
-            }
-    if datetime_from:
-        context['datetime_from'] = kwargs['timestamp__gte']
-    else:
-        context['datetime_from'] = datetime_from_initial
-    if datetime_to:
-        context['datetime_to'] = kwargs['timestamp__lte']
-    else:
-        context['datetime_to'] = datetime_to_initial
+
+    context = {  # public, deployment, project, etc.
+                 # plot & related data
+                 # for getting the no. of positions
+                 # for plotting the site markers
+                 # for displaying html form
+                 # 'form': Form(deps=deps, data=request.GET or None),
+                 # if sites should be shown
+                 # points
+                 # lines
+                 # clicked point's data, note: string
+                 # 'selected_data': json.dumps(selected_data),
+                 # Flag, either likelihood (1, default) or activity data (2)
+                 # Deployment selected for graph
+                 # graph queried data as lines or points on map
+                 # position vs. track
+                 # datetime_from
+                 # datetime_to
+        'view_type': json.dumps(view_type),
+        'deps_list': json.dumps(req_deps_IDs),
+        'deps': req_deps_IDs,
+        'deps_limit4': req_deps_IDs,
+        'pos_data': json.dumps(queried_data),
+        'positions': queried_data,
+        'siteslist': json.dumps(sites),
+        'form': index_form,
+        'sites_checked': json.dumps(sites_checked),
+        'points_checked': json.dumps(points_checked),
+        'colorpoints_checked': json.dumps(colorpoints_checked),
+        'lines_checked': json.dumps(lines_checked),
+        'graph_data': json.dumps(graph_data),
+        'display_type': json.dumps(display_type),
+        'data_type': json.dumps(data_type),
+        'datetime_from': kwargs['timestamp__gte'],
+        'datetime_to': kwargs['timestamp__lte']
+        }
 
     return context
 
@@ -393,6 +398,7 @@ def get_context(request, deps=[], req_deps=[]):
 def sort_query_results(queried_objects):
     ''' Choose highest likelihood position for each timestamp 
       and sort query data by timestamp. '''
+    print "in sort_query_results"
 
   # use dictionary to remove duplicates (positions with same timestamp)
     queried_data = []  # data ordered by timestamp
@@ -507,6 +513,7 @@ def view_by_dep(request, project_id, dep_id):
     transmitter = deps[0].txID
     transmitter_frequency = transmitter.frequency
 
+    print 'in index, deps ', deps
     context = get_context(request, deps, deps)
 
     nav_options = get_nav_options(request)
@@ -519,13 +526,12 @@ def view_by_dep(request, project_id, dep_id):
     
 def get_data(request, project_id):
     dep_id = request.GET['deployment']; 
-    dep_id = dep_id.split("+")
+    dep_id = dep_id.split(" ")
     dep_id = [int(i) for i in dep_id]
     try:
         project = Project.objects.get(ID=project_id)
     except ObjectDoesNotExist:
         raise Http404
-
     if not project.is_public:
         if request.user.is_authenticated():
             user = request.user
@@ -534,7 +540,10 @@ def get_data(request, project_id):
                 and (project.is_collaborator(user)
                      or project.is_viewer(user)):
 
-                deps = project.get_deployments().filter(ID=dep_id)
+                q = Q()
+                for dep in dep_id:
+                    q = q | Q(ID = str(dep))
+                deps = project.get_deployments().filter(q)
             else:
                 raise PermissionDenied  # 403
         else:
@@ -550,7 +559,11 @@ def get_data(request, project_id):
         except ObjectDoesNotExist:
             raise Http404
 
+    print 'in get_data about to get_context, deps is', deps
     context = get_context(request, deps, deps)
+    print '-----------------------------'
+    #print context['pos_data']
+    print '-----------------------------'
     response = HttpResponse(json.dumps(context['pos_data']), content_type="application/json")
     return response
 
