@@ -74,7 +74,7 @@ def get_context(request, deps=[], req_deps=[]):
     else:
         lines_checked = None
     if 'data_type' in request.GET:
-        data_type = request.GET['data_type']
+        data_type = int(request.GET['data_type'])
     else:
         data_type = 1
     if 'likelihood_low' in request.GET:
