@@ -350,15 +350,7 @@ def get_context(request, deps=[], req_deps=[]):
         kwargs['timestamp__gte'] = None
         kwargs['timestamp__lte'] = None
 
-    print '-========================'
-    #print queried_objects
-    print '-========================'
     queried_data = sort_query_results(queried_objects)
-    print '-========================'
-    #print queried_data
-    print '-========================'
-            
-
 
     context = {  # public, deployment, project, etc.
                  # plot & related data
@@ -671,6 +663,9 @@ def downloadKMLFile(request, project_id, dep_id, kml_type):
   return response
 
 def download_by_dep(request, project_id, dep_id):
+    dep_id = dep_id.split("+")
+    dep_id = [int(i) for i in dep_id]
+
     try:
         project = Project.objects.get(ID=project_id)
     except ObjectDoesNotExist:
@@ -683,8 +678,13 @@ def download_by_dep(request, project_id, dep_id):
                 or user.has_perm('project.can_view') \
                 and (project.is_collaborator(user)
                      or project.is_viewer(user)):
-
-                deps = project.get_deployments().filter(ID=dep_id)
+                try:
+                    q = Q()
+                    for dep in dep_id:
+                        q = q | Q(ID = str(dep))
+                    deps = project.get_deployments().filter(q)
+                except ObjectDoesNotExist:
+                    raise Http404
             else:
                 raise PermissionDenied  # 403
         else:
@@ -692,8 +692,13 @@ def download_by_dep(request, project_id, dep_id):
             return redirect('/account/login/?next=%s'
                             % request.get_full_path())
     else:
-
-        deps = project.get_deployments().filter(ID=dep_id)
+        try:
+            q = Q()
+            for dep in dep_id:
+                q = q | Q(ID = str(dep))
+            deps = project.get_deployments().filter(q)
+        except ObjectDoesNotExist:
+            raise Http404
 
     context = get_context(request, deps, deps)
 
@@ -715,20 +720,21 @@ def download_by_dep(request, project_id, dep_id):
         'likelihood',
         'activity',
         ])
-    for row in json.loads(context['pos_data']):
-        writer.writerow([
-            row[0],
-            row[1],
-            row[2],
-            row[3],
-            row[4],
-            str(row[5]) + row[9],
-            row[10],
-            row[8][0],
-            row[8][1],
-            row[6],
-            row[7],
-            ])
+    for dep in json.loads(context['pos_data']):
+        for row in dep:
+            writer.writerow([
+                row[0],
+                row[1],
+                row[2],
+                row[3],
+                row[4],
+                str(row[5]) + row[9],
+                row[10],
+                row[8][0],
+                row[8][1],
+                row[6],
+                row[7],
+                ])
     return response
 
 

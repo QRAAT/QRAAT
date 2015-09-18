@@ -7,7 +7,7 @@ admin.autodiscover()
 urlpatterns = patterns('map.views',
     url(r'^$', 'index'),
     url(
-        r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/download/$',
+        r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>[0-9]+(\+[0-9]+)*)/download/$',
         'download_by_dep', name='download_by_dep'),
     url(
         r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>[0-9]+(\+[0-9]+)*)/$',
