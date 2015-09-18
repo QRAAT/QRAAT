@@ -244,9 +244,6 @@ sudo openssl req -new -key $SERVER_KEY_PATH/private/server.key -out /tmp/server.
 sudo openssl x509 -req -days 356 -in /tmp/server.csr -signkey $SERVER_KEY_PATH/private/server.key -out $SERVER_KEY_PATH/certs/server.crt
 fi
 
-# Restart Apache
-sudo service apache2 restart
-
 fi # End of 'complete-install'
 
 # Start of 'update'
@@ -276,6 +273,9 @@ stdbuf -o0 python $WWW_DIR/manage.py collectstatic
 echo
 echo "When asked to create a superuser, say yes to create an admin account for your site. If you want to create one later, use 'manage.py createsuperuser'"
 stdbuf -o0 python $WWW_DIR/manage.py syncdb
+
+# Restart Apache
+sudo service apache2 restart
     
 if [ "$COMPLETE_INSTALL" = true ]; then
     echo
