@@ -2230,9 +2230,9 @@ google.maps.event.addDomListener(window, 'load', initialize);
 {% if positions %}
 <b>No. of points displayed</b>: {{positions|length}}
 
-{% if deps|length > 1 %} <br><b>Line Colors: Blue</b>: {{deps.0}} | <b>Yellow:</b> {{deps.1}}{% endif %}
+{% if deps|length > 1 %} <br><b>Line Colors: Blue</b>: {{deps.0}} | <b>Red:</b> {{deps.1}}{% endif %}
 {% if deps|length > 2 %} | <b>Green:</b> {{deps.2}}{% endif %}
-{% if deps|length > 3 %} | <b>Red:</b> {{deps.3}}{% endif %}
+{% if deps|length > 3 %} | <b>Yellow:</b> {{deps.3}}{% endif %}
 <br>
 
 {% endif %} <!-- endif for positions -->
