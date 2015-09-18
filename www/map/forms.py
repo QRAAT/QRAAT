@@ -19,7 +19,7 @@ GRAPH_CHOICES = [('1', 'Likelihood'), ('2', 'Activity'), ('3', 'Covariance')]
 def get_choices(deps=[]):
   choices_list = []
   for dep in deps:
-    choices_list.append((dep.ID, dep.ID))
+    choices_list.append((dep.ID, "{} {}".format(dep.targetID.name, dep.txID.frequency)))
   return choices_list
 
 def get_deps(req_deps=[]):
@@ -137,15 +137,6 @@ class Form(forms.Form):
             label='Graph Type', 
             initial="1")
 
-  deployment = forms.MultipleChoiceField(
-            #choices = get_choices(),
-            #widget = forms.SelectMultiple(), #hold down CTRL to select all
-            widget = forms.CheckboxSelectMultiple(),
-            required = True,
-            label = 'Deployment IDs (displays first 4)')
-            #Note: initial doesn't work. it sets choices to '6' and '3'
-            #In views.py: instance_of_form.fields['deployment'].initial = ['63']
- 
   sites = forms.BooleanField(
             required=True, 
             label="View Site Locations",
@@ -165,3 +156,18 @@ class Form(forms.Form):
             initial=False,
             required=False,
             label="Lines")
+
+  heatmap = forms.BooleanField(
+            initial=False,
+            required=False,
+            label="Heatmap")
+
+  deployment = forms.MultipleChoiceField(
+            #choices = get_choices(),
+            #widget = forms.SelectMultiple(), #hold down CTRL to select all
+            widget = forms.CheckboxSelectMultiple(),
+            required = True,
+            label = 'Deployment IDs (displays first 4)')
+            #Note: initial doesn't work. it sets choices to '6' and '3'
+            #In views.py: instance_of_form.fields['deployment'].initial = ['63']
+ 

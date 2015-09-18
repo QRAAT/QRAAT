@@ -46,9 +46,13 @@ def get_context(request, deps=[], req_deps=[]):
         req_deps_IDs.append(int(dep))
 
     if 'sites' in request.GET:
+        if request.GET['sites'] == 'off':
+            sites_checked = 0
+        else:
+            sites_checked = 1
         sites_checked = 1
     else:
-        sites_checked = None
+        sites_checked = 1
     if 'points' in request.GET:
         points_checked = 1
     else:
@@ -463,6 +467,17 @@ def index(request):
     return render(request, 'map/index.html', context)
 
 
+def view_all_dep(request, project_id):
+    try:
+        project = Project.objects.get(ID=project_id)
+    except ObjectDoesNotExist:
+        raise Http404
+    deployments = project.get_deployments()
+    dep_ids = []
+    for dep in deployments:
+        dep_ids.append(dep.ID)
+    return view_by_dep(request, project_id, '+'.join(map(str, dep_ids)))
+
 def view_by_dep(request, project_id, dep_id):
     ''' Compile a list of deployments associated with `dep_id`. '''
 
@@ -507,20 +522,24 @@ def view_by_dep(request, project_id, dep_id):
     except ObjectDoesNotExist:
         raise Http404
 
-    target = deps[0].targetID
-    target_name = target.name
-
-    transmitter = deps[0].txID
-    transmitter_frequency = transmitter.frequency
-
     print 'in index, deps ', deps
     context = get_context(request, deps, deps)
 
     nav_options = get_nav_options(request)
     context['nav_options'] = nav_options
     context['project'] = project
-    context['target_name'] = target_name
-    context['transmitter_frequency'] = transmitter_frequency
+    
+    context['target_name'] = []
+    context['transmitter_frequency'] = []
+    for i in range(len(dep_id)):
+        target = deps[i].targetID
+        target_name = target.name
+
+        transmitter = deps[i].txID
+        transmitter_frequency = transmitter.frequency
+
+        context['target_name'].append(target_name)
+        context['transmitter_frequency'].append(transmitter_frequency)
 
     return render(request, 'map/index.html', context)
     

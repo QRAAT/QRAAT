@@ -57,7 +57,7 @@ var graphFilters = []; // Data filter (likelihood, activity, ...) bounds [[[low,
 
 var seriesDepInd;
 var deps = {{deps_list}};
-var activeDeps = deps;
+var activeDeps = deps.slice();
 var curr_dep = deps[0];
 var markers_querydata = [];
 var selectedMarkers = [];
@@ -118,7 +118,8 @@ function getGraphData(markers, sel_data){
     }
     for(var j=0; j<deps.length; j++) {
 	// Skip non active deps
-	if(activeDeps.indexOf(deps[j]) == -1)
+        var pointDeps = getActPointsDepsInd();
+	if(pointDeps.indexOf(j) == -1)
 	    continue;
 
 	var data = {};
@@ -521,13 +522,14 @@ function setMarkerVisibility(bool) {
 }
 
 function colorMarkers() {
-    if( !document.getElementById('id_points').checked) 
+    if( !document.getElementById('id_points').checked) // TODO: remove?
 	return;
 
     // Note: This assumes a 1 to 1 correspondence b/w rawPosData[0] and markers_querydata. This should be the case, but take care.
     for(var k = 0; k<deps.length; k++) {
 	// Skip non active deps
-	if(activeDeps.indexOf(deps[k]) == -1) {
+        var pointDeps = getActPointsDepsInd();
+	if(pointDeps.indexOf(k) == -1) {
 	    for(var i=0; i<markers_querydata[k].length; i++)
 		markers_querydata[k][i].setVisible(false);
 	    continue;
@@ -623,6 +625,36 @@ window.onload = function() {
     //hideFormFields();
 };
 
+function getActPointsDepsInd() {
+    var arr = [];
+    $("[id^=id_points_]").each(function(i) {
+        if(document.getElementById('id_deployment_'+i).checked && this.checked) {
+            arr.push(i);
+        }
+    });
+    return arr;
+}
+
+function getActLinesDepsInd() {
+    var arr = [];
+    $("[id^=id_lines_]").each(function(i) {
+        if(document.getElementById('id_deployment_'+i).checked && this.checked) {
+            arr.push(i);
+        }
+    });
+    return arr;
+}
+
+function getActHeatmapDepsInd() {
+    var arr = [];
+    $("[id^=id_heatmap_]").each(function(i) {
+        if(document.getElementById('id_deployment_'+i).checked && this.checked) {
+            arr.push(i);
+        }
+    });
+    return arr;
+}
+
 function getDepsInd(deployments) {
     // Finds index of deployment in rawPosData
     var inds = [];
@@ -684,7 +716,6 @@ function updateData() {
     var reqTimeFrom = (new timezoneJS.Date(document.getElementById("id_datetime_from").value, TIMEZONE).getTime())/1000; 
     var reqTimeTo = (new timezoneJS.Date(document.getElementById("id_datetime_to").value, TIMEZONE).getTime())/1000;
     selectedTimeRange = [reqTimeFrom, reqTimeTo];
-    console.log('activeDeps ', activeDeps);
     var dataLatestTimes = findLatestDataTimes(activeDeps);
     var dataEarliestLatestTime = dataLatestTimes[0];
     for(var i=0; i<dataLatestTimes.length; i++) { var time = dataLatestTimes[i]; if(time != null && time < dataEarliestLatestTime) dataEarliestLatestTime = time }
@@ -1058,7 +1089,7 @@ function loadMarkers(map, prepend) {
 	    /*if ( ({{view_type|safe}} == "deployment") ||
 	    ( (deps.length > 0) && (rawPosData[j][i][1] == deps[0]) ) ) {
 	    */
-		if($('#id_colorpoints')[0].checked != 'checked') {
+		if(! $('#id_colorpoints')[0].checked) {
 		    if ((rawPosData[j][i][1] == deps[0])) {
 			var url = ('/static/icons/basedotblue.png');
 		    }
@@ -1366,6 +1397,7 @@ function loadHeatmap() {
     }
 
     // TODO: what happens if you hide a deployment after already creating it's latlng data
+    var heatmapDeps = getActHeatmapDepsInd();
     for(var i = 0; i<latlongData.length; i++) {
 	if(latlongData[i] == null)
 	    continue;
@@ -1375,7 +1407,7 @@ function loadHeatmap() {
 	    	radius: 15,
 		opacity: 0.7,
 	    },
-	    map: map,
+            map: heatmapDeps.indexOf(i) == -1 ? null : map,
 	});
 	heatmap.set('data', latlongData[i]);
 	heatmaps[i] = heatmap;
@@ -1398,6 +1430,7 @@ function loadPolyline() {
 	}
     }
 
+    var lineDeps = getActLinesDepsInd();
     for(var i = 0; i<latlongData.length; i++) {
 	if(latlongData[i] == null)
 	    continue;
@@ -1408,8 +1441,8 @@ function loadPolyline() {
 	    strokeOpacity: 1.0,
 	    strokeWeight: 2,
 	    map: map,
+            visible: lineDeps.indexOf(i) == -1 ? false : true,
 	});
-	//polyline.setMap(map);
 	polylines[i] = polyline;
     }
     
@@ -1632,6 +1665,9 @@ function initialize(){
 	$("#id_deployment_" + i).on('click', function(e) {
 	    //var dep = deps[i]; //parseFloat($(this).prop('value'));
 	    if($(this)[0].checked) {
+                $("#id_deployment_options_"+i+" :input").each(function() {
+                    this.disabled=false;
+                });
 		activeDeps.push(dep);
 		// Maintain order of deployments
 		var temp = [];
@@ -1644,18 +1680,21 @@ function initialize(){
 		setLatLongData(i);
 		if(heatmaps && heatmaps[i]) heatmaps[i].setMap(null);
 		if(polylines && polylines[i]) polylines[i].setVisible(true);
+
 	    } 
 	    else {
+                $("#id_deployment_options_"+i+" :input").each(function() {
+                    this.disabled=true;
+                });
 	    	activeDeps.splice(activeDeps.indexOf(dep),1);
 		if(heatmaps && heatmaps[i]) heatmaps[i].setMap(map);
 		if(polylines && polylines[i]) polylines[i].setVisible(false);
 	    }
 	updateFlot(markers_querydata);
 	colorMarkers();
-	e.stopPropagation(); // To stop it from collapsing "it's" contents
+        e.stopPropagation(); // To stop it from collapsing its contents
 	});
     });
-    $("[id^=id_points_]").prop('checked', true);
     $(".sidebar-header").on('click', function(){$(this).next().collapse('toggle');});
 
     // Initialize timezoneJS which we use for the flot time axis
@@ -1704,6 +1743,61 @@ function initialize(){
     });
     $("#id_colorpoints").on('change', function() {colorMarkers(); $("#plot-div").data("plot").draw();});
     $("#id_sites").on('click', toggleSites);
+    $("#id_points").on('click', function() {
+        var checked = this.checked;
+        setMarkerVisibility(checked);
+        $("[id^=id_points_]").prop('checked', checked);
+    });
+    $("[id^=id_points_]").prop('checked', true);
+    $("[id^=id_points_]").each(function(i) {
+        $(this).on('click', function() {
+            colorMarkers();
+            updateFlot(markers_querydata);
+        });
+    });
+    $("#id_lines").on('click', function() {
+	if(this.checked) {
+	    if(oldLatLngIndex.length == 0)
+		oldLatLngIndex = currPosDataIndex.slice();
+
+	    if(polylines == null) {
+		loadPolyline();
+	    }
+
+	    //changeSelectionHelper([oldLatLngIndex, [getPosIndex(selectedTimeRange[0], 'gte'), getPosIndex(selectedTimeRange[1], 'lte')]]);
+	    for(var i=0; i<deps.length; i++) {
+	    	if(activeDeps.indexOf(deps[i]) != -1)
+		    setLatLongData(i);
+	    }
+	    
+	    $.each(polylines, function(i,p){if(p) p.setVisible(true); });
+	}
+	else if(polylines != null)
+	    $.each(polylines, function(i,p){if(p) p.setVisible(false); });
+        var checked = this.checked;
+        $("[id^=id_lines_]").prop('checked', checked);
+    });
+    $("[id^=id_lines_]").each(function(i) {
+        // TODO: This loads all deployments on first select
+        $(this).on('click', function() {
+            if(this.checked) {
+                if(oldLatLngIndex.length == 0)
+                    oldLatLngIndex = currPosDataIndex.slice();
+
+                if(polylines == null) {
+                    loadPolyline();
+                }
+
+                if(activeDeps.indexOf(deps[i]) != -1) {
+                    setLatLongData(i);
+                }
+                
+                polylines[i].setVisible(true);
+            }
+            else if(polylines != null)
+                polylines[i].setVisible(false);
+        });
+    });
     $("#id_heatmap").on('click', function(){
 	if($(this)[0].checked) {
 	    if(oldLatLngIndex.length == 0)
@@ -1724,31 +1818,30 @@ function initialize(){
 	}
 	else if(heatmaps != null)
 	    $.each(heatmaps, function(i, h) {if(h) h.setMap(null)});
+        var checked = this.checked;
+        $("[id^=id_heatmap_]").prop('checked',checked);
     });
-    $("#id_points").on('click', function() {
-        setMarkerVisibility($(this)[0].checked);
+    $("[id^=id_heatmap_]").each(function(i) {
+        // TODO: This loads all deployments on first select
+        $(this).on('click', function() {
+            if(this.checked) {
+                if(oldLatLngIndex.length == 0)
+                    oldLatLngIndex = currPosDataIndex.slice();
+
+                if(polylines == null) {
+                    loadHeatmap();
+                }
+
+                if(activeDeps.indexOf(deps[i]) != -1) {
+                    setLatLongData(i);
+                }
+                
+                heatmaps[i].setMap(map);
+            }
+            else if(polylines != null)
+                heatmaps[i].setMap(null);
+        });
     });
-    $("#id_lines").on('click', function() {
-	if($(this)[0].checked) {
-	    if(oldLatLngIndex.length == 0)
-		oldLatLngIndex = currPosDataIndex.slice();
-
-	    if(polylines == null) {
-		loadPolyline();
-	    }
-
-	    //changeSelectionHelper([oldLatLngIndex, [getPosIndex(selectedTimeRange[0], 'gte'), getPosIndex(selectedTimeRange[1], 'lte')]]);
-	    for(var i=0; i<deps.length; i++) {
-	    	if(activeDeps.indexOf(deps[i]) != -1)
-		    setLatLongData(i);
-	    }
-	    
-	    $.each(polylines, function(i,p){if(p) p.setVisible(true); });
-	}
-	else if(polylines != null)
-	    $.each(polylines, function(i,p){if(p) p.setVisible(false); });
-    });
-
 
     // Hard code the initial center latitude and longitude of the map
     self.lat = 38.487828027;
@@ -1934,7 +2027,7 @@ function initialize(){
     
     
     // Show site markers if site is checked in preferences
-    if ((sites_checked ==1) || ({{view_type|safe}} == "deployment")) { // TODO: What is that second condition??? for??
+    if ((sites_checked ==1)) { // || ({{view_type|safe}} == "deployment")) { // TODO: What is that second condition??? for??
         for (var i = 0; i < site_list.length; i++) {
             locations.push([
             site_list[i][3],  // [0]: site location lat
@@ -2048,106 +2141,67 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <a href={%url 'project:show-project' project.ID %}#deployments><h4><center>{{project.name}}</center></h4></a>
 {% endif %}
 
-{% if target_name %}
-<p><b>Target: </b>{{target_name}}</p>
-{% endif %}
-
-{% if transmitter_frequency %}
-<p><b>Transmitter Frequency: </b>{{transmitter_frequency}}</p>
-{% endif %}
-
 <div class = "sidebar-form">
 <div id ="prefs">
 <form id="form" action ="" name="settings" method="get">
-  <!-- <input type="submit" value="SUBMIT PREFERENCES" /> -->
-    <div class="sidebar-header">Data vvv<hr></div>
-    <div class="collapse in" id="data-section">
-        {% for field in form %} 
-	  {% if field.auto_id = "id_deployment" %}
-		<!-- Do nothing currently - prevents an extra <br> being added -->
-
-	{% elif field.auto_id = "id_datetime_from" or field.auto_id = "id_datetime_to" %}
-		
-		<b>{{field.label_tag}}</b> <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="YYYY-MM-DD HH:MM:SS (24hr)"> {{field}} </div>
-	 {% elif field.auto_id = "id_data_type" %}
-	 	<b>{{field.label_tag}}</b> {{field}}<br>
-	   {% endif %}
-	 {% endfor %}
+    <div class="sidebar-header">
+        Data<hr>
     </div>
-    <div>
-	{% for field in form %}
-	{% if field.auto_id = "id_datetime_from" or field.auto_id = "id_datetime_to" or field.auto_id = "id_data_type" %}
-	  {% elif field.auto_id = "id_likelihood_low" %}
-	  <table>
-			<tr>
-				<th></th>
-				<th>Min</th>
-				<th>Max</th>
-			</tr>
-			<tr>
-				<th>Likelihood</th>
-				<td>{{field}}</td>
-		{% elif field.auto_id = "id_likelihood_high" %}
-				<td>{{field}}</td>
-			</tr>
-			
-		{% elif field.auto_id = "id_activity_low" %}
-			<tr>
-				<th>Activity</th>
-				<td>{{field}}</td>
-				
-		{% elif field.auto_id = "id_activity_high" %}
-				<td>{{field}}</td>
-			</tr>
-        
-        	{% elif field.auto_id = "id_covariance_low" %}
-			<tr>
-				<th>Covariance</th>
-				<td>{{field}}</td>
-				
-		{% elif field.auto_id = "id_covariance_high" %}
-				<td>{{field}}</td>
-			</tr>
-            
-		</table>
-	</div>
-		{% elif field.auto_id = "id_deployment" %}
-	  	{% for dep in field %}
-		    <div class="sidebar-header">
-			<!-- TODO: Make clicking the label toggle the checkbox, maybe by giving it the right for. This is easy to do in Django 1.7+ -->
-		    <label for="id_deployment_{{dep.choice_label}}" style="font-weight: normal">
-			Deployment {{dep.choice_label}} 
-		    </label>
-		    <span>{{dep.tag}}</span>
-		    <hr>
-		    </div>
-		    <div class="collapse in">
-			<label for="id_points_{{dep.choice_label}}">
-			    Points
-			    <input type="checkbox" id="id_points_{{dep.choice_label}}" value="{{dep.choice_label}}"></input>
-			<label for="id_lines_{{dep.choice_label}}">
-			    Lines
-			    <input type="checkbox" id="id_lines_{{dep.choice_label}}" value="{{dep.choice_label}}"></input>
-			</label>
-			</label>
-			<label for="id_heatmap_{{dep.choice_label}}">
-			    Heatmap
-			    <input type="checkbox" id="id_heatmap_{{dep.choice_label}}" value="{{dep.choice_label}}"></input>
-			</label>
-		    </div>
-		{% endfor %}
-	  {% else %}
-		<b>{{field.label_tag}}</b> {{field}}<br>
-		
-	  {% endif %}
-	{% endfor %}
-  
+    <div class="collapse in" id="data-section">
+	{{form.datetime_from.label_tag}} <!-- id_datetime_from -->
+        <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="YYYY-MM-DD HH:MM:SS (24hr)"> {{form.datetime_from}}<br> </div>
+	{{form.datetime_to.label_tag}}
+        <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="YYYY-MM-DD HH:MM:SS (24hr)"> {{form.datetime_to}}<br> </div>
+        {{form.data_type.label_tag}} {{form.data_type}}<br>
+	<table>
+	    <tr>
+		<th></th>
+		<th>Min</th>
+		<th>Max</th>
+	    </tr>
+	    <tr>
+		<th>Likelihood</th>
+		<td>{{form.likelihood_low}}</td>
+		<td>{{form.likelihood_high}}</td>
+	    </tr>
+	    <tr>
+		<th>Activity</th>
+		<td>{{form.activity_low}}</td>
+		<td>{{form.activity_high}}</td>
+	    </tr>
+	</table>
+        {{form.graph_data.label_tag}}{{form.graph_data}}<br>
+    </div>
+    <div class="sidebar-header">
+        Display<hr>
+    </div>
+    <div class="collapse in">
+        {{form.sites.label_tag}} {{form.sites}}<br>
+        {{form.points.label_tag}} {{form.points}}<br>
+        {{form.colorpoints.label_tag}} {{form.colorpoints}}<br>
+        {{form.lines.label_tag}} {{form.lines}}<br>
+        {{form.heatmap.label_tag}} {{form.heatmap}}<br>
+    </div>
+    <div class="sidebar-header">Deployments<hr></div>
+    <div class="collapse in">
+    {% for dep in form.deployment %}
+        <div class="sidebar-header">
+            <label for="id_deployment_{{forloop.counter0}}" style="font-weight: normal">Deployment {{dep.choice_label}}</label>
+            {{dep.choice_label_tag}}
+            {{dep.tag}} <hr style="border-color: #CCCCCC">
+        </div>
+        <div id="id_deployment_options_{{forloop.counter0}}" class="collapse in">
+            <label for="id_points_{{forloop.counter0}}">Points</label>
+            <input type="checkbox" id="id_points_{{forloop.counter0}}" value="{{forloop.counter0}}"></input>
+            <label for="id_lines_{{forloop.counter0}}">Lines</label>
+            <input type="checkbox" id="id_lines_{{forloop.counter0}}" value="{{forloop.counter0}}"></input>
+            <label for="id_heatmap_{{forloop.counter0}}">Heatmap</label>
+            <input type="checkbox" id="id_heatmap_{{forloop.counter0}}" value="{{forloop.counter0}}"></input>
+        </div>
+    {% endfor %}
+    </div>
 </form>
 <!-- <font size="1">date range: 2013-08-13  13:57:16 to 2014-06-16 14:28:12</font> -->
-<div class="sidebar-header">Heatmap vvv<hr></div>
-<form class="collapse in" id="heatmap-form">
-    <b>Display Heatmap</b> <input id="id_heatmap" type="checkbox" name="heatmap">
-</form>
 </div><!-- end prefs -->
 
 <div class="section_title">

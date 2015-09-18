@@ -34,6 +34,9 @@
         <a href="edit-project">
             <input type="button" class="btn btn-primary btn-lg" value="Edit Project" name="" />
         </a>
+        <a href="{% url 'map:view_all_dep' project.ID %}">
+            <input type="button" class="btn btn-primary btn-lg" style="float:right" value="View All Deployments" name="" />
+        </a>
     </h3>
 </div>
 
