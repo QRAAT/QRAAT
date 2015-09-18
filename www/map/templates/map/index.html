@@ -126,7 +126,7 @@ function getGraphData(markers, sel_data){
 	data.data = [];
 	data.markers = [];
 	data.deployments = [];
-	outerloop: for(var i = currPosDataIndex[j][0]; i <= currPosDataIndex[j][1]; i++) {
+    outerloop: for(var i = currPosDataIndex[j][0]; i>=0 && i <= currPosDataIndex[j][1]; i++) {
 	    var flot_point = [rawPosData[j][i][2]*1000, rawPosData[j][i][graphTypeEnum[graph_data_type]]];
 	    for(var k=0; k<graphTypeIndex.length; k++) {
 		var val = rawPosData[j][i][graphTypeIndex[k]];
@@ -774,7 +774,7 @@ function updateData() {
 		second: ("0" + (theDate.getSeconds())).slice(-2), 
 		// + 1 second so we dont get the last point we already have from this query
 	    };
-	    return dT.year+"/"+dT.month+"/"+dT.day+" "+dT.hour+":"+dT.minute+":"+dT.second;
+	    return dT.year+"-"+dT.month+"-"+dT.day+" "+dT.hour+":"+dT.minute+":"+dT.second;
 	}
 
 	if(reqTimeFrom < userRequestedMaxTimeRange[0]) {
@@ -782,7 +782,10 @@ function updateData() {
 	    var depInds = getDepsInd(activeDeps);
 	    for(var j = 0; j<depInds.length; j++){
 		var depI = depInds[j];
-		var dataEarliestTime = rawPosData[depI][0][2];
+        if(rawPosDta[depI].length > 0)
+            var dataEarliestTime = rawPosData[depI][0][2];
+        else
+            var dataEarliestTime = Date.now()/1000 | 0;
 		var oldDateString = $("#id_datetime_to").val();
 		var dateEarliestString = timeToString(dataEarliestTime - 1); // -1 to not repeat a point
 		
@@ -1001,31 +1004,31 @@ function updateDataWraper() {
 
     // This waits until all requests (all deployments) for new data is done
     $.when.apply(null,dataRequests).done(function() {
-	// TODO: Make sure response is success 
-	$("#plot-div").data("plot").clearSelection();
-	resetTimeSlider();
+        // TODO: Make sure response is success 
+        $("#plot-div").data("plot").clearSelection();
+        resetTimeSlider();
 
-	$("#id_likelihood_low").val(graphFilters[0][0]);
-	$("#id_likelihood_high").val(graphFilters[0][1]);
-	$("#id_activity_low").val(graphFilters[1][0]);
-	$("#id_activity_high").val(graphFilters[1][1]);
-	if($("#id_graph_data option:selected").text() == "Likelihood") {
-	    $("#filter-slider").slider("values",[$("#id_likelihood_low").val(), $("#id_likelihood_high").val()]);
-	}
-	else if ($("#id_graph_data option:selected").text() == "Activity") {
-	    $("#filter-slider").slider("values",[$("#id_activity_low").val(), $("#id_activity_high").val()]);
-	}
-	//$("#filter-slider").slider("values",[0,1]);
-	//colorMarkers(); // Extraneous when creating a whole new markers_querydata, but w/e. Changing the filter-slider calls colorMarkers
-	document.getElementById('updateMap').disabled = false;
-	document.getElementById('updateMap').style.backgroundColor = '#DDD';
-	document.getElementById('page-overlay').style.visibility = 'hidden';
-	//return true; // To make it submit when you press enter?
+        $("#id_likelihood_low").val(graphFilters[0][0]);
+        $("#id_likelihood_high").val(graphFilters[0][1]);
+        $("#id_activity_low").val(graphFilters[1][0]);
+        $("#id_activity_high").val(graphFilters[1][1]);
+        if($("#id_graph_data option:selected").text() == "Likelihood") {
+            $("#filter-slider").slider("values",[$("#id_likelihood_low").val(), $("#id_likelihood_high").val()]);
+        }
+        else if ($("#id_graph_data option:selected").text() == "Activity") {
+            $("#filter-slider").slider("values",[$("#id_activity_low").val(), $("#id_activity_high").val()]);
+        }
+        //$("#filter-slider").slider("values",[0,1]);
+        //colorMarkers(); // Extraneous when creating a whole new markers_querydata, but w/e. Changing the filter-slider calls colorMarkers
+        document.getElementById('updateMap').disabled = false;
+        document.getElementById('updateMap').style.backgroundColor = '#DDD';
+        document.getElementById('page-overlay').style.visibility = 'hidden';
+        //return true; // To make it submit when you press enter?
     }).fail(function() {
-	alert('An error occured in getting the data, please refresh the page.');
-	document.getElementById('updateMap').disabled = false;
-	document.getElementById('updateMap').style.backgroundColor = '#DDD';
-	document.getElementById('page-overlay').style.visibility = 'hidden';
+        alert('An error occured in getting the data, please refresh the page.');
+        document.getElementById('updateMap').disabled = false;
+        document.getElementById('updateMap').style.backgroundColor = '#DDD';
+        document.getElementById('page-overlay').style.visibility = 'hidden';
     });
 }
 //TODO: Remove this after finishing updating-with-ajax
@@ -1068,6 +1071,7 @@ function loadMarkers(map, prepend) {
 	console.log("loading markers for a dep??");
 	if(markers_querydata[j] == null)
 	    markers_querydata[j] = [];
+    if(rawPosData[j].length==0) {continue;}
 	/*
 	if ( ((display_type != null) && (display_type==1) &&
 	(currPosDataIndex[1]-currPosDataIndex[0]> 0))

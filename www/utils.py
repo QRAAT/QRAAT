@@ -33,11 +33,11 @@ That timezone is specified in the timezoneinfo file as a string.
 Specifying the timezone instead of using local datetime functions may be redundant if your server is in the same timezone as your data, but doing so allows your server to be anywhere and allows easier extensibility if there's data from other locations.
 '''
 
-def strftime(date, PATTERN = "%Y/%m/%d %H:%M:%S"):
+def strftime(date, PATTERN = "%Y-%m-%d %H:%M:%S"):
     return date.strftime(PATTERN)
 
 # Returns a naive datetime
-def strptime(date_string, PATTERN = "%Y/%m/%d %H:%M:%S"):
+def strptime(date_string, PATTERN = "%Y-%m-%d %H:%M:%S"):
     try:
         return datetime.strptime(date_string, PATTERN)
     except Exception, e:
