@@ -124,6 +124,24 @@ rmg_dbarchive $RMG_BACKUP_DIR_DATABASE
 rmg_dbarchive archive_log $RMG_BACKUP_DIR_DATABASE
 echo $0 finished database dump `date`
 
+# Create a backup copy of the code repository
+tar zcf /rmg_server/QRAAT_deployment_code.tar.gz /rmg_server/QRAAT_deployment_code/
+if [ -e $RMG_BACKUP_CODE_DIR ]
+then
+	cp /rmg_server/QRAAT_deployment_code.tar.gz $RMG_BACKUP_CODE_DIR
+else
+	echo ERROR: missing environment variable for backup code directory path
+fi
+
+# Create a backup copy of the web directory
+tar zcf /rmg_server/www.tar.gz /var/www
+if [ -e $RMG_BACKUP_WWW_DIR ]
+then
+	cp /rmg_server/www.tar.gz $RMG_BACKUP_WWW_DIR
+else
+	echo ERROR: missing environment variable for backup www directory path
+fi
+
 # Check for secondary backup
 if [ -z "$RMG_BACKUP_DRIVE2" ]
 then

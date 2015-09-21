@@ -86,6 +86,8 @@ if [ ! -z "${RMG_BACKUP_DRIVE}" ]
 then
 	export RMG_BACKUP_DIR=${RMG_BACKUP_DRIVE}/backup${RMG_SERVER_DIR}
 	export RMG_BACKUP_ARCHIVE_DIR=$RMG_BACKUP_DIR/archive
+	export RMG_BACKUP_CODE_DIR=$RMG_BACKUP_DIR/code
+	export RMG_BACKUP_WWW_DIR=$RMG_BACKUP_DIR/www
 fi
 
 # Path for mount point of secondary backup drive2
