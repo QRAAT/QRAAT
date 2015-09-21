@@ -39,7 +39,6 @@ INITIAL_DATA_WINDOW = 60 * 60 * 4
 
 
 def get_context(request, deps=[], req_deps=[]):
-    print "in get_context"
     req_deps_list = req_deps.values_list('ID', flat=True)
     req_deps_IDs = []
     for dep in req_deps_list:
@@ -219,7 +218,6 @@ def get_context(request, deps=[], req_deps=[]):
         else:
             datetime_from = None 
 
-    print 'in get_context datetimefrom and to', datetime_from, datetime_to
   # Site locations
 
     sites = []
@@ -258,10 +256,6 @@ def get_context(request, deps=[], req_deps=[]):
         view_type = 'public'
     else:
         view_type = 'deployment'
-    print 'len deps', len(deps)
-    print 'len req_deps', len(req_deps)
-
-    print '------- req deps exists'
 
     queried_objects = []
     kwargs = {}
@@ -271,14 +265,11 @@ def get_context(request, deps=[], req_deps=[]):
         if int(data_type) == 1: # Raw positions
             for i in range(len(req_deps)):
                 queried_objects.append([])
-                print '----~~~~~ here, kwargs and ID', kwargs, req_deps[i].ID
                 queried_objects[i] = \
                     Position.objects.filter(deploymentID=req_deps[i].ID,
                         **kwargs)
         elif int(data_type) == 2: # Tracks
-            print '~~~~....... here, tracks'
             for i in range(len(req_deps)):
-                print '~~~....~~' ,req_deps[i].ID, kwargs['timestamp__gte'], kwargs['timestamp__lte']
                 queried_objects.append([])
                 queried_objects[i] = \
                     Position.objects.raw('''SELECT * FROM position
@@ -290,7 +281,6 @@ def get_context(request, deps=[], req_deps=[]):
                     kwargs['timestamp__gte'],
                     kwargs['timestamp__lte'],
                     ))
-            print 'here.....~~~~'
         else:
             raise Exception("data_type isn't 1 or 2")
 
@@ -394,7 +384,6 @@ def get_context(request, deps=[], req_deps=[]):
 def sort_query_results(queried_objects):
     ''' Choose highest likelihood position for each timestamp 
       and sort query data by timestamp. '''
-    print "in sort_query_results"
 
   # use dictionary to remove duplicates (positions with same timestamp)
     queried_data = []  # data ordered by timestamp
@@ -501,10 +490,10 @@ def view_by_dep(request, project_id, dep_id):
         pass  # public project
 
 
-    print '-----------------------------------------------------'
-    print request.GET
-    print request.POST
-    print '-----------------------------------------------------'
+    #print '-----------------------------------------------------'
+    #print request.GET
+    #print request.POST
+    #print '-----------------------------------------------------'
 
     try:
         q = Q()
@@ -514,7 +503,6 @@ def view_by_dep(request, project_id, dep_id):
     except ObjectDoesNotExist:
         raise Http404
 
-    print 'in index, deps ', deps
     context = get_context(request, deps, deps)
 
     nav_options = get_nav_options(request)
@@ -570,11 +558,7 @@ def get_data(request, project_id):
         except ObjectDoesNotExist:
             raise Http404
 
-    print 'in get_data about to get_context, deps is', deps
     context = get_context(request, deps, deps)
-    print '-----------------------------'
-    #print context['pos_data']
-    print '-----------------------------'
     response = HttpResponse(json.dumps(context['pos_data']), content_type="application/json")
     return response
 
@@ -613,7 +597,6 @@ def downloadKMLFile(request, project_id, dep_id, kml_type):
   dep_id = dep_id.split("+")
   dep_id = [int(i) for i in dep_id]
 
-  print kml_type
   trackPath='No'
   trackLocation='No'
   histogram='No'
