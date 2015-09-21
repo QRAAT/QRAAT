@@ -389,7 +389,6 @@ def main(deploymentIDs, trackPath, trackLocation, histogram, timeArray, latitude
   return createKML(deploymentIDs, radius, numberOfIntervals, trackPath, trackLocation, histogram, timeArray, latitudeArray, longitudeArray)
 
   ## Let user know the file is ready.
-  print 'kml is generated'
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7]))
