@@ -610,6 +610,9 @@ def get_latest_time(request, project_id, dep_id):
 
 ## modify the script from here
 def downloadKMLFile(request, project_id, dep_id, kml_type): 
+  dep_id = dep_id.split("+")
+  dep_id = [int(i) for i in dep_id]
+
   print kml_type
   trackPath='No'
   trackLocation='No'
@@ -633,8 +636,10 @@ def downloadKMLFile(request, project_id, dep_id, kml_type):
            or (user.has_perm("project.can_view")
                and (project.is_collaborator(user)
                     or project.is_viewer(user))):
-
-        deps = project.get_deployments().filter(ID=dep_id)
+        q = Q()
+        for dep in dep_id:
+            q = q | Q(ID = str(dep))
+        deps = project.get_deployments().filter(q)
       else:
         raise PermissionDenied #403
 
@@ -643,22 +648,30 @@ def downloadKMLFile(request, project_id, dep_id, kml_type):
 
 
   else:
-    deps = project.get_deployments().filter(ID=dep_id)
+    q = Q()
+    for dep in dep_id:
+        q = q | Q(ID = str(dep))
+    deps = project.get_deployments().filter(q)
   
   context = get_context(request, deps, deps)
 
+  depTargetNames = []
+  for dep in deps:
+    depTargetNames.append(dep.targetID.name)
+
   response = HttpResponse(content_type='application/vnd.google-earth.kml+xml')
-  response['Content-Disposition'] = 'attachement; filename="Deployment%s%s.kml"' % (dep_id,kml_type)
+  response['Content-Disposition'] = ('attachement; filename="Deployment%s%s.kml"' % (map(str,depTargetNames),kml_type)).replace("'","")
 
   timeArray=[] 
   latitudeArray=[] 
   longitudeArray=[]
-  for row in json.loads(context['pos_data']):
-    timeArray.append(row[2]) 
-    latitudeArray.append(row[8][0])
-    longitudeArray.append(row[8][1])
+  for dep in json.loads(context['pos_data']):
+      for row in dep:
+        timeArray.append(row[2]) 
+        latitudeArray.append(row[8][0])
+        longitudeArray.append(row[8][1])
 
-  kmlDoc = kmlGeneratorModule.main(dep_id, trackPath, trackLocation, histogram, timeArray, latitudeArray, longitudeArray)
+  kmlDoc = kmlGeneratorModule.main(depTargetNames, trackPath, trackLocation, histogram, timeArray, latitudeArray, longitudeArray)
   response.write(kmlDoc)
   return response
 

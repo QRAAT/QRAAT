@@ -143,14 +143,14 @@ def createPoints(kmlDoc, epochTime, latitude, longitude):
   pointElement.appendChild(coorElement)
   return placemarkElement
 
-def createTrack(kmlDoc, timeArray, longitudeArray, latitudeArray):
+def createTrack(kmlDoc, deploymentID, timeArray, longitudeArray, latitudeArray):
   placemarkElement = kmlDoc.createElement('Placemark')
   styleUrl= '#fox-icon'
   styleUrlElement = kmlDoc.createElement('styleUrl')
   styleUrlElement.appendChild(kmlDoc.createTextNode(styleUrl))
   placemarkElement.appendChild(styleUrlElement)
 
-  trackName = 'Track'
+  trackName = 'Track %s' % (deploymentID)
   nameElement = kmlDoc.createElement('name')
   nameElement.appendChild(kmlDoc.createTextNode(trackName))
   placemarkElement.appendChild(nameElement)
@@ -300,7 +300,7 @@ def meanTimeSampling(numberOfIntervals, timeArray, latitudeArray, longitudeArray
       
   return meanTimeArray, meanLatitudeArray, meanLongitudeArray
 
-def createKML(deploymentID, radius, numberOfIntervals, trackPath, trackLocation, histogram, timeArray, latitudeArray, longitudeArray):
+def createKML(deploymentIDs, radius, numberOfIntervals, trackPath, trackLocation, histogram, timeArray, latitudeArray, longitudeArray):
 
   kmlDoc = xml.dom.minidom.Document()
 
@@ -335,37 +335,38 @@ def createKML(deploymentID, radius, numberOfIntervals, trackPath, trackLocation,
       timeString = str(timeString)[0:10]+'T'+str(timeString)[11:25]
       convertedTime.append(timeString)
 
-  ##Create tracks if the setting is yes.
-  if (trackPath=='Yes'):
-    trackElement = createTrack(kmlDoc,convertedTime,meanLongitudeArray,meanLatitudeArray)
-    documentElement.appendChild(trackElement)
+  for dep in deploymentIDs:
+    ##Create tracks if the setting is yes.
+    if (trackPath=='Yes'):
+      trackElement = createTrack(kmlDoc,dep,convertedTime,meanLongitudeArray,meanLatitudeArray)
+      documentElement.appendChild(trackElement)
 
-  ##Create track locatoins if the setting is yes.
-  if (trackLocation=='Yes'):
-    folderElement = kmlDoc.createElement('Folder')
-    folderName = 'Track Locations'
-    nameElement = kmlDoc.createElement('name')
-    nameElement.appendChild(kmlDoc.createTextNode(folderName))
-    folderElement.appendChild(nameElement)
-    meanArrayLength = len(meanTimeArray)
-    for i in range(meanArrayLength):
-      placemarkElement = createPoints(kmlDoc, meanTimeArray[i], meanLatitudeArray[i], meanLongitudeArray[i])
-      folderElement.appendChild(placemarkElement)
-    documentElement.appendChild(folderElement)
+    ##Create track locatoins if the setting is yes.
+    if (trackLocation=='Yes'):
+      folderElement = kmlDoc.createElement('Folder')
+      folderName = 'Track Locations %s' % (dep)
+      nameElement = kmlDoc.createElement('name')
+      nameElement.appendChild(kmlDoc.createTextNode(folderName))
+      folderElement.appendChild(nameElement)
+      meanArrayLength = len(meanTimeArray)
+      for i in range(meanArrayLength):
+        placemarkElement = createPoints(kmlDoc, meanTimeArray[i], meanLatitudeArray[i], meanLongitudeArray[i])
+        folderElement.appendChild(placemarkElement)
+      documentElement.appendChild(folderElement)
 
-  ##Create histogram if the setting is yes.
-  if (histogram=='Yes'):
-    [altitudeArray, maxAltitude] = calculateAltitude(radius, latitudeArray, longitudeArray)
-    folderElement2 = kmlDoc.createElement('Folder')
-    folderName2 = 'Histogram'
-    nameElement2 = kmlDoc.createElement('name')
-    nameElement2.appendChild(kmlDoc.createTextNode(folderName2))
-    folderElement2.appendChild(nameElement2)
-    arrayLength=len(altitudeArray)
-    for i in range(arrayLength):
-      placemarkElement = createPlacemark(kmlDoc, altitudeArray[i], latitudeArray[i], longitudeArray[i], maxAltitude)
-      folderElement2.appendChild(placemarkElement)
-    documentElement.appendChild(folderElement2)
+    ##Create histogram if the setting is yes.
+    if (histogram=='Yes'):
+      [altitudeArray, maxAltitude] = calculateAltitude(radius, latitudeArray, longitudeArray)
+      folderElement2 = kmlDoc.createElement('Folder')
+      folderName2 = 'Histogram %s' % (dep)
+      nameElement2 = kmlDoc.createElement('name')
+      nameElement2.appendChild(kmlDoc.createTextNode(folderName2))
+      folderElement2.appendChild(nameElement2)
+      arrayLength=len(altitudeArray)
+      for i in range(arrayLength):
+        placemarkElement = createPlacemark(kmlDoc, altitudeArray[i], latitudeArray[i], longitudeArray[i], maxAltitude)
+        folderElement2.appendChild(placemarkElement)
+      documentElement.appendChild(folderElement2)
 
   ##Output the file.
   ##fileName = 'deployment%s_python.kml'%(deploymentID)
@@ -374,9 +375,8 @@ def createKML(deploymentID, radius, numberOfIntervals, trackPath, trackLocation,
 
   return kmlDoc.toprettyxml('  ', newl = '\n', encoding = 'utf-8')
 
-def main(deploymentID, trackPath, trackLocation, histogram, timeArray, latitudeArray, longitudeArray):
+def main(deploymentIDs, trackPath, trackLocation, histogram, timeArray, latitudeArray, longitudeArray):
   ## Set all the necessary parameters.
-  deploymentID = 124
   radius = 0.00016
   numberOfIntervals = 100
   
@@ -386,7 +386,7 @@ def main(deploymentID, trackPath, trackLocation, histogram, timeArray, latitudeA
     #longitudeArray[i]=float(longitudeArray[i])
   ## Create kml file with the given parameters.
 
-  return createKML(deploymentID, radius, numberOfIntervals, trackPath, trackLocation, histogram, timeArray, latitudeArray, longitudeArray)
+  return createKML(deploymentIDs, radius, numberOfIntervals, trackPath, trackLocation, histogram, timeArray, latitudeArray, longitudeArray)
 
   ## Let user know the file is ready.
   print 'kml is generated'

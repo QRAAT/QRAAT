@@ -15,7 +15,7 @@ urlpatterns = patterns('map.views',
     url(
         r'^project/(?P<project_id>\d+)/$', 'view_all_dep', name='view_all_dep'),
     url(
-        r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>\d+)/downloadKML/(?P<kml_type>.+)/$',
+        r'^project/(?P<project_id>\d+)/deployment/(?P<dep_id>[0-9]+(\+[0-9]+)*)/downloadKML/(?P<kml_type>.+)/$',
         'downloadKMLFile', name='downloadKMLFile'),
     url(r'^target/(?P<target_id>\d+)/$', 'view_by_target'),
     url(r'^transmitter/(?P<tx_id>\d+)/$', 'view_by_tx'),

@@ -1044,7 +1044,8 @@ function submitDownloadForm() {
 }
 
 function submitDownloadFormKML() {
-    document.getElementById('form').action = "downloadKML";
+    // TODO: Figure out why this doesn't automatically append /
+    document.getElementById('form').action = "downloadKML/"+$('#KMLtype').val()+"/";
     document.getElementById('form').submit();
 }
 
