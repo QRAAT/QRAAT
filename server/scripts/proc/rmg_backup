@@ -66,25 +66,25 @@ then
 		exit 1
 	fi
 fi
-echo Checking for backup archive directory: $RMG_BACKUP_ARCHIVE_DIR
-if [ ! -e $RMG_BACKUP_ARCHIVE_DIR ]
+echo Checking for backup archive directory: $RMG_BACKUP_DIR_ARCHIVE
+if [ ! -e $RMG_BACKUP_DIR_ARCHIVE ]
 then
-	echo WARNING: creating backup archive directory $RMG_BACKUP_ARCHIVE_DIR
-	mkdir $RMG_BACKUP_ARCHIVE_DIR
-	if [ ! -e $RMG_BACKUP_ARCHIVE_DIR ]
+	echo WARNING: creating backup archive directory $RMG_BACKUP_DIR_ARCHIVE
+	mkdir $RMG_BACKUP_DIR_ARCHIVE
+	if [ ! -e $RMG_BACKUP_DIR_ARCHIVE ]
 	then
-		echo ERROR: cannot create backup archive directory $RMG_BACKUP_ARCHIVE_DIR
+		echo ERROR: cannot create backup archive directory $RMG_BACKUP_DIR_ARCHIVE
 		exit 1
 	fi
 fi
 
-# Backup $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_ARCHIVE_DIR
+# Backup $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_DIR_ARCHIVE
 BACKUP_ARCHIVE_FILELIST=/var/log/rmg/rmg_backup_archive_rsynclog
-echo Copying files from $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_ARCHIVE_DIR
+echo Copying files from $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_DIR_ARCHIVE
 rm -f $BACKUP_ARCHIVE_FILELIST
 echo Logging to $BACKUP_ARCHIVE_FILELIST
 echo $0 starting primary backup `date`
-rsync -av --out-format='%n' $RMG_SERVER_ARCHIVE_DIR/  $RMG_BACKUP_ARCHIVE_DIR >$BACKUP_ARCHIVE_FILELIST
+rsync -av --out-format='%n' $RMG_SERVER_ARCHIVE_DIR/  $RMG_BACKUP_DIR_ARCHIVE >$BACKUP_ARCHIVE_FILELIST
 echo $0 finished primary backup `date`
 if [ $? -ne 0 ]
 then
@@ -126,21 +126,49 @@ echo $0 finished database dump `date`
 
 # Create a backup copy of the code repository
 tar zcf /rmg_server/QRAAT_deployment_code.tar.gz /rmg_server/QRAAT_deployment_code/
-if [ -e $RMG_BACKUP_CODE_DIR ]
+if [ -z $RMG_BACKUP_DIR_CODE ]
 then
-	cp /rmg_server/QRAAT_deployment_code.tar.gz $RMG_BACKUP_CODE_DIR
+	if [ ! -e $RMG_BACKUP_DIR_CODE ]
+	then
+		mkdir -p $RMG_BACKUP_DIR_CODE
+		if [ ! -e $RMG_BACKUP_DIR_CODE ]
+		then
+			echo ERROR: cannot create backup directory $RMG_BACKUP_DIR_CODE
+		fi
+	fi
+	if [ -e $RMG_BACKUP_DIR_CODE ]
+	then
+		cp /rmg_server/QRAAT_deployment_code.tar.gz $RMG_BACKUP_DIR_CODE
+	else
+		echo ERROR: missing directory $RMG_BACKUP_DIR_CODE, cannot backup code
+	fi
 else
-	echo ERROR: missing environment variable for backup code directory path
+	echo ERROR: missing environment variable for path to backup directory code
 fi
 
 # Create a backup copy of the web directory
 tar zcf /rmg_server/www.tar.gz /var/www
-if [ -e $RMG_BACKUP_WWW_DIR ]
+if [ -z $RMG_BACKUP_DIR_WWW ]
 then
-	cp /rmg_server/www.tar.gz $RMG_BACKUP_WWW_DIR
+	if [ ! -e $RMG_BACKUP_DIR_WWW ]
+	then
+		mkdir -p $RMG_BACKUP_DIR_WWW
+		if [ ! -e $RMG_BACKUP_DIR_WWW ]
+		then
+			echo ERROR: cannot create backup directory $RMG_BACKUP_DIR_WWW
+		fi
+	fi
+	if [ -e $RMG_BACKUP_DIR_WWW ]
+	then
+		cp /rmg_server/www.tar.gz $RMG_BACKUP_DIR_WWW
+	else
+		echo ERROR: missing directory $RMG_BACKUP_DIR_WWW, cannot backup www
+	fi
 else
-	echo ERROR: missing environment variable for backup www directory path
+	echo ERROR: missing environment variable for path to backup directory www
 fi
+
+
 
 # Check for secondary backup
 if [ -z "$RMG_BACKUP_DRIVE2" ]
