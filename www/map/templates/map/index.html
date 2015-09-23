@@ -349,6 +349,26 @@ function loadFlot(pos_markers, map, dep_id){
             }
             }
         });
+        // Gray overlay + text if no data
+        plot.hooks.drawOverlay.push(function(plot, ctx) {
+            var data = plot.getData();
+            for(var i=0; i<data.length; i++) {
+                if(data[i].data.length != 0) { return; }
+            }
+            
+            var plotOffset = plot.getPlotOffset();
+            var o = plot.getOptions();
+            ctx.save();
+            ctx.translate(plotOffset.left, plotOffset.top);
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = "#AAA"
+            ctx.fillRect(0,0,plot.width(),plot.height());
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = "#FDFDFD";
+            ctx.font = "40px sans-serif";
+            ctx.fillText("No Data", plot.width()/2-90, plot.height()/2+10);
+            ctx.restore();
+        });
         // Highlights the flot plot based on selecting the map
         plot.hooks.drawOverlay.push(function(plot, ctx) {
             var plotOffset = plot.getPlotOffset();
@@ -1131,7 +1151,7 @@ function loadMarkers(map, prepend) {
 			var url = ('static/cons/basedotpurple.png');
 		    }
 		} else {
-		    var iconnum = (((rawPosData[j][i][2]-rawPosData[j][currPosDataIndex[j][0]][2])/timeframe)*(99)) | 0;
+		    var iconnum = (((rawPosData[j][i][2] - selectedTimeRange[0]) / timeframe)* 99) | 0;
 		    var url = '/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png';
 		}
 		   
@@ -2306,7 +2326,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
         <div id="time-slider" style="height:13px; width:100%; display:table-cell; visibility:hidden"></div>
     </div>
     <div class="row-4" style="display:flex">
-        <div id="filter-slider" style="display:table-cell; width:13px; height:100%; visibility:hidden"></div>
+        <div id="filter-slider" style="display:table-cell; width:13px; height:100%; margin-bottom:8; visibility:hidden"></div>
         <div style="display:table-cell; width:100%" id="plot-div"></div>
     </div>
 </div> <!-- end ui-content -->

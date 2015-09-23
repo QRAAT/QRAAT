@@ -339,6 +339,8 @@ def get_context(request, deps=[], req_deps=[]):
     else: # No data at all
         kwargs['timestamp__gte'] = None
         kwargs['timestamp__lte'] = None
+        for i in range(len(req_deps)):
+            queried_objects.append([])
 
     queried_data = sort_query_results(queried_objects)
 
@@ -374,8 +376,8 @@ def get_context(request, deps=[], req_deps=[]):
         'graph_data': json.dumps(graph_data),
         'display_type': json.dumps(display_type),
         'data_type': json.dumps(data_type),
-        'datetime_from': kwargs['timestamp__gte'],
-        'datetime_to': kwargs['timestamp__lte']
+        'datetime_from': json.dumps(kwargs['timestamp__gte']),
+        'datetime_to': json.dumps(kwargs['timestamp__lte'])
         }
 
     return context
