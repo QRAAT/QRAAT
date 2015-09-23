@@ -311,77 +311,81 @@ function loadFlot(pos_markers, map, dep_id){
     
     // Gets the gradient colors before drawing the flot plot
     $.getJSON("/static/ramp255_0_0_0_255_0/values.json", function(data) {
-	redGreenRamp = data;
-       	var graph_data = getGraphData(pos_markers, sel_data);
+        redGreenRamp = data;
+        var graph_data = getGraphData(pos_markers, sel_data);
         plot = $.plot("#plot-div", graph_data, options);
-	console.log("after $.plot??");
-	// TODO: Move this into another js file of appearance customization maybe
-	/*
-	plot.hooks.drawOverlay[0] = function(plot, ctx) {
-            if (plot.getSelection()) {
-                var plotOffset = plot.getPlotOffset();
-                var o = plot.getOptions();
-                ctx.save();
-                ctx.translate(plotOffset.left, plotOffset.top);
-                var c = $.color.parse(o.selection.color);
-                ctx.strokeStyle = c.scale("a", .8).toString();
-                ctx.lineWidth = 1;
-                ctx.lineJoin = o.selection.shape;
-                ctx.fillStyle = c.scale("a", .4).toString();
-                var x = Math.min(selection.first.x, selection.second.x) + .5,
-                    y = Math.min(selection.first.y, selection.second.y) + .5,
-                    w = Math.abs(selection.second.x - selection.first.x) - 1,
-                    h = Math.abs(selection.second.y - selection.first.y) - 1;
-                //ctx.fillRect(x, y, w, h);
-                ctx.strokeRect(x, y, w, h);
-                ctx.restore()
+        console.log("after $.plot??");
+        // TODO: Move this into another js file of appearance customization maybe
+        /*
+        plot.hooks.drawOverlay[0] = function(plot, ctx) {
+                if (plot.getSelection()) {
+                    var plotOffset = plot.getPlotOffset();
+                    var o = plot.getOptions();
+                    ctx.save();
+                    ctx.translate(plotOffset.left, plotOffset.top);
+                    var c = $.color.parse(o.selection.color);
+                    ctx.strokeStyle = c.scale("a", .8).toString();
+                    ctx.lineWidth = 1;
+                    ctx.lineJoin = o.selection.shape;
+                    ctx.fillStyle = c.scale("a", .4).toString();
+                    var x = Math.min(selection.first.x, selection.second.x) + .5,
+                        y = Math.min(selection.first.y, selection.second.y) + .5,
+                        w = Math.abs(selection.second.x - selection.first.x) - 1,
+                        h = Math.abs(selection.second.y - selection.first.y) - 1;
+                    //ctx.fillRect(x, y, w, h);
+                    ctx.strokeRect(x, y, w, h);
+                    ctx.restore()
+                }
+            };
+        */
+        // Gets the index of the series currently being drawn
+        // TODO: Do i still need this?
+        plot.hooks.drawSeries.push(function(plot, ctx, series) {
+            seriesDepInd = -1;
+            for(var i = 0; i<deps.length; i++) {
+            if(deps[i] == series.label){
+                seriesDepInd = i;
+                break;
             }
-        };
-	*/
-	// Gets the index of the series currently being drawn
-	// TODO: Do i still need this?
-	plot.hooks.drawSeries.push(function(plot, ctx, series) {
-	    seriesDepInd = -1;
- 	    for(var i = 0; i<deps.length; i++) {
-		if(deps[i] == series.label){
-		    seriesDepInd = i;
-		    break;
-		}
-	    }
-	});
-	// Highlights the flot plot based on selecting the map
-	plot.hooks.drawOverlay.push(function(plot, ctx) {
-	    var plotOffset = plot.getPlotOffset();
-	    var o = plot.getOptions();
-	    ctx.save();
-	    ctx.translate(plotOffset.left, plotOffset.top);
-	    ctx.globalAlpha = 0.5;
+            }
+        });
+        // Highlights the flot plot based on selecting the map
+        plot.hooks.drawOverlay.push(function(plot, ctx) {
+            var plotOffset = plot.getPlotOffset();
+            var o = plot.getOptions();
+            ctx.save();
+            ctx.translate(plotOffset.left, plotOffset.top);
+            ctx.globalAlpha = 0.5;
 
-	    // TODO: ? Assumes selMapTimes has the times of the active deployments.
-	    var depInds = getDepsInd(activeDeps);
-	    for(var j=0; j<selMapTimes.length; j++) {
-	    	var depI = depInds[j];
-	     	ctx.fillStyle = colors[depI%4];
-		ctx.strokeStyle = colors[depI%4];
-		var xaxis = plot.getAxes().xaxis;
-		for(var i = 0; i < selMapTimes[j].length; i++) {
-		    var x = xaxis.p2c(selMapTimes[j][i][0]*1000),
-			y = 0,
-			w = xaxis.p2c(selMapTimes[j][i][1]*1000)-x,
-			h = plot.height();
-		    ctx.fillRect(x,y,w,h);
-		    ctx.strokeRect(x,y,w,h);
-		}
-	    }
-	    ctx.restore()
-	});
+            // TODO: ? Assumes selMapTimes has the times of the active deployments.
+            var depInds = getDepsInd(activeDeps);
+            for(var j=0; j<selMapTimes.length; j++) {
+                var depI = depInds[j];
+                ctx.fillStyle = colors[depI%4];
+            ctx.strokeStyle = colors[depI%4];
+            var xaxis = plot.getAxes().xaxis;
+            for(var i = 0; i < selMapTimes[j].length; i++) {
+                var x = xaxis.p2c(selMapTimes[j][i][0]*1000),
+                y = 0,
+                w = xaxis.p2c(selMapTimes[j][i][1]*1000)-x,
+                h = plot.height();
+                ctx.fillRect(x,y,w,h);
+                ctx.strokeRect(x,y,w,h);
+            }
+            }
+            ctx.restore()
+        });
 
-	xaxis = $("#plot-div").data("plot").getAxes().xaxis;
-	yaxis = $("#plot-div").data("plot").getAxes().yaxis;
-	$("#time-slider")[0].style.marginLeft = plot.getPlotOffset().left + "px";
-	$("#time-slider")[0].style.marginRight = plot.getPlotOffset().right + "px";
-	$("#filter-slider")[0].style.marginTop = plot.getPlotOffset().top + "px";
-	$("#filter-slider")[0].style.marginBottom = plot.getPlotOffset().bottom + "px";
+        //xaxis = $("#plot-div").data("plot").getAxes().xaxis;
+        //yaxis = $("#plot-div").data("plot").getAxes().yaxis;
+        xaxis = plot.getAxes().xaxis;
+        yaxis = plot.getAxes().yaxis;
+        $("#time-slider").css("marginLeft",$("#plot-div").data("plot").getPlotOffset().left + "px");
+        $("#time-slider").css("marginRight",$("#plot-div").data("plot").getPlotOffset().right + "px");
+        $("#time-slider").css("visibility","");
+        $("#filter-slider").css("marginTop",$("#plot-div").data("plot").getPlotOffset().top + "px");
+        $("#filter-slider").slider().height(plot.height());
+        $("#filter-slider").css("visibility","");
         flotPlotWidth = plot.width();
         flotSelectedRange[0] = 0;
         flotSelectedRange[1] = flotPlotWidth;
@@ -490,11 +494,18 @@ function loadFlot(pos_markers, map, dep_id){
     $("#plot-div").resize(function () {
         var oldFlotPlotWidth = flotPlotWidth;
         flotPlotWidth = $(this).width();
-	$("#time-slider")[0].style.marginLeft = $(this).data("plot").getPlotOffset().left + "px";
-	$("#time-slider")[0].style.marginRight = $(this).data("plot").getPlotOffset().right + "px";
+        var offset = plot.getPlotOffset();
+        $("#time-slider").css("marginLeft",offset.left + "px");
+        $("#time-slider").css("marginRight",offset.right + "px");
+        $("#time-slider").css("visibility","");
+        $("#filter-slider").css("marginTop",offset.top + "px");
+        $("#filter-slider").css("marginBottom",offset.bottom + "px");
+        $("#filter-slider").slider().height($(this).height()-offset.top-offset.bottom);
+        $("#filter-slider").css("visibility","");
+        
         flotSelectedRange[1]=flotPlotWidth;
         flotSelectedWidth = flotSelectedRange[1]-flotSelectedRange[0];
-	plot.draw();
+        plot.draw();
     });
 }
 
@@ -708,6 +719,17 @@ function getPosIndex(timestamp,depInd,searchDirection) {
 	    return -1;
     }
 }
+
+function updateNumPoints() {
+    var lengths = [];
+    $.each(currPosDataIndex, function(i,indices) {
+        if(indices && indices[1] != 0)
+            lengths.push(indices[1]-indices[0]+1);
+        else
+            lengths.push(0);
+    });
+    $("#num_points").html("<b>No. of points: </b>"+lengths.join(" | "));
+}
 function updateData() {
     setGraphFilters();
     var ajaxRequests = [];
@@ -782,7 +804,7 @@ function updateData() {
 	    var depInds = getDepsInd(activeDeps);
 	    for(var j = 0; j<depInds.length; j++){
 		var depI = depInds[j];
-        if(rawPosDta[depI].length > 0)
+        if(rawPosData[depI].length > 0)
             var dataEarliestTime = rawPosData[depI][0][2];
         else
             var dataEarliestTime = Date.now()/1000 | 0;
@@ -1023,6 +1045,7 @@ function updateDataWraper() {
         document.getElementById('updateMap').disabled = false;
         document.getElementById('updateMap').style.backgroundColor = '#DDD';
         document.getElementById('page-overlay').style.visibility = 'hidden';
+        updateNumPoints();
         //return true; // To make it submit when you press enter?
     }).fail(function() {
         alert('An error occured in getting the data, please refresh the page.');
@@ -1667,40 +1690,49 @@ function initialize(){
     */
     $("input[name='deployment']").prop('checked', true);
     $.each(deps, function(i, dep) {
-	$("#id_deployment_" + i).on('click', function(e) {
-	    //var dep = deps[i]; //parseFloat($(this).prop('value'));
-	    if($(this)[0].checked) {
-                $("#id_deployment_options_"+i+" :input").each(function() {
-                    this.disabled=false;
-                });
-		activeDeps.push(dep);
-		// Maintain order of deployments
-		var temp = [];
-		for(var j=0; j<deps.length; j++) {
-		    if(activeDeps.indexOf(deps[j]) != -1)
-			temp.push(deps[j]);
-		}
-		activeDeps = temp;
-		// TODO: There wll be cases where nothing has changed in between hiding/showing the heatmap/lines
-		setLatLongData(i);
-		if(heatmaps && heatmaps[i]) heatmaps[i].setMap(null);
-		if(polylines && polylines[i]) polylines[i].setVisible(true);
+        $("#id_deployment_" + i).prev().css("background-color", colors[i%4]);
+        $("#id_deployment_" + i).on('click', function(e) {
+            //var dep = deps[i]; //parseFloat($(this).prop('value'));
+            if($(this)[0].checked) {
+                    $("#id_deployment_options_"+i+" :input").each(function() {
+                        this.disabled=false;
+                    });
+            activeDeps.push(dep);
+            // Maintain order of deployments
+            var temp = [];
+            for(var j=0; j<deps.length; j++) {
+                if(activeDeps.indexOf(deps[j]) != -1)
+                temp.push(deps[j]);
+            }
+            activeDeps = temp;
+            // TODO: There wll be cases where nothing has changed in between hiding/showing the heatmap/lines
+            setLatLongData(i);
+            if(heatmaps && heatmaps[i]) heatmaps[i].setMap(null);
+            if(polylines && polylines[i]) polylines[i].setVisible(true);
 
-	    } 
-	    else {
-                $("#id_deployment_options_"+i+" :input").each(function() {
-                    this.disabled=true;
-                });
-	    	activeDeps.splice(activeDeps.indexOf(dep),1);
-		if(heatmaps && heatmaps[i]) heatmaps[i].setMap(map);
-		if(polylines && polylines[i]) polylines[i].setVisible(false);
-	    }
-	updateFlot(markers_querydata);
-	colorMarkers();
-        e.stopPropagation(); // To stop it from collapsing its contents
-	});
+            } 
+            else {
+                    $("#id_deployment_options_"+i+" :input").each(function() {
+                        this.disabled=true;
+                    });
+                activeDeps.splice(activeDeps.indexOf(dep),1);
+            if(heatmaps && heatmaps[i]) heatmaps[i].setMap(map);
+            if(polylines && polylines[i]) polylines[i].setVisible(false);
+            }
+            updateFlot(markers_querydata);
+            colorMarkers();
+            e.stopPropagation(); // To stop it from collapsing its contents
+        });
     });
-    $(".sidebar-header").on('click', function(){$(this).next().collapse('toggle');});
+    $(".sidebar-header").on('click', function(){
+        if($(this).attr('clicked')=="true") {
+            $(this).attr('clicked', "false");    
+        }
+        else {
+            $(this).attr('clicked', "true");
+        }
+        $(this).next().collapse('toggle');
+    });
 
     // Initialize timezoneJS which we use for the flot time axis
     // Copied it from est_status.html. TODO: Should this be changed
@@ -2102,6 +2134,7 @@ function initialize(){
     rawPosData = {{pos_data|safe}};
     console.log("rawposdata", rawPosData);
     for(var i = 0; i<deps.length; i++) currPosDataIndex[i] = [0, rawPosData[i].length-1]; // = [0, rawPosData[i].length-1 > 0 ? rawPosData[i].length-1 : 0];
+    updateNumPoints();
     selectedTimeRange = [{{datetime_from}}, {{datetime_to}}];
     userRequestedMaxTimeRange = [{{datetime_from}}, {{datetime_to}}];
 
@@ -2150,7 +2183,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <div id ="prefs">
 <form id="form" action ="" name="settings" method="get">
     <div class="sidebar-header">
-        Data<hr>
+        Data<span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr>
     </div>
     <div class="collapse in" id="data-section">
 	{{form.datetime_from.label_tag}} <!-- id_datetime_from -->
@@ -2178,7 +2211,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
         {{form.graph_data.label_tag}}{{form.graph_data}}<br>
     </div>
     <div class="sidebar-header">
-        Display<hr>
+        Display<span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr>
     </div>
     <div class="collapse in">
         {{form.sites.label_tag}} {{form.sites}}<br>
@@ -2187,13 +2220,15 @@ google.maps.event.addDomListener(window, 'load', initialize);
         {{form.lines.label_tag}} {{form.lines}}<br>
         {{form.heatmap.label_tag}} {{form.heatmap}}<br>
     </div>
-    <div class="sidebar-header">Deployments<hr></div>
+    <div class="sidebar-header">
+        Deployments<span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr>
+    </div>
     <div class="collapse in">
     {% for dep in form.deployment %}
         <div class="sidebar-header">
-            <label for="id_deployment_{{forloop.counter0}}" style="font-weight: normal">Deployment {{dep.choice_label}}</label>
-            {{dep.choice_label_tag}}
-            {{dep.tag}} <hr style="border-color: #CCCCCC">
+            <label for="id_deployment_{{forloop.counter0}}" style="font-weight: normal">{{dep.choice_label}}</label>
+            <span class="circle"></span>
+            {{dep.tag}} <span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr style="border-color: #CCCCCC">
         </div>
         <div id="id_deployment_options_{{forloop.counter0}}" class="collapse in">
             <label for="id_points_{{forloop.counter0}}">Points</label>
@@ -2233,12 +2268,15 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <font size="2">
 <!-- View Type: {{view_type}} <br>-->
 {% if positions %}
-<b>No. of points displayed</b>: {{positions|length}}
+<div id="num_points">
+<b>No. of points</b>: 
+</div>
 
-{% if deps|length > 1 %} <br><b>Line Colors: Blue</b>: {{deps.0}} | <b>Red:</b> {{deps.1}}{% endif %}
+{% if deps|length > 1 %}  <b>Line Colors: Blue</b>: {{deps.0}} | <b>Red:</b> {{deps.1}}
 {% if deps|length > 2 %} | <b>Green:</b> {{deps.2}}{% endif %}
 {% if deps|length > 3 %} | <b>Yellow:</b> {{deps.3}}{% endif %}
 <br>
+{% endif %}
 
 {% endif %} <!-- endif for positions -->
 
@@ -2263,19 +2301,17 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <div class="ui-content">
     <div class='page-overlay' id='page-overlay'><img class='spinner centered' src='/static/map/css/ajax-loader.gif'></div>    
     <div class="row-3" id="map-canvas"></div> <!-- end row-3, map-canvas -->
-    <div class="row-5" id="time-slider"></div> <!-- TODO: What is the class for -->
-    {% if positions %}
-    <!-- FLOT CHART -->
-    <div id="flot-div">
-    <div class="row-4 flex">
+    <div style="display:flex; height:16px">
+        <div style="width:13px; display:table-cell">&nbsp;</div>
+        <div id="time-slider" style="height:13px; width:100%; display:table-cell; visibility:hidden"></div>
+    </div>
+    <div class="row-4" style="display:flex">
+        <div id="filter-slider" style="display:table-cell; width:13px; height:100%; visibility:hidden"></div>
+        <div style="display:table-cell; width:100%" id="plot-div"></div>
+    </div>
+</div> <!-- end ui-content -->
 	<center>
 	<!-- uncomment next line for small overview graph -->
   <!--   <div id="overview" class="demo-placeholder" style="float: right; width: 100px; height: 125px;"></div> -->
 	</center>
-	<div id="filter-slider" style="height: 100%"></div>
-	<div class="row-2" id="plot-div"></div> <!-- end row-2, plot-div -->
-	</div>  <!-- end row-4 -->
-    </div>
-</div> <!-- end ui-content -->
-{% endif %} <!-- end if positions (if there is query data) -->
 {% endblock %} <!-- end content block -->
