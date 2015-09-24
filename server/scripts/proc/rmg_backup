@@ -48,6 +48,21 @@ then
 	exit 1
 fi
 
+# Paths for subdirectories of rmg_server directory on backup drive
+if [ ! -z "${RMG_BACKUP_DRIVE}" ]
+then
+	export RMG_BACKUP_DIR=${RMG_BACKUP_DRIVE}/backup${RMG_SERVER_DIR}
+	export RMG_BACKUP_DIR_ARCHIVE=$RMG_BACKUP_DIR/archive
+	export RMG_BACKUP_DIR_CODE=$RMG_BACKUP_DIR/code
+	export RMG_BACKUP_DIR_WWW=$RMG_BACKUP_DIR/www
+fi
+
+# Paths for subdirectories of rmg_server directory on secondary backup drive
+if [ ! -z "${RMG_BACKUP_DRIVE2}" ]
+then
+	export RMG_BACKUP_DIR2=${RMG_BACKUP_DRIVE2}/backup${RMG_SERVER_DIR}
+fi
+
 # Check destination directories
 echo Checking for backup drive: $RMG_BACKUP_DRIVE
 if [ ! -e $RMG_BACKUP_DRIVE ]
@@ -126,7 +141,7 @@ echo $0 finished database dump `date`
 
 # Create a backup copy of the code repository
 tar zcf /rmg_server/QRAAT_deployment_code.tar.gz /rmg_server/QRAAT_deployment_code/
-if [ -z $RMG_BACKUP_DIR_CODE ]
+if [ -z "$RMG_BACKUP_DIR_CODE" ]
 then
 	if [ ! -e $RMG_BACKUP_DIR_CODE ]
 	then
@@ -143,12 +158,12 @@ then
 		echo ERROR: missing directory $RMG_BACKUP_DIR_CODE, cannot backup code
 	fi
 else
-	echo ERROR: missing environment variable for path to backup directory code
+	echo ERROR: missing environment variable RMG_BACKUP_DIR_CODE
 fi
 
 # Create a backup copy of the web directory
 tar zcf /rmg_server/www.tar.gz /var/www
-if [ -z $RMG_BACKUP_DIR_WWW ]
+if [ -z "$RMG_BACKUP_DIR_WWW" ]
 then
 	if [ ! -e $RMG_BACKUP_DIR_WWW ]
 	then
@@ -165,10 +180,8 @@ then
 		echo ERROR: missing directory $RMG_BACKUP_DIR_WWW, cannot backup www
 	fi
 else
-	echo ERROR: missing environment variable for path to backup directory www
+	echo ERROR: missing environment variable RMG_BACKUP_DIR_WWW
 fi
-
-
 
 # Check for secondary backup
 if [ -z "$RMG_BACKUP_DRIVE2" ]
@@ -208,11 +221,9 @@ else
 fi
 
 # Sync frontend server
-if [ -z "$RMG_BACKUP_DRIVE2" ]
+if [ ! -z "$RMG_BACKUP_DRIVE2" ]
 then
-	echo RMG_BACKUP_DRIVE2 is not set, files not copied to frontend server
-	#TODO Try copying files from RMG_BACKUP_DRIVE instead
-else
+	# use backup drive 2
 	echo Checking for backup drive: $RMG_BACKUP_DRIVE2
 	if [ ! -e $RMG_BACKUP_DRIVE2 ]
 	then
@@ -237,6 +248,35 @@ else
 	then
 		echo Error in rsync, bailing out
 	fi
+elif [ ! -z "$RMG_BACKUP_DRIVE" ]
+	# use backup drive
+	echo ERROR: RMG_BACKUP_DRIVE2 not set, using RMG_BACKUP_DRIVE
+	echo Checking for backup drive: $RMG_BACKUP_DRIVE
+	if [ ! -e $RMG_BACKUP_DRIVE ]
+	then
+		echo ERROR: backup drive $RMG_BACKUP_DRIVE not found
+		exit 1
+	fi
+	echo Checking for backup directory: $RMG_BACKUP_DIR
+	if [ ! -e $RMG_BACKUP_DIR ]
+	then
+		echo ERROR: backup directory $RMG_BACKUP_DIR not found
+		exit 1
+	fi
+	RMG_BACKUP_DIR_DATABASE=$RMG_BACKUP_DIR/database
+	RMG_BACKUP_FRONTEND_DATABASE=$RMG_BACKUP_FRONTEND/database
+	echo Copying database files from $RMG_BACKUP_DIR_DATABASE/ to $RMG_BACKUP_FRONTEND_DATABASE
+	BACKUP_FRONTEND_RSYNCLOG=/var/log/rmg/rmg_backup_frontend_rsynclog
+	echo Logging to $BACKUP_FRONTEND_RSYNCLOG
+	echo $0 starting frontend backup `date`
+	rsync -ravz --bwlimit=80 $RMG_BACKUP_DIR_DATABASE/ $RMG_BACKUP_FRONTEND_DATABASE >$BACKUP_FRONTEND_RSYNCLOG
+	echo $0 finished frontend backup `date`
+	if [ $? -ne 0 ]
+	then
+		echo Error in rsync, bailing out
+	fi
+else
+	echo ERROR: no backup drives set, skipping frontend backup
 fi
 
 echo Finished $0 at `date`
