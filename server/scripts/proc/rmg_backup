@@ -249,6 +249,7 @@ then
 		echo Error in rsync, bailing out
 	fi
 elif [ ! -z "$RMG_BACKUP_DRIVE" ]
+then
 	# use backup drive
 	echo ERROR: RMG_BACKUP_DRIVE2 not set, using RMG_BACKUP_DRIVE
 	echo Checking for backup drive: $RMG_BACKUP_DRIVE
