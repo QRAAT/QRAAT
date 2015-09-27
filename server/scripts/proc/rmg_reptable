@@ -1,0 +1,565 @@
+#!/usr/bin/perl
+#rmg_rep_2a
+
+# Version 2 of the replication script, using perl instead of bash.
+# Version 2a reads the configuration information from a database table called rep_config, containing these columns:
+#
+#	rep_config
+#
+#	ID		Always have an ID :)
+#	tablename	The name of the table to be replicated
+#	idname		The name of the ID column, needed because not all tables have a column called ID
+#	replicate	Flag to enable replication for this table
+#	reverse		Flag to indicate that the table should be replicated in the reverse direction
+#	incremental	Flag to indicate that the table should be replicated incrementally from the lastid value
+#	lastid		The maximum value of the idname column that was last replicated
+#
+# This script assumes it's running on the frontend server and the default replication direction is from backend to frontend.
+# When the table entry in the rep_config table has its 'reverse' column set, replication is from frontend to backend (not implemented yet).
+# Blame: Marcel Losekoot
+
+use strict ;
+use warnings ;
+use DBI ;	# for database connector
+
+my $Testing = 0 ;	# Set to 1 to disabled replication command, used for testing the rest of the code.
+my $Env_rmg_server_db_auth = "RMG_SERVER_DB_AUTH" ;
+my $View_Frontend = 'repfrontend' ;	# the name of the view that represents the frontend server
+my $View_Backend = 'repbackend' ;	# the name of the view that represents the backend server
+my $Normal_port = "3306" ;
+my $Tunnel_used = 1 ;	# Set to 1 to redirect mysql traffic through the tunnel.
+# For now, we assume the tunnel is prevously setup, using: ssh -N -L 13306:localhost:3306 replicator@rmgs 
+my $Tunnel_port = "13306" ;
+my $Tunnel_host = "127.0.0.1" ;
+
+my $Config_Table_Name = "rep_config" ;	# The name of the table containing a list of tables to replicate.
+
+my @TableNames = () ;
+
+sub usage()
+{
+	print "Usage: $0 all|table\n" ;
+	print "Replicates qraat database tables from $View_Backend to $View_Frontend, defined in $Env_rmg_server_db_auth.\n" ;
+	print "If given a table name, will replicate only that table, if given 'all' will replicate all eligible tables.\n" ;
+	#print "The list of replicated tables is:\n" ;
+	#listtables(1) ;	# replicate == 1
+	#print "The list of tables not replicated is:\n" ;
+	#listtables(0) ;	# replicate == 0
+	return 1 ;
+}
+
+sub listtables($$)
+{
+	my ( $do_rep, $tables ) = @_ ;
+	my @keys = sort keys %$tables ;
+	foreach my $key ( @keys )
+	{
+		my $reftablehash = $tables->{$key} ;
+		my $show_table = 0 ;
+		if( not defined $do_rep )
+		{
+			$show_table = 1 ;
+		}
+		if( (defined $do_rep) && ($reftablehash->{replicate} == $do_rep) )
+		{
+			$show_table = 1 ;
+		}
+		if( $show_table )
+		{
+			printf "%25s",$reftablehash->{tablename} ;
+			print "\treplicate=$reftablehash->{replicate} incremental=$reftablehash->{incremental} reverse=$reftablehash->{reverse}\n" ;
+		}
+	}
+}
+
+sub main
+{
+	my $argc = scalar @ARGV ;
+	my $err = 0 ;
+	if( $argc < 1 )
+	{
+		usage() ;
+		return 1 ;
+	}
+	my $credentials = get_credentials() ;
+	if( not defined $credentials )
+	{
+		return 1 ;
+	}
+	#show_credentials($credentials) ;
+	my $tables = get_tables($credentials) ;
+	if( not defined $tables )
+	{
+		return 1 ;
+	}
+	#show_tables($tables) ;
+	# $tables is a reference to a hash of hashes
+	my $tablename = $ARGV[0] ;
+	if( $tablename =~ /^all$/i )
+	{
+		$err = replicate_all_tables($credentials,$tables) ;
+	}
+	else
+	{
+		my $tabledata = findtable($tablename,$tables) ;
+		if( not defined $tabledata )
+		{
+			print "Unknown table '$tablename'. Known tables are:\n" ;
+			listtables(undef,$tables) ;
+			return 1 ;
+		}
+		$err = replicate_table($tabledata,$credentials) ;
+	}
+	return $err ;
+}
+
+my %Credentials =
+(
+	$View_Backend =>
+	{
+		host => "",
+		user => "",
+		password => "",
+		name => "",	# db name
+	},
+	$View_Frontend =>
+	{
+		host => "",
+		user => "",
+		password => "",
+		name => "",	# db name
+	},
+) ;
+
+sub get_credentials()
+{
+	my $rmg_server_db_auth = $ENV{$Env_rmg_server_db_auth} ;
+	if( (not defined $rmg_server_db_auth) || ($rmg_server_db_auth eq ""))
+	{
+		print "Environment variable $Env_rmg_server_db_auth is not defined.\n" ;
+		print "Run 'source rmg_env' first\n" ;
+		return undef ;
+	}
+	my @views = keys %Credentials ;
+	foreach my $view ( @views )
+	{
+		my @columns = keys $Credentials{$view} ;
+		foreach my $column ( @columns )
+		{
+			my $value = `rmg_csv --row view=$view $column <$rmg_server_db_auth` ;
+			chomp($value) ;
+			$Credentials{$view}{$column} = $value ; 
+		}
+	}
+	$Credentials{$View_Frontend}{port} = $Normal_port ;
+	if( $Tunnel_used )
+	{
+		# port redirection for tunnel to View_Backend
+		$Credentials{$View_Backend}{port} = $Tunnel_port ;
+		$Credentials{$View_Backend}{host} = $Tunnel_host ;
+	}
+	return \%Credentials ;
+}
+
+sub show_credentials($)
+{
+	my ( $ref_creds ) = @_ ;
+	my @views = keys %$ref_creds ;
+	foreach my $view ( @views )
+	{
+		my @columns = keys $ref_creds->{$view} ;
+		foreach my $column ( @columns )
+		{
+			my $value = $ref_creds->{$view}{$column} ;
+			print "$view $column = $value\n" ;
+		}
+	}
+}
+
+sub get_tables($)	# reads configuration data from the database and returns a hash with the data
+{
+	my ( $ref_creds ) = @_ ;
+	my %tables = () ;
+	my $host = $ref_creds->{$View_Frontend}{host} ;
+	my $port = $ref_creds->{$View_Frontend}{port} ;
+	my $user = $ref_creds->{$View_Frontend}{user} ;
+	my $password = $ref_creds->{$View_Frontend}{password} ;
+	my $database = $ref_creds->{$View_Frontend}{name} ;
+	my $dbh = opendatabase($host,$port,$user,$password,$database) ;
+	if( not defined $dbh )
+	{
+		print "Cannot open database '$database'\n" ;
+		closedatabase($dbh) ;
+		return undef ;
+	}
+	my $query = "SELECT count(*) from information_schema.tables where table_name='$Config_Table_Name'" ;
+	my $count = dblookup($dbh,$query) ;
+	if( (not defined $count) || ($count eq "") || ($count eq 0) )
+	{
+		print "Cannot find table '$Config_Table_Name'\n" ;
+		closedatabase($dbh) ;
+		return undef ;
+	}
+	$query = "SELECT ID,tablename,idname,replicate,reverse,incremental,lastid from $Config_Table_Name" ;
+	my @data = dbdata($dbh,$query) ;
+	closedatabase($dbh) ;
+	for my $ref_row ( @data )
+	{
+		my %table_data = () ;
+		my $id = $ref_row->[0] ;
+		$table_data{'tablename'} = $ref_row->[1] ;
+		$table_data{'idname'} = $ref_row->[2] ;
+		$table_data{'replicate'} = $ref_row->[3] ;
+		$table_data{'reverse'} = $ref_row->[4] ;
+		$table_data{'incremental'} = $ref_row->[5] ;
+		$table_data{'lastid'} = $ref_row->[6] ;
+		$tables{$id} = \%table_data ;
+	}
+	return \%tables ;
+}
+
+sub show_tables($)
+{
+	my ( $tables ) = @_ ;
+	my @table_keys = sort keys %$tables ;
+	for my $key ( @table_keys )
+	{
+		my $ref_hash = $tables->{$key} ;
+		#print "table $key: $ref_hash\n" ;
+		my @row_keys = sort keys %$ref_hash ;
+		#print "row keys are: @row_keys\n" ;
+		for my $row_key ( @row_keys )
+		{
+			print "$row_key=$ref_hash->{$row_key} " ;
+		}
+		print "\n" ;
+	}
+}
+
+
+sub findtable($$)	# returns a reference to the hash in $tables for the named table
+{
+	my ( $tablename, $tables ) = @_ ;
+	my @keys = sort keys %$tables ;
+	foreach my $key ( @keys )
+	{
+		my $tabledata = $tables->{$key} ;
+		if( $tabledata->{tablename} eq $tablename )
+		{
+			return $tabledata ;	# known table
+		}
+	}
+	return undef ;	# not found
+}
+
+sub replicate_all_tables($$)
+{
+	my ( $credentials, $tables ) = @_ ;
+	my @keys = sort keys %$tables ;
+	my $table_count = scalar @keys ;
+	print "Checking $table_count tables\n" ;
+	my $err = 0 ;
+	my $norep_count = 0 ;
+	foreach my $key ( @keys )
+	{
+		my $reftablehash = $tables->{$key} ;
+		showtabledata($reftablehash) ;
+		if( not $reftablehash->{replicate} )
+		{
+			$norep_count++ ;
+			next ;
+		}
+		if( $reftablehash->{reverse} )
+		{
+			print "Cannot replicate table '$reftablehash->{tablename}', can't do reverse replication yet.\n" ;
+			$norep_count++ ;
+			next ;
+		}
+		$err += replicate_table($reftablehash,$credentials) ;	
+	}
+	print "Replicated $table_count tables, ignored $norep_count tables, $err errors\n" ;
+	return $err ;
+}
+
+sub showtabledata($)
+{
+	my ( $reftablehash ) = @_ ;
+	print "Table=$reftablehash->{tablename} id=$reftablehash->{idname} replicate=$reftablehash->{replicate} incremental=$reftablehash->{incremental} reverse=$reftablehash->{reverse}, lastid=$reftablehash->{lastid}\n" ;
+}
+
+sub replicate_table($$)
+{
+	my ( $tabledata, $creds ) = @_ ;
+	my $tablename = $tabledata->{tablename} ;
+	print "Replicating table $tablename\n" ;
+	my $empty = emptytable($tabledata,$creds) ;
+	if( not defined $empty ) { return 1 ; }
+	if( $empty )
+	{
+		print "Table $tablename appears to be empty, ignoring it.\n" ;
+		return 0 ;
+	}
+	my $current_lastid = getlastid($tabledata,$creds) ;	# gets last id of table in source database
+	#print "debug: source current lastid = $current_lastid\n" ;
+	if( (not defined $current_lastid) || ($current_lastid eq "") || ($current_lastid == 0) )
+	{
+		print "Missing value for current lastid in table '$tablename', assuming 0.\n" ;
+		$current_lastid = 0 ;
+	}
+	my $idname = $tabledata->{idname} ;
+	my @where = () ;
+	if( $tabledata->{incremental} )
+	{
+		my $previous_lastid = $tabledata->{lastid} ;
+		if( (defined $previous_lastid) && ($previous_lastid ne "") && ($previous_lastid > 0) )
+		{
+			print "Using previous lastid $previous_lastid and current lastid $current_lastid\n" ;
+			if( (not defined $current_lastid) || ($current_lastid eq "") || ($current_lastid < 0) )
+			{
+				@where = ( "--where", "$idname>$previous_lastid" ) ;
+			}
+			else	# both previous_lastid and current_lastid are good
+			{
+				if( $current_lastid == $previous_lastid )
+				{
+					print "No new data in incremental table $tablename, skipping it.\n" ;
+					return 0 ;
+				}
+				@where = ( "--where", "\"$idname>$previous_lastid","AND","$idname<=$current_lastid\"" ) ;
+			}
+		}
+		else
+		{
+			print "No lastid found for '$tablename', assuming 0\n" ;
+		}
+	}
+	
+	# Create DSN values for pt-table-sync
+	my $source_dsn = "h=$creds->{$View_Backend}{host},P=$creds->{$View_Backend}{port},D=$creds->{$View_Backend}{name},t=$tabledata->{tablename},u=$creds->{$View_Backend}{user},p=$creds->{$View_Backend}{password}" ;
+	my $destination_dsn = "h=$creds->{$View_Frontend}{host},P=$creds->{$View_Frontend}{port},u=$creds->{$View_Frontend}{user},p=$creds->{$View_Frontend}{password}" ;
+	# Assemble the pt-table-sync command
+	#my @command = ( "pt-table-sync", "--verbose", "--execute", "$source_dsn", "$destination_dsn", @where) ;
+	my @command = ( "pt-table-sync", "--verbose", "--execute", "'$source_dsn'", "'$destination_dsn'", @where) ;
+	my $return_code = "" ;
+	if( $Testing )
+	{
+		print "Replication disabled for testing: command=@command\n" ;
+	}
+	else
+	{
+		my $command_string = "@command" ;
+		print "command_string=$command_string\n" ;
+		my $result = `$command_string` ;
+		$return_code = $? ;
+		print $result ;
+		#$return_code = system(@command) ;	#`$command` ;
+		#$return_code = `$command_string` ;
+	}
+	print "return_code=$return_code, \$?=$?\n" ;
+	if( ($return_code ne "") && ($return_code == 256) )	# percona error
+	{
+		print "Cannot replicate table $tabledata->{tablename}.\n" ;
+		return 1 ;
+	}
+	# UPDATE lastid value in rep_config
+	my $err = setlastid($tabledata,$creds,$current_lastid) ;
+	if( $err )
+	{
+		print "Cannot update lastid value for $tablename.\n" ;
+	}
+	return 0 ;
+}
+
+sub emptytable($$)	# Check for empty table in source database
+{
+	my ( $tabledata, $ref_creds ) = @_ ;
+	my $tablename = $tabledata->{tablename} ;
+	my $idname = $tabledata->{idname} ;
+	my $source = $tabledata->{reverse} ? $View_Frontend : $View_Backend ;	# Source view is backend for normal rep, frontend for reverse rep
+	my $host = $ref_creds->{$source}{host} ;
+	my $port = $ref_creds->{$source}{port} ;
+	my $user = $ref_creds->{$source}{user} ;
+	my $password = $ref_creds->{$source}{password} ;
+	my $database = $ref_creds->{$source}{name} ;
+	my $dbh = opendatabase($host,$port,$user,$password,$database) ;
+	if( not defined $dbh )
+	{
+		return undef ;	# bad
+	}
+	my $count = "" ;
+	my $query = "SELECT count(*) FROM $tablename" ;
+	$count = dblookup($dbh,$query) ;
+	closedatabase($dbh) ;
+	if( (defined $count) && ($count ne "") && ($count > 0) )
+	{
+		return 0 ;	# means table is not empty, all OK
+	}
+	return 1 ;	# empty table
+}
+
+sub getlastid($$)	# fetch last id value from the given table in the database on the source server
+{
+	my ( $tabledata, $ref_creds ) = @_ ;
+	my $tablename = $tabledata->{tablename} ;
+	my $idname = $tabledata->{idname} ;
+	my $view = $tabledata->{reverse} ? $View_Frontend : $View_Backend ;
+	my $host = $ref_creds->{$view}{host} ;
+	my $port = $ref_creds->{$view}{port} ;
+	my $user = $ref_creds->{$view}{user} ;
+	my $password = $ref_creds->{$view}{password} ;
+	my $database = $ref_creds->{$view}{name} ;
+	my $dbh = opendatabase($host,$port,$user,$password,$database) ;
+	if( not defined $dbh )
+	{
+		return undef ;
+	}
+	my $lastid = "" ;
+	my $query = "SELECT max($idname) FROM $tablename" ;
+	#print "debug: host=$host database=$database query=$query\n" ;
+	$lastid = dblookup($dbh,$query) ;
+	#print "debug: lastid=$lastid\n" ;
+	closedatabase($dbh) ;
+	return $lastid ;
+}
+
+sub setlastid($$$)
+{
+	my ( $tabledata, $ref_creds, $lastid ) = @_ ;
+	my $tablename = $tabledata->{tablename} ;	# Could just pass tablename ...
+	if( (not defined $lastid) || ($lastid eq "") || ($lastid == 0) )
+	{
+		print "Error: missing lastid, cannot update lastid for table '$tablename'\n" ;
+		return 1 ;
+	}
+	my $host = $ref_creds->{$View_Frontend}{host} ;
+	my $port = $ref_creds->{$View_Frontend}{port} ;
+	my $user = $ref_creds->{$View_Frontend}{user} ;
+	my $password = $ref_creds->{$View_Frontend}{password} ;
+	my $database = $ref_creds->{$View_Frontend}{name} ;
+	my $dbh = opendatabase($host,$port,$user,$password,$database) ;
+	if( not defined $dbh )
+	{
+		return 1 ;
+	}
+	my $query = "UPDATE $Config_Table_Name SET lastid = $lastid WHERE tablename = '$tablename'" ;
+	my $err = 0 ;
+	if( $Testing )
+	{
+		print "Update disabled for testing: query=$query\n" ;
+	}
+	else
+	{
+		$err = dbexecute($dbh,$query) ;
+	}
+	closedatabase($dbh) ;
+	return $err ;
+}
+
+sub opendatabase($$$$$)	# gets the credentials from the given rmg authfile, connects to the database, returns the database handle
+{
+	my ( $host, $port, $user, $pass, $name ) = @_ ;
+	if( (not defined $host) || (not defined $port) || (not defined $user) || (not defined $pass) || (not defined $name) ) { return undef ; }
+	my $timeout = 10 ;
+	my $dsn = "DBI:mysql:database=$name;host=$host;port=$port;mysql_connect_timeout=$timeout" ;
+	my $dbh = DBI->connect($dsn,$user,$pass) ;
+	if( not $dbh )
+	{
+		print "ERROR: cannot connect to database host: $DBI::errstr\n" ;
+		return undef ;
+	}
+	return $dbh ;
+}
+
+sub closedatabase($)
+{
+	my ( $dbh ) = @_ ;
+	if( not $dbh->disconnect() )
+	{
+		print "ERROR: cannot close database: $DBI::errstr\n" ;
+	}
+}
+
+sub dblookup($$)	# executes a given query, assumed to produce one result item, returned
+{
+	#
+	# Executes the given query to return one value, or undef
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return undef ;
+	}
+	my $matches = $sth->rows() ;
+	if( not $matches )
+	{
+		return undef ;
+	}
+	my $ref_row = $sth->fetchrow_arrayref ;
+	if( not defined($ref_row) )
+	{
+		return undef ;
+	}
+	return $ref_row->[0] ;
+}
+
+sub dbexecute($$)	# executes a given query, returns 0 for OK, 1 for error
+{
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	return 0 ;
+}
+
+sub dbdata($$)		# generic database read function, returns an array of data resulting from the given query
+{
+	my ( $dbh, $query ) = @_ ;
+	my $sth = $dbh->prepare($query) ;
+	if( not $sth )
+	{
+		print "ERROR: cannot prepare query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	if( not $sth->execute() )
+	{
+		print "ERROR: cannot execute query: $DBI::errstr Query='$query'\n" ;
+		return 1 ;
+	}
+	my $matches = $sth->rows() ;
+	if( $matches == 0 )
+	{
+		$sth->finish() ;
+		return 1 ;
+	}
+	my $ref_row ;
+	my @data = () ;
+	while( my $ref_row = $sth->fetchrow_arrayref() )
+	{
+		if( defined($ref_row) )
+		{
+			if( defined($ref_row->[0]) )
+			{
+				push @data, [ @$ref_row ] ;
+			}
+		}
+	}
+	$sth->finish() ;
+	return @data ;
+}
+
+exit main ;
+#END
