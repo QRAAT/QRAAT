@@ -222,18 +222,21 @@ def get_context(request, deps=[], req_deps=[]):
 
     sites = []
     for s in Site.objects.all():
-        sites.append((
-            s.ID,
-            s.name,
-            s.location,
-            float(s.latitude),
-            float(s.longitude),
-            float(s.easting),
-            float(s.northing),
-            s.utm_zone_number,
-            s.utm_zone_letter,
-            float(s.elevation),
-            ))
+        try:
+            sites.append((
+                s.ID,
+                s.name,
+                s.location,
+                float(s.latitude),
+                float(s.longitude),
+                float(s.easting),
+                float(s.northing),
+                s.utm_zone_number,
+                s.utm_zone_letter,
+                float(s.elevation),
+                ))
+        except TypeError:
+            pass
     index_form = Form(deps=deps, req_deps=req_deps, data=request.GET
                       or None)
 
