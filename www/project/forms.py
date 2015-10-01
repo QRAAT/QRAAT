@@ -262,11 +262,11 @@ class AddTransmitterForm(ProjectElementForm):
 
             # creates parameters from tx_make_parameters in tx_parameters
             for parameter in Tx_make_parameters:
+                print parameter
                 TxParameters.objects.create(
                     txID=Tx,
                     name=parameter.name,
-                    value=parameter.value,
-                    units=parameter.units)
+                    value=parameter.value)
 
         return Tx
 

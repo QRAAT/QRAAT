@@ -2,4 +2,8 @@
 {% load class_tag %}
 
 {%block success_msg %} Deployment created {% endblock %}
-{% block title_msg %} New Deployment {% endblock %}
+{% block title_msg %}
+New Deployment.
+<font size=3 color="#7F7C7C">
+    There must be an available <a href={%url 'project:add-transmitter' project.ID %}>transmitter</a> and a <a href={%url 'project:add-target' project.ID %}>target</a> to make a deployment.. 
+{% endblock %}

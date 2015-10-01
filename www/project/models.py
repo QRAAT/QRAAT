@@ -400,8 +400,7 @@ class TxParameters(models.Model):
     :param ID: ID
     :param txID: Foreign key for transmitter
     :param name: parameter's name
-    :param value: parameter's value
-    :param units: parameter's units"""
+    :param value: parameter's value"""
 
     class Meta:
         app_label = QRAAT_APP_LABEL
@@ -417,8 +416,6 @@ class TxParameters(models.Model):
 
     value = models.CharField(max_length=64, null=False)  # varchar(64)
 
-    units = models.CharField(max_length=32)  # varchar(32)
-
 
 class TxMakeParameters(models.Model):
     """**Tx Make Parameters Model Object**.
@@ -428,8 +425,7 @@ class TxMakeParameters(models.Model):
     :param ID: ID
     :param tx_makeID: Foreign key for tx_make
     :param name: parameter's name
-    :param value: parameter's value
-    :param units: parameter's units"""
+    :param value: parameter's value"""
 
     class Meta:
         app_label = QRAAT_APP_LABEL
@@ -444,8 +440,6 @@ class TxMakeParameters(models.Model):
     name = models.CharField(max_length=32, null=False)  # varchar(32)
 
     value = models.CharField(max_length=64, null=False)  # varchar(64)
-
-    units = models.CharField(max_length=32)  # varchar(32)
 
 
 class Target(models.Model):

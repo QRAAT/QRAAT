@@ -84,8 +84,7 @@ class TransmitterAdmin(admin.ModelAdmin):
             TxParameters.objects.create(
                 txID=Tx,
                 name=parameter.name,
-                value=parameter.value,
-                units=parameter.units)
+                value=parameter.value)
 
 
 class TransmitterInline(admin.StackedInline):
@@ -101,7 +100,7 @@ class TxMakeAdmin(admin.ModelAdmin):
 
 class TxParametersAdmin(admin.ModelAdmin):
     list_display = (
-        'ID', 'name', 'value', 'units',
+        'ID', 'name', 'value', 
         'txID', 'Tx_name', 'Project_name')
 
     ordering = ('ID',)
@@ -114,7 +113,7 @@ class TxParametersAdmin(admin.ModelAdmin):
 
 
 class TxMakeParametersAdmin(admin.ModelAdmin):
-    list_display = ('ID', 'name', 'value', 'units',
+    list_display = ('ID', 'name', 'value', 
                     'tx_makeID', 'Tx_model')
     ordering = ('ID',)
 
