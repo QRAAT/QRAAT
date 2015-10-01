@@ -37,13 +37,38 @@ echo Starting $0 at `date`
 # Set RMG environment variables
 source rmg_env
 
+# Check environment variables (yes, necessary, trust me)
+echo Checking environment variables are set
+if [ -z "$RMG_SERVER_DIR" ]
+then
+	echo ERROR: environment variable RMG_SERVER_DIR is not set, use source rmg_env
+	exit 1
+fi
+if [ -z "$RMG_SERVER_ARCHIVE_DIR" ]
+then
+	echo ERROR: environment variable RMG_SERVER_ARCHIVE_DIR is not set, use source rmg_env
+	exit 1
+fi
+if [ -z "$RMG_BACKUP_DRIVE" ]
+then
+	echo ERROR: environment variable RMG_BACKUP_DRIVE is not set, use source rmg_env
+	exit 1
+fi
+if [ -z "$RMG_ARCHIVE_DAYS" ]
+then
+	echo ERROR: environment variable RMG_ARCHIVE_DAYS is not set, use source rmg_env
+	exit 1
+fi
+RMG_BACKUP_DIR=${RMG_BACKUP_DRIVE}/backup${RMG_SERVER_DIR}
+RMG_BACKUP_DIR_ARCHIVE=${RMG_BACKUP_DIR}/archive
+
 # Find all expired files and check if they're backed up and then delete them.
 badcount=0
 rmcount=0
 cd $RMG_SERVER_ARCHIVE_DIR
 for filename in `find . -type f -mtime +$RMG_ARCHIVE_DAYS`
 do
-	destination=$RMG_BACKUP_ARCHIVE_DIR/$filename
+	destination=$RMG_BACKUP_DIR_ARCHIVE/$filename
 	if [[ -e $destination ]]
 	then
 		let rmcount=$rmcount+1
