@@ -227,7 +227,11 @@ else
 	df -l $RMG_BACKUP_DRIVE $RMG_BACKUP_DRIVE2
 fi
 
-# Sync frontend server
+# Sync frontend server from backup drive
+# Forcing it to use RMG_BACKUP_DRIVE by disabling RMG_BACKUP_DRIVE2
+#unset RMG_BACKUP_DRIVE2
+#unset does not seem to work, try this
+RMG_BACKUP_DRIVE2=""
 if [ -n "$RMG_BACKUP_DRIVE2" ]
 then
 	# use backup drive 2
