@@ -53,7 +53,7 @@ sub usage()
 
 sub main()
 {
-	print localtime()." Starting\n" ;
+	print "Starting $0 at ".localtime()."\n" ;
 	my $argc = scalar @ARGV ;
 	if( $argc < 1 )
 	{
@@ -109,7 +109,7 @@ sub main()
 		$err = archive_table($dbh,$table,$path) ;
 	}
 	closedatabase($dbh) ;
-	print localtime()." Finished\n" ;
+	print "Finished $0 at ".localtime()."\n" ;
 	return $err ;
 }
 
