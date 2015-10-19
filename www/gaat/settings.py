@@ -79,7 +79,7 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'django',
+        'NAME': 'qraat',
         'USER': django_admin.user,
 	'PASSWORD': django_admin.password, 
         },

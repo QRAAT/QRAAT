@@ -1,5 +1,4 @@
 CREATE DATABASE IF NOT EXISTS qraat;
-CREATE DATABASE IF NOT EXISTS django;
 
 DROP USER web_reader;
 CREATE USER web_reader@'localhost' identified by 'password';
