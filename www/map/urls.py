@@ -26,6 +26,6 @@ urlpatterns = patterns('map.views',
         r'^project/(?P<project_id>\d+)/deployment/([0-9]+(\+[0-9]+)*)/get_data/$',
         'get_data', name='get_data'),
     url(
-        r'^project/(?P<project_id>\d+)/$',
+        r'^project/(?P<project_id>\d+)/get_data/$',
         'get_data', name='get_data'),
 )
