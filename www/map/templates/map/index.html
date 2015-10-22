@@ -382,16 +382,16 @@ function loadFlot(pos_markers, map, dep_id){
             for(var j=0; j<selMapTimes.length; j++) {
                 var depI = depInds[j];
                 ctx.fillStyle = colors[depI%4];
-            ctx.strokeStyle = colors[depI%4];
-            var xaxis = plot.getAxes().xaxis;
-            for(var i = 0; i < selMapTimes[j].length; i++) {
-                var x = xaxis.p2c(selMapTimes[j][i][0]*1000),
-                y = 0,
-                w = xaxis.p2c(selMapTimes[j][i][1]*1000)-x,
-                h = plot.height();
-                ctx.fillRect(x,y,w,h);
-                ctx.strokeRect(x,y,w,h);
-            }
+                ctx.strokeStyle = colors[depI%4];
+                var xaxis = plot.getAxes().xaxis;
+                for(var i = 0; i < selMapTimes[j].length; i++) {
+                    var x = xaxis.p2c(selMapTimes[j][i][0]*1000),
+                    y = 0,
+                    w = xaxis.p2c(selMapTimes[j][i][1]*1000)-x,
+                    h = plot.height();
+                    ctx.fillRect(x,y,w,h);
+                    ctx.strokeRect(x,y,w,h);
+                }
             }
             ctx.restore()
         });
@@ -1642,34 +1642,38 @@ function selectMap(bounds) {
     var depInds = getDepsInd(activeDeps);
 
     for(var k=0; k<depInds.length; k++) {
-	var depI = depInds[k],
-	    inds = [getPosIndex(selectedTimeRange[0], depI ,'gte'), getPosIndex(selectedTimeRange[1], depI, 'lte')],
-	    selectedInds = [[inds[0],inds[0]]],
-	    j=0;
+        var depI = depInds[k],
+            inds = [getPosIndex(selectedTimeRange[0], depI ,'gte'), getPosIndex(selectedTimeRange[1], depI, 'lte')],
+            selectedInds = [[inds[0],inds[0]]],
+            j=0;
 
-	for(var i = inds[0]+1; i <= inds[1]; i++) {
-	    if(bounds.contains(markers_querydata[depI][i].getPosition())) {
-		if(i > selectedInds[j][1] || i < selectedInds[j][0]) {
-		    // Check if selected marker is concurrent in time
-		    if(i - selectedInds[j][1] == 1) {
-			selectedInds[j][1] = i;
-			// Check if this creates concurrent
-		    }
-		    else {
-			selectedInds.push([i,i]);
-			j++;
-		    }
-		}
-	    }
-	}
+        // If nothing was index not found
+        if(inds[0]==-1 && inds[1]==-1) {
+            selectedInds = [];
+        }
+        for(var i = inds[0]+1; i <= inds[1]; i++) {
+            if(bounds.contains(markers_querydata[depI][i].getPosition())) {
+            if(i > selectedInds[j][1] || i < selectedInds[j][0]) {
+                // Check if selected marker is concurrent in time
+                if(i - selectedInds[j][1] == 1) {
+                selectedInds[j][1] = i;
+                // Check if this creates concurrent
+                }
+                else {
+                selectedInds.push([i,i]);
+                j++;
+                }
+            }
+            }
+        }
 
-	// Change indices to timestamps
-	selMapTimes.push([]);
-	console.log("selinds", selectedInds);
-	for(var i = 0; i < selectedInds.length; i++) {
-	    selMapTimes[k].push([rawPosData[depI][selectedInds[i][0]][2],
-		rawPosData[depI][selectedInds[i][1]][2]]);
-	}
+        // Change indices to timestamps
+        selMapTimes.push([]);
+        console.log("selinds", selectedInds);
+        for(var i = 0; i < selectedInds.length; i++) {
+            selMapTimes[k].push([rawPosData[depI][selectedInds[i][0]][2],
+            rawPosData[depI][selectedInds[i][1]][2]]);
+        }
     }
 
     $("#plot-div").data("plot").triggerRedrawOverlay();
