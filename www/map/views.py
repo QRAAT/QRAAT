@@ -339,10 +339,10 @@ def get_context(request, deps=[], req_deps=[]):
         #        index_form.fields['activity_high'].initial = round(math.ceil(min(filter_values[3])*100),2)/100
         #    else:
         #        index_form.fields['activity_high'].initial = 1
-        index_form.fields['likelihood_low'] = 0
-        index_form.fields['likelihood_high'] = 1
-        index_form.fields['activity_low'] = 0
-        index_form.fields['activity_high'] = 1
+        index_form.fields['likelihood_low'].initial = 0
+        index_form.fields['likelihood_high'].initial = 1
+        index_form.fields['activity_low'].initial = 0
+        index_form.fields['activity_high'].initial = 1
     else: # No data at all
         kwargs['timestamp__gte'] = None
         kwargs['timestamp__lte'] = None
