@@ -311,34 +311,38 @@ def get_context(request, deps=[], req_deps=[]):
         index_form.fields['datetime_to'].initial = datetime_to
 
         # Get the ceiling/floor to 2 decimal places. 
-        if likelihood_low != None:
-            index_form.fields['likelihood_low'].initial = likelihood_low
-        else:
-            if len(filter_values[0]) != 0:
-                index_form.fields['likelihood_low'].initial = round(math.floor(min(filter_values[0])*100),2)/100
-            else:
-                index_form.fields['likelihood_low'].initial = 0
-        if likelihood_low != None:
-            index_form.fields['likelihood_high'].initial = likelihood_high
-        else:
-            if len(filter_values[1]) != 0:
-                index_form.fields['likelihood_high'].initial = round(math.ceil(min(filter_values[1])*100),2)/100
-            else:
-                index_form.fields['likelihood_high'].initial = 1
-        if activity_low != None:
-            index_form.fields['activity_low'].initial = activity_low
-        else:
-            if len(filter_values[2]) != 0:
-                index_form.fields['activity_low'].initial = round(math.floor(min(filter_values[2])*100),2)/100
-            else:
-                index_form.fields['activity_low'].initial = 0
-        if activity_low != None:
-            index_form.fields['activity_high'].initial = activity_high
-        else:
-            if len(filter_values[3]) != 0:
-                index_form.fields['activity_high'].initial = round(math.ceil(min(filter_values[3])*100),2)/100
-            else:
-                index_form.fields['activity_high'].initial = 1
+        #if likelihood_low != None:
+        #    index_form.fields['likelihood_low'].initial = likelihood_low
+        #else:
+        #    if len(filter_values[0]) != 0:
+        #        index_form.fields['likelihood_low'].initial = round(math.floor(min(filter_values[0])*100),2)/100
+        #    else:
+        #        index_form.fields['likelihood_low'].initial = 0
+        #if likelihood_low != None:
+        #    index_form.fields['likelihood_high'].initial = likelihood_high
+        #else:
+        #    if len(filter_values[1]) != 0:
+        #        index_form.fields['likelihood_high'].initial = round(math.ceil(min(filter_values[1])*100),2)/100
+        #    else:
+        #        index_form.fields['likelihood_high'].initial = 1
+        #if activity_low != None:
+        #    index_form.fields['activity_low'].initial = activity_low
+        #else:
+        #    if len(filter_values[2]) != 0:
+        #        index_form.fields['activity_low'].initial = round(math.floor(min(filter_values[2])*100),2)/100
+        #    else:
+        #        index_form.fields['activity_low'].initial = 0
+        #if activity_low != None:
+        #    index_form.fields['activity_high'].initial = activity_high
+        #else:
+        #    if len(filter_values[3]) != 0:
+        #        index_form.fields['activity_high'].initial = round(math.ceil(min(filter_values[3])*100),2)/100
+        #    else:
+        #        index_form.fields['activity_high'].initial = 1
+        index_form.fields['likelihood_low'] = 0
+        index_form.fields['likelihood_high'] = 1
+        index_form.fields['activity_low'] = 0
+        index_form.fields['activity_high'] = 1
     else: # No data at all
         kwargs['timestamp__gte'] = None
         kwargs['timestamp__lte'] = None
