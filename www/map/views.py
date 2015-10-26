@@ -287,28 +287,28 @@ def get_context(request, deps=[], req_deps=[]):
         else:
             raise Exception("data_type isn't 1 or 2")
 
-        filter_values = [[],[],[],[]] # Having inner arrays instead of just a min/max value is a remnant  of wanting to know the min/max for each deployment
-        for i in range(len(req_deps)):
-            # Get the max/min filter values of each deployment
-            if likelihood_low == None:
-                temp = queried_objects[i].aggregate(Min('likelihood'))['likelihood__min']
-                if temp != None:
-                    filter_values[0].append(temp)
-            if likelihood_high == None:
-                temp = queried_objects[i].aggregate(Max('likelihood'))['likelihood__max']
-                if temp != None:
-                    filter_values[1].append(temp)
-            if activity_low == None:
-                temp = queried_objects[i].aggregate(Min('activity'))['activity__min']
-                if temp != None:
-                    filter_values[2].append(temp)
-            if activity_high == None:
-                temp = queried_objects[i].aggregate(Max('activity'))['activity__max']
-                if temp != None:
-                    filter_values[3].append(temp)
-
         index_form.fields['datetime_from'].initial = datetime_from
         index_form.fields['datetime_to'].initial = datetime_to
+
+        #filter_values = [[],[],[],[]] # Having inner arrays instead of just a min/max value is a remnant  of wanting to know the min/max for each deployment
+        #for i in range(len(req_deps)):
+        #    # Get the max/min filter values of each deployment
+        #    if likelihood_low == None:
+        #        temp = queried_objects[i].aggregate(Min('likelihood'))['likelihood__min']
+        #        if temp != None:
+        #            filter_values[0].append(temp)
+        #    if likelihood_high == None:
+        #        temp = queried_objects[i].aggregate(Max('likelihood'))['likelihood__max']
+        #        if temp != None:
+        #            filter_values[1].append(temp)
+        #    if activity_low == None:
+        #        temp = queried_objects[i].aggregate(Min('activity'))['activity__min']
+        #        if temp != None:
+        #            filter_values[2].append(temp)
+        #    if activity_high == None:
+        #        temp = queried_objects[i].aggregate(Max('activity'))['activity__max']
+        #        if temp != None:
+        #            filter_values[3].append(temp)
 
         # Get the ceiling/floor to 2 decimal places. 
         #if likelihood_low != None:

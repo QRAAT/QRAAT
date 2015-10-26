@@ -761,10 +761,14 @@ function updateData() {
     var dataLatestTimes = findLatestDataTimes(activeDeps);
     var dataEarliestLatestTime = dataLatestTimes[0];
 
-    for(var i=0; i<dataLatestTimes.length; i++) { var time = dataLatestTimes[i]; if(time != null && time < dataEarliestLatestTime) dataEarliestLatestTime = time }
+    for(var i=0; i<dataLatestTimes.length; i++) {
+         var time = dataLatestTimes[i];
+         if(dataEarliestLatestTime == null) dataEarliestLatestTime = time;
+         else if(time != null && time < dataEarliestLatestTime) dataEarliestLatestTime = time;
+    }
 
     // If the user wants data from before what we have, or non continguous, or new dataType (raw or tracks)
-    if($("#id_data_type option:selected").text() != dataType || reqTimeTo < userRequestedMaxTimeRange[0] || reqTimeFrom > userRequestedMaxTimeRange[1]) { 
+    if($("#id_data_type option:selected").text() != dataType || reqTimeTo < userRequestedMaxTimeRange[0] || reqTimeFrom > userRequestedMaxTimeRange[1] || dataEarliestLatestTime == null) {  
 	dataType = $("#id_data_type option:selected").text(); 
 	console.log("Case 1: new array");
         // All new array
@@ -825,9 +829,9 @@ function updateData() {
 	    var depInds = getDepsInd(activeDeps);
 	    for(var j = 0; j<depInds.length; j++){
             var depI = depInds[j];
+            var oldDateString = $("#id_datetime_to").val();
             if(rawPosData[depI].length > 0) {
                 var dataEarliestTime = rawPosData[depI][0][2];
-                var oldDateString = $("#id_datetime_to").val();
                 var dateEarliestString = timeToString(dataEarliestTime - 1); // -1 to not repeat a point
                 $("#id_datetime_to").val(dateEarliestString);
             }
