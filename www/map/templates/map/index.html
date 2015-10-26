@@ -887,10 +887,15 @@ function updateData() {
 	    for(var j = 0; j<depInds.length; j++){
             var depI = depInds[j];
             var oldDateString = $("#id_datetime_from").val();
-            var dateLatestString = timeToString(dataLatestTimes[j] + 1);	    
+            if(dataLatestTimes[j] == null) {
+                var dateLatestString = timeToString(dataEarliestLatestTime + 1);	    
+            }
+            else {
+                var dateLatestString = timeToString(dataLatestTimes[j] + 1);	    
+            }
             $("#id_datetime_from").val(dateLatestString);
             var tempform = serializeForm($("#form"), [deps[depI]]);
-            $("#id_datetime_from").val(oldDateString); // Hopefully this doesn't cause flickering
+            $("#id_datetime_from").val(oldDateString);
             console.log('case 2.b, depI is: ', depI);
             ajaxRequests.push(
             $.ajax({
@@ -898,10 +903,10 @@ function updateData() {
                 data: tempform, 
                 dataType: 'json',
                 success: function(data) {
-                    console.log('case 2.b ajax, depII is: ', depII);
+                console.log('case 2.b ajax, depI is: ', depI);
                 data = $.parseJSON(data)[0];
-                    if(data.length == 0)
-                        return;
+                if(data.length == 0)
+                    return;
                 var depII = getDepsInd([data[0][1]]);
                     depII = depII[0];
                 var start = getPosIndex(reqTimeFrom, depII, 'gte');
