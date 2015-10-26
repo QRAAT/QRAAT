@@ -277,8 +277,8 @@ def get_context(request, deps=[], req_deps=[]):
                 queried_objects[i] = \
                     Position.objects.raw('''SELECT * FROM position
                 JOIN track_pos ON track_pos.positionID = position.ID
-               WHERE position.deploymentID = %s
-                 AND position.timestamp >= %s AND position.timestamp <= %s''',
+               WHERE track_pos.deploymentID = %s
+                 AND track_pos.timestamp >= %s AND track_pos.timestamp <= %s''',
                     ( 
                     req_deps[i].ID,
                     kwargs['timestamp__gte'],
