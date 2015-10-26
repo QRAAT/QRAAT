@@ -760,6 +760,7 @@ function updateData() {
     selectedTimeRange = [reqTimeFrom, reqTimeTo];
     var dataLatestTimes = findLatestDataTimes(activeDeps);
     var dataEarliestLatestTime = dataLatestTimes[0];
+
     for(var i=0; i<dataLatestTimes.length; i++) { var time = dataLatestTimes[i]; if(time != null && time < dataEarliestLatestTime) dataEarliestLatestTime = time }
 
     // If the user wants data from before what we have, or non continguous, or new dataType (raw or tracks)
@@ -823,54 +824,52 @@ function updateData() {
 	    console.log("Case 2.a: concatenating so stuff goes in front. (concatenating creates a whole new array");
 	    var depInds = getDepsInd(activeDeps);
 	    for(var j = 0; j<depInds.length; j++){
-		var depI = depInds[j];
-        if(rawPosData[depI].length > 0)
-            var dataEarliestTime = rawPosData[depI][0][2];
-        else
-            var dataEarliestTime = Date.now()/1000 | 0;
-		var oldDateString = $("#id_datetime_to").val();
-		var dateEarliestString = timeToString(dataEarliestTime - 1); // -1 to not repeat a point
-		
-		$("#id_datetime_to").val(dateEarliestString);
-		var tempform = serializeForm($("#form"), [deps[depI]]);
-		$("#id_datetime_to").val(oldDateString);
-		ajaxRequests.push(
-		$.ajax({
-		    url: "get_data/",
-		    data:  tempform,
-		    dataType: 'json',
-		    success: function(data) {
-		        data = $.parseJSON(data)[0];
-		        if(data.length == 0)
-		            return;
-		        var depII = getDepsInd([data[0][1]]);
-		        depII = depII[0];
-		        var end = getPosIndex(reqTimeTo,depII, 'lte');
-		        rawPosData[depII] = data.concat(rawPosData[depII]); // Q: How slow is this for large arrays
-		        // Push new points to front
-		        if(latlongData != null) {
-		            for(var i = 0; i < data.length; i++) {
-		                latlongData[depII].insertAt(i, new google.maps.LatLng(rawPosData[depII][i][8][0], rawPosData[depII][i][8][1]));
-		            }
-		            // If we have to remove points from the end
-		            if(end < currPosDataIndex[depII][1]) {
-		                var currend = currPosDataIndex[depII][1];
-		                for(var i = end; i < currend; i++) {
-		         	   latlongData[depII].pop();
-		                }
-		            }
-		        }
-		        var emptyArr = new Array(data.length);
-		        markers_querydata[depII] = emptyArr.concat(markers_querydata[depII]);
+            var depI = depInds[j];
+            if(rawPosData[depI].length > 0) {
+                var dataEarliestTime = rawPosData[depI][0][2];
+                var oldDateString = $("#id_datetime_to").val();
+                var dateEarliestString = timeToString(dataEarliestTime - 1); // -1 to not repeat a point
+                $("#id_datetime_to").val(dateEarliestString);
+            }
+            var tempform = serializeForm($("#form"), [deps[depI]]);
+            $("#id_datetime_to").val(oldDateString);
+            ajaxRequests.push(
+            $.ajax({
+                url: "get_data/",
+                data:  tempform,
+                dataType: 'json',
+                success: function(data) {
+                    data = $.parseJSON(data)[0];
+                    if(data.length == 0)
+                        return;
+                    var depII = getDepsInd([data[0][1]]);
+                    depII = depII[0];
+                    var end = getPosIndex(reqTimeTo,depII, 'lte');
+                    rawPosData[depII] = data.concat(rawPosData[depII]); // Q: How slow is this for large arrays
+                    // Push new points to front
+                    if(latlongData != null) {
+                        for(var i = 0; i < data.length; i++) {
+                            latlongData[depII].insertAt(i, new google.maps.LatLng(rawPosData[depII][i][8][0], rawPosData[depII][i][8][1]));
+                        }
+                        // If we have to remove points from the end
+                        if(end < currPosDataIndex[depII][1]) {
+                            var currend = currPosDataIndex[depII][1];
+                            for(var i = end; i < currend; i++) {
+                           latlongData[depII].pop();
+                            }
+                        }
+                    }
+                    var emptyArr = new Array(data.length);
+                    markers_querydata[depII] = emptyArr.concat(markers_querydata[depII]);
 
-		        currPosDataIndex[depII] = [0, end + data.length];
-		        console.log("end and data.length",end, data.length);
-		        console.log("currposdataindex", currPosDataIndex); 
+                    currPosDataIndex[depII] = [0, end + data.length];
+                    console.log("end and data.length",end, data.length);
+                    console.log("currposdataindex", currPosDataIndex); 
 
-		        findBounds([data]);
-		        updateHelper(depII, true);
-		    },
-		}));
+                    findBounds([data]);
+                    updateHelper(depII, true);
+                },
+            }));
 	    }
 	}
 	if(reqTimeTo > dataEarliestLatestTime) {
@@ -882,49 +881,49 @@ function updateData() {
 	    // this behind the scenes stuff.
 	    var depInds = getDepsInd(activeDeps);
 	    for(var j = 0; j<depInds.length; j++){
-		var depI = depInds[j];
-		var oldDateString = $("#id_datetime_from").val();
-		var dateLatestString = timeToString(dataLatestTimes[j] + 1);	    
-		$("#id_datetime_from").val(dateLatestString);
-		var tempform = serializeForm($("#form"), [deps[depI]]);
-		$("#id_datetime_from").val(oldDateString); // Hopefully this doesn't cause flickering
-		console.log('case 2.b, depI is: ', depI);
-		ajaxRequests.push(
-		$.ajax({
-		    url: "get_data/", 		    
-		    data: tempform, 
-		    dataType: 'json',
-		    success: function(data) {
-		    	console.log('case 2.b ajax, depII is: ', depII);
-			data = $.parseJSON(data)[0];
-		        if(data.length == 0)
-		            return;
-			var depII = getDepsInd([data[0][1]]);
-		        depII = depII[0];
-			var start = getPosIndex(reqTimeFrom, depII, 'gte');
-			console.log("start: ", start);
-			for(var i = 0; i < data.length; i++) {
-			    rawPosData[depII].push(data[i]);
-			}
-			// Update latlongData
-			if(latlongData != null) {
-			    if(start > currPosDataIndex[depII][0]) {
-				var currstart = currPosDataIndex[depII][0];
-				for(var i = start; i < currstart; i++) {
-				    latlongData[depII].removeAt(0);
-				}
-			    }
-			    for(var i = 0; i < data.length; i++) {
-				latlongData[depII].push(new google.maps.LatLng(data[i][8][0], data[i][8][0]));
-			    }	
-			}
-			currPosDataIndex[depII] = [start, rawPosData[0].length-1];
-			console.log("currposdataindex", currPosDataIndex); 
+            var depI = depInds[j];
+            var oldDateString = $("#id_datetime_from").val();
+            var dateLatestString = timeToString(dataLatestTimes[j] + 1);	    
+            $("#id_datetime_from").val(dateLatestString);
+            var tempform = serializeForm($("#form"), [deps[depI]]);
+            $("#id_datetime_from").val(oldDateString); // Hopefully this doesn't cause flickering
+            console.log('case 2.b, depI is: ', depI);
+            ajaxRequests.push(
+            $.ajax({
+                url: "get_data/", 		    
+                data: tempform, 
+                dataType: 'json',
+                success: function(data) {
+                    console.log('case 2.b ajax, depII is: ', depII);
+                data = $.parseJSON(data)[0];
+                    if(data.length == 0)
+                        return;
+                var depII = getDepsInd([data[0][1]]);
+                    depII = depII[0];
+                var start = getPosIndex(reqTimeFrom, depII, 'gte');
+                console.log("start: ", start);
+                for(var i = 0; i < data.length; i++) {
+                    rawPosData[depII].push(data[i]);
+                }
+                // Update latlongData
+                if(latlongData != null) {
+                    if(start > currPosDataIndex[depII][0]) {
+                    var currstart = currPosDataIndex[depII][0];
+                    for(var i = start; i < currstart; i++) {
+                        latlongData[depII].removeAt(0);
+                    }
+                    }
+                    for(var i = 0; i < data.length; i++) {
+                    latlongData[depII].push(new google.maps.LatLng(data[i][8][0], data[i][8][0]));
+                    }	
+                }
+                currPosDataIndex[depII] = [start, rawPosData[0].length-1];
+                console.log("currposdataindex", currPosDataIndex); 
 
-			findBounds([data]);
-			updateHelper(depII);
-		    }
-		}));
+                findBounds([data]);
+                updateHelper(depII);
+                }
+            }));
 	    }
 	}
     }	
@@ -996,15 +995,17 @@ function updateData() {
 	for(var j = 0; j<deployments.length; j++) {
 	    var dep = deployments[j];
 	    console.log(dep);
+        var found = false;
 	    for(var i=0; i < rawPosData.length; i++) {
-		if(rawPosData[i].length == 0) {
-		    latest.push(null);
-		    break;
-		} else if(rawPosData[i][0][1] == dep) {
-		    latest.push(rawPosData[i][rawPosData[i].length-1][2]);
-		    break;
-		}
+            if(rawPosData[i].length != 0 && rawPosData[i][0][1] == dep) {
+                latest.push(rawPosData[i][rawPosData[i].length-1][2]);
+                found = true;
+                break;
+            }
 	    }
+        if(!found) {
+            latest.push(null);
+        }
 	}
 	console.log('findlatestdatatimes ',latest);
 	return latest;
@@ -1037,7 +1038,7 @@ function updateData() {
     return ajaxRequests;
 }
 
-function updateDataWraper() {
+function updateDataWrapper() {
     document.getElementById('updateMap').disabled = true;
     document.getElementById('updateMap').style.backgroundColor = '#CCC';
     document.getElementById('page-overlay').style.visibility = 'visible';
@@ -1767,7 +1768,7 @@ function initialize(){
     
     setGraphFilters();
     //document.getElementById("id_sites").onclick = toggleSites;
-    $("#id_data_type").on('change', updateDataWraper); // Raw vs tracks
+    $("#id_data_type").on('change', updateDataWrapper); // Raw vs tracks
 
     // Bind filter form inputs to filter slider
     $("#id_likelihood_low").on('change', function() {
@@ -2269,7 +2270,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
 </div><!-- end prefs -->
 
 <div class="section_title">
-  <center><button id="updateMap" onclick="updateDataWraper()">Update Map</button><button onclick="submitDownloadForm()" data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="Data for all deployments for the timerange specified above">Download CSV</button></center>
+  <center><button id="updateMap" onclick="updateDataWrapper()">Update Map</button><button onclick="submitDownloadForm()" data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="Data for all deployments for the timerange specified above">Download CSV</button></center>
 <h6></h6>
   <b>&nbsp;&nbsp;Download KML File</b>
 <h6></h6>
