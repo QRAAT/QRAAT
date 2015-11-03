@@ -1048,7 +1048,7 @@ function updateData() {
 
 function updateDataWrapper() {
     document.getElementById('updateMap').disabled = true;
-    document.getElementById('updateMap').style.backgroundColor = '#CCC';
+    //document.getElementById('updateMap').style.backgroundColor = '#CCC';
     document.getElementById('page-overlay').style.visibility = 'visible';
 
     var dataRequests = updateData();
@@ -1073,14 +1073,14 @@ function updateDataWrapper() {
         //$("#filter-slider").slider("values",[0,1]);
         //colorMarkers(); // Extraneous when creating a whole new markers_querydata, but w/e. Changing the filter-slider calls colorMarkers
         document.getElementById('updateMap').disabled = false;
-        document.getElementById('updateMap').style.backgroundColor = '#DDD';
+        //document.getElementById('updateMap').style.backgroundColor = '#DDD';
         document.getElementById('page-overlay').style.visibility = 'hidden';
         updateNumPoints();
         //return true; // To make it submit when you press enter?
     }).fail(function() {
         alert('An error occured in getting the data, please refresh the page.');
         document.getElementById('updateMap').disabled = false;
-        document.getElementById('updateMap').style.backgroundColor = '#DDD';
+        //document.getElementById('updateMap').style.backgroundColor = '#DDD';
         document.getElementById('page-overlay').style.visibility = 'hidden';
     });
 }
