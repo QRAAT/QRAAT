@@ -1021,25 +1021,24 @@ function updateData() {
     }
 
     function serializeForm($form, deployments) {
-	// Given a form, replaces "deployment=68&depoyment=69" with "deployment=xx+yy"
-	// where x and y are from the deployments array parameter
-	var str = $form.serialize();
-	var start = str.indexOf('deployment');
-	var next = start;
-	if(start != 1) {
-	    while((next = str.indexOf('deployment', next+1)) != -1);
-	    end = str.indexOf('&', next);
-	    str = str.substring(0,start) + str.substring(end+1, str.length);
-	    str += "&deployment=" + deployments.join('+');
-	}
-	return str
+        // Given a form, replaces "deployment=68&depoyment=69" with "deployment=xx+yy"
+        // where x and y are from the deployments array parameter
+        var str = $form.serialize();
+        var start = str.indexOf('deployment');
+        var next = start;
+        if(start != 1) {
+            while((next = str.indexOf('deployment', next+1)) != -1);
+            end = str.indexOf('&', next);
+            str = str.substring(0,start) + str.substring(end+1, str.length);
+            str += "&deployment=" + deployments.join('+');
+        }
+        return str
     }
 
     function updateHelper(depI, prepend) {
-	oldLatLngIndex[depI] = currPosDataIndex[depI].slice();
-	if(prepend == null){ prepend = false; }
-	loadMarkers(map, prepend);
-	updateFlot(markers_querydata, [selectedTimeRange[0]*1000, selectedTimeRange[1]*1000]);
+        oldLatLngIndex[depI] = currPosDataIndex[depI].slice();
+        if(prepend == null) { prepend = false; }
+        loadMarkers(map, prepend);
     }
 
     userRequestedMaxTimeRange = [reqTimeFrom, reqTimeTo];
@@ -1058,6 +1057,7 @@ function updateDataWrapper() {
     $.when.apply(null,dataRequests).done(function() {
         // TODO: Make sure response is success 
         $("#plot-div").data("plot").clearSelection();
+        updateFlot(markers_querydata, [selectedTimeRange[0]*1000, selectedTimeRange[1]*1000]);
         resetTimeSlider();
 
         $("#id_likelihood_low").val(graphFilters[0][0]);
