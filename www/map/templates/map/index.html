@@ -289,7 +289,7 @@ function loadFlot(pos_markers, map, dep_id){
 	    max: selectedTimeRange[1] * 1000,
             mode: "time",
             timezone: "America/Los_Angeles", // TODO: Timezone is hardcoded
-            timeformat: "%m-%d %H:%M",
+            timeformat: "%m/%d %H:%M",
             axisLabel: "Time (Los Angeles)",
             axisLabelUseCanvas: true,
             axisLabelFontSizePixels: 12,
@@ -821,7 +821,7 @@ function updateData() {
 		second: ("0" + (theDate.getSeconds())).slice(-2), 
 		// + 1 second so we dont get the last point we already have from this query
 	    };
-	    return dT.year+"-"+dT.month+"-"+dT.day+" "+dT.hour+":"+dT.minute+":"+dT.second;
+	    return dT.year+"/"+dT.month+"/"+dT.day+" "+dT.hour+":"+dT.minute+":"+dT.second;
 	}
 
 	if(reqTimeFrom < userRequestedMaxTimeRange[0]) {
@@ -2221,9 +2221,9 @@ google.maps.event.addDomListener(window, 'load', initialize);
     </div>
     <div class="collapse in" id="data-section">
 	{{form.datetime_from.label_tag}} <!-- id_datetime_from -->
-        <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="YYYY-MM-DD HH:MM:SS (24hr)"> {{form.datetime_from}}<br> </div>
+        <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="YYYY/MM/DD HH:MM:SS (24hr)"> {{form.datetime_from}}<br> </div>
 	{{form.datetime_to.label_tag}}
-        <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="YYYY-MM-DD HH:MM:SS (24hr)"> {{form.datetime_to}}<br> </div>
+        <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="YYYY/MM/DD HH:MM:SS (24hr)"> {{form.datetime_to}}<br> </div>
         {{form.data_type.label_tag}} {{form.data_type}}<br>
 	<table>
 	    <tr>
