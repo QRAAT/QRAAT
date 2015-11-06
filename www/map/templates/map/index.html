@@ -183,7 +183,8 @@ function loadFlot(pos_markers, map, dep_id){
 	    return redGreenRamp[(i | 0)]; //i|0 truncates i
 	}
 	else {
-	    return colors[seriesDepInd];
+        // TODO: Only works with four (4) colors 
+	    return colors[seriesDepInd%4];
 	}
 
 	/*
