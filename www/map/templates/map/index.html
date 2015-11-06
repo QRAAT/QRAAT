@@ -46,6 +46,7 @@ var rawPosData = []; // Sorted position data straight from the database (with fi
 var latlongData; // MVCArray with latlong that correspond to the rawPosData 
 var oldLatLngIndex = []; // Save the indices when we disable the polyline/heatmap so that we can defer updating latlongData for when those options are selected
 var currPosDataIndex = []; // Indices of the start and end of requested data in rawPosData [[start,end],[start,end],...]
+var currTimeRange = []; // start and end timestamps on the form in seconds
 var userRequestedMaxTimeRange = []; // Keep track of this so that if there's chunks of missing data, we don't refetch data based on the time of the actual data previously retrieved. 
 
 var colors = ["#5373BE", "#A73737", "#80B13A", "#6E37A6"];
@@ -411,104 +412,110 @@ function loadFlot(pos_markers, map, dep_id){
         flotSelectedRange[1] = flotPlotWidth;
         flotSelectedWidth = flotPlotWidth;
         plot.draw();
+
+        Object.observe(plot.getXAxes()[0], function(changes) {
+            console.log(changes);
+        });
     });
     
     
     // Select marker in map when clicked on flot
     $("#plot-div").bind("plotclick", function (event, pos, item) {
-	if (item == undefined) {
-	// Make it remove the marker of the previously selected point when you click nothing
-	    if(selectedMarkers.length > 0 && selectedMarkers[0].selected)
-		selectedMarkers[0].selected.setMap(null);
-	    return false;
-	} 
-        //uncomment to have this show up after enablePosition2 in the html (perhaps clickdata2?)
-        //$("#clickdata2").text("Index " + item.dataIndex +', Date/Time:'+item.datapoint[0]+', '+item.series.label + ': ' + item.datapoint[1]);
-        
-        //save clicked info in global variables
-        flot_clicked_series = item.series;
-        flot_clicked_datapoint = item.datapoint;
-        console.log("plotclicked event", event); 
-	var s = item.series.label;
-	for(var i=0; i<deps.length; i++){
-	    if(s==deps[i]){
-	    	seriesDepInd = i;
-		break;
-	    }
-	}
-	var tempmarker = markers_querydata[seriesDepInd][currPosDataIndex[seriesDepInd][0]+item.dataIndex];
+        if (item == undefined) {
+        // Make it remove the marker of the previously selected point when you click nothing
+            if(selectedMarkers.length > 0 && selectedMarkers[0].selected)
+            selectedMarkers[0].selected.setMap(null);
+            return false;
+        } 
+            //uncomment to have this show up after enablePosition2 in the html (perhaps clickdata2?)
+            //$("#clickdata2").text("Index " + item.dataIndex +', Date/Time:'+item.datapoint[0]+', '+item.series.label + ': ' + item.datapoint[1]);
+            
+            //save clicked info in global variables
+            flot_clicked_series = item.series;
+            flot_clicked_datapoint = item.datapoint;
+            console.log("plotclicked event", event); 
+        var s = item.series.label;
+        for(var i=0; i<deps.length; i++){
+            if(s==deps[i]){
+                seriesDepInd = i;
+            break;
+            }
+        }
+        var tempmarker = markers_querydata[seriesDepInd][currPosDataIndex[seriesDepInd][0]+item.dataIndex];
         addSelectedPos(tempmarker, map);
     });
 
     $("#plot-div").bind("plothover", function(event, pos, item) {
-	if(item){
-	    var sl = item.series.label;
-	    seriesDepInd = -1;
-	    for(var i=0; i<deps.length; i++){
-		if(sl==deps[i]){
-		    seriesDepInd = i;
-		    break;
-		}
-	    }
-	}
+        if(item){
+            var sl = item.series.label;
+            seriesDepInd = -1;
+            for(var i=0; i<deps.length; i++){
+                if(sl==deps[i]){
+                    seriesDepInd = i;
+                    break;
+                }
+            }
+        }
     });
     
     $("#plot-div").bind("plotselected",function (event, ranges) {
-	var xaxis = $(this).data("plot").getAxes().xaxis;
-	var timeframearr = [xaxis.min/1000, xaxis.max/1000];
-	var timeframe = timeframearr[1] - timeframearr[0];
+        var xaxis = $(this).data("plot").getAxes().xaxis;
+        var timeframearr = [xaxis.min/1000, xaxis.max/1000];
+        var timeframe = timeframearr[1] - timeframearr[0];
 
-	// If the selection isn't the same as before (IE, if it wasn't selected by the slider)
-	if(selectedTimeRange[0] != ranges.xaxis.from/1000 || selectedTimeRange[1] != ranges.xaxis.to/1000) {
-	    //var selectedOldNew = [[getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')]];
-	    selectedTimeRange = [ranges.xaxis.from/1000, ranges.xaxis.to/1000];	
-	    //selectedOldNew[1] = [getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')];
-	    $('#time-slider').slider("values", 
-		[(selectedTimeRange[0]-timeframearr[0])/timeframe, 
-		(selectedTimeRange[1]-timeframearr[0])/timeframe]);
-	    //changeSelectionHelper(selectedOldNew);
-	    for(var i=0; i<deps.length; i++) {
-		if(activeDeps.indexOf(deps[i]) != -1) 
-		    setLatLongData(i);
-	    }
-	}
+        // If the selection isn't the same as before (IE, if it wasn't selected by the slider)
+        if(selectedTimeRange[0] != ranges.xaxis.from/1000 || selectedTimeRange[1] != ranges.xaxis.to/1000) {
+            //var selectedOldNew = [[getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')]];
+            selectedTimeRange = [ranges.xaxis.from/1000, ranges.xaxis.to/1000];	
+            //selectedOldNew[1] = [getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')];
+            console.log('values are',       [(selectedTimeRange[0]-timeframearr[0])/timeframe, 
+            (selectedTimeRange[1]-timeframearr[0])/timeframe]);
+            $('#time-slider').slider("values", 
+            [(selectedTimeRange[0]-timeframearr[0])/timeframe, 
+            (selectedTimeRange[1]-timeframearr[0])/timeframe]);
+            //changeSelectionHelper(selectedOldNew);
+            for(var i=0; i<deps.length; i++) {
+            if(activeDeps.indexOf(deps[i]) != -1) 
+                setLatLongData(i);
+            }
+        }
 
-	flotSelectedRange[0] = xaxis.p2c(ranges.xaxis.from); //(ranges.xaxis.from/1000-(rawPosData[0][currPosDataIndex[0][0]][2]))/timeframe * flotPlotWidth;
-	flotSelectedRange[1] = xaxis.p2c(ranges.xaxis.to); //(ranges.xaxis.to/1000-(rawPosData[0][currPosDataIndex[0][0]][2]))/timeframe * flotPlotWidth;
-	flotSelectedWidth = flotSelectedRange[1] - flotSelectedRange[0];
+        flotSelectedRange[0] = xaxis.p2c(ranges.xaxis.from); //(ranges.xaxis.from/1000-(rawPosData[0][currPosDataIndex[0][0]][2]))/timeframe * flotPlotWidth;
+        flotSelectedRange[1] = xaxis.p2c(ranges.xaxis.to); //(ranges.xaxis.to/1000-(rawPosData[0][currPosDataIndex[0][0]][2]))/timeframe * flotPlotWidth;
+        flotSelectedWidth = flotSelectedRange[1] - flotSelectedRange[0];
 
-	if(boundingRect) {
-	   selectMap(boundingRect.getBounds());
-	}
-	plot.draw();
-	colorMarkers();
+        if(boundingRect) {
+           selectMap(boundingRect.getBounds());
+        }
+        plot.draw();
+        colorMarkers();
     });
 
     $("#plot-div").bind("plotunselected", function (event) {
-	console.log("plot unselected event", event);
-	if(flotSelectedRange[0]==0 && flotSelectedRange[1]==flotPlotWidth)
-	    return;
-	flotSelectedRange = [0, flotPlotWidth];
-	flotSelectedWidth = flotPlotWidth;	
-	//var selectedOldNew = [[getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')],
-	 //   currPosDataIndex.slice(0)];
-	  
-	var xaxis = $(this).data("plot").getAxes().xaxis;
-	selectedTimeRange = [xaxis.min/1000, xaxis.max/1000];
-	resetTimeSlider();
-	//changeSelectionHelper(selectedOldNew);
-	for(var i=0; i<deps.length; i++) {
-	    if(activeDeps.indexOf(deps[i]) != -1) 
-		setLatLongData(i);
-	}
+        console.log("plot unselected event", event);
+        if(flotSelectedRange[0]==0 && flotSelectedRange[1]==flotPlotWidth)
+            return;
+        flotSelectedRange = [0, flotPlotWidth];
+        flotSelectedWidth = flotPlotWidth;	
+        //var selectedOldNew = [[getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')],
+         //   currPosDataIndex.slice(0)];
+          
+        var xaxis = $(this).data("plot").getAxes().xaxis;
+        selectedTimeRange = [xaxis.min/1000, xaxis.max/1000];
+        resetTimeSlider();
+        //changeSelectionHelper(selectedOldNew);
+        for(var i=0; i<deps.length; i++) {
+            if(activeDeps.indexOf(deps[i]) != -1) 
+            setLatLongData(i);
+        }
 
-	if(boundingRect) {
-	    boundingRect.setMap(null);
-	    boundingRect = null;
-	    selMapTimes = [];	
-	}
-	plot.draw();
-	colorMarkers();
+        if(boundingRect) {
+            boundingRect.setMap(null);
+            boundingRect = null;
+            selMapTimes = [];	
+        }
+        plot.draw();
+        colorMarkers();
     });
 
     $("#plot-div").resize(function () {
@@ -758,6 +765,7 @@ function updateData() {
     var reqTimeFrom = (new timezoneJS.Date(document.getElementById("id_datetime_from").value, TIMEZONE).getTime())/1000; 
     var reqTimeTo = (new timezoneJS.Date(document.getElementById("id_datetime_to").value, TIMEZONE).getTime())/1000;
     selectedTimeRange = [reqTimeFrom, reqTimeTo];
+    currTimeRange = [reqTimeFrom, reqTimeTo];
     var dataLatestTimes = findLatestDataTimes(activeDeps);
     var dataEarliestLatestTime = dataLatestTimes[0];
 
@@ -1041,7 +1049,12 @@ function updateData() {
         loadMarkers(map, prepend);
     }
 
-    userRequestedMaxTimeRange = [reqTimeFrom, reqTimeTo];
+    if(userRequestedMaxTimeRange != []) {
+        userRequestedMaxTimeRange = [Math.min(reqTimeFrom,userRequestedMaxTimeRange[0]), Math.max(reqTimeTo,userRequestedMaxTimeRange[1])];
+    }
+    else {
+        userRequestedMaxTimeRange = [reqTimeFrom, reqTimeTo];
+    }
     
     return ajaxRequests;
 }
@@ -1330,16 +1343,6 @@ function setupSlider() {
 	},
 	slide: function(event, ui) {
 	    console.log("changed or sliding idk whatever", ui);
-	    var currTimeRange;
-	    for(var i=0; i<deps.length; i++) {
-		if(rawPosData[i].length > 0) {
-		    // TODO: replace with the datetime to and from in form?
-		    currTimeRange = [rawPosData[i][currPosDataIndex[i][0]][2] , rawPosData[i][currPosDataIndex[i][1]][2]];
-		    break;
-		}
-	    }
-	    if(!currTimeRange)
-	    	return;
 	    var currTimeDelta = currTimeRange[1] - currTimeRange[0];
 	    
 	    /*
@@ -2170,6 +2173,7 @@ function initialize(){
     for(var i = 0; i<deps.length; i++) currPosDataIndex[i] = [0, rawPosData[i].length-1]; // = [0, rawPosData[i].length-1 > 0 ? rawPosData[i].length-1 : 0];
     updateNumPoints();
     selectedTimeRange = [{{datetime_from}}, {{datetime_to}}];
+    currTimeRange = [{{datetime_from}}, {{datetime_to}}];
     userRequestedMaxTimeRange = [{{datetime_from}}, {{datetime_to}}];
 
 	
