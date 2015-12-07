@@ -253,7 +253,11 @@ then
 	BACKUP_FRONTEND_RSYNCLOG=/var/log/rmg/rmg_backup_frontend_rsynclog
 	echo Logging to $BACKUP_FRONTEND_RSYNCLOG
 	echo $0 starting frontend backup `date`
-	rsync -ravz --bwlimit=80 $RMG_BACKUP_DIR2_DATABASE/ $RMG_BACKUP_FRONTEND_DATABASE >$BACKUP_FRONTEND_RSYNCLOG
+	#
+	command="rsync -ravz --bwlimit=80 $RMG_BACKUP_DIR2_DATABASE/ $RMG_BACKUP_FRONTEND_DATABASE"
+	echo $command
+	`$command >$BACKUP_FRONTEND_RSYNCLOG`
+	#
 	echo $0 finished frontend backup `date`
 	if [ $? -ne 0 ]
 	then
@@ -281,7 +285,11 @@ then
 	BACKUP_FRONTEND_RSYNCLOG=/var/log/rmg/rmg_backup_frontend_rsynclog
 	echo Logging to $BACKUP_FRONTEND_RSYNCLOG
 	echo $0 starting frontend backup `date`
-	rsync -ravz --bwlimit=80 $RMG_BACKUP_DIR_DATABASE/ $RMG_BACKUP_FRONTEND_DATABASE >$BACKUP_FRONTEND_RSYNCLOG
+	#
+	command="rsync -ravz --bwlimit=80 $RMG_BACKUP_DIR_DATABASE/ $RMG_BACKUP_FRONTEND_DATABASE"
+	echo $command
+	`$command >$BACKUP_FRONTEND_RSYNCLOG`
+	#
 	echo $0 finished frontend backup `date`
 	if [ $? -ne 0 ]
 	then
