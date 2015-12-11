@@ -189,7 +189,7 @@ export RMG_POS_TIME_WINDOW=15
 export RMG_POS_TIME_STEP=15
 
 # Calibration data to use in auto position calculation
-export RMG_POS_CAL_ID=3
+export RMG_POS_CAL_ID=10
 
 # EST Score Threshold for filter before position estimation
 export RMG_POS_EST_THRESHOLD=0.0
