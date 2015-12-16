@@ -49,6 +49,13 @@ usage: rmg-node state/check/help [-options]
   configuration file, usually /home/rmg/site.csv. If not, it immediately 
   performs the transition.
 
+  Return codes:
+   0 - Success
+   1 - Unknown Error
+   2 - Read-only Disk
+   3 - Harddrive is full
+   4 - Ramdisk is full
+
   'help' prints this help. 
 !EOF!
 }
@@ -131,7 +138,7 @@ function disk_status() {
   TMPFILE=$(mktemp $RMG_SITE_METADATA_DIR/tempfile.XXXXXXXX)
   if [ $? -ne "0" ]; then
     echo "Couldn't make test file."
-    AVAILABLE_BLOCKS=$(df -k / | tail -1 | awk '{print $4}')
+    AVAILABLE_BLOCKS=$(df -k $RMG_SITE_METADATA_DIR | tail -1 | awk '{print $4}')
     if [ $AVAILABLE_BLOCKS -lt "1024" ]; then
       echo "Disk Full"
       #TODO poweroff? inform server? e-mail for help?
@@ -144,6 +151,13 @@ function disk_status() {
   else
     rm $TMPFILE
     echo "Could make test file."
+  fi
+  AVAILABLE_RAMDISK=$(df -k $RMG_SITE_RAMDISK | tail -1 | awk '{print $4}')
+  if [ $AVAILABLE_RAMDISK -lt "1024" ]; then
+    echo "Ramdisk Full"
+    TIME=`date -u +%s`
+    echo "$TIME,Site stopped; Ramdisk Full" >> $RMG_SITE_STATUS_LOG
+    exit 4
   fi
 }
 
