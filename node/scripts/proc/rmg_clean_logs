@@ -1,0 +1,15 @@
+#!/bin/bash
+# rmg_clean_logs
+# deletes files in $RMG_SITE_LOG_DIR directory older than $days (default 7)
+# usage: rmg_clean_logs [days]
+
+PATH="/usr/local/bin:$PATH"
+source rmg_env
+
+days=$1
+if [ -z "$days" ]
+ then
+  days=7
+fi
+
+find $RMG_SITE_LOG_DIR/* -mtime +$days -exec rm {} \;
