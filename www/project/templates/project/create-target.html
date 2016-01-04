@@ -1,6 +1,13 @@
 {% extends "project/base_create_object.html" %}
 {% load class_tag %}
 
+{% block script %}
+{{ block.super }}
+<script>
+
+</script>
+{% endblock %}
+
 {%block success_msg %} Target created {% endblock %}
 {% block title_msg %} 
 

@@ -83,8 +83,12 @@ urlpatterns = patterns(
         'edit_project', name='edit-project'),
 
     url(
-        r'^(?P<project_id>\d+)/edit-project/add-manufacturer/$',
-        'add_manufacturer', name='add_manufacturer'),
+        r'^(?P<project_id>\d+)/edit-project/add-manufacturer-inline/$',
+        'add_manufacturer_inline', name='add-manufacturer_inline'),
+
+#    url(
+#        r'^(?P<project_id>\d+)/edit-project/add-target-inline/$',
+#        'add_target_inline', name='add-target_inline'),
 
     url(
         r'^(?P<project_id>\d+)/edit-project/add-location/$',
@@ -98,6 +102,10 @@ urlpatterns = patterns(
     url(
         r'^(?P<project_id>\d+)/edit-project/add-target/$', 'add_target',
         name='add-target'),
+    url(
+        r'^(?P<project_id>\d+)/edit-project/create-placeholder-target/$',
+        'create_placeholder_target',
+        name='create-placeholder-target'),
 
     url(
         r'^(?P<project_id>\d+)/edit-project/add-deployment/$',

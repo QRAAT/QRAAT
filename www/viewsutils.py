@@ -174,10 +174,10 @@ def render_project_form(
     :type request: HttpRequest.
     :param project_id: Project's id to check user permissions
     :type project_id: str.
-    :param post_form: Form to render when receives a post request
-    :type post_form: ProjectForm.
-    :param get_form: Form to render when receives a get request
-    :type get_form: ProjectForm.
+    :param post_form: form to render when receives a post request
+    :type post_form: Projectform 
+    :param get_form: form to render when receives a get request
+    :type get_form: Projectform 
     :param template_path: The path of the template that will be rendered
     :type template_path: str.
     :param success_url: Url to redirect in case of success
@@ -207,6 +207,57 @@ def render_project_form(
 
         return render(request, template_path,
                       {"form": form,
+                       "nav_options": nav_options,
+                       "changed": thereis_newelement,
+                       "project": project})
+    else:
+        return not_allowed_page(request)
+
+def render_project_formset(
+        request, project_id, post_formset,
+        get_formset, template_path, success_url):
+    """This is a main view called by other views that aim to render forms for
+    Transmitters, Locations, Targets, and Deployments
+
+    :param request: Django's http request object
+    :type request: HttpRequest.
+    :param project_id: Project's id to check user permissions
+    :type project_id: str.
+    :param post_formset: Formset to render when receives a post request
+    :type post_formset: ProjectFormSet from formset_factory(ProjectForm).
+    :param get_formset: Formset to render when receives a get request
+    :type get_formset: ProjectFormSet from formset_factory(ProjectForm).
+    :param template_path: The path of the template that will be rendered
+    :type template_path: str.
+    :param success_url: Url to redirect in case of success
+    :type success_url: str.
+    :returns:  HttpResponse -- Http response obj with a rendered page that \
+            contains a formset to add or edit Transmitters, \
+            Locations, Targets, or Deployments
+    """
+
+    user = request.user
+    project = get_project(project_id)
+    nav_options = get_nav_options(request)
+    thereis_newelement = None
+
+    if can_change(project, user):
+        if request.method == 'POST':
+            formset = post_formset
+            for form in formset:
+                form.set_project(project)
+            if formset.is_valid():
+                formset.save()
+                return redirect(success_url)
+
+        elif request.method == 'GET':
+            thereis_newelement = request.GET.get("new_element")
+            formset = get_formset
+            for form in formset:
+                form.set_project(project)
+
+        return render(request, template_path,
+                      {"formset": formset,
                        "nav_options": nav_options,
                        "changed": thereis_newelement,
                        "project": project})

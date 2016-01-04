@@ -194,13 +194,17 @@ class AddDeploymentForm(ProjectElementForm):
 
     class Meta:
         model = Deployment
-        exclude = ["projectID", "is_hidden", "time_end"]
+        exclude = ["projectID", "is_active", "is_hidden"]
 
     DATE_FORMAT = "%m/%d/%Y %H:%M:%S"
 
     txID = forms.ChoiceField()
     targetID = forms.ChoiceField()
     time_start = forms.DateTimeField(
+        widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+        initial=datetime.now().strftime(DATE_FORMAT),
+        input_formats=[DATE_FORMAT, ])
+    time_end = forms.DateTimeField(
         widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
         initial=datetime.now().strftime(DATE_FORMAT),
         input_formats=[DATE_FORMAT, ])
@@ -224,6 +228,18 @@ class AddDeploymentForm(ProjectElementForm):
         except:
             raise forms.ValidationError(
                 "We couldn't parse the time_start given.\
+                        Check if the format is correct")
+        else:
+            return timestamp
+    # TODO: determine if this actually works, especially DST vs not DST
+    def clean_time_end(self):
+        time_end = self.cleaned_data.get("time_end").astimezone(pytz.utc)
+
+        try:
+            timestamp = utils.date_totimestamp(time_end)
+        except:
+            raise forms.ValidationError(
+                "We couldn't parse the time_end given.\
                         Check if the format is correct")
         else:
             return timestamp

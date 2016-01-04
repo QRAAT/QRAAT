@@ -39,7 +39,7 @@ class Project(models.Model):
 
     ownerID = models.IntegerField(
         null=False, help_text="References UID in\
-                                  web frontend, i.e 'django.auth_user.id'")
+                                  web frontend, i.e 'qraat.auth_user.id'")
 
     name = models.CharField(max_length=50, null=False)  # varchar(50) not null
 
@@ -212,7 +212,7 @@ class AuthProjectViewer(models.Model):
     groupID = models.IntegerField(
         null=False,
         unique=True,
-        help_text="References GUID in web forntend, i.e. django.auth_group.id")
+        help_text="References GUID in web forntend, i.e. qraat.auth_group.id")
 
     projectID = models.ForeignKey(Project, db_column="projectID", unique=True)
 
@@ -235,7 +235,7 @@ class AuthProjectCollaborator(models.Model):
     groupID = models.IntegerField(
         null=False,
         unique=True,
-        help_text="References GUID in web frontend, i.e. django.auth.group.id")
+        help_text="References GUID in web frontend, i.e. qraat.auth_group.id")
 
     projectID = models.ForeignKey(Project, db_column="projectID", unique=True)
 

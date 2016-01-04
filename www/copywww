@@ -291,7 +291,7 @@ fi
 
 echo
 
-printf "\nIt's suggested that you source rmg_env in your bash profile\n"
+printf "\nIt's suggested that you source rmg_env in your bash profile if you haven't already\n"
 
 printf "\nNOTE: Please change the timezone in gaat/timezoneinfo to the timezone where your data will come from. You can refer to https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for your timezone\n"
 

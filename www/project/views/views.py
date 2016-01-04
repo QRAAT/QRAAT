@@ -12,9 +12,9 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core import serializers
 from django.template import Context
-from project.models import Project, Tx, Location
-from project.models import Target, Deployment
+from project.models import Project, Tx, TxMake, TxMakeParameters, Location, Target, Deployment
 #from project.models import Site, Telemetry, Est
+from django.forms import modelformset_factory
 from project.forms import ProjectForm, OwnersEditProjectForm, AddTransmitterForm
 from project.forms import AddManufacturerForm, AddTargetForm
 from project.forms import AddDeploymentForm, AddLocationForm
@@ -354,11 +354,13 @@ def edit_project(request, project_id):
             return not_allowed_page(request)
 
 
+# Returns json format of new {ID:txMake.ID,manufacturer:manufacturer,model:model}, or false 
 @login_required(login_url="/account/login")
-def add_manufacturer(request, project_id):
+def add_manufacturer_inline(request, project_id):
     user = request.user
     nav_options = get_nav_options(request)
     istherenew_make = None
+    successful = False
 
     try:
         project = Project.objects.get(ID=project_id)
@@ -367,39 +369,91 @@ def add_manufacturer(request, project_id):
                 raise Http404
 
     else:
-        if user.id == project.ownerID and user.is_superuser:
-            transmitter_form = AddTransmitterForm()
+        if can_change(project, user):
             if request.method == 'POST':
-                manufacturer_form = AddManufacturerForm(data=request.POST)
-
-                if manufacturer_form.is_valid():
-                    make_obj = manufacturer_form.save()
-                    return redirect(
-                        "../add-manufacturer?newmake=\
-                                True?makeid=%d" % make_obj.ID)
-
+                # Saving the tx make/model
+                form = dict(request.POST)
+                # Each key should have only one none null value (unless people mess with the html?)
+                # vals should be non empty, from in-browser validation
+                for val in form['manufacturer']:
+                    if val:
+                        manufacturer = val
+                        break
+                for val in form['model']:
+                    if val:
+                        model = val
+                        break
+                for val in form['pulse_width']:
+                    if val:
+                        pulse_width = val
+                        break
+                for val in form['pulse_rate']:
+                    if val:
+                        pulse_rate = val
+                        break
+                txMake = TxMake(manufacturer=manufacturer, model=model, demod_type=form['demod_type'][0])
+                txMake.save()
+                if(form['demod_type'][0]==u'pulse'): 
+                    TxMakeParameters(tx_makeID=txMake, name='pulse_width', value=pulse_width).save()
+                    TxMakeParameters(tx_makeID=txMake, name='pulse_rate', value=pulse_rate).save()
+                    # Hardcoded
+                    TxMakeParameters(tx_makeID=txMake, name='band3', value=150).save()
+                    TxMakeParameters(tx_makeID=txMake, name='band10', value=900).save()
+                # Const demod_type doesn't store any parameters
+                return HttpResponse(json.dumps({'ID':txMake.ID,'manufacturer':manufacturer,'model':model}), content_type="application/json")
             elif request.method == 'GET':
-                istherenew_make = request.GET.get("newmake")
-                manufacturer_form = AddManufacturerForm()
+                print 'Error? Adding tx_make form method is GET?'
+                return HttpResponse(json.dumps({'result':False}), content_type="application/json")
+                 
 
-            return render(
-                request, "project/create-manufacturer.html",
-                {"nav_options": nav_options,
-                 "manufacturer_form": manufacturer_form,
-                 "transmitter_form": transmitter_form,
-                 "changed": istherenew_make,
-                 "project": project})
-        else:
-            return not_allowed_page(request)
+@login_required(login_url="account/login")
+def create_placeholder_target(request, project_id):
+    user = request.user
+    nav_options = get_nav_options(request)
+    istherenew_make = None
+    successful = False
+
+    try:
+        project = Project.objects.get(ID=project_id)
+
+    except ObjectDoesNotExist:
+                raise Http404
+
+    else:
+        if can_change(project, user):
+            if request.method == 'POST':
+                form = dict(request.POST)
+                ntargets = int(form['number'][0])
+                copyID = int(form['copyID'][0])
+                try:
+                    copyTarget = Target.objects.get(ID=copyID)
+                except ObjectDoesNotExist:
+                    raise Http404
+                else:
+                    ids = []
+                    names = []
+                    for i in range(0,ntargets):
+                        # if pk = None, django generates the primary key for us, inserts as new row
+                        copyTarget.pk = None
+                        copyTarget.name = Placeholder + " " + str(i)
+                        copyTarget.save()
+                        ids.append(copyTarget.ID)
+                        names.append(copyTarget.name)
+                    print ids
+                    name = "assbut"
+                    return HttpResponse(json.dumps({'names':names, 'ids':ids}), content_type="application/json")
+            elif request.method == 'GET':
+                raise PermissionDenied
+                return HttpResponse(json.dumps({'result':False}), content_type="application/json")
 
 
 @login_required(login_url="account/login")
 def add_location(request, project_id):
-    return render_project_form(
+    return render_project_formset(
         request=request,
         project_id=project_id,
-        post_form=AddLocationForm(data=request.POST),
-        get_form=AddLocationForm(),
+        post_formset=modelformset_factory(Location, form=AddLocationForm)(data=request.POST),
+        get_formset=modelformset_factory(Location, form=AddLocationForm, extra=2)(queryset=Location.objects.none()),
         template_path="project/create-location.html",
         success_url="%s?new_element=True" % reverse(
             "project:manage-locations", args=(project_id,)))
@@ -407,11 +461,11 @@ def add_location(request, project_id):
 
 @login_required(login_url="/account/login")
 def add_transmitter(request, project_id):
-    return render_project_form(
+    return render_project_formset(
         request=request,
         project_id=project_id,
-        post_form=AddTransmitterForm(data=request.POST),
-        get_form=AddTransmitterForm(),
+        post_formset=modelformset_factory(Tx, form=AddTransmitterForm)(data=request.POST),
+        get_formset=modelformset_factory(Tx, form=AddTransmitterForm, extra=2)(queryset=Tx.objects.none()),
         template_path="project/create-transmitter.html",
         success_url="%s?new_element=True" % reverse(
             "project:manage-transmitters", args=(project_id,)))
@@ -419,11 +473,11 @@ def add_transmitter(request, project_id):
 
 @login_required(login_url="/account/login")
 def add_target(request, project_id):
-    return render_project_form(
+    return render_project_formset(
         request=request,
         project_id=project_id,
-        post_form=AddTargetForm(data=request.POST),
-        get_form=AddTargetForm(),
+        post_formset=modelformset_factory(Target, form=AddTargetForm)(data=request.POST),
+        get_formset=modelformset_factory(Target, form=AddTargetForm, extra=2)(queryset=Target.objects.none()),
         template_path="project/create-target.html",
         success_url="%s?new_element=True" % reverse(
             "project:manage-targets", args=(project_id,))
@@ -432,11 +486,11 @@ def add_target(request, project_id):
 
 @login_required(login_url="/account/login")
 def add_deployment(request, project_id):
-    return render_project_form(
+    return render_project_formset(
         request=request,
         project_id=project_id,
-        post_form=AddDeploymentForm(data=request.POST),
-        get_form=AddDeploymentForm(),
+        post_formset=modelformset_factory(Deployment, form=AddDeploymentForm)(data=request.POST),
+        get_formset=modelformset_factory(Deployment, form=AddDeploymentForm, extra=2)(queryset=Deployment.objects.none()),
         template_path="project/create-deployment.html",
         success_url="%s?new_element=True" % reverse(
             "project:manage-deployments", args=(project_id,))
@@ -550,7 +604,6 @@ def manage_deployments(request, project_id):
         project,
         "project/manage_deployments.html",
         content)
-
 
 @login_required(login_url="/account/login")
 def edit_transmitter(request, project_id, transmitter_id):
