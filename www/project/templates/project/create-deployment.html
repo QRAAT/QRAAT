@@ -8,6 +8,7 @@ New Deployment.
     There must be an available <a href={%url 'project:add-transmitter' project.ID %}>transmitter</a> and a <a href={%url 'project:add-target' project.ID %}>target</a> to make a deployment.
 <br>
 If you create a placeholder target, remember to change the target information when you actually deploy the transmitter on an animal.
+</font>
 {% endblock %}
 
 {% block script %}
@@ -21,7 +22,7 @@ $(document).ready(function() {
     $("#formset_table").prepend("<tr id='table-controls'><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>");
     $($("#table-controls")[0].children[2]).append("<button class='copy-last btn btn-default' type='button'>Copy last</button>")
     $($("#table-controls")[0].children[3]).append("<button class='copy-last btn btn-default' type='button'>Copy last</button>")
-    $($("#table-controls")[0].children[5]).append("<div class='input-group'><select id='placeholder-select'></select><span class='input-group-btn'><button id='create-placeholders' class=' btn btn-default' type='button'>Create Placeholders</button></span></div></div>")
+    //$($("#table-controls")[0].children[5]).append("<div class='input-group'><select id='placeholder-select'></select><span class='input-group-btn'><button id='create-placeholders' class=' btn btn-default' type='button'>Create Placeholders</button></span></div></div>")
 
     $("select[name$=targetID]").append("<option value=create>Create Target</option>");
     $("select").change(function() {
@@ -119,17 +120,17 @@ function submitTarget() {
         data: $("#target-form").serialize(),
         dataType: 'json',
         success: function(data) {
-            if(data['result']==false || !(data['ID']!=null && data['manufacturer']!=null && data['model']!=null)) {
-                $("#create-manufacturer-div span.label-warning").css("display","");
+            if(data['result']==false || !(data['ID']!=null && data['name']!=null)) {
+                $("#create-target-div span.label-warning").css("display","");
             }
             else {
                 // Add options to selects
-                $("select[name$=tx_makeID] option:last-child").before("<option value="+data['ID']+">"+data['ID']+" "+data['manufacturer']+" "+data['model']+"</option>");
-                $("#create-manufacturer-div span.label-success").css("display","");
+                $("select[name$=targetID] option:last-child").before("<option value="+data['ID']+">"+data['ID']+" "+data['name']+"</option>");
+                $("#create-target-div span.label-success").css("display","");
             }
         },
         fail: function(data) {
-            $("#create-manufacturer-div span.label-warning").css("display","");
+            $("#create-target-div span.label-warning").css("display","");
         },
     }); 
 }
@@ -138,7 +139,7 @@ function submitTarget() {
 
 {% block content %}
 {{ block.super }}
-<!-- Hidden form that will be copied to create tx_makes -->
+<!-- Hidden form that will be copied to create targets -->
 <div id="create-target-div" style="padding:10px ;display:None">
     <button type="button" id="close-div" class="btn btn-xs" style="float:right">Close</button>
     <!-- <form method="post" action="../add-target/"> -->
