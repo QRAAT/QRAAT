@@ -36,8 +36,15 @@ $(document).ready(function(){
     $(".delete_button").click(function() {
         $(this).closest("tr").hide();
         $(this).closest("tr").find(":input").each(function() {
-            $(this).val("");
+            console.log($(this));
+            if($(this).hasClass("datetime")) {
+                console.log("clearing datetimme field");
+            }
+            else {
+                $(this).val("");
+            }
         });
+        $("#num_rows").val($("#form tr.objectrow:visible").length);
     });
 
     $(".copy_button").click(function() {
@@ -223,7 +230,8 @@ function checkFormEmpty() {
 {% endfor %}
 </table>
 <div class="input-group submit-btn">
-    <div class="col-sm-offset-9 col-sm-10">
+    <!--<div class="col-sm-offset-9 col-sm-10">-->
+    <div>
         <button class="btn btn-primary btn-lg" type="submit" value="create">{%block button_name %} Save {% endblock %}</button>
     </div>
 </div>

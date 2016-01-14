@@ -86,9 +86,9 @@ urlpatterns = patterns(
         r'^(?P<project_id>\d+)/edit-project/add-manufacturer-inline/$',
         'add_manufacturer_inline', name='add-manufacturer_inline'),
 
-#    url(
-#        r'^(?P<project_id>\d+)/edit-project/add-target-inline/$',
-#        'add_target_inline', name='add-target_inline'),
+    url(
+        r'^(?P<project_id>\d+)/edit-project/add-target-inline/$',
+        'add_target_inline', name='add-target_inline'),
 
     url(
         r'^(?P<project_id>\d+)/edit-project/add-location/$',

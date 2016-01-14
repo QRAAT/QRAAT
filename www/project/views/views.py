@@ -392,6 +392,7 @@ def add_manufacturer_inline(request, project_id):
                         pulse_rate = val
                         break
                 txMake = TxMake(manufacturer=manufacturer, model=model, demod_type=form['demod_type'][0])
+                
                 txMake.save()
                 if(form['demod_type'][0]==u'pulse'): 
                     TxMakeParameters(tx_makeID=txMake, name='pulse_width', value=pulse_width).save()
@@ -404,11 +405,61 @@ def add_manufacturer_inline(request, project_id):
             elif request.method == 'GET':
                 print 'Error? Adding tx_make form method is GET?'
                 return HttpResponse(json.dumps({'result':False}), content_type="application/json")
+
+def add_target_inline(request, project_id):
+    user = request.user
+    nav_options = get_nav_options(request)
+    istherenew_make = None
+    successful = False
+
+    try:
+        project = Project.objects.get(ID=project_id)
+
+    except ObjectDoesNotExist:
+                raise Http404
+
+    else:
+        if can_change(project, user):
+            if request.method == 'POST':
+                form = dict(request.POST)
+                # Each key should have only one none null value (unless people mess with the html?)
+                # vals should be non empty, from in-browser validation
+                for val in form['name']:
+                    if val:
+                        name = val
+                        break
+                for val in form['description']:
+                    if val:
+                        description = val
+                        break
+                for val in form['max_speed_family']:
+                    if val:
+                        max_speed_family = val
+                        break
+                for val in form['speed_burst']:
+                    if val:
+                        speed_burst = val
+                        break
+                for val in form['speed_sustained']:
+                    if val:
+                        speed_sustained = val
+                        break
+                for val in form['speed_limit']:
+                    if val:
+                        speed_limit = val
+                        break
+                
+                target = Target(name=name, description=description, max_speed_family=max_speed_family, speed_burst=speed_burst, speed_sustained=speed_sustained, speed_limit=speed_limit, projectID=Project.objects.get(pk=project_id))
+                target.save()
+                return HttpResponse(json.dumps({'ID':target.ID,'name':target.name}), content_type="application/json")
+            elif request.method == 'GET':
+                print 'Error? Adding tx_make form method is GET?'
+                return HttpResponse(json.dumps({'result':False}), content_type="application/json")
                  
 
 @login_required(login_url="account/login")
 def create_placeholder_target(request, project_id):
-    user = request.user
+    user = request.user 
     nav_options = get_nav_options(request)
     istherenew_make = None
     successful = False
