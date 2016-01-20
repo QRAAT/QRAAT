@@ -26,7 +26,7 @@ $(document).ready(function() {
         $(this).closest("div").find("input[type!=hidden]").val("");
         $(this).closest("div").find("span.label").css("display","none");
         $tr = $(this).closest("tr");
-        $("#page-bottom").wrapInner($("#create-target-div"));
+        $("#page-bottom").wrapInner($("#create-manufacturer-div"));
         $tr.remove();
     });
     $("#demod_type").change(function() {

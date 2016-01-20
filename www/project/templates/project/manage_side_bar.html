@@ -24,6 +24,11 @@
         <a href={% url 'project:manage-deployments' project.ID %}>Manage Deployments</a>
         </li>
     </li>
+    <li>
+        <li class="side-bar-element">
+        <a href={% url 'project:bulk-wizard' project.ID %}>Bulk Wizard</a>
+        </li>
+    </li>
 </ol>
 
 {% endif %}

@@ -547,6 +547,18 @@ def add_deployment(request, project_id):
             "project:manage-deployments", args=(project_id,))
         )
 
+@login_required(login_url="/account/login")
+def bulk_wizard(request, project_id):
+    project = get_project(project_id)
+    content = {}
+    content["nav_options"] = get_nav_options(request)
+    content["project"] = project
+
+    return render_manage_page(
+        request,
+        project,
+        "project/bulk-create.html",
+        content)
 
 def show_project(request, project_id):
 

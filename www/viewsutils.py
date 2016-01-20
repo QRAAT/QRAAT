@@ -279,3 +279,19 @@ def render_manage_page(request, project, template_path, content):
 
     else:
         return not_allowed_page(request)
+
+def render_bulk_page(request, project, template_path, content):
+    user = request.user
+    nav_options = get_nav_options(request)
+
+    if request.method == "GET":
+        content["changed"] = request.GET.get("new_element")
+        content["deleted"] = request.GET.get("deleted")
+
+    if can_change(project, user):
+        return render(
+            request, template_path,
+            content)
+
+    else:
+        return not_allowed_page(request)
