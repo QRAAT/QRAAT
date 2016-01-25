@@ -215,7 +215,7 @@ def render_project_form(
 
 def render_project_formset(
         request, project_id, post_formset,
-        get_formset, template_path, success_url):
+        get_formset, template_path, success_url="", redirect_bool=True, extra_context=None):
     """This is a main view called by other views that aim to render forms for
     Transmitters, Locations, Targets, and Deployments
 
@@ -248,7 +248,12 @@ def render_project_formset(
                 form.set_project(project)
             if formset.is_valid():
                 formset.save()
-                return redirect(success_url)
+                if redirect_bool:
+                   return redirect(success_url)
+                # For the bulk wizard page that after saving a formset, displays a new formset for new objects, instead of redirecting to another page
+                # The request is returned, along with the formset in request.POST
+                else:
+                    return request
 
         elif request.method == 'GET':
             thereis_newelement = request.GET.get("new_element")
@@ -256,11 +261,19 @@ def render_project_formset(
             for form in formset:
                 form.set_project(project)
 
-        return render(request, template_path,
-                      {"formset": formset,
-                       "nav_options": nav_options,
-                       "changed": thereis_newelement,
-                       "project": project})
+        context = {"formset": formset,
+                   "nav_options": nav_options,
+                   "changed": thereis_newelement,
+                   "project": project}
+
+        if extra_context != None:
+            if isinstance(extra_context, dict):
+                context.update(extra_context)
+            else:
+                raise TypeError("Passed in non-dict for extra_context in render_project_formset")
+
+        return render(request, template_path, context)
+                      
     else:
         return not_allowed_page(request)
 
