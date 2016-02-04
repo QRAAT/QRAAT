@@ -547,6 +547,18 @@ def add_deployment(request, project_id):
             "project:manage-deployments", args=(project_id,))
         )
 
+"""
+This is a somewhat lengthy function that deals with displaying multiple forms in succession on one URL page.
+It starts off on a simple page where you select the number of form rows, beyond that it gets complicated.
+
+request.method == 'POST'
+These requests are from submitting the forms (besides the initial simple 'number' form). 
+We pass the request to render_project_formset (with redirect_bool=False), which validates the form, and we store the return value in 'rval'. 
+If the form is valid, then b/c redirect_bool==False, it does not return a HttpResponse, but instead the model objects built created by the form. 
+If the form is not valid, then it returns a rendered page (HttpResponse) with the form errors included.
+We check what type the return value is, and if it's type HttpResonse, then the form was not valid and this function returns the HttpResponse returned by render_project_formset.
+If it's not, then we call and return render_project_formset with the modelform of the next form, or redirect to some page if it's the last form.
+"""
 # The worst function ever
 @login_required(login_url="/account/login")
 def bulk_wizard(request, project_id, number=0):
@@ -579,31 +591,10 @@ def bulk_wizard(request, project_id, number=0):
             except ValueError:
                 return HttpResponseBadRequest("Entered a non-number")
 
-        # Dep error
-        if request.GET.get("form-0-tx_targetID") != None:
-            return render_project_formset(
-                request=request,
-                project_id=project_id,
-                post_formset=modelformset_factory(Deployment, form=AddDeploymentForm)(data=request.POST),
-                get_formset=modelformset_factory(Deployment, form=AddDeploymentForm, extra=num)(queryset=Deployment.objects.none()),
-                template_path="project/bulk-create.html",
-                success_url="",
-                redirect_bool=False
-                )
-        # Target error
-        elif request.GET.get("form-0-name") != None:
-            return render_project_formset(
-                request=request,
-                project_id=project_id,
-                post_formset=modelformset_factory(Target, form=AddTargetForm)(data=request.POST),
-                get_formset=modelformset_factory(Target, form=AddTargetForm, extra=num)(queryset=Target.objects.none()),
-                template_path="project/bulk-create.html",
-                success_url="",
-                redirect_bool=False
-                )
-        # Tx
-        else: #elif request.GET.get("form-0-tx_makeID") != None:
-            return render_project_formset(
+
+        # Tx error
+        if request.GET.get("form-0-serial_no"): #elif request.GET.get("form-0-tx_makeID") != None:
+            return render_wizard_project_formset(
                 request=request,
                 project_id=project_id,
                 post_formset=modelformset_factory(Tx, form=AddTransmitterForm)(data=request.POST),
@@ -611,8 +602,47 @@ def bulk_wizard(request, project_id, number=0):
                 template_path="project/bulk-create.html",
                 success_url="",
                 redirect_bool=False,
-                extra_context={"title_msg":"New Transmitter"}
+                extra_context={"title_msg":"New Transmitter", "current_form": "tx"}
                 )
+        # Target error
+        elif request.GET.get("form-0-name") != None: # Tx doesn't have a name field
+            return render_wizard_project_formset(
+                request=request,
+                project_id=project_id,
+                post_formset=modelformset_factory(Target, form=AddTargetForm)(data=request.POST),
+                get_formset=modelformset_factory(Target, form=AddTargetForm, extra=num)(queryset=Target.objects.none()),
+                template_path="project/bulk-create.html",
+                success_url="",
+                redirect_bool=False,
+                extra_context={"current_form": "target"}
+                )
+        # Dep error     
+        elif request.GET.get("form-0-targetID") != None:
+            return render_wizard_project_formset(
+                request=request,
+                project_id=project_id,
+                post_formset=modelformset_factory(Deployment, form=AddDeploymentForm)(data=request.POST),
+                get_formset=modelformset_factory(Deployment, form=AddDeploymentForm, extra=num)(queryset=Deployment.objects.none()),
+                template_path="project/bulk-create.html",
+                success_url="",
+                redirect_bool=False,
+                extra_context={"current_form": "deployment"}
+                )
+        # From initial page that selects the num
+        # Tx, not error
+        else:
+            return render_wizard_project_formset(
+                request=request,
+                project_id=project_id,
+                post_formset=modelformset_factory(Tx, form=AddTransmitterForm)(data=request.POST),
+                get_formset=modelformset_factory(Tx, form=AddTransmitterForm, extra=num)(queryset=Tx.objects.none()),
+                template_path="project/bulk-create.html",
+                success_url="",
+                redirect_bool=False,
+                extra_context={"title_msg":"New Transmitter", "current_form": "tx"}
+                )
+        
+        
     # POST requests from submitting forms
     elif request.method == 'POST':
         num = request.GET.get("number")
@@ -627,60 +657,67 @@ def bulk_wizard(request, project_id, number=0):
         if request.POST.get("form-0-tx_makeID") != None:
             print 'in post, tx'
             print type(num)
-            rval = render_project_formset(
+            rval = render_wizard_project_formset(
                     request=request,
                     project_id=project_id,
                     post_formset=modelformset_factory(Tx, form=AddTransmitterForm)(data=request.POST),
                     get_formset=modelformset_factory(Tx, form=AddTransmitterForm, extra=num)(queryset=Tx.objects.none()),
                     template_path="project/bulk-create.html",
                     success_url="",
-                    redirect_bool=False
+                    redirect_bool=False,
+                    extra_context={"current_form": "tx"}
                     ) 
         # If Deployment
         elif request.POST.get("form-0-targetID") != None:
             #request.method = 'GET' # Dumb way to make request GET
-            rval = render_project_formset(
+            rval = render_wizard_project_formset(
                 request=request,
                 project_id=project_id,
-                post_formset=modelformset_factory(Deployment, form=AddDeploymentForm)(data=request.POST),#(data=request.POST),
+                post_formset=modelformset_factory(Deployment, form=AddDeploymentForm)(data=request.POST),
                 get_formset=modelformset_factory(Deployment, form=AddDeploymentForm, extra=num)(queryset=Deployment.objects.none()),
                 template_path="project/bulk-create.html",
                 success_url="",
-                redirect_bool=False
+                redirect_bool=False,
+                extra_context={"current_form": "deployment"}
             ) 
         # If Target
         elif request.POST.get("form-0-name") != None:
             #request.method = 'GET' # Dumb way to make request GET
             print type(num)
-            rval = render_project_formset(
+            rval = render_wizard_project_formset(
                 request=request,
                 project_id=project_id,
-                post_formset=modelformset_factory(Target, form=AddTargetForm)(data=request.POST),#(data=request.POST),
+                post_formset=modelformset_factory(Target, form=AddTargetForm)(data=request.POST),
                 get_formset=modelformset_factory(Target, form=AddTargetForm, extra=num)(queryset=Target.objects.none()),
                 template_path="project/bulk-create.html",
                 success_url="",
-                redirect_bool=False
+                redirect_bool=False,
+                extra_context={"current_form": "target"}
             ) 
             
-        # Now we check what render_project_formset returns. Because we used "redirect_bool=False", when the form is valid and we would usually be redirected to another page, we instead return the request, not HttpResponse. 
+        # Now we check what render_wizard_project_formset returns. Because we used "redirect_bool=False", when the form is valid and we would usually be redirected to another page, we instead return the saved objects, not HttpResponse. 
         # Thus, if not instance of HttpResonse, there was a valid form submission
         if not isinstance(rval, HttpResponse):
             # For when forms were successfully validated. Instead of redirecting to another page, just come back to this page with new formset
-            request = rval
             print request.POST
             # Shoddy way of testing which model form we're on. Perhaps turn the keys of request.POST into list, search for field ending in tx_makeID
-            # Submitted valid TX form, return a Target form
+            # Submitted valid Tx form, return a Target form
             if request.POST.get("form-0-tx_makeID") != None:
                 request.method = 'GET' # Dumb way to make request GET
                 print type(num)
-                return render_project_formset(
+                ids = [x.pk for x in rval]
+                print ids
+                passed_options = {"tx_ids":ids}
+                return render_wizard_project_formset(
                     request=request,
                     project_id=project_id,
                     post_formset=modelformset_factory(Target, form=AddTargetForm)(),#(data=request.POST),
                     get_formset=modelformset_factory(Target, form=AddTargetForm, extra=num)(queryset=Target.objects.none()),
                     template_path="project/bulk-create.html",
                     success_url="",
-                    redirect_bool=False
+                    redirect_bool=False,
+                    extra_context={"current_form": "target",
+                                    "passed_options": passed_options}
                 ) 
             # Deployment. Valid deployment form submission, so we're done with the wizard, so we just go to the manage deployment page.
             elif request.POST.get("form-0-targetID") != None:
@@ -690,29 +727,21 @@ def bulk_wizard(request, project_id, number=0):
                 success_url="%s?new_element=True" % reverse(
                     "project:manage-deployments", args=(project_id,))
                 return redirect(success_url)
-                #return render_project_formset(
-                #    request=request,
-                #    project_id=project_id,
-                #    post_formset=modelformset_factory(Deployment, form=AddDeploymentForm)(data=request.POST),
-                #    get_formset=modelformset_factory(Deployment, form=AddDeploymentForm, extra=2)(queryset=Deployment.objects.none()),
-                #    template_path="project/create-deployment.html",
-                #    success_url="%s?new_element=True" % reverse(
-                #        "project:manage-deployments", args=(project_id,))
-                #    )
             # Target to Dep
             elif request.POST.get("form-0-name") != None:
                 request.method = 'GET' # Dumb way to make request GET
                 print "target to dep 1"
                 print type(num)
                 print num
-                return render_project_formset(
+                return render_wizard_project_formset(
                     request=request,
                     project_id=project_id,
                     post_formset=modelformset_factory(Deployment, form=AddDeploymentForm)(),#(data=request.POST),
                     get_formset=modelformset_factory(Deployment, form=AddDeploymentForm, extra=num)(queryset=Deployment.objects.none()),
                     template_path="project/bulk-create.html",
                     success_url="",
-                    redirect_bool=False
+                    redirect_bool=False,
+                    extra_context={"current_form": "deployment"}
                 ) 
         else:
             return rval     
