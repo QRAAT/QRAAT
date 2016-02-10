@@ -1,0 +1,74 @@
+{% load class_tag %}
+
+{%block script %}
+<link rel="stylesheet" type"text/css" href="/static/css/jquery.datetimepicker.css" >
+<script type="text/javascript" src="/static/js/jquery.datetimepicker.js"></script>
+
+<script>
+
+$(document).ready(function(){
+        var inputs = $(".input-group").children("input, select, textarea");
+        for(var i=0; i<inputs.length; i++){
+            $(inputs[i]).addClass("form-control");
+        }
+        
+        $(".datetime").datetimepicker({format: "m/d/Y H:i:s"})
+});
+
+</script>
+{% endblock %}
+
+{% block form %}
+
+{% if form %}
+<div class="form-container"> 
+  <form  method="post">
+    {% csrf_token %}
+	<!-- Display form errors -->
+	{% if form.non_field_errors %}
+		<div class="alert alert-danger">
+			{{ form.non_field_errors }}
+		</div>
+	{% endif %}
+	<!-- Loop over form fields -->
+	<div class="input-group-container">
+	{% for field in form %}
+			{% if field.errors %}
+				{% for error in field.errors %}
+					<div class="input-error">
+						* {{ error|escape}}
+					</div>
+				{% endfor %}
+			{% endif %}
+		<!-- Display form fields -->
+			<div class="input-group input-lg">
+                {% if field.field.widget|get_class == "CheckboxInput" %}
+                <input class="form-control" value="{{field.label}}" disabled></input>
+                    <span class="input-group-addon">
+                        {{field}}
+                    </span>
+                {% elif field.field.widget|get_class == "FilteredSelectMultiple" %}
+                    <h5>
+                        {{ field.label }}:
+                    </h5>
+                    <div class="form-row">
+                        {{field}}
+                    </div>
+                {% else %}
+                    <span class="input-group-addon">
+                        {{ field.label_tag}}
+                    </span>
+                    {{ field }}
+                {% endif %}
+			</div>
+	{% endfor %}
+	<div class="input-group submit-btn">
+		<div class="col-sm-offset-9 col-sm-10">
+            <button class="btn btn-primary btn-lg" type="submit" value="create">{%block button_name %} Save {% endblock %}</button>
+		</div>
+	</div>
+	</div>
+ </form>
+</div>
+{% endif %}
+{% endblock %}

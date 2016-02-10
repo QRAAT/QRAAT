@@ -279,6 +279,8 @@ def check_deletion(request, project_id):
 def create_project(request):
 
     nav_options = get_nav_options(request)
+    print 'nav options are'
+    print nav_options
 
     if request.method == 'POST':
 
@@ -572,9 +574,10 @@ def bulk_wizard(request, project_id, number=0):
     # GET requests are from non submission page loads. 
     if request.method == 'GET':
         num = request.GET.get("number")
-        print num is None
-        print num == ''
         number = num
+
+        txIDs = request.GET.get("txIDs")
+        targetIDs = request.GET.get("targetIDs")
         # If no num 
         if num is None or num == '':
             return render_manage_page(
@@ -614,7 +617,7 @@ def bulk_wizard(request, project_id, number=0):
                 template_path="project/bulk-create.html",
                 success_url="",
                 redirect_bool=False,
-                extra_context={"current_form": "target"}
+                extra_context={"title_msg": "New Target", "current_form": "target", "txIDs": txIDs}
                 )
         # Dep error     
         elif request.GET.get("form-0-targetID") != None:
@@ -626,7 +629,7 @@ def bulk_wizard(request, project_id, number=0):
                 template_path="project/bulk-create.html",
                 success_url="",
                 redirect_bool=False,
-                extra_context={"current_form": "deployment"}
+                extra_context={"title_msg": "New Deployment","current_form": "deployment", "txIDs": txIDs, "targetIDs": targetIDs}
                 )
         # From initial page that selects the num
         # Tx, not error
@@ -646,6 +649,9 @@ def bulk_wizard(request, project_id, number=0):
     # POST requests from submitting forms
     elif request.method == 'POST':
         num = request.GET.get("number")
+
+        txIDs = request.POST.get("txIDs")
+        targetIDs = request.POST.get("targetIDs")
         try:
             num = int(num)
             if num < 1:
@@ -665,7 +671,7 @@ def bulk_wizard(request, project_id, number=0):
                     template_path="project/bulk-create.html",
                     success_url="",
                     redirect_bool=False,
-                    extra_context={"current_form": "tx"}
+                    extra_context={"title_msg":"New Transmitter", "current_form": "tx"}
                     ) 
         # If Deployment
         elif request.POST.get("form-0-targetID") != None:
@@ -678,7 +684,7 @@ def bulk_wizard(request, project_id, number=0):
                 template_path="project/bulk-create.html",
                 success_url="",
                 redirect_bool=False,
-                extra_context={"current_form": "deployment"}
+                extra_context={"title_msg": "New Deployment","current_form": "deployment", "txIDs": txIDs, "targetIDs": targetIDs}
             ) 
         # If Target
         elif request.POST.get("form-0-name") != None:
@@ -692,7 +698,7 @@ def bulk_wizard(request, project_id, number=0):
                 template_path="project/bulk-create.html",
                 success_url="",
                 redirect_bool=False,
-                extra_context={"current_form": "target"}
+                extra_context={"title_msg": "New Target", "current_form": "target", "txIDs": txIDs}
             ) 
             
         # Now we check what render_wizard_project_formset returns. Because we used "redirect_bool=False", when the form is valid and we would usually be redirected to another page, we instead return the saved objects, not HttpResponse. 
@@ -705,9 +711,8 @@ def bulk_wizard(request, project_id, number=0):
             if request.POST.get("form-0-tx_makeID") != None:
                 request.method = 'GET' # Dumb way to make request GET
                 print type(num)
-                ids = [x.pk for x in rval]
+                ids = " ".join(str(x.pk) for x in rval)
                 print ids
-                passed_options = {"tx_ids":ids}
                 return render_wizard_project_formset(
                     request=request,
                     project_id=project_id,
@@ -716,8 +721,9 @@ def bulk_wizard(request, project_id, number=0):
                     template_path="project/bulk-create.html",
                     success_url="",
                     redirect_bool=False,
-                    extra_context={"current_form": "target",
-                                    "passed_options": passed_options}
+                    extra_context={"title_msg": "New Target",
+                                    "current_form": "target",
+                                    "txIDs": ids}
                 ) 
             # Deployment. Valid deployment form submission, so we're done with the wizard, so we just go to the manage deployment page.
             elif request.POST.get("form-0-targetID") != None:
@@ -731,8 +737,7 @@ def bulk_wizard(request, project_id, number=0):
             elif request.POST.get("form-0-name") != None:
                 request.method = 'GET' # Dumb way to make request GET
                 print "target to dep 1"
-                print type(num)
-                print num
+                ids = " ".join(str(x.pk) for x in rval)
                 return render_wizard_project_formset(
                     request=request,
                     project_id=project_id,
@@ -741,7 +746,10 @@ def bulk_wizard(request, project_id, number=0):
                     template_path="project/bulk-create.html",
                     success_url="",
                     redirect_bool=False,
-                    extra_context={"current_form": "deployment"}
+                    extra_context={"title_msg": "New Deployment",
+                                    "current_form": "deployment",
+                                    "txIDs": txIDs,
+                                    "targetIDs": ids}
                 ) 
         else:
             return rval     

@@ -1,0 +1,170 @@
+{% extends "project/base_create_object.html" %}
+{% load class_tag %}
+
+{% block script %}
+{{ block.super }}
+
+<script>
+var current_form = "{{ current_form }}";
+
+$(document).ready(function(){
+    // Hide some controls not related to the current form
+    if(current_form != "tx") {
+        $("#serial_no_filler_div").hide();
+        $("#copy_manufacturer_div").hide();
+    }
+	// These are for remembering what the ids of the newly created tx and targets are so they can be auto selected 
+	$("#form").append("<input type='text' id='txIDs' name='txIDs' value='{{ txIDs }}' style='display: none'> <input type='text'id='targetIDs' name='targetIDs' value='{{ targetIDs }}' style='display: none'>");
+
+	// Auto select the appropriate fields
+	if(current_form == "deployment") {
+        var txIDs = $("#txIDs").val().split(" ");
+        var targetIDs = $("#targetIDs").val().split(" ");
+        for(var i = 0; i < txIDs.length; i++) {
+           $("#id_form-"+i+"-txID").val(txIDs[i]); 
+        }
+        for(var i = 0; i < targetIDs.length; i++) {
+           $("#id_form-"+i+"-targetID").val(targetIDs[i]); 
+        }
+	}
+
+	$("#name_filler").click(function() {
+
+	});
+
+	$("#tx_name_form").submit(function(event) {
+		fillNames();
+		event.preventDefault();
+	});
+
+	$("#serial_no_form").submit(function(event) {
+		fillSerialNo();
+		event.preventDefault();
+	});
+
+	$("#copy_manufacturer_btn").click(function() {
+		var num = $("#form").find("tr.objectrow").length;
+		var val = $("#id_form-0-tx_makeID").val();	
+		for(var i=1; i<num; i++) {
+			$("#id_form-" + i + "-tx_makeID").val(val);
+		}
+	});
+    
+    // For collapsable. TODO: Be more specific than btn
+    $(".btn").on('click', function(){
+        if($(this).attr('clicked')=="true") {
+            $(this).attr('clicked', "false");    
+        }
+        else {
+            $(this).attr('clicked', "true");
+        }
+        $(this).next().collapse('toggle');
+    });
+})
+function submitNumber() {
+	return false;
+}
+
+function fillNames(event) {
+	var foo = document.forms["tx_name_form"]["fillval"].value;
+	var regex = /\d+$/;
+
+	if(foo == null || foo == "" || !regex.test(foo) ) {
+		alert("Input must end in a number");
+		return false;
+	}
+
+	var starting_num = foo.match(regex)[0];
+	var name_front = foo.slice(0,foo.lastIndexOf(starting_num));
+	var i = 0;
+	var input_id_front = "id_form-";
+	var input_id_back = "-name";
+	$("#form").find("tr.objectrow").each(function (ind, ele) {
+        if($(ele).css("display") != "none") {
+            $("#"+input_id_front+i+input_id_back).val(name_front+starting_num);
+			i++;
+			starting_num++;
+        }
+    });
+	
+	return false;
+}
+
+function fillSerialNo(event) {
+	var foo = document.forms["serial_no_form"]["fillval"].value;
+	var regex = /\d+$/;
+
+	if(foo == null || foo == "" || !regex.test(foo) ) {
+		alert("Input must end in a number");
+		return false;
+	}
+
+	var starting_num = foo.match(regex)[0];
+	var name_front = foo.slice(0,foo.lastIndexOf(starting_num));
+	var i = 0;
+	var input_id_front = "id_form-";
+	var input_id_back = "-name";
+	$("#form").find("tr.objectrow").each(function (ind, ele) {
+        if($(ele).css("display") != "none") {
+            $("#"+input_id_front+i+input_id_back).val(name_front+starting_num);
+			i++;
+			starting_num++;
+        }
+    });
+	
+	return false;
+}
+</script>
+
+{% endblock %}
+
+{% block content %}
+{{ block.super }}
+
+{% if not formset %}
+<p> How many transmitters are you creating, or how many are you changing their transmitters and deployments for? </p>
+<form method="get" onsubmit="submitNumber()">
+	<input id="number" name="number" step="1" type="number" min="1" value="5">
+    <inline data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="For altering transmitters that already exist in the database"> <input id="using_old_tx" name="using_old_tx" type="checkbox"> Using existing transmitters<br> </inline>
+    <div class="input-group submit-btn">
+        <button class="btn btn-sm btn-primary" type="submit" style="margin-top: 5px">Submit</button>
+    </div>
+</form>
+{% else %}
+
+<div class="seperate-div">
+<button class="btn btn-default" id="name_filler_btn" type="button" data-toggle="collapse" data-target="#name_filler_div">Fill in Names &nbsp;<span class="arrow-down">▾</span><span class="arrow-up">▴</span></button>
+<div id="name_filler_div" class="collapse" style="">
+	<p>This will fill in all the names </p>
+	<p>The format of the names is any combination of letters, followed by numbers. The numbers will be incremented automatically. <p>
+	<p>For example, entering QR17 when you have 3 rows will fill in Q17, Q18, and Q19. </p>
+	<form id="tx_name_form">
+		<input type="input" name="fillval"> 
+		<button type="submit">Fill</button>
+	</form>
+</div>
+</div>
+
+
+<div id= "serial_no_filler_div" class="seperate-div">
+<hr>
+<button class="btn btn-default" id="serial_no_filler_btn" type="button" data-toggle="collapse" data-target="#serial_no_filler_div_inner">Fill in Serial Numbers &nbsp;<span class="arrow-down"> ▾</span><span class="arrow-up"> ▴</span></button>
+<div id="serial_no_filler_div_inner" class="collapse" style="">
+	<p>This will fill in all the serial numbers, assuming they are numeric and sequential.</p>
+	<form id="serial_no_form">
+		<input type="input" name="fillval"> 
+		<button type="submit">Fill</button>
+	</form>
+</div>
+</div>
+
+
+<div id="copy_manufacturer_div" class="seperate-div">
+<hr>
+<button class="btn btn-default" id="copy_manufacturer_btn" type="button">Copy Manufacturer</button>
+</div>
+
+{% endif %}
+
+{% endblock %}
+

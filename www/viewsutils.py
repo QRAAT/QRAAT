@@ -319,7 +319,8 @@ def render_wizard_project_formset(
                    "changed": thereis_newelement,
                    "project": project,
                    "current_form": "",
-                   "passed_options": ""}
+                   "txIDs":" ",
+                   "targetIDs": ""}
 
         if extra_context != None:
             if isinstance(extra_context, dict):
@@ -338,6 +339,7 @@ def render_manage_page(request, project, template_path, content):
     if request.method == "GET":
         content["changed"] = request.GET.get("new_element")
         content["deleted"] = request.GET.get("deleted")
+        content["title_msg"] = "Bulk Wizard"
 
     if can_change(project, user):
         return render(
