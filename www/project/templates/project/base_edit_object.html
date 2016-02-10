@@ -1,6 +1,6 @@
 {% extends "project/base.html" %}
 {% block css %}
-<link rel='stylesheet' type='text/css' href='/static/project/css/formstyle.css'/>
+<link rel='stylesheet' type='text/css' href='/static/project/css/style.css'/>
 {% endblock %}
 {% load class_tag %}
 
@@ -16,11 +16,11 @@
 
     <div class="page-header">
         <h4>
-            {% block title_msg %}{{ title_msg }}{% endblock %}
+            {% block title_msg %}{% endblock %}
         </h4>
     </div>
 
-    {% include "project/base_form.html" %}
+    {% include "project/base_edit_form.html" %}
 
 {% endblock %} 
 

@@ -34,11 +34,35 @@ $(document).ready(function(){
     });
 
     $(".delete_button").click(function() {
+        $(this).closest("tr").remove();
+        /*
         $(this).closest("tr").hide();
         $(this).closest("tr").find(":input").each(function() {
-            $(this).val("");
+            console.log($(this));
+            if($(this).hasClass("datetime")) {
+                console.log("clearing datetimme field");
+            }
+            else {
+                $(this).val("");
+            }
         });
+        */
         $("#num_rows").val($("#form tr.objectrow:visible").length);
+
+        // Change total form number (for Django formset management)
+        var num = $("#id_form-TOTAL_FORMS").val();
+        $("#id_form-TOTAL_FORMS").val( --num );
+        // Change the numbers of the remaining rows
+        var $row = $("#form tr.objectrow:visible:first");
+        for(var currnum = 0; currnum < num; currnum++) {
+            $row.find(":input:not(button)").each(function(myInput) {
+                var id = this.id;
+                var name = this.name;
+                $(this).attr("id", id.replace(/\d+/, function(num) { return currnum; }));
+                $(this).attr("name", name.replace(/\d+/, function(num) { return currnum; }));
+            })
+            $row = $row.next(".objectrow");
+        }
     });
 
     $(".copy_button").click(function() {
@@ -109,31 +133,29 @@ function checkFormEmpty() {
 
 {% block form %}
 
-{% comment %}
-{% if formset %}
+
+{% if form %}
 <div class="form-container"> 
   <form  method="post">
-    {{ formset.management_form }}
     {% csrf_token %}
-{% for form in formset %}
-	<!-- Display form errors -->
-	{% if form.non_field_errors %}
-		<div class="alert alert-danger">
-			{{ form.non_field_errors }}
-		</div>
-	{% endif %}
-	<!-- Loop over form fields -->
-	<div class="input-group-container">
-	{% for field in form %}
-			{% if field.errors %}
-				{% for error in field.errors %}
-					<div class="input-error">
-						* {{ error|escape}}
-					</div>
-				{% endfor %}
-			{% endif %}
-		<!-- Display form fields -->
-			<div class="input-group input-lg">
+    <!-- Display form errors -->
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+    <!-- Loop over form fields -->
+    <div class="input-group-container">
+    {% for field in form %}
+            {% if field.errors %}
+                {% for error in field.errors %}
+                    <div class="input-error">
+                        * {{ error|escape}}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        <!-- Display form fields -->
+            <div class="input-group input-lg">
                 {% if field.field.widget|get_class == "CheckboxInput" %}
                 <input class="form-control" value="{{field.label}}" disabled></input>
                     <span class="input-group-addon">
@@ -152,23 +174,22 @@ function checkFormEmpty() {
                     </span>
                     {{ field }}
                 {% endif %}
-			</div>
-	{% endfor %}
-	</div>
-{% endfor %}
-	<div class="input-group submit-btn">
-		<div class="col-sm-offset-9 col-sm-10">
-            <button class="btn btn-primary btn-lg" type="submit" value="create">{%block button_name %} Save {% endblock %}</button>
-		</div>
-	</div>
+            </div>
+    {% endfor %}
+    <div class="input-group submit-btn">
+        <div class="col-sm-offset-9 col-sm-10">
+            <button class="btn btn-primary btn-lg" type="submit" value="create">{%block form_button_name %} Save {% endblock %}</button>
+        </div>
+    </div>
+    </div>
  </form>
 </div>
 {% endif %}
-{% endcomment %}
+
 
 {% if formset %}
-<div id="controls-div" style="display: flex; justify-content:flex-end">
-    <div class="input-group" style="width:10em;">
+<div id="controls-div" style="">
+    <div class="input-group" style="float: right; width:10em;">
         <input class="form-control" id="num_rows" step="any" type="number" aria-label="Set number of rows in form">
         <span class="input-group-btn">
             <button class="btn btn-default" id="change_num_rows" type="button">No. Rows</button>

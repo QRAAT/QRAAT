@@ -9,11 +9,10 @@
 <script>
 $(document).ready(function() {
     $("select[name$=tx_makeID]").append("<option value=create>Create Model</option>");
-    $("select").change(function() {
+    $("select[name$=tx_makeID]").change(function() {
         if($(this).val() == "create") {
             var $tr = $(this).closest("tr");
             $tr.after("<tr></tr>");
-            $(this).closest("tr").after("<tr></tr>");
             $tr.next().wrapInner("<td colspan='6'></td>");
             $tr.next().children().wrapInner($("#create-manufacturer-div"));
             $("#create-manufacturer-div").css("display","");
@@ -25,6 +24,9 @@ $(document).ready(function() {
         // Clear inputs, hide success/failure labels
         $(this).closest("div").find("input[type!=hidden]").val("");
         $(this).closest("div").find("span.label").css("display","none");
+        $tr = $(this).closest("tr");
+        $("#page-bottom").wrapInner($("#create-manufacturer-div"));
+        $tr.remove();
     });
     $("#demod_type").change(function() {
         $("#create-manufacturer-div div").css("display","none");
@@ -51,6 +53,7 @@ function submitTxMake() {
                 // Add options to selects
                 $("select[name$=tx_makeID] option:last-child").before("<option value="+data['ID']+">"+data['ID']+" "+data['manufacturer']+" "+data['model']+"</option>");
                 $("#create-manufacturer-div span.label-success").css("display","");
+                $("#create-manufacturer-div").closest("tr").prev("tr").find("select[name$=tx_makeID] :nth-last-child(2)").prop("selected",true);
             }
         },
         fail: function(data) {
@@ -64,6 +67,7 @@ function submitTxMake() {
 {% block content %}
 {{ block.super }}
 <!-- Hidden form that will be copied to create tx_makes -->
+<div id="page-bottom">
 <div id="create-manufacturer-div" style="padding:10px ;display:None">
     <button type="button" id="close-div" class="btn btn-xs" style="float:right">Close</button>
     <!-- <form method="post" action="../add-manufacturer/"> -->
@@ -111,5 +115,6 @@ function submitTxMake() {
             <span class="label label-warning" style="display:none">Failed</span>
         </span>
     </form>
+</div>
 </div>
 {% endblock %}

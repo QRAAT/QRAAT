@@ -39,6 +39,7 @@ INITIAL_DATA_WINDOW = 60 * 60 * 4
 
 
 def get_context(request, deps=[], req_deps=[]):
+    print "in get_context"
     req_deps_list = req_deps.values_list('ID', flat=True)
     req_deps_IDs = []
     for dep in req_deps_list:
@@ -196,6 +197,7 @@ def get_context(request, deps=[], req_deps=[]):
         for dep in req_deps_IDs:
             args = args | Q(deploymentID=str(dep))
         datetime_to = Position.objects.filter(args).aggregate(Max('timestamp'))['timestamp__max']
+        print "found datetime"
         if datetime_to != None:
             datetime_to = utils.strftime(utils.timestamp_todate(datetime_to))
     if 'lines' in request.GET:
@@ -286,6 +288,7 @@ def get_context(request, deps=[], req_deps=[]):
                     ))
         else:
             raise Exception("data_type isn't 1 or 2")
+        print "got query"
 
         index_form.fields['datetime_from'].initial = datetime_from
         index_form.fields['datetime_to'].initial = datetime_to

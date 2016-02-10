@@ -215,7 +215,7 @@ def render_project_form(
 
 def render_project_formset(
         request, project_id, post_formset,
-        get_formset, template_path, success_url):
+        get_formset, template_path, success_url=""):
     """This is a main view called by other views that aim to render forms for
     Transmitters, Locations, Targets, and Deployments
 
@@ -256,17 +256,102 @@ def render_project_formset(
             for form in formset:
                 form.set_project(project)
 
-        return render(request, template_path,
-                      {"formset": formset,
-                       "nav_options": nav_options,
-                       "changed": thereis_newelement,
-                       "project": project})
+        context = {"formset": formset,
+                   "nav_options": nav_options,
+                   "changed": thereis_newelement,
+                   "project": project}
+
+        return render(request, template_path, context)
+                      
     else:
         return not_allowed_page(request)
 
+def render_wizard_project_formset(
+        request, project_id, post_formset,
+        get_formset, template_path, success_url="", redirect_bool=True, extra_context=None):
+    """This is a main view called by other views that aim to render forms for
+    Transmitters, Locations, Targets, and Deployments
+
+    :param request: Django's http request object
+    :type request: HttpRequest.
+    :param project_id: Project's id to check user permissions
+    :type project_id: str.
+    :param post_formset: Formset to render when receives a post request
+    :type post_formset: ProjectFormSet from formset_factory(ProjectForm).
+    :param get_formset: Formset to render when receives a get request
+    :type get_formset: ProjectFormSet from formset_factory(ProjectForm).
+    :param template_path: The path of the template that will be rendered
+    :type template_path: str.
+    :param success_url: Url to redirect in case of success
+    :type success_url: str.
+    :returns:  HttpResponse -- Http response obj with a rendered page that \
+            contains a formset to add or edit Transmitters, \
+            Locations, Targets, or Deployments
+    """
+
+    user = request.user
+    project = get_project(project_id)
+    nav_options = get_nav_options(request)
+    thereis_newelement = None
+
+    if can_change(project, user):
+        if request.method == 'POST':
+            formset = post_formset
+            for form in formset:
+                form.set_project(project)
+            if formset.is_valid():
+                saved_objects = formset.save()
+                if redirect_bool:
+                   return redirect(success_url)
+                # For the bulk wizard page that after saving a formset, displays a new formset for new objects, instead of redirecting to another page
+                # It instead returns the saved objects, so that the next form can display something based on the previous imput
+                else:
+                    return saved_objects
+
+        elif request.method == 'GET':
+            thereis_newelement = request.GET.get("new_element")
+            formset = get_formset
+            for form in formset:
+                form.set_project(project)
+
+        context = {"formset": formset,
+                   "nav_options": nav_options,
+                   "changed": thereis_newelement,
+                   "project": project,
+                   "current_form": "",
+                   "txIDs":" ",
+                   "targetIDs": ""}
+
+        if extra_context != None:
+            if isinstance(extra_context, dict):
+                context.update(extra_context)
+            else:
+                raise TypeError("Passed in non-dict for extra_context in render_project_formset")
+
+        return render(request, template_path, context)
+                      
+    else:
+        return not_allowed_page(request)
 
 def render_manage_page(request, project, template_path, content):
     user = request.user
+
+    if request.method == "GET":
+        content["changed"] = request.GET.get("new_element")
+        content["deleted"] = request.GET.get("deleted")
+        content["title_msg"] = "Bulk Wizard"
+
+    if can_change(project, user):
+        return render(
+            request, template_path,
+            content)
+
+    else:
+        return not_allowed_page(request)
+
+def render_bulk_page(request, project, template_path, content):
+    user = request.user
+    nav_options = get_nav_options(request)
 
     if request.method == "GET":
         content["changed"] = request.GET.get("new_element")
