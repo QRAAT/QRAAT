@@ -137,13 +137,13 @@ def get_nav_options(request):
                 {"url": "admin:index",
                  "name": "Admin Pages"},
                 {"url": "map:system-status",
-                 "name": "System Status"}]
+                 "name": "System Status"},
+                {"url": "graph:graph_home", 
+                 "name": "Graphs"}]
 
             for opt in super_user_opts:  # Add admin options
                 nav_options.append(opt)
 
-    nav_options.append({"url": "graph:graph_home", 
-                         "name": "Graphs"}) 
     return nav_options
     
     

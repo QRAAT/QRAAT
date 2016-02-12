@@ -32,7 +32,7 @@
         </br>
         </br>
         <a href="edit-project">
-            <input type="button" class="btn btn-primary btn-lg" value="Edit Project" name="" />
+            <input type="button" class="btn btn-primary btn-lg" value="Edit Project" name="" {% if not project|is_owner:user and not project|is_collaborator:user %} style="visibility:hidden" {% endif %}/>
         </a>
         <a href="{% url 'map:view_all_dep' project.ID %}">
             <input type="button" class="btn btn-primary btn-lg" style="float:right" value="View All Deployments" name="" />
