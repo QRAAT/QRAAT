@@ -97,9 +97,9 @@ function numVisibleRows() {
 }
 
 function addMore(selector, type) {
-    var newElement = $(selector).clone(true);
+    var $newElement = $(selector).clone(true);
     var total = $("#id_" + type + "-TOTAL_FORMS").val();
-    newElement.find(':input').each(function() {
+    $newElement.find(':input').each(function() {
         if($(this).attr("name")) {
             var name = $(this).attr("name").replace("-" + (total-1) + "-", "-" + total + "-");
             var id = "id_" + name;
@@ -109,11 +109,17 @@ function addMore(selector, type) {
             }
         }
     });
+    // clone() doesn't coppy selec's selcted value
+    var newSelects = $newElement.find("select");
+    $(selector).find("select").each(function (i) {
+       $(newSelects[i]).val($(this).val());
+    });
+
     total++;
     // Update formset manager total
     $("#id_" + type + "-TOTAL_FORMS").val(total);
     $(selector).css('display','');
-    $(selector).after(newElement);
+    $(selector).after($newElement);
 }
 
 // true if form is empty, false if not empty
@@ -189,10 +195,10 @@ function checkFormEmpty() {
 
 {% if formset %}
 <div id="controls-div" style="">
-    <div class="input-group" style="float: right; width:10em;">
+    <div class="input-group" style="float: right; width:14em;">
         <input class="form-control" id="num_rows" step="any" type="number" aria-label="Set number of rows in form">
         <span class="input-group-btn">
-            <button class="btn btn-default" id="change_num_rows" type="button">No. Rows</button>
+            <button class="btn btn-default" id="change_num_rows" type="button">Number of Rows</button>
         </span>
     </div>
 </div>

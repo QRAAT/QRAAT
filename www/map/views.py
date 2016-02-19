@@ -466,6 +466,9 @@ def view_all_dep(request, project_id):
     except ObjectDoesNotExist:
         raise Http404
     deployments = project.get_deployments()
+    if not deployments:
+        raise Http404("No Deployments")
+
     dep_ids = []
     for dep in deployments:
         dep_ids.append(dep.ID)

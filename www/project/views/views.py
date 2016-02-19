@@ -279,8 +279,6 @@ def check_deletion(request, project_id):
 def create_project(request):
 
     nav_options = get_nav_options(request)
-    print 'nav options are'
-    print nav_options
 
     if request.method == 'POST':
 
@@ -405,7 +403,6 @@ def add_manufacturer_inline(request, project_id):
                 # Const demod_type doesn't store any parameters
                 return HttpResponse(json.dumps({'ID':txMake.ID,'manufacturer':manufacturer,'model':model}), content_type="application/json")
             elif request.method == 'GET':
-                print 'Error? Adding tx_make form method is GET?'
                 return HttpResponse(json.dumps({'result':False}), content_type="application/json")
 
 def add_target_inline(request, project_id):
@@ -455,7 +452,6 @@ def add_target_inline(request, project_id):
                 target.save()
                 return HttpResponse(json.dumps({'ID':target.ID,'name':target.name}), content_type="application/json")
             elif request.method == 'GET':
-                print 'Error? Adding tx_make form method is GET?'
                 return HttpResponse(json.dumps({'result':False}), content_type="application/json")
                  
 # Returns json format of new {}, or false 
@@ -508,7 +504,6 @@ def add_target_inline(request, project_id):
                 target.save()
                 return HttpResponse(json.dumps({'ID':target.ID,'name':name}), content_type="application/json")
             elif request.method == 'GET':
-                print 'Error? Adding tx_make form method is GET?'
                 return HttpResponse(json.dumps({'result':False}), content_type="application/json")
                  
 @login_required(login_url="account/login")
@@ -544,7 +539,6 @@ def create_placeholder_target(request, project_id):
                         copyTarget.save()
                         ids.append(copyTarget.ID)
                         names.append(copyTarget.name)
-                    print ids
                     name = "assbut"
                     return HttpResponse(json.dumps({'names':names, 'ids':ids}), content_type="application/json")
             elif request.method == 'GET':
@@ -616,13 +610,11 @@ If it's not, then we call and return render_project_formset with the modelform o
 # The worst function ever
 @login_required(login_url="/account/login")
 def bulk_wizard(request, project_id, number=0):
-    print 'in bulk_wizard view'
     project = get_project(project_id)
     content = {}
     content["nav_options"] = get_nav_options(request)
     content["project"] = project
 
-    print request.method == 'GET'
     # GET requests are from non submission page loads. 
     if request.method == 'GET':
         num = request.GET.get("number")
@@ -713,8 +705,6 @@ def bulk_wizard(request, project_id, number=0):
             
         # If Tx
         if request.POST.get("form-0-tx_makeID") != None:
-            print 'in post, tx'
-            print type(num)
             rval = render_wizard_project_formset(
                     request=request,
                     project_id=project_id,
@@ -741,7 +731,6 @@ def bulk_wizard(request, project_id, number=0):
         # If Target
         elif request.POST.get("form-0-name") != None:
             #request.method = 'GET' # Dumb way to make request GET
-            print type(num)
             rval = render_wizard_project_formset(
                 request=request,
                 project_id=project_id,
@@ -757,14 +746,11 @@ def bulk_wizard(request, project_id, number=0):
         # Thus, if not instance of HttpResonse, there was a valid form submission
         if not isinstance(rval, HttpResponse):
             # For when forms were successfully validated. Instead of redirecting to another page, just come back to this page with new formset
-            print request.POST
             # Shoddy way of testing which model form we're on. Perhaps turn the keys of request.POST into list, search for field ending in tx_makeID
             # Submitted valid Tx form, return a Target form
             if request.POST.get("form-0-tx_makeID") != None:
                 request.method = 'GET' # Dumb way to make request GET
-                print type(num)
                 ids = " ".join(str(x.pk) for x in rval)
-                print ids
                 return render_wizard_project_formset(
                     request=request,
                     project_id=project_id,
@@ -779,16 +765,13 @@ def bulk_wizard(request, project_id, number=0):
                 ) 
             # Deployment. Valid deployment form submission, so we're done with the wizard, so we just go to the manage deployment page.
             elif request.POST.get("form-0-targetID") != None:
-                print 'valid dep form submission. should end here.'
                 #request.method = 'GET' # Dumb way to make request GET
-                print type(num)
                 success_url="%s?new_element=True" % reverse(
                     "project:manage-deployments", args=(project_id,))
                 return redirect(success_url)
             # Target to Dep
             elif request.POST.get("form-0-name") != None:
                 request.method = 'GET' # Dumb way to make request GET
-                print "target to dep 1"
                 ids = " ".join(str(x.pk) for x in rval)
                 return render_wizard_project_formset(
                     request=request,

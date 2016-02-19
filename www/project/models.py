@@ -529,7 +529,7 @@ class Deployment(models.Model):
     description = models.TextField(blank=True)
 
     time_start = models.DecimalField(
-        max_digits=16, decimal_places=6,
+        max_digits=16, decimal_places=6, 
         help_text="Unix Timestamp (s.us)")  # decimal(16,6)
 
     time_end = models.DecimalField(

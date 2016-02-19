@@ -77,14 +77,14 @@ urlpatterns = patterns(
         r'^(?P<project_id>\d+)/deployment/(?P<deployment_id>\d+)/$',
         'show_deployment',
         name='show-deployment'),
-
-    url(
-        r'^(?P<project_id>\d+)/bulk-wizard/$', 'bulk_wizard',
-        name='bulk-wizard'),
     
     url(
         r'^(?P<project_id>\d+)/edit-project/$',
         'edit_project', name='edit-project'),
+
+    url(
+        r'^(?P<project_id>\d+)/edit-project/bulk-wizard/$', 'bulk_wizard',
+        name='bulk-wizard'),
 
     url(
         r'^(?P<project_id>\d+)/edit-project/add-manufacturer-inline/$',

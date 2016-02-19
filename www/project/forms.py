@@ -261,7 +261,9 @@ class AddTransmitterForm(ProjectElementForm):
         labels = {"name": ("Transmitter name"),
                   "serial_no": ("Serial number"),
                   "tx_makeID": ("Manufacturer"),
-                  "frequency": ("Frequency")}
+                  "frequency": ("Frequency (Hz)")}
+
+    frequency = forms.FloatField(min_value=0, widget=widgets.NumberInput(attrs={"step":"0.001"}))
 
     def save(self, commit=True):
         """Overriden method to set the right tx_make and
