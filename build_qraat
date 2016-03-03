@@ -223,6 +223,12 @@ function server_install {
   echo -n '.'
   sudo ldconfig
 
+  my_echo "--------------------------------"
+  my_echo "Setting up the qraat database"
+  my_echo "Input the password for mysql's root account: "
+  read pswd 
+  mysql -u root --password=$pswd qraat < $RMG_SERVER_SRC/etc/db_schema.sql
+
   echo ' done.'
   echo 
 }

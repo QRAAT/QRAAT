@@ -1,0 +1,4 @@
+view,host,user,password,name
+web_reader,localhost,web_reader,password,qraat
+web_writer,localhost,web_writer,password,qraat
+admin,localhost,django_admin,password,django
