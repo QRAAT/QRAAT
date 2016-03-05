@@ -19,197 +19,146 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import blocks, params
+import blocks
 from pic_interface import pic_interface
 import os, time
 import qraat.error
 
-FPGA_FREQ = 10.7e6
-CHANNELS = 4
 
 class detector_array:
-    """
-      A GR signal processing graph comprised of blocks in in :mod:`qraat.rmg.blocks`. 
-      The graph is made up of the USRP source, a polyphase filter bank, and the pulse 
-      detector bank. This class handles time-multiplexing between transmitter tuning
-      groups (see :class:`qraat.rmg.params.tuning`).
+  """
+    A GR signal processing graph comprised of blocks in in :mod:`qraat.rmg.blocks`. 
+    The graph is made up of the USRP source, a polyphase filter bank, and the pulse 
+    detector bank. This class handles time-multiplexing between transmitter tuning
+    groups (see :class:`qraat.rmg.params.tuning`).
 
-    :param filename: CSV-formatted transmitter configuration file. 
-    :type filename: string
-    :param directory: Target directory for .det files produced by the detector array. 
-    :type directory: string
-    :param num_bands: The number of bands to divide the receiver's bandwidth into. (Typically we use
-       32 bands. The USRP bandwidth is 256 Khz, meaning each band is 8 Khz wide.) 
-    :type num_bands: int
-    :param serial_port: serial interface for PIC controller, given as a file name.
-    :type serial_port: string
-    :param no_usrp_flag: Use :class:`qraat.rmg.blocks.no_usrp_top_block` instead of the USRP source block. 
-    :type no_usrp_flag: bool
-    """ 
+  :param filename: XML-formatted transmitter configuration file. 
+  :type filename: string
+  :param directory: Target directory for .det files produced by the detector array. 
+  :type directory: string
+  :param serial_port: serial interface for PIC controller, given as a file name.
+  :type serial_port: string
+  :param no_usrp_flag: Use :class:`qraat.rmg.blocks.no_usrp_top_block` instead of the USRP source block. 
+  :type no_usrp_flag: bool
+  :param log_file: full path and filename to write log to
+  :type log_file: string
+  """ 
 
-    def __init__(self,filename = "tx.csv",directory = "./det_files", num_bands = 1, serial_port = '/dev/ttyS0', no_usrp = None):
-        
-        print "Writing RMG status information to " + directory + '/status.txt'
-        if not os.path.exists(directory):
-            print 'Making directory: {0}'.format(directory)
-            os.makedirs(directory)
-        timestr = "\nInitializing RMG at {0}\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
-        paramstr = "\tTransmitter File: {0}\n\tDirectory: {1}\n\tNumber of Bands: {2}\n\tSerial Port: {3}\n\tSource: ".format(filename, directory, num_bands, serial_port)
-        if no_usrp != None:
-            paramstr += "Null\n\n"
-        else:
-            paramstr += "USRP\n\n"
-        with open(directory + '/status.txt','a') as status_file:
-            status_file.write(timestr)
-            status_file.write(paramstr)
+  def __init__(self,filename = "tx.xml",directory = "./det_files", serial_port = '/dev/ttyS0', no_usrp = None, log_file = None):
 
-        self.NO_USRP = no_usrp
-        self.high_lo = True
-        self.decim = 250
-        self.filename = filename
-        self.directory = directory
-        if self.directory[-1] == "/":
-          self.directory = self.directory[:-1]
-        self.num_bands = num_bands
-        self.backend_param = None
-        self.frontend = None
-        self.backend = None
-        self.num_be = 0
-        self.connected_be = 0
-        if no_usrp != None:
-            self.sc = None
-            print "Serial Communication Disabled"
-        else:
-            self.sc = pic_interface(serial_port)
+    self.log_file = log_file
+    self.log("Initializing RMG at {0}\n".format(time.strftime('%Y-%m-%d %H:%M:%S')))
+    paramstr = "\tTransmitter File: {0}\n\tDirectory: {1}\n\tSerial Port: {2}\n\tSource: ".format(filename, directory, serial_port)
+    if no_usrp != None:
+        paramstr += "Null\n\n"
+    else:
+        paramstr += "USRP\n\n"
+    self.log(paramstr)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    self.NO_USRP = no_usrp
+    self.high_lo = True
+    self.filename = filename
+    self.directory = directory
+    if self.directory[-1] == "/":
+      self.directory = self.directory[:-1]
+    self.__create_graph()
 
-        self.__create_graph()
-  
-    ## private graph initialization routines ##
+  ## private graph initialization routines ##
 
-    def __create_graph(self):
-        self.__load_param()
-        self.__create_frontend()
-        self.__create_backend()
-        
-        for j in range(CHANNELS):
-            self.frontend.connect((self.frontend.u,j), (self.backend,j))
+  def __create_graph(self):
+    self.__create_backend()
+    self.__create_frontend()
+
+  def __create_frontend(self):
+    if self.NO_USRP == None:
+      self.frontend = blocks.usrp_top_block(self.backend.fpga_freq, self.backend.fpga_decim, self.backend.usrp_channels)
+      self.sc = pic_interface(serial_port)
+      if self.backend.high_lo:
+        self.sc.use_high_lo()
+      else:
+        self.sc.use_low_lo()
+    else:
+      self.frontend = blocks.no_usrp_top_block(self.backend.fpga_freq,  self.backend.usrp_channels, self.NO_USRP, self.backend.usb_rate)
+      self.sc = None
+      self.log("Using Null Frontend, Serial Communication Disabled\n")
+
+  def __create_backend(self):
+    self.backend = blocks.software_backend(self.filename, self.directory)
+    self.connected_tuning = None
+    self.log("Timing Block ")
+    self.log(str(self.backend.timing))
+    self.log("\n")
 
 
-        self.__tune_pll(self.backend_param.tunings[self.connected_be].lo1)
 
-    def __load_param(self):
-    #
-    # Load a CSV formatted list of transmitters and calculate 
-    # the USRP tuning parameters.  Chris ~18 Sep 2012
-    #
-        
-        self.backend_param = params.backend(self.filename, self.num_bands)
-        self.high_lo       = self.backend_param.high_lo
-        self.decim         = self.backend_param.decim
+  ## public runnables ##
 
-        self.num_be = len(self.backend_param.tunings)
-        if self.sc != None:
-            if self.high_lo:
-                self.sc.use_high_lo()
-            else:
-                self.sc.use_low_lo()
+  def log(self, log_string):
+    if self.log_file:
+      with open(self.log_file, 'a') as lf:
+        lf.write(log_string)
 
-  
-    def __create_frontend(self):
-        if self.high_lo:
-            lo3 = FPGA_FREQ
-        else:
-            lo3 = -FPGA_FREQ
-        if self.NO_USRP == None:
-            self.frontend = blocks.usrp_top_block(lo3, int(self.decim), CHANNELS)
-        else:
-            self.frontend = blocks.no_usrp_top_block(lo3, int(self.decim), CHANNELS, self.NO_USRP)
-            print "Using Null Frontend"
+  def tune_pll(self, freq):
+    if not self.sc is None:
+      self.sc.tune(freq)
+      if not self.sc.check(freq):
+        self.log("Pic frequency error, retry\n")
+        self.sc.tune(freq)
+        if not self.sc.check(freq):
+          self.log("Pic frequency error, Reseting PIC\n")
+          self.sc.reset_pic()
+          self.sc.tune(freq)
+          if not self.sc.check(freq):
+            self.log("Pic frequency error\n")
+            self.log(self.sc.status_string())
+            raise qraat.error.PLL_LockError()
 
-    def __create_backend(self):
+  def connect(self, tuning_id):
+    self.connected_tuning = self.backend.tunings[tuning_id]
+    for c in range(self.backend.usrp_channels):
+      self.frontend.connect((self.frontend.u,c), (self.connected_tuning,c))
 
-        self.backend = blocks.software_backend(CHANNELS, self.backend_param, self.directory)
+  def disconnect(self):
+    if self.connected_tuning:
+      for c in range(self.backend.usrp_channels):
+        self.frontend.disconnect((self.frontend.u,c), (self.connected_tuning, c))
+    self.connected_tuning = None
 
-    def __tune_pll(self, freq):
-        if not self.sc is None:
-            self.sc.tune(freq)
-            if not self.sc.check(freq):
-                print "Pic frequency error, retry"
-                self.sc.tune(freq)
-                if not self.sc.check(freq):
-                    print "Pic frequency error"
-                    print "Reseting PIC"
-                    self.sc.reset_pic()
-                    self.sc.tune(freq)
-                    if not self.sc.check(freq):
-                        print "Pic frequency error"
-                        self.sc.print_status()
-                        raise qraat.error.PLL_LockError()
-
-     
-    ## public runnables ##
-
-    def next(self):
-        print time.strftime('%Y-%m-%d %H:%M:%S')
-        self.backend.disable()
-        self.connected_be += 1
-        if self.connected_be == self.num_be:
-            self.connected_be = 0
-        self.__tune_pll(self.backend_param.tunings[self.connected_be].lo1)
-        self.backend.enable(self.backend_param.tunings[self.connected_be].bands)
-    
-    def start(self):
+  def run(self):
+    self.log("Starting RMG main loop at {0}\n".format(time.strftime('%Y-%m-%d %H:%M:%S')))
+    if len(self.backend.tunings) == 0:
+      self.log("No backend tunings\nStopping at {}\n".format(time.strftime('%Y-%m-%d %H:%M:%S')))
+    elif len(self.backend.tunings) == 1:
+      tuning_id = self.backend.tunings.keys[0]
+      self.log("Only one backend tuning, Running tuning {}".format(tuning_id))
+      self.connect(tuning_id)
+      self.frontend.run() #blocking call
+    else:
+      while(1):#run loop
+        current_time = time.time()
+        tuning_id, stop_time = self.backend.timing.get_tuning(current_time)
+        self.connect(tuning_id)
+        self.log("{}: Running tuning {} until {}\n".format(current_time, tuning_id, stop_time)) 
         self.frontend.start()
+        time.sleep(stop_time - time.time())
+        self.frontend.stop()
+        self.frontend.wait()
+        self.disconnect()
 
-    def run(self,sleep_sec = 10):
-        timestr = "Starting RMG at {0}\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
-        with open(self.directory + '/status.txt','a') as status_file:
-            status_file.write(timestr)
-            status_file.write(str(self.backend_param) + '\n')
-
-        if self.num_be > 1:
-            self.start()
-            #
-            # WARNIING: Keyboard Interrupt here is not caught! 
-            #
-            while(1):
-                try:
-                    time.sleep(sleep_sec)
-                    self.next()
-                except KeyboardInterrupt:
-                    timestr = "Stopping RMG for Keyboard Interrupt at {0}\n\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
-                    with open(self.directory + '/status.txt','a') as status_file:
-                        status_file.write(timestr)
-
-                    if self.sc != None:
-                        del self.sc
-                    break
-                except:
-                    timestr = "Stopping RMG for Exception at {0}\n\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
-                    with open(self.directory + '/status.txt','a') as status_file:
-                        status_file.write(timestr)
-                    print "Exception "
-                    raise
-        else:
-                try:
-                    self.frontend.run()
-
-                except KeyboardInterrupt:
-                    timestr = "Stopping RMG for Keyboard Interrupt at {0}\n\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
-                    with open(self.directory + '/status.txt','a') as status_file:
-                        status_file.write(timestr)
-
-                    if self.sc != None:
-                        del self.sc
-
-                except:
-                    timestr = "Stopping RMG for Exception at {0}\n\n".format(time.strftime('%Y-%m-%d %H:%M:%S'))
-                    with open(self.directory + '/status.txt','a') as status_file:
-                        status_file.write(timestr)
-                    print "Exception "
-                    raise
+  def run_once(self):
+    self.log("Starting RMG once through at {0}\n".format(time.strftime('%Y-%m-%d %H:%M:%S')))
+    for t in self.backend.timing.timing_list:
+      self.connect(t[0])
+      self.log("Runing tuning {} for {} seconds\n".format(t[0],t[1]))
+      self.frontend.start()
+      time.sleep(t[1])
+      self.frontend.stop()
+      self.frontend.wait()
+      self.disconnect()
+    self.log("Finished at {0}\n\n".format(time.strftime('%Y-%m-%d %H:%M:%S')))
 
 
 if __name__ == '__main__':
-    dir_finder = detector_array()
-    dir_finder.run()
+    dir_finder = detector_array(filename="./test_tx.xml", no_usrp=0.01, log_file="./log_file")
+    dir_finder.run_once()

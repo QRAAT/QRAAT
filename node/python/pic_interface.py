@@ -35,7 +35,7 @@ class pic_interface:
 
   def __init__(self, port = '/dev/ttyS0'):
     self.ser = serial.Serial(port, timeout = 1)  #open serial port
-    print "Serial port: %s" % (self.ser.portstr,)       #check which port was realy used
+    print "PIC interface serial port: {}".format(self.ser.portstr)       #check which port was realy used
     self.lo = -1
     self._read()
 
@@ -160,6 +160,11 @@ class pic_interface:
     self._read()
     out = (self.freq == in_freq) and self.w and self.lock
     return out
+
+  def status_string(self):
+    self._read()
+    ret_string = "Serial Port: {3}, Frequency: {0:d} Hz, Write: {1}, Lock: {2}".format(self.freq, self.w, self.lock, self.ser.portstr)
+    return ret_string
 
   def print_status(self):
     """ Print frequency to the terminal. """ 
