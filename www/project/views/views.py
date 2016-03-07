@@ -610,33 +610,119 @@ If it's not, then we call and return render_project_formset with the modelform o
 # The worst function ever
 @login_required(login_url="/account/login")
 def bulk_wizard(request, project_id, number=0):
-    project = get_project(project_id)
-    content = {}
-    content["nav_options"] = get_nav_options(request)
-    content["project"] = project
+    user = request.user
+    try:
+        project = Project.objects.get(ID=project_id)
+        if project.is_owner(user) or project.is_collaborator(user):
+            pass # Just to take the rest of the function out of this block
+        else:
+            return not_allowed_page(request)
+
+    except ObjectDoesNotExist:
+        raise Http404
 
     # GET requests are from non submission page loads. 
     if request.method == 'GET':
-        num = request.GET.get("number")
-        number = num
+        # Check how many never before used tx and targets there are for this project
+        # QuerySets
+        # Tx and Target ID's that've been used
+        usedTxs = []
+        usedTargets = []
+        for d in project.get_deployments():
+            usedTxs.append(d.txID.ID)
+            usedTargets.append(d.targetID.ID)
+        pTx = project.get_transmitters().exclude(pk__in=usedTxs)
+        pTarget = project.get_targets().exclude(pk__in=usedTargets)
+        pTxIDs = [x.pk for x in pTx]
+        pTargetIDs = [x.pk for x in pTarget]
 
-        txIDs = request.GET.get("txIDs")
-        targetIDs = request.GET.get("targetIDs")
-        # If no num 
-        if num is None or num == '':
-            return render_manage_page(
-                request,
-                project,
-                "project/bulk-create.html",
-                content)
-        # Number of forms present
-        else: 
+        num = request.GET.get("number")
+        # Check number of forms present
+        if not num is None: 
             try:
                 num = int(num)
                 if num < 1:
                     return HttpResponseBadRequest("Non positive value")
             except ValueError:
                 return HttpResponseBadRequest("Entered a non-number")
+
+        txIDs = request.GET.get("txIDs")
+        targetIDs = request.GET.get("targetIDs")
+
+        # Check if using existing targets
+        existing_tx = request.GET.get("existing_tx")
+        existing_tx_target = request.GET.get("existing_tx_target")
+        if existing_tx == "true":
+            if not num:
+                return render_bulk_page(
+                    request,
+                    project,
+                    "project/bulk-create.html",
+                    extra_context={"readonlyformset": modelformset_factory(Tx, form=AddTransmitterForm, extra=0)(queryset=pTxIDs),
+                        "unused_tx_num": len(pTxIDs), 
+                        "unused_target_num": len(pTargetIDs),
+                        "current_form": "tx",
+                        "txIDs": " ".join(str(__) for __ in pTxIDs)}
+                )
+            else:
+                return render_wizard_project_formset(
+                    request=request,
+                    project_id=project_id,
+                    post_formset=modelformset_factory(Target, form=AddTargetForm)(),#(data=request.POST),
+                    get_formset=modelformset_factory(Target, form=AddTargetForm, extra=num)(queryset=Target.objects.none()),
+                    template_path="project/bulk-create.html",
+                    success_url="",
+                    redirect_bool=False,
+                    extra_context={"title_msg": "New Target",
+                                    "current_form": "target",}
+                ) 
+
+        elif existing_tx_target == "tx":
+            return render_bulk_page(
+                request,
+                project,
+                "project/bulk-create.html",
+                extra_context={"readonlyformset": modelformset_factory(Tx, form=AddTransmitterForm, extra=0)(queryset=pTxIDs),
+                    "unused_tx_num": len(pTxIDs), 
+                    "unused_target_num": len(pTargetIDs),
+                    "current_form": "tx",
+                    "targetIDs": " ".join(str(__) for __ in pTxIDs)}
+                )
+        elif existing_tx_target == "target":
+            if not num:
+                return render_bulk_page(
+                    request,
+                    project,
+                    "project/bulk-create.html",
+                    extra_context={"readonlyformset": modelformset_factory(Target, form=AddTargetForm, extra=0)(queryset=pTargetIDs),
+                        "unused_tx_num": len(pTxIDs), 
+                        "unused_target_num": len(pTargetIDs),
+                        "current_form": "target",
+                        "targetIDs": " ".join(str(__) for __ in pTargetIDs)}
+                    )
+            else:
+                print  " ".join(str(__) for __ in pTxIDs)
+                print  " ".join(str(__) for __ in pTargetIDs)
+                return render_wizard_project_formset(
+                    request=request,
+                    project_id=project_id,
+                    post_formset=modelformset_factory(Deployment, form=AddDeploymentForm)(data=request.POST),
+                    get_formset=modelformset_factory(Deployment, form=AddDeploymentForm, extra=num)(queryset=Deployment.objects.none()),
+                    template_path="project/bulk-create.html",
+                    success_url="",
+                    redirect_bool=False,
+                    extra_context={"current_form": "deployment",
+                        "txIDs": " ".join(str(__) for __ in pTxIDs),
+                        "targetIDs": " ".join(str(__) for __ in pTargetIDs)}
+                ) 
+        # If no num 
+        if num is None or num == '':
+            return render_bulk_page(
+                request,
+                project,
+                "project/bulk-create.html",
+                extra_context={"unused_tx_num": len(pTx), "unused_target_num": len(pTarget)}
+                )
 
 
         # Tx error
@@ -665,6 +751,7 @@ def bulk_wizard(request, project_id, number=0):
                 )
         # Dep error     
         elif request.GET.get("form-0-targetID") != None:
+            print "error dep"
             return render_wizard_project_formset(
                 request=request,
                 project_id=project_id,

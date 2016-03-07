@@ -311,6 +311,7 @@ def render_wizard_project_formset(
         elif request.method == 'GET':
             thereis_newelement = request.GET.get("new_element")
             formset = get_formset
+            print "helloitsseme"
             for form in formset:
                 form.set_project(project)
 
@@ -349,18 +350,29 @@ def render_manage_page(request, project, template_path, content):
     else:
         return not_allowed_page(request)
 
-def render_bulk_page(request, project, template_path, content):
+def render_bulk_page(request, project, template_path, extra_context=None):
     user = request.user
     nav_options = get_nav_options(request)
 
+    context = {"nav_options": nav_options,
+                "project": project,
+                }
+
     if request.method == "GET":
-        content["changed"] = request.GET.get("new_element")
-        content["deleted"] = request.GET.get("deleted")
+        context["changed"] = request.GET.get("new_element")
+        context["deleted"] = request.GET.get("deleted")
+        context["title_msg"] = "Bulk Wizard"
+
+    if extra_context != None:
+        if isinstance(extra_context, dict):
+            context.update(extra_context)
+        else:
+            raise TypeError("Passed in non-dict for extra_context in render_bulk_page")
 
     if can_change(project, user):
         return render(
             request, template_path,
-            content)
+            context)
 
     else:
         return not_allowed_page(request)
