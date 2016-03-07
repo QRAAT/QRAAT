@@ -239,19 +239,19 @@ function submitTxMake() {
     </div>
 </form>
 <br/>
-<p style="margin-bottom: 0px">You have {{ unused_tx_num }} transmitter{% if unused_tx_num > 0 %}s{% endif %} that have never been associated with a deployment. Would you like to start with those transmitters?</p>
+<p style="margin-bottom: 0px">You have {{ unused_tx_num }} transmitter{% if unused_tx_num != 1 %}s{% endif %} that have never been associated with a deployment. {% if unused_tx_num > 0 %}Would you like to start with those transmitters?{% endif %}</p>
 <form id="existing_tx_form"> 
     <input type="hidden" id="existing_tx" name="existing_tx">
 </form>
-<button class="btn btn-sm btn-primary" type="button" style="margin-top: 5px" onclick="$('#existing_tx').val('true'); $('#existing_tx_form').submit()">Start with existing transmitters</button>
+<button class="btn btn-sm btn-primary" type="button" style="{% if unused_tx_num == 0 %}display: none; {% endif %}margin-top: 5px" onclick="$('#existing_tx').val('true'); $('#existing_tx_form').submit()">Start with existing transmitters</button>
 
 <br/>
 
-<p style="margin-bottom:0px">You have {{ unused_tx_num }} transmitter{% if unused_tx_num > 0 %}s{% endif %} and {{ unused_target_num }} target{% if unused_target_num > 0 %}s{% endif %} that have never been associated with a deployment. Would you like to start with those transmitters and targets?</p>
+<p style="margin-bottom:0px">You have {{ unused_tx_num }} transmitter{% if unused_tx_num != 1 %}s{% endif %} and {{ unused_target_num }} target{% if unused_target_num != 1 %}s{% endif %} that have never been associated with a deployment. {% if unused_tx_num > 0 and unused_target_num > 0 %}Would you like to start with those transmitters and targets?{% endif %}</p>
 <form id="existing_tx_target_form">
     <input type="hidden" id="existing_tx_target" name="existing_tx_target">
 </form>
-<button class="btn btn-sm btn-primary" type="button" style="margin-top: 5px" onclick="$('#existing_tx_target').val('tx'); $('#existing_tx_target_form').submit()">Start with existing transmitters and targets</button>
+<button class="btn btn-sm btn-primary" type="button" style="{% if unused_tx_num == 0 or unused_target_num == 0 %} display: none; {%endif %}margin-top: 5px" onclick="$('#existing_tx_target').val('tx'); $('#existing_tx_target_form').submit()">Start with existing transmitters and targets</button>
 
 {% elif readonlyformset %}
 <table>

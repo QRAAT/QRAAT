@@ -658,7 +658,7 @@ def bulk_wizard(request, project_id, number=0):
                     request,
                     project,
                     "project/bulk-create.html",
-                    extra_context={"readonlyformset": modelformset_factory(Tx, form=AddTransmitterForm, extra=0)(queryset=pTxIDs),
+                    extra_context={"readonlyformset": modelformset_factory(Tx, form=AddTransmitterForm, extra=0)(queryset=pTx),
                         "unused_tx_num": len(pTxIDs), 
                         "unused_target_num": len(pTargetIDs),
                         "current_form": "tx",
@@ -682,27 +682,25 @@ def bulk_wizard(request, project_id, number=0):
                 request,
                 project,
                 "project/bulk-create.html",
-                extra_context={"readonlyformset": modelformset_factory(Tx, form=AddTransmitterForm, extra=0)(queryset=pTxIDs),
+                extra_context={"readonlyformset": modelformset_factory(Tx, form=AddTransmitterForm, extra=0)(queryset=pTx),
                     "unused_tx_num": len(pTxIDs), 
                     "unused_target_num": len(pTargetIDs),
                     "current_form": "tx",
-                    "targetIDs": " ".join(str(__) for __ in pTxIDs)}
-                )
+                }
+            )
         elif existing_tx_target == "target":
             if not num:
                 return render_bulk_page(
                     request,
                     project,
                     "project/bulk-create.html",
-                    extra_context={"readonlyformset": modelformset_factory(Target, form=AddTargetForm, extra=0)(queryset=pTargetIDs),
+                    extra_context={"readonlyformset": modelformset_factory(Target, form=AddTargetForm, extra=0)(queryset=pTarget),
                         "unused_tx_num": len(pTxIDs), 
                         "unused_target_num": len(pTargetIDs),
                         "current_form": "target",
                         "targetIDs": " ".join(str(__) for __ in pTargetIDs)}
                     )
             else:
-                print  " ".join(str(__) for __ in pTxIDs)
-                print  " ".join(str(__) for __ in pTargetIDs)
                 return render_wizard_project_formset(
                     request=request,
                     project_id=project_id,

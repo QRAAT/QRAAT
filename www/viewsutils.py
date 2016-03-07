@@ -311,7 +311,6 @@ def render_wizard_project_formset(
         elif request.method == 'GET':
             thereis_newelement = request.GET.get("new_element")
             formset = get_formset
-            print "helloitsseme"
             for form in formset:
                 form.set_project(project)
 
