@@ -287,8 +287,8 @@ function loadFlot(pos_markers, map, dep_id){
         points: { show: true, fill: false, symbol: drawFlotPoint},
         grid: { hoverable: true, clickable: true },
         xaxis: {
-	    min: selectedTimeRange[0] * 1000,
-	    max: selectedTimeRange[1] * 1000,
+	    min: currTimeRange[0] * 1000,
+	    max: currTimeRange[1] * 1000,
             mode: "time",
             timezone: "America/Los_Angeles", // TODO: Timezone is hardcoded
             timeformat: "%m/%d %H:%M",
@@ -1397,13 +1397,13 @@ function setupSlider() {
 
 	    if($("#id_graph_data option:selected").text() == "Likelihood") {
 	    	var fi = 0;
-		$("#id_likelihood_low").val(ui.values[0]);
-		$("#id_likelihood_high").val(ui.values[1]);
+            $("#id_likelihood_low").val(ui.values[0]);
+            $("#id_likelihood_high").val(ui.values[1]);
 	    }
 	    else if ($("#id_graph_data option:selected").text() == "Activity") {
-	   	var fi = 1; 
-		$("#id_activity_low").val(ui.values[0]);
-		$("#id_activity_high").val(ui.values[1]);
+            var fi = 1; 
+            $("#id_activity_low").val(ui.values[0]);
+            $("#id_activity_high").val(ui.values[1]);
 	    }
 	    // TODO: Finding the delta is pointless if we bound the yaxis to [0,1] in the plot options
 	    var yaxis = $("#plot-div").data("plot").getAxes().yaxis;	    
@@ -1785,36 +1785,37 @@ function initialize(){
 
     // Bind filter form inputs to filter slider
     $("#id_likelihood_low").on('change', function() {
-	setGraphFilters();
-	if($("#id_graph_data option:selected").text() == "Likelihood")
-	    if($("#filter-slider").slider("values",0) != $(this).val())
-		$("#filter-slider").slider("values",0,$(this).val());
+        setGraphFilters();
+        if($("#id_graph_data option:selected").text() == "Likelihood")
+            if($("#filter-slider").slider("values",0) != $(this).val())
+                $("#filter-slider").slider("values",0,$(this).val());
     });
     $("#id_likelihood_high").on('change', function() {
-	setGraphFilters();
-	if($("#id_graph_data option:selected").text() == "Likelihood")
-	    if($("#filter-slider").slider("values",1) != $(this).val())
-		$("#filter-slider").slider("values",1,$(this).val());
+        setGraphFilters();
+        if($("#id_graph_data option:selected").text() == "Likelihood")
+            if($("#filter-slider").slider("values",1) != $(this).val())
+                $("#filter-slider").slider("values",1,$(this).val());
     });
     $("#id_activity_low").on('change', function() {
-	setGraphFilters();
-	if($("#id_graph_data option:selected").text() == "Activity")
-	    if($("#filter-slider").slider("values",0) != $(this).val())
-		$("#filter-slider").slider("values",0,$(this).val());
+        setGraphFilters();
+        if($("#id_graph_data option:selected").text() == "Activity")
+            if($("#filter-slider").slider("values",0) != $(this).val())
+                $("#filter-slider").slider("values",0,$(this).val());
     });
     $("#id_activity_high").on('change', function() {
-	setGraphFilters();
-	if($("#id_graph_data option:selected").text() == "Activity")
-	    if($("#filter-slider").slider("values",1) != $(this).val())
-		$("#filter-slider").slider("values",1,$(this).val());
+        setGraphFilters();
+        if($("#id_graph_data option:selected").text() == "Activity")
+            if($("#filter-slider").slider("values",1) != $(this).val())
+                $("#filter-slider").slider("values",1,$(this).val());
     });
 
 
     $("#id_graph_data").on('change', function(){
-	//updateFlot(markers_querydata);
-	var yaxis = $("#plot-div").data("plot").getAxes().yaxis;
-	var delta = yaxis.max - yaxis.min;
-	$("#filter-slider").slider("values",[(graphFilters[$(this).val()-1][0] - yaxis.min)/delta, (graphFilters[$(this).val()-1][1] - yaxis.min)/delta]);
+        var dataLabel = $("#id_graph_data option:selected").text();
+        $("#plotLabel").html(dataLabel + " Graph");
+        var yaxis = $("#plot-div").data("plot").getAxes().yaxis;
+        var delta = yaxis.max - yaxis.min;
+        $("#filter-slider").slider("values",[(graphFilters[$(this).val()-1][0] - yaxis.min)/delta, (graphFilters[$(this).val()-1][1] - yaxis.min)/delta]);
     });
     $("#id_colorpoints").on('change', function() {colorMarkers(); $("#plot-div").data("plot").draw();});
     $("#id_sites").on('click', toggleSites);
@@ -2348,6 +2349,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
         <div id="filter-slider" style="flex-basis:13px; height:100%; margin-bottom:8; visibility:hidden"></div>
         <div style="flex-basis: fill; width:100%; height:100%" id="plot-div"></div>
     </div>
+    <p id="plotLabel" style="text-align: center; color: grey"><b>Likelihood Graph</b></p>
 </div> <!-- end ui-content -->
 	<center>
 	<!-- uncomment next line for small overview graph -->
