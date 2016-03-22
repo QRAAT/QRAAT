@@ -25,6 +25,11 @@ import sys, os, time, errno
 import numpy as np
 from string import Template
 
+#: The DB schema is hard-coded to handle four channels. For this 
+#: reason, this value is also hard-coded here. And also used as
+#: the value hardcoded in the queries and headers  #FIXME
+MAX_CHANNEL_CT = 4
+
 # Some SQL queries. 
 
 query_insert_est = Template(
@@ -105,10 +110,6 @@ class est (qraat.csv.csv):
     :type fn: str
     
   """
-    
-  #: The DB schema is hard-coded to handle four channels. For this 
-  #: reason, this value is also hard-coded here. 
-  channel_ct = 4 
 
   def __init__(self, det=None, dets=None, fn=None):
   
@@ -192,6 +193,9 @@ class est (qraat.csv.csv):
     :param det: Pulse record. 
     :type det: qraat.det.det
     """
+
+    if (det.channel_ct > MAX_CHANNEL_CT):
+      raise qraat.error.Det_ChannelError(det.channel_ct, MAX_CHANNEL_CT)
     
     det.eig()
     det.f_signal()
@@ -206,7 +210,7 @@ class est (qraat.csv.csv):
     # Fourier decomposistion
     new_row.fdsp        = det.f_pwr
     det.f_sig = det.f_sig.transpose()
-    for i in range(self.channel_ct): 
+    for i in range(det.channel_ct): 
       setattr(new_row, 'fd%dr' % (i+1), det.f_sig[0,i].real)
       setattr(new_row, 'fd%di' % (i+1), det.f_sig[0,i].imag)
   
@@ -216,7 +220,7 @@ class est (qraat.csv.csv):
     # Eigenvalue decomposition 
     new_row.edsp   = det.e_pwr
     det.e_sig = det.e_sig.transpose()
-    for i in range(self.channel_ct): 
+    for i in range(det.channel_ct): 
       setattr(new_row, 'ed%dr' % (i+1), det.e_sig[0,i].real)
       setattr(new_row, 'ed%di' % (i+1), det.e_sig[0,i].imag)
   
@@ -225,8 +229,8 @@ class est (qraat.csv.csv):
 
     # Noise covariance
     new_row.tnp = np.trace(det.n_cov).real  # ??
-    for i in range(self.channel_ct):
-      for j in range(self.channel_ct): 
+    for i in range(det.channel_ct):
+      for j in range(det.channel_ct): 
         setattr(new_row, 'nc%d%dr' % (i+1, j+1), det.n_cov[i,j].real)
         setattr(new_row, 'nc%d%di' % (i+1, j+1), det.n_cov[i,j].imag)
 

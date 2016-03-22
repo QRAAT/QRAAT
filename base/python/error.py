@@ -45,3 +45,9 @@ class ResolveIdError (QraatError):
 class PLL_LockError (QraatError):
   def __init__(self):
     QraatError.__init__(self, "PLL not locked", 2)
+
+class Det_ChannelError(QraatError):
+  def __init__(self,det_channel_ct, max_channel_ct):
+    QraatError.__init__(self, "Too many channels in det file {}, max {}".format(det_channel_ct, max_channel_ct), 3)
+    self.det_channel_ct = det_channel_ct
+    self.max_channel_ct = max_channel_ct
