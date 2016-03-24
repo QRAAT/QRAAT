@@ -6,7 +6,7 @@ import time
 def results(manOrLik):
   deployments = [57, 60, 61, 62]
   methods = ['bandwidth filter', 'estScore Filter', 'NBC',
-             'modified BC', 'decisionTree', 'randomForests']
+             'modified BC', 'decisionTree', 'randomForests', 'SVM']
   depDict = {}
   
   db_con = MySQLdb.connect(user="root", db="qraat")

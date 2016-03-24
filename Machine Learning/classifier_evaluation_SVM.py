@@ -13,8 +13,8 @@ def rbfKernel(data, x, gamma):
 
 def SVMPredict(alphaArray, x, y, b, gamma, data):
   f = b
-  for i in alphaArray:
-    f+=alphaArray[i]*y[i]*rbfKernel(data, gamma, x[i])
+  for i in range(len(alphaArray)):
+    f+=alphaArray[i]*y[i]*rbfKernel(data, x[i], gamma)
   if (f > 0):
     return 1
   else:
@@ -40,9 +40,28 @@ def evaluation(deploymentID, start_time,
     
     cur = db_con.cursor()
 
-    tree = {}
-    cur.execute("""SELECT branchID, data_type, data_value
-                   FROM decision_tree%s
+    y = []
+    x = []
+    alphaArray = []
+    cur.execute("""SELECT isPulse, band3, band10, frequency,
+                   ec, tnp, edsp, fdsp, edsnr, fdsnr, alpha
+                   FROM est, SVM_alpha%s, est_class%s
+                   WHERE est.ID = SVM_alpha%s.estID
+                   AND est.ID = est_class%s.estID
+                   AND SVM_alpha%s.start_time = %s
+                   AND est.deploymentID = %s
+                   AND est.siteID = %s
+                   AND SVM_alpha%s.validation = %s;
+                """%(manOrLik, manOrLik, manOrLik, manOrLik, manOrLik,
+                     start_time, deploymentID, i, manOrLik, validation))
+    for row in cur.fetchall():
+      y.append(row[0])
+      x.append(row[1:10])
+      alphaArray.append(row[10])
+
+    b = 0
+    cur.execute("""SELECT b
+                   FROM SVM_b%s
                    WHERE start_time = %s
                    AND deploymentID = %s
                    AND siteID = %s
@@ -50,7 +69,19 @@ def evaluation(deploymentID, start_time,
                 """%(manOrLik, start_time, deploymentID,
                      i, validation))
     for row in cur.fetchall():
-      tree[row[0]] = [row[1], row[2]]
+      b = row[0]
+
+    gamma = 0
+    cur.execute("""SELECT gamma
+                   FROM SVM_gamma%s
+                   WHERE start_time = %s
+                   AND deploymentID = %s
+                   AND siteID = %s
+                   AND validation = %s;
+                """%(manOrLik, start_time, deploymentID,
+                     i, validation))
+    for row in cur.fetchall():
+      gamma = row[0]
     
     cur.execute("""SELECT isPulse, band3, band10, frequency,
                    ec, tnp, edsp, fdsp, edsnr, fdsnr
@@ -66,11 +97,8 @@ def evaluation(deploymentID, start_time,
                 """%(manOrLik, manOrLik, start_time, end_time,
                      deploymentID, i, validation))
     for row in cur.fetchall():
-      estData = {'band3':row[1], 'band10':row[2],
-                 'frequency':row[3], 'ec':row[4], 'tnp':row[5],
-                 'edsp':row[6], 'fdsp':row[7],
-                 'edsnr':row[8], 'fdsnr':row[9]}
-      isPulse = decisionTreePrediction(estData, tree)
+      estData = row[1:10]
+      isPulse = SVMPredict(alphaArray, x, y, b, gamma, estData)
 
       if (row[0] == 1):
         if (isPulse == 1):
@@ -128,14 +156,14 @@ def insertResults(depID, validation):
   cur.execute("""INSERT INTO classifier_performance
                  (deploymentID, validation, TP, TN,
                  FP, FN, total_records, classifier_type)
-                 VALUES (%s, %s, %s, %s, %s, %s, %s, 'decisionTree')
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, 'SVM')
               """%(depID, validation, evalMan[0], evalMan[1],
                    evalMan[2], evalMan[3], sum(evalMan)))
   cur2 = db_con.cursor()
   cur2.execute("""INSERT INTO classifier_performance2
                   (deploymentID, validation, TP, TN,
                   FP, FN, total_records, classifier_type)
-                  VALUES (%s, %s, %s, %s, %s, %s, %s, 'decisionTree')
+                  VALUES (%s, %s, %s, %s, %s, %s, %s, 'SVM')
                """%(depID, validation, evalLik[0], evalLik[1],
                     evalLik[2], evalLik[3], sum(evalLik)))
 
