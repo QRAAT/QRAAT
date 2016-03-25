@@ -6,7 +6,7 @@ from sklearn.svm import SVC
 
 
 def getDataSet(start_time, end_time, deploymentID,
-                   siteID, validations, manOrLik):
+               siteID, validations, manOrLik):
   x = []
   y = []
   idArray = []
@@ -40,22 +40,6 @@ def getDataSet(start_time, end_time, deploymentID,
     
   return x,y, idArray
 
-def rbfKernel(data, x):
-  normSquare = 0
-  for i in range(9):
-    difference = data[i] - x[i]
-    normSquare += difference**2
-  return np.exp(-normSquare/9.0)
-
-def SVMPredict(alphaArray, x, y, b, data):
-  f = b
-  for i in alphaArray:
-    f+=alphaArray[i]*y[i]*rbfKernel(data, x[i])
-  if (f > 0):
-    return 1
-  else:
-    return -1
-
 
 def SVM(deploymentID, site, start_time, end_time,
         validation, manOrLik):
@@ -65,30 +49,6 @@ def SVM(deploymentID, site, start_time, end_time,
      dataset.
      If corss validation takes too long, use hide out method instead.
   """
-##  x,y = getDataSet(start_time, end_time, deploymentID,
-##                   site, [4,5,6,7,8,9], manOrLik)
-##  x1,y1 = getDataSet(start_time, end_time, deploymentID,
-##                     site, [1,2,3], manOrLik)
-##  x=np.array(x)
-##  y=np.array(y)
-##  print 'start training'
-##  clf = SVC()
-##  clf.fit(x, y) 
-##  SVC(C=1.0, cache_size=2000, class_weight=None, coef0=0.0,
-##      decision_function_shape=None, degree=3, gamma='auto', kernel='rbf',
-##      max_iter=-1, probability=False, random_state=None, shrinking=True,
-##      tol=0.001, verbose=False)
-##  print clf.intercept_
-##  alphaArray = {}
-##  for i in range(len(clf.support_)):
-##    alphaArray[clf.support_[i]] = clf.dual_coef_[0][i]
-##  
-##  error = 0
-##  for i in range(len(y1)):
-##    isPulse = clf.predict([x1[1]])
-##    if (isPulse != SVMPredict(alphaArray, x, y, clf.intercept_[0], x1[i])):
-##      error += 1
-##  print float(error)/len(y1), jodifjdso
 
   numberOfSamplePoints = 1000
 
