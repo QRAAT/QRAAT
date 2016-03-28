@@ -4,7 +4,13 @@ import numpy as np
 import time
 import math
 
+
 def decisionTreePrediction(estData, tree):
+  """
+     traverse the tree with the observation and return the 
+     result from the tree.
+  """
+  
   dataTypes = ['band3', 'band10', 'frequency',
                'ec', 'tnp', 'edsp', 'fdsp',
                'edsnr', 'fdsnr']
@@ -22,10 +28,11 @@ def decisionTreePrediction(estData, tree):
       isPulse = check[1]
   return isPulse
 
+
 def evaluation(deploymentID, start_time,
                end_time, sites, validation, manOrLik):
   """
-     Find the TP, TN, FP, and FN for the deployment and time.
+     Find the TP, TN, FP, and FN for the deployment.
   """
   
   falsePositive_dep = 0
@@ -94,6 +101,11 @@ def evaluation(deploymentID, start_time,
 
   
 def insertResults(depID, validation):
+  """
+     gather evaluation from evaluation functoin, stores the performance
+     to the database, and print the results.
+  """
+  
   db_con = MySQLdb.connect(user="root", db="qraat")
   start_time = {57:1382252400,
                 60:1383012615,
@@ -152,14 +164,17 @@ def insertResults(depID, validation):
   print 'False Nagative Rate: %s'%(float(evalLik[3])/(evalLik[3] + evalLik[0]))
   print 'Overall Error Rate: %s'%(float(evalLik[2] + evalLik[3])/(sum(evalLik)))
 
+
 def main():
   """
      This program should evulate all deployment
-     and site combinations for bandwidth filter.
+     and site combinations for decision tree.
      It will do 10 times on different traning
      and validation sets. It will also do it on
      both manual and likelihood labelings.
   """
+
+#go through each combination of validation and deployment
   initTime = time.time()
   deploymentIDArray = [57, 60, 61, 62]
   for i in range(10):

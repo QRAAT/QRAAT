@@ -2,6 +2,11 @@ import MySQLdb
 import numpy as np
 
 def setNumLikelihood(deploymentID, start_time, end_time, site):
+  """
+     set the validation number to each of the likelihood labeling.
+  """
+
+#create counter array to keep track how much each block needs
   db_con = MySQLdb.connect(user="root", db="qraat")
   cur = db_con.cursor()
   cur.execute("""SELECT COUNT(*) FROM est
@@ -17,6 +22,7 @@ def setNumLikelihood(deploymentID, start_time, end_time, site):
   for i in range(total%10):
     counter[i] += 1
 
+#randomly assign validations to each est and insert it to the labeling
   cur2 = db_con.cursor()
   cur2.execute("""SELECT estID FROM est
                   INNER JOIN est_class2
@@ -45,6 +51,11 @@ def setNumLikelihood(deploymentID, start_time, end_time, site):
                  """%(setNumber, row[0]))
 
 def setNumManual(deploymentID, start_time, end_time, site):
+  """
+      set the validation number to each of the manual labeling.
+  """
+    
+#create counter array to keep track how much each block needs
   db_con = MySQLdb.connect(user="root", db="qraat")
   cur = db_con.cursor()
   cur.execute("""SELECT COUNT(*) FROM est
@@ -59,7 +70,8 @@ def setNumManual(deploymentID, start_time, end_time, site):
   counter = [total/10]*10
   for i in range(total%10):
     counter[i] += 1
-  
+
+#randomly assign validations to each est and insert it to the labeling
   cur2 = db_con.cursor()
   cur2.execute("""SELECT estID FROM est
                   INNER JOIN est_class
@@ -88,6 +100,15 @@ def setNumManual(deploymentID, start_time, end_time, site):
                  """%(setNumber, row[0]))
 
 def main():
+  """
+      This program will set the validation number to each est.
+      The number of the est's in each validation set is set to
+      be nearly equally sized blocks by keeping track of how 
+      many est's can still be in a single validation. The data 
+      is stored in est_class table.
+  """
+    
+#going through each combination of deployment and site
   deploymentID = [57, 60, 61, 62]
   start_time = {57:1382252400,
                 60:1383012615,

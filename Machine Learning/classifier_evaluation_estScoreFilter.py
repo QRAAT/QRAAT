@@ -5,6 +5,10 @@ import time
 import math
 
 def estScoreFilter(estScore, estScoreBound):
+  """
+     classify est as pulse if est score less than the threshold,
+     noise vise versa.
+  """
   if (estScore > estScoreBound):
     return 0
   else:
@@ -13,7 +17,7 @@ def estScoreFilter(estScore, estScoreBound):
 def likelihoodLabelingEvaluation(deploymentID, start_time, end_time,
                                  sites, validation):
   """
-     Find the TP, TN, FP, and FN for the deployment and time.
+     Find TP, TN, FP, and FN for likelihood labaling.
   """
   
   estScoreBound = 5
@@ -65,7 +69,7 @@ def likelihoodLabelingEvaluation(deploymentID, start_time, end_time,
 def manualLabelingEvaluation(deploymentID, start_time, end_time,
                                sites, validation):
   """
-     Find the TP, TN, FP, and FN for the deployment and time.
+     Find TP, TN, FP, and FN for manual labeling.
   """
   
   estScoreBound = 5
@@ -181,11 +185,12 @@ def evaluation(depID, validation):
 def main():
   """
      This program should evulate all deployment
-     and site combinations for bandwidth filter.
+     and site combinations for est score filter.
      It will do 10 times on different traning
      and validation sets. It will also do it on
      both manual and likelihood labelings.
   """
+  
   initTime = time.time()
   deploymentIDArray = [57, 60, 61, 62]
   for i in range(10):

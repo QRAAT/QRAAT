@@ -5,15 +5,19 @@ import time
 import math
 
 def bandwidthFilter(band3, band10, band3Bound, band10Bound):
+  """
+     classfy pulse if both band3 and band10 and under the threshold, noise vice versa
+  """
   if ((band3 < band3Bound)&(band10 < band10Bound)):
     return 1
   else:
     return 0
 
+
 def likelihoodLabelingEvaluation(deploymentID, start_time, end_time,
                                  sites, validation):
   """
-     Find the TP, TN, FP, and FN for the deployment and time.
+     Find the TP, TN, FP, and FN for the deployment and time for likelihood labeling.
   """
   
   band3Bound = 450
@@ -64,7 +68,7 @@ def likelihoodLabelingEvaluation(deploymentID, start_time, end_time,
 def manualLabelingEvaluation(deploymentID, start_time, end_time,
                                sites, validation):
   """
-     Find the TP, TN, FP, and FN for the deployment and time.
+     Find the TP, TN, FP, and FN for the deployment and time for manual labeling.
   """
   
   band3Bound = 450
@@ -114,6 +118,12 @@ def manualLabelingEvaluation(deploymentID, start_time, end_time,
 
   
 def evaluation(depID, validation):
+  """
+      Go through each combinations of site and evaluate bandwidth
+      filter with each of manual labeling and likelihood labeling.
+      The evaluation result is stored in the classifier_performance
+      table. It also prints the result.
+  """
   db_con = MySQLdb.connect(user="root", db="qraat")
   start_time = {57:1382252400,
                 60:1383012615,
@@ -129,22 +139,22 @@ def evaluation(depID, validation):
            62:[1,2,3,4,5,6,8]}
   
   evalMan = manualLabelingEvaluation(depID, start_time[depID],
-                                                  end_time[depID], sites[depID],
-                                                  validation)
+                                     end_time[depID], sites[depID],
+                                     validation)
   evalLik = likelihoodLabelingEvaluation(depID, start_time[depID],
-                                                      end_time[depID], sites[depID],
-                                                      validation)
+                                         end_time[depID], sites[depID],
+                                         validation)
   
   if ((depID == 61) | (depID == 62)):
     start_time = 1391276584
     end_time = 1391285374
     sites = [1,3,4,5,6,8]
     tmpEvalMan = manualLabelingEvaluation(depID, start_time,
-                                                                end_time, sites,
-                                                                validation)
+                                          end_time, sites,
+                                          validation)
     tmpEvalLik = likelihoodLabelingEvaluation(depID, start_time,
-                                                                    end_time, sites,
-                                                                    validation)
+                                              end_time, sites,
+                                              validation)
     for i in range(4):
       evalMan[i] += tmpEvalMan[i]
       evalLik[i] += tmpEvalLik[i]
@@ -176,6 +186,7 @@ def evaluation(depID, validation):
   print 'False Nagative Rate: %s'%(float(evalLik[3])/(evalLik[3] + evalLik[0]))
   print 'Overall Error Rate: %s'%(float(evalLik[2] + evalLik[3])/(sum(evalLik)))
 
+
 def main():
   """
      This program should evulate all deployment
@@ -184,6 +195,8 @@ def main():
      and validation sets. It will also do it on
      both manual and likelihood labelings.
   """
+  
+#go through each combination of validation and deployment
   initTime = time.time()
   deploymentIDArray = [57, 60, 61, 62]
   for i in range(10):
