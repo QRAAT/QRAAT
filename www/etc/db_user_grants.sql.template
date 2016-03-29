@@ -6,6 +6,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.* TO d
 GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_group TO django_admin@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_group_permissions TO django_admin@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_permission TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_user_user_permission TO django_admin@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_user TO django_admin@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_user_groups TO django_admin@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.django_admin_log TO django_admin@'localhost';

@@ -196,6 +196,7 @@ def get_context(request, deps=[], req_deps=[]):
         args = Q()
         for dep in req_deps_IDs:
             args = args | Q(deploymentID=str(dep))
+        # try max of max of each deployments, might be faster than . can always be optimized either way
         datetime_to = Position.objects.filter(args).aggregate(Max('timestamp'))['timestamp__max']
         print "found datetime"
         if datetime_to != None:
