@@ -29,6 +29,7 @@ use DBI ;
 #use DBD::Wire10 ;				# perl -MCPAN -e shell \r install DBD::Wire10
 
 my $Debug = 0 ;
+my $ConnectTimeout = 10 ;
 
 my $TableNameEstCount = "estcount" ;		# The name of the db table
 my $TableNameSitelist = "site" ;		# The name of the db table
@@ -115,7 +116,7 @@ sub get_est_count($)
 	# Site
 	my $site_est_count = "" ;
 	#my $site_estdir = $ENV{$ENV_NAME_RMG_SITE_EST_DIR} ;
-	#$command = "ssh $sitename 'find $site_estdir -type f -iname \"*.est\" | wc -l'" ;
+	#$command = "ssh -o ConnectTimeout=$ConnectTimeout $sitename 'find $site_estdir -type f -iname \"*.est\" | wc -l'" ;
 	#if( $Debug ) { print "debug: get_est_count: site command=$command\n" ; }
 	#$result = `$command` ;
 	#chomp($result) ;

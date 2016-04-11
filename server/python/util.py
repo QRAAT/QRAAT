@@ -60,6 +60,10 @@ def timestamp_to_datetime(t):
 ### Common miscellaneous computations. ########################################
 
 def compute_time_windows(t_start, t_end, t_step, t_window):
+  t_start = int(t_start)
+  t_end = int(t_end)
+  t_step = int(t_step)
+  t_window = int(t_window)
   half = t_window / 2.0
   t_start = int(t_start + half); t_end = int(t_end - half) + 1
   for i in range(t_start - (t_start % t_step), 

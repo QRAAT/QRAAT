@@ -13,10 +13,11 @@ of the documentation, do
 
 Here's how I setup doxygen/breathe/sphinx: 
 
-(1) Download breathe 1.0.0 here: https://pypi.python.org/pypi/breathe. Untar it
+(1) Download breathe 4.2.0 here: https://pypi.python.org/pypi/breathe. Untar it
     and run ``sudo python setup.py install``. 
 
 (2) Next, generate a doxygen configuration file for the C++ interface files. 
+    ``sudo apt-get install doxygen python-sphinx``.  
     In include/, do ``doxygen -g doxygen.cfg``. Move doxygen.cfg to doc/.
 
 (3) Set the following parameters in doxygen.cfg: 

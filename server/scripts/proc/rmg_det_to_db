@@ -73,9 +73,12 @@ except mdb.Error, e:
 dir_sitelist = []
 (status, output) = commands.getstatusoutput(
         '/usr/bin/find {0}/* -maxdepth 0 -type d'.format(det_dir) )
-sitedirs = output.split('\n')
-for d in sitedirs:
-  dir_sitelist.append(d.split('/')[-1])
+if status == 0:
+  sitedirs = output.split('\n')
+  for d in sitedirs:
+    dir_sitelist.append(d.split('/')[-1])
+else:
+  print "det_to_db: no site directories found in {}".format(det_dir)
 
 
 for site in dir_sitelist:

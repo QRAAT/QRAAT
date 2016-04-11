@@ -1,0 +1,8 @@
+{% extends "project/manage_project_base.html" %}
+{% load project_filters %}
+
+{%block success_msg %} Transmitter created {% endblock %}
+{% block deleted_msg %} Transmitters deleted {% endblock %}
+
+{% block managed_obj %} Transmitters {% endblock %}
+{% block add_url %} {% url 'project:add-transmitter' project.ID %} {% endblock %}

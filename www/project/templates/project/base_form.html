@@ -1,0 +1,262 @@
+{% load class_tag %}
+
+{%block script %}
+<link rel="stylesheet" type"text/css" href="/static/css/jquery.datetimepicker.css" >
+<script type="text/javascript" src="/static/js/jquery.datetimepicker.js"></script>
+
+<script>
+
+$(document).ready(function(){
+    $("#num_rows").val($("#form tr.objectrow:visible").length);
+
+    var inputs = $(".input-group").children("input, select, textarea");
+    for(var i=0; i<inputs.length; i++){
+        $(inputs[i]).addClass("form-control");
+    }
+    
+    $(".datetime").datetimepicker({format: "m/d/Y H:i:s"});
+    $("textarea").attr("rows",1);
+
+    $("#change_num_rows").click(function() {
+        var curnum = numVisibleRows();
+        var num = $("#num_rows").val();
+        if(num-curnum > 0) {
+            for(var i=0; i<num-curnum; i++) {
+                addMore('#form tr:last', 'form');
+            }
+        }
+        else {
+            for(var i=0; i<curnum-num; i++) {
+                var $row = $("#form tr.objectrow:visible:last");
+                $row.find(".delete_button").trigger("click"); 
+            }
+        }
+    });
+
+    $(".delete_button").click(function() {
+        $(this).closest("tr").remove();
+        /*
+        $(this).closest("tr").hide();
+        $(this).closest("tr").find(":input").each(function() {
+            console.log($(this));
+            if($(this).hasClass("datetime")) {
+                console.log("clearing datetimme field");
+            }
+            else {
+                $(this).val("");
+            }
+        });
+        */
+        $("#num_rows").val($("#form tr.objectrow:visible").length);
+
+        // Change total form number (for Django formset management)
+        var num = $("#id_form-TOTAL_FORMS").val();
+        $("#id_form-TOTAL_FORMS").val( --num );
+        // Change the numbers of the remaining rows
+        var $row = $("#form tr.objectrow:visible:first");
+        for(var currnum = 0; currnum < num; currnum++) {
+            $row.find(":input:not(button)").each(function(myInput) {
+                var id = this.id;
+                var name = this.name;
+                $(this).attr("id", id.replace(/\d+/, function(num) { return currnum; }));
+                $(this).attr("name", name.replace(/\d+/, function(num) { return currnum; }));
+            })
+            $row = $row.next(".objectrow");
+        }
+    });
+
+    $(".copy_button").click(function() {
+        var table = $("#formset_table")[0];
+        var $row = $(this).closest("tr");
+        var $copiedInputs = $(this).closest("tr").find(":input");
+        // Find row of copy button
+        for(var i=0; i<table.rows.length; i++) {
+            if(table.rows[i]==$row[0]) {
+                // Copy those values into next rows
+                for(var j=i+1,nextrow; nextrow=table.rows[j]; j++) {
+                    var $inputs = $(nextrow).find(":input");
+                    $copiedInputs.each(function(index,ele) {
+                        $inputs.eq(index).val($(this).val());
+                    });
+                }
+            }
+        }
+        
+    });
+});
+
+function numVisibleRows() {
+    var $table = $("#formset_table");
+    var num = 0;
+    $table.find("tr.objectrow").each(function (ind, ele) {
+        if($(ele).css("display") != "none") {
+            num++;
+        }
+    });
+    return num;
+}
+
+function addMore(selector, type) {
+    var $newElement = $(selector).clone(true);
+    var total = $("#id_" + type + "-TOTAL_FORMS").val();
+    $newElement.find(':input').each(function() {
+        if($(this).attr("name")) {
+            var name = $(this).attr("name").replace("-" + (total-1) + "-", "-" + total + "-");
+            var id = "id_" + name;
+            $(this).attr({"name": name, "id": id});//.val('').removeAttr('checked');
+            if(name.indexOf("description") != -1) {
+               $(this).val("");
+            }
+        }
+    });
+    // clone() doesn't coppy selec's selcted value
+    var newSelects = $newElement.find("select");
+    $(selector).find("select").each(function (i) {
+       $(newSelects[i]).val($(this).val());
+    });
+
+    total++;
+    // Update formset manager total
+    $("#id_" + type + "-TOTAL_FORMS").val(total);
+    $(selector).css('display','');
+    $(selector).after($newElement);
+}
+
+// true if form is empty, false if not empty
+function checkFormEmpty() {
+    var empty = true;
+    $("#formset_table").find(":input").each(function() {
+        if($.trim($(this).val()) !== '') {
+            empty = false;
+            return;
+        }
+    });
+    return empty;
+}
+
+</script>
+{% endblock %}
+
+{% block form %}
+
+
+{% if form %}
+<div class="form-container"> 
+  <form  method="post">
+    {% csrf_token %}
+    <!-- Display form errors -->
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+    <!-- Loop over form fields -->
+    <div class="input-group-container">
+    {% for field in form %}
+            {% if field.errors %}
+                {% for error in field.errors %}
+                    <div class="input-error">
+                        * {{ error|escape}}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        <!-- Display form fields -->
+            <div class="input-group input-lg">
+                {% if field.field.widget|get_class == "CheckboxInput" %}
+                <input class="form-control" value="{{field.label}}" disabled></input>
+                    <span class="input-group-addon">
+                        {{field}}
+                    </span>
+                {% elif field.field.widget|get_class == "FilteredSelectMultiple" %}
+                    <h5>
+                        {{ field.label }}:
+                    </h5>
+                    <div class="form-row">
+                        {{field}}
+                    </div>
+                {% else %}
+                    <span class="input-group-addon">
+                        {{ field.label_tag}}
+                    </span>
+                    {{ field }}
+                {% endif %}
+            </div>
+    {% endfor %}
+    <div class="input-group submit-btn">
+        <div class="col-sm-offset-9 col-sm-10">
+            <button class="btn btn-primary btn-lg" type="submit" value="create">{%block form_button_name %} Save {% endblock %}</button>
+        </div>
+    </div>
+    </div>
+ </form>
+</div>
+{% endif %}
+
+
+{% if formset %}
+<div id="controls-div" style="">
+    <div class="input-group" style="float: right; width:14em;">
+        <input class="form-control" id="num_rows" step="any" type="number" aria-label="Set number of rows in form">
+        <span class="input-group-btn">
+            <button class="btn btn-default" id="change_num_rows" type="button">Number of Rows</button>
+        </span>
+    </div>
+</div>
+<div class="form-container"> 
+<form id="form"  onsubmit="return !checkFormEmpty()" method="post">
+{% csrf_token %}
+{{ formset.management_form }}
+{{ formset.non_form_errors.as_ul }}
+<table id="formset_table" class="form" style="table-layout: fixed;">
+{% for form in formset.forms %}
+  {% if forloop.first %}
+  <thead><tr>
+    {% for field in form.visible_fields %}
+        <th name="{{ field.label|capfirst }}">{{ field.label|capfirst }}</th>
+    {% endfor %}
+  </tr></thead>
+  {% endif %}
+  {% if formset.errors %}
+    <tr>
+    {% for field in form.visible_fields %}
+      <td>
+        {% if field.errors %}
+          {{ field.errors.as_ul }}
+        {% endif %}
+      </td> 
+    {% endfor %}
+    </tr>
+  {% endif %}
+  <tr class="{% cycle row1,row2 %} objectrow">
+  {% for field in form.visible_fields %}
+    <td>
+    {# Include the hidden fields in the form #}
+    {% comment %}
+    {% if forloop.first %}
+      {% for hidden in form.hidden_fields %}
+      {{ hidden }}
+      {% endfor %}
+    {% endif %}
+    {% endcomment %}
+      {{ field }}
+    </td>
+  {% endfor %}
+    <td>
+      <button type="button" class="btn btn-xs delete_button">Delete</button>
+    </td>
+    <td>
+      <button type="button" class="btn btn-xs copy_button">Copy▾</button>
+    </td>
+  </tr>
+{% endfor %}
+</table>
+<div class="input-group submit-btn">
+    <!--<div class="col-sm-offset-9 col-sm-10">-->
+    <div>
+        <button class="btn btn-primary btn-lg" type="submit" value="create">{%block button_name %} Save {% endblock %}</button>
+    </div>
+</div>
+</form>
+</div>
+{% endif %}
+{% endblock %}

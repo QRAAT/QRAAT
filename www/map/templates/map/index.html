@@ -1,0 +1,2356 @@
+{% extends "base.html" %}
+<!-- File: map/templates/index.html -->
+{% block script %}
+    <link rel="stylesheet" type="text/css" href="/static/map/css/style.css"/>
+    <!-- Link google maps API with alisha's gmail key -->
+    <script type="text/javascript" 
+        src="https://maps.googleapis.com/maps/api/js?key={% load google_maps_api %}&libraries=visualization&sensor=true_or_false">
+    </script>
+    <!-- <link href="/static/flot/example.css" rel="stylesheet" type="text/css"> -->
+    <!-- Already loaded in templates/bootstrap <script src="/static/js/jquery.min.js"></script> -->
+    <script type="text/javascript" src="/static/flot/jquery.flot.min.js"></script>
+    <!-- TODO: remove type= (there for deminification) -->
+    <script src ="/static/flot/jquery.flot.time.min.js"></script>
+    <script src ="/static/flot/jquery.flot.selection.min.js"></script>
+    <script src="/static/flot/jquery.flot.threshold.min.js"></script>
+    <script src="/static/flot/jquery.flot.resize.min.js"></script>
+    <!--    <script src="/static/flot/jquery.flot.axislabels.js"></script>  TODO: minify this  This script is ass. One of the callbacks, which is called by draw, calls draw again. Thus doubling the time it takes, which is important considering draw takes ~200ms See for axis view-source:http://www.flotcharts.org/javascript/flot.demo.js-->
+    <script src="/static/map/js/date.js"></script>
+    <script src="/static/flot/jquery.flot.time.min.js"></script>
+    <!-- <script src="/static/map/js/jquery-ui.min.js"></script> -->
+    <!-- TODO: Ask about google hosting or not -->
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+    <script src"/static/maps/test1.js"></script>
+
+   
+<script>
+
+// Global variables
+var highlightedPoly;
+var map;
+var heatmaps;
+var polylines;
+var mapCenter;
+var markers = []; //TODO: This is never used. Change all markers_querydata to markers?
+var markers_sites = [];
+var flotPlotWidth; //So this doesn't have to be calculated for each point drawn
+var flotSelectedRange = []; //X coordinates of start and end of selected range to color
+var flotSelctedWidth; //Width of the range
+var selectedTimeRange = []; //Start and end of time range selected (in seconds, not javascript milliseconds)
+var selMapTimes = []; //[[[start,end],...],[[start,end]...]] in seconds
+var boundingRect;
+var redGreenRamp;
+// Timestamps are unix time in seconds
+var rawPosData = []; // Sorted position data straight from the database (with filtering/sorting done in the Django view). We'll 'cache' data in that if the user asks for data that is adjoined to the end of what we currently have, we'll append that, and if they ask for a subset of data, we'll just use data from this, and not fetch it again. If the user asks for data that is adjoining, but before the begining TODO: then what????? We just make a new array?
+var latlongData; // MVCArray with latlong that correspond to the rawPosData 
+var oldLatLngIndex = []; // Save the indices when we disable the polyline/heatmap so that we can defer updating latlongData for when those options are selected
+var currPosDataIndex = []; // Indices of the start and end of requested data in rawPosData [[start,end],[start,end],...]
+var currTimeRange = []; // start and end timestamps on the form in seconds
+var userRequestedMaxTimeRange = []; // Keep track of this so that if there's chunks of missing data, we don't refetch data based on the time of the actual data previously retrieved. 
+
+var colors = ["#5373BE", "#A73737", "#80B13A", "#6E37A6"];
+colors[-1] = "#CCCCCC";
+var dataType;
+var graphTypeEnum = {'LIKELIHOOD': 6, 'ACTIVITY': 7,};// 'COVARIANCE': ?};
+var graphTypeIndex = [6,7];
+var graphFilters = []; // Data filter (likelihood, activity, ...) bounds [[[low,high], [low,high], ...],[[low,high], [low,high], ...]] 
+
+var seriesDepInd;
+var deps = {{deps_list}};
+var activeDeps = deps.slice();
+var curr_dep = deps[0];
+var markers_querydata = [];
+var selectedMarkers = [];
+
+function addSelectedPos(marker, map){
+    /*Add a marker to a selected position point*/
+    for (var i =0; i < selectedMarkers.length; i++) {
+        if(selectedMarkers[i].selected)
+        selectedMarkers[i].selected.setMap(null);
+        else // ??
+            selectedMarkers[i].setMap(null);
+    }
+    
+    marker.selected = new google.maps.Marker({
+        position: new google.maps.LatLng
+        (
+        marker.qraat_pos[8][0],
+        marker.qraat_pos[8][1]
+        ),
+        map: map,
+        zIndex: google.maps.Marker.MAX_ZINDEX + 1
+        // zIndex sets marker on top of all other markers
+    });
+    
+    // Set on click infoWindow content for highlighted data marker
+    addInfoWindow(marker.selected, marker.qraat_pos, map);
+    
+    //Empty selectedMarkers array
+    selectedMarkers = new Array();
+    
+    selectedMarkers.push(marker);
+    
+    // Deployment changed need to reload flot
+    if(marker.qraat_pos[1] != curr_dep){
+        reloadFlot(markers_querydata, map, marker);
+        curr_dep = marker.qraat_pos[1];
+    }
+    
+    selectFlotPoint(marker);
+    map.panTo(marker.getPosition());
+}
+
+// What is the reason for this to use markers instead of the raw data
+// TODO: Change to active deps
+// TODO: Make colors not hardcoded, or at least changes colors past 4 deployments
+function getGraphData(markers, sel_data){
+    var graph_data = [{label: "-1", data: [], color: "#CCCCCC", markers: [], deployments: []}]; 
+    //$.each(deps, function(i,dep) {graph_data.push({data: []})});
+
+    var dep_ind;
+    
+    // graph_data_index specifies column in pos_data to display in Flot.
+    if (sel_data ==2) { // activity
+        var graph_data_type = 'ACTIVITY';
+    }
+    else{ // likelihood (default)
+        var graph_data_type = 'LIKELIHOOD';
+    }
+    for(var j=0; j<deps.length; j++) {
+	// Skip non active deps
+        var pointDeps = getActPointsDepsInd();
+	if(pointDeps.indexOf(j) == -1)
+	    continue;
+
+	var data = {};
+	data.data = [];
+	data.markers = [];
+	data.deployments = [];
+    outerloop: for(var i = currPosDataIndex[j][0]; i>=0 && i <= currPosDataIndex[j][1]; i++) {
+	    var flot_point = [rawPosData[j][i][2]*1000, rawPosData[j][i][graphTypeEnum[graph_data_type]]];
+	    for(var k=0; k<graphTypeIndex.length; k++) {
+		var val = rawPosData[j][i][graphTypeIndex[k]];
+
+		if(val < graphFilters[k][0] || val > graphFilters[k][1]) {
+		    markers[j][i].flot_point = flot_point;
+		    graph_data[0].data.push(flot_point);
+		    graph_data[0].markers.push(markers[i]);
+		    graph_data[0].deployments.push(markers[j][i].qraat_pos[1]);
+		    continue outerloop;
+		}
+	    }
+
+	    markers[j][i].flot_point = flot_point;
+	    data.data.push(flot_point);
+	    data.markers.push(markers[i]);
+	    data.deployments.push(markers[j][i].qraat_pos[1]);
+	    data.label = deps[j];
+	    data.color = colors[j%4];
+	}
+	graph_data.push(data);
+    }
+    return graph_data;
+}
+
+function reloadFlot(markers, map, marker){
+    var dep_id = marker.qraat_pos[1];
+    // $("#plot-div").data("plot").shutdown(); // Is this necessary?
+    loadFlot(markers, map, dep_id);
+}
+
+function loadFlot(pos_markers, map, dep_id){
+    var xaxis,
+	yaxis,
+	depInd;
+    for(var i=0; i<deps.length; i++) {if(deps[i]==dep_id){depInd = i; break;}}
+
+    function drawFlotPoint(ctx, x, y, radius, shadow){
+	ctx.strokeStyle = colorPoint(x,y);
+	ctx.arc(x, y, radius, 0, Math.PI*2, false); 
+    }
+
+    function colorPoint(x,y) {
+	if(xaxis == null) return; // The first time $.plot() is called, xaxis hasn't been initialized yet
+	var time = xaxis.c2p(x)/1000;
+
+	// Grey out point if not selected
+	if(time < selectedTimeRange[0] || time > selectedTimeRange[1])
+	    return "#CCCCCC";
+
+	if($("#id_colorpoints")[0].checked && seriesDepInd != -1) {
+	    var i = (x-flotSelectedRange[0])/flotSelectedWidth * 99;
+	    return redGreenRamp[(i | 0)]; //i|0 truncates i
+	}
+	else {
+        // TODO: Only works with four (4) colors 
+	    return colors[seriesDepInd%4];
+	}
+
+	/*
+	var i = getPosIndex(xaxis.c2p(x)/1000,seriesDepInd);
+	if(i == -1){
+	    console.log("xaxis.c2p(x) not returning exact timestamp?", x, xaxis.c2p(x), "and seriesDepInd", seriesDepInd, i)
+	    // Literally the world's ugliest bandadge. 
+	    // When plots drawOverlay is called, it calls drawPointHighlight
+	    // which then ends up calling drawFlotPoint and then colorPoint
+	    // And now we have no knowledge about which series/deployment it is
+	    for(var j=0; j<deps.length; j++) {
+		if(j != seriesDepInd) {
+		    console.log("HERE");
+		    var ind = getPosIndex(xaxis.c2p(x)/1000,j) 
+		    if(ind != -1) {
+			console.log("HERE2");
+			// TODO: Change when add covariance filter
+			if($("#id_graph_data option:selected").text() == 'Likelihood') {
+			    console.log("HERE3",yaxis.c2p(y) , rawPosData[j][ind][6], rawPosData[j][ind][7]);
+			    if(yaxis.c2p(y) == rawPosData[j][ind][6]) {
+				i = ind;
+				seriesDepInd = j;
+				console.log('found match');
+				break;
+			    }
+			}
+			else {
+			    if(yaxis.c2p(y) == rawPosData[j][ind][7]) {
+				i = ind;
+				seriesDepInd = j;
+				console.log('found match');
+				break;
+			    }
+			}
+		    }
+		}
+	    }
+	}
+
+	// Filter by likelihood, activity, etc
+	for(var j = 0; j < graphTypeIndex.length; j++) {
+	    var val = rawPosData[seriesDepInd][i][graphTypeIndex[j]];
+	    // TODO: FIX
+	    if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
+		return "#CCCCCC";
+	    }
+	}
+
+	var cChecked = document.getElementById('id_colorpoints').checked;
+	if(x > flotSelectedRange[0] && x < flotSelectedRange[1]) {
+	    if(!cChecked || deps.length > 1){ 
+		return colors[seriesDepInd];
+	    }
+	    else {
+		var i = (x-flotSelectedRange[0])/flotSelectedWidth * 99;
+		return redGreenRamp[(i | 0)]; //i|0 truncates i
+	    }
+	}
+	else if(x>=flotPlotWidth) {
+	    if(!cChecked && flotSelectedRange[1]>=flotPlotWidth)
+		return redGreenRamp[99]; 
+	    return "#CCCCCC"; 
+	}
+	else if(x<=0) {
+	    if(!cChecked && flotSelectedRange[0]<=0)
+		return redGreenRamp[0]
+	    return "#CCCCCC";
+	}
+	else{
+	    return "#CCCCCC";
+	}
+	*/
+    }
+    
+    //Loads flot graph
+    
+    var flot_clicked_series;
+    var flot_clicked_datapoint;
+    var graph_dep = dep_id;
+    var sel_data = {{graph_data}};
+    var label, min, max;
+    
+    for (var i=0; i < deps.length; i++) {
+        if (graph_dep == deps[i]) { var colorIndex = i; };
+    }
+    
+    //determine graph type for y-axis label
+    var yaxis_label;
+    if (sel_data == 2) { // activity
+        yaxis_label = "Activity";
+    }
+    else{ // likelihood (default)
+        yaxis_label = "Likelihood";
+    }
+    
+    var plot;
+    var options = {
+        legend: { show: false },
+        //points: { show: true, fill: true, radius: 2 },
+        points: { show: true, fill: false, symbol: drawFlotPoint},
+        grid: { hoverable: true, clickable: true },
+        xaxis: {
+	    min: selectedTimeRange[0] * 1000,
+	    max: selectedTimeRange[1] * 1000,
+            mode: "time",
+            timezone: "America/Los_Angeles", // TODO: Timezone is hardcoded
+            timeformat: "%m/%d %H:%M",
+            axisLabel: "Time (Los Angeles)",
+            axisLabelUseCanvas: true,
+            axisLabelFontSizePixels: 12,
+            axisLabelFontFamily: "Lucida Grande,Verdana,Arial,sans-serif",
+            axisLabelPadding: 15},
+        yaxis: {
+	    min: 0,
+	    max: 1,
+            axisLabel: yaxis_label,
+            axisLabelUseCanvas: true,
+            axisLabelFontSizePixels: 12,
+            axisLabelFontFamily: "Lucida Grande,Verdana,Arial,sans-serif",
+            axisLabelPadding: 10},
+        highlightColor: 'red',
+	shadowSize: 0,
+        selection: { mode: "x", minSize: 1},
+        //colors: color, 
+    };
+    
+    // Gets the gradient colors before drawing the flot plot
+    $.getJSON("/static/ramp255_0_0_0_255_0/values.json", function(data) {
+        redGreenRamp = data;
+        var graph_data = getGraphData(pos_markers, sel_data);
+        plot = $.plot("#plot-div", graph_data, options);
+        console.log("after $.plot??");
+        // TODO: Move this into another js file of appearance customization maybe
+        /*
+        plot.hooks.drawOverlay[0] = function(plot, ctx) {
+                if (plot.getSelection()) {
+                    var plotOffset = plot.getPlotOffset();
+                    var o = plot.getOptions();
+                    ctx.save();
+                    ctx.translate(plotOffset.left, plotOffset.top);
+                    var c = $.color.parse(o.selection.color);
+                    ctx.strokeStyle = c.scale("a", .8).toString();
+                    ctx.lineWidth = 1;
+                    ctx.lineJoin = o.selection.shape;
+                    ctx.fillStyle = c.scale("a", .4).toString();
+                    var x = Math.min(selection.first.x, selection.second.x) + .5,
+                        y = Math.min(selection.first.y, selection.second.y) + .5,
+                        w = Math.abs(selection.second.x - selection.first.x) - 1,
+                        h = Math.abs(selection.second.y - selection.first.y) - 1;
+                    //ctx.fillRect(x, y, w, h);
+                    ctx.strokeRect(x, y, w, h);
+                    ctx.restore()
+                }
+            };
+        */
+        // Gets the index of the series currently being drawn
+        // TODO: Do i still need this?
+        plot.hooks.drawSeries.push(function(plot, ctx, series) {
+            seriesDepInd = -1;
+            for(var i = 0; i<deps.length; i++) {
+            if(deps[i] == series.label){
+                seriesDepInd = i;
+                break;
+            }
+            }
+        });
+        // Gray overlay + text if no data
+        plot.hooks.drawOverlay.push(function(plot, ctx) {
+            var data = plot.getData();
+            for(var i=0; i<data.length; i++) {
+                if(data[i].data.length != 0) { return; }
+            }
+            
+            var plotOffset = plot.getPlotOffset();
+            var o = plot.getOptions();
+            ctx.save();
+            ctx.translate(plotOffset.left, plotOffset.top);
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = "#AAA"
+            ctx.fillRect(0,0,plot.width(),plot.height());
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = "#FDFDFD";
+            ctx.font = "40px sans-serif";
+            ctx.fillText("No Data", plot.width()/2-90, plot.height()/2+10);
+            ctx.restore();
+        });
+        // Highlights the flot plot based on selecting the map
+        plot.hooks.drawOverlay.push(function(plot, ctx) {
+            var plotOffset = plot.getPlotOffset();
+            var o = plot.getOptions();
+            ctx.save();
+            ctx.translate(plotOffset.left, plotOffset.top);
+            ctx.globalAlpha = 0.5;
+
+            // TODO: ? Assumes selMapTimes has the times of the active deployments.
+            var depInds = getDepsInd(activeDeps);
+            for(var j=0; j<selMapTimes.length; j++) {
+                var depI = depInds[j];
+                ctx.fillStyle = colors[depI%4];
+                ctx.strokeStyle = colors[depI%4];
+                var xaxis = plot.getAxes().xaxis;
+                for(var i = 0; i < selMapTimes[j].length; i++) {
+                    var x = xaxis.p2c(selMapTimes[j][i][0]*1000),
+                    y = 0,
+                    w = xaxis.p2c(selMapTimes[j][i][1]*1000)-x,
+                    h = plot.height();
+                    ctx.fillRect(x,y,w,h);
+                    ctx.strokeRect(x,y,w,h);
+                }
+            }
+            ctx.restore()
+        });
+
+        //xaxis = $("#plot-div").data("plot").getAxes().xaxis;
+        //yaxis = $("#plot-div").data("plot").getAxes().yaxis;
+        xaxis = plot.getAxes().xaxis;
+        yaxis = plot.getAxes().yaxis;
+        $("#time-slider").css("marginLeft",$("#plot-div").data("plot").getPlotOffset().left + "px");
+        $("#time-slider").css("marginRight",$("#plot-div").data("plot").getPlotOffset().right + "px");
+        $("#time-slider").css("visibility","");
+        $("#filter-slider").css("marginTop",$("#plot-div").data("plot").getPlotOffset().top + "px");
+        $("#filter-slider").slider().height(plot.height());
+        $("#filter-slider").css("visibility","");
+        flotPlotWidth = plot.width();
+        flotSelectedRange[0] = 0;
+        flotSelectedRange[1] = flotPlotWidth;
+        flotSelectedWidth = flotPlotWidth;
+        plot.draw();
+
+        Object.observe(plot.getXAxes()[0], function(changes) {
+            console.log(changes);
+        });
+    });
+    
+    
+    // Select marker in map when clicked on flot
+    $("#plot-div").bind("plotclick", function (event, pos, item) {
+        if (item == undefined) {
+        // Make it remove the marker of the previously selected point when you click nothing
+            if(selectedMarkers.length > 0 && selectedMarkers[0].selected)
+            selectedMarkers[0].selected.setMap(null);
+            return false;
+        } 
+            //uncomment to have this show up after enablePosition2 in the html (perhaps clickdata2?)
+            //$("#clickdata2").text("Index " + item.dataIndex +', Date/Time:'+item.datapoint[0]+', '+item.series.label + ': ' + item.datapoint[1]);
+            
+            //save clicked info in global variables
+            flot_clicked_series = item.series;
+            flot_clicked_datapoint = item.datapoint;
+            console.log("plotclicked event", event); 
+        var s = item.series.label;
+        for(var i=0; i<deps.length; i++){
+            if(s==deps[i]){
+                seriesDepInd = i;
+            break;
+            }
+        }
+        var tempmarker = markers_querydata[seriesDepInd][currPosDataIndex[seriesDepInd][0]+item.dataIndex];
+        addSelectedPos(tempmarker, map);
+    });
+
+    $("#plot-div").bind("plothover", function(event, pos, item) {
+        if(item){
+            var sl = item.series.label;
+            seriesDepInd = -1;
+            for(var i=0; i<deps.length; i++){
+                if(sl==deps[i]){
+                    seriesDepInd = i;
+                    break;
+                }
+            }
+        }
+    });
+    
+    $("#plot-div").bind("plotselected",function (event, ranges) {
+        var xaxis = $(this).data("plot").getAxes().xaxis;
+        var timeframearr = [xaxis.min/1000, xaxis.max/1000];
+        var timeframe = timeframearr[1] - timeframearr[0];
+
+        // If the selection isn't the same as before (IE, if it wasn't selected by the slider)
+        if(selectedTimeRange[0] != ranges.xaxis.from/1000 || selectedTimeRange[1] != ranges.xaxis.to/1000) {
+            //var selectedOldNew = [[getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')]];
+            selectedTimeRange = [ranges.xaxis.from/1000, ranges.xaxis.to/1000];	
+            //selectedOldNew[1] = [getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')];
+            console.log('values are',       [(selectedTimeRange[0]-timeframearr[0])/timeframe, 
+            (selectedTimeRange[1]-timeframearr[0])/timeframe]);
+            $('#time-slider').slider("values", 
+            [(selectedTimeRange[0]-timeframearr[0])/timeframe, 
+            (selectedTimeRange[1]-timeframearr[0])/timeframe]);
+            //changeSelectionHelper(selectedOldNew);
+            for(var i=0; i<deps.length; i++) {
+            if(activeDeps.indexOf(deps[i]) != -1) 
+                setLatLongData(i);
+            }
+        }
+
+        flotSelectedRange[0] = xaxis.p2c(ranges.xaxis.from); //(ranges.xaxis.from/1000-(rawPosData[0][currPosDataIndex[0][0]][2]))/timeframe * flotPlotWidth;
+        flotSelectedRange[1] = xaxis.p2c(ranges.xaxis.to); //(ranges.xaxis.to/1000-(rawPosData[0][currPosDataIndex[0][0]][2]))/timeframe * flotPlotWidth;
+        flotSelectedWidth = flotSelectedRange[1] - flotSelectedRange[0];
+
+        if(boundingRect) {
+           selectMap(boundingRect.getBounds());
+        }
+        plot.draw();
+        colorMarkers();
+    });
+
+    $("#plot-div").bind("plotunselected", function (event) {
+        console.log("plot unselected event", event);
+        if(flotSelectedRange[0]==0 && flotSelectedRange[1]==flotPlotWidth)
+            return;
+        flotSelectedRange = [0, flotPlotWidth];
+        flotSelectedWidth = flotPlotWidth;	
+        //var selectedOldNew = [[getPosIndex(selectedTimeRange[0],'gte'), getPosIndex(selectedTimeRange[1],'lte')],
+         //   currPosDataIndex.slice(0)];
+          
+        var xaxis = $(this).data("plot").getAxes().xaxis;
+        selectedTimeRange = [xaxis.min/1000, xaxis.max/1000];
+        resetTimeSlider();
+        //changeSelectionHelper(selectedOldNew);
+        for(var i=0; i<deps.length; i++) {
+            if(activeDeps.indexOf(deps[i]) != -1) 
+            setLatLongData(i);
+        }
+
+        if(boundingRect) {
+            boundingRect.setMap(null);
+            boundingRect = null;
+            selMapTimes = [];	
+        }
+        plot.draw();
+        colorMarkers();
+    });
+
+    $("#plot-div").resize(function () {
+        var oldFlotPlotWidth = flotPlotWidth;
+        flotPlotWidth = $(this).width();
+        var offset = plot.getPlotOffset();
+        $("#time-slider").css("marginLeft",offset.left + "px");
+        $("#time-slider").css("marginRight",offset.right + "px");
+        $("#time-slider").css("visibility","");
+        $("#filter-slider").css("marginTop",offset.top + "px");
+        $("#filter-slider").css("marginBottom",offset.bottom + "px");
+        $("#filter-slider").slider().height($(this).height()-offset.top-offset.bottom);
+        $("#filter-slider").css("visibility","");
+        
+        flotSelectedRange[1]=flotPlotWidth;
+        flotSelectedWidth = flotSelectedRange[1]-flotSelectedRange[0];
+        plot.draw();
+    });
+}
+
+function updateFlot(pos_markers, timerange) {
+    // timerange in ms
+
+    var sel_data = $("#id_graph_data").val()
+    var graph_data = getGraphData(pos_markers, sel_data);
+    var p = $("#plot-div").data("plot")
+    if(timerange != null) {
+	p.getOptions().xaxes[0].min = timerange[0];
+	p.getOptions().xaxis.min = timerange[0];
+	p.getOptions().xaxes[0].max = timerange[1];
+	p.getOptions().xaxis.max = timerange[1];
+    }
+    p.setData(graph_data);
+    p.setupGrid();
+    p.draw();
+}
+
+function setMarkerVisibility(bool) {
+    for(var j=0; j<currPosDataIndex.length; j++)
+	for(var i = currPosDataIndex[j][0]; i <= currPosDataIndex[j][1]; i++) 
+	markers_querydata[j][i].setVisible(bool);
+}
+
+function colorMarkers() {
+    if( !document.getElementById('id_points').checked) // TODO: remove?
+	return;
+
+    // Note: This assumes a 1 to 1 correspondence b/w rawPosData[0] and markers_querydata. This should be the case, but take care.
+    for(var k = 0; k<deps.length; k++) {
+	// Skip non active deps
+        var pointDeps = getActPointsDepsInd();
+	if(pointDeps.indexOf(k) == -1) {
+	    for(var i=0; i<markers_querydata[k].length; i++)
+		markers_querydata[k][i].setVisible(false);
+	    continue;
+	}
+
+	var colorInd = k % 4,
+	    url;
+	if(colorInd==0)
+	    url = '/static/icons/basedotblue.png';
+	else if(colorInd==1)
+	    url = '/static/icons/basedotred.png';
+	else if(colorInd==2)
+	    url = '/static/icons/basedotgreen.png';
+	else
+	    url = '/static/icons/basedotpurple.png';
+	var timeframe = selectedTimeRange[1] - selectedTimeRange[0];
+
+	alldatafor: for(var i = 0; i < rawPosData[k].length; i++) {
+	    if(rawPosData[k][i][2] >= selectedTimeRange[0] && rawPosData[k][i][2] <= selectedTimeRange[1]) {
+		// Filter by likelihood, activity, etc
+		for(var j = 0; j < graphTypeIndex.length; j++) {
+		    var val = rawPosData[k][i][graphTypeIndex[j]];
+		    if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
+			markers_querydata[k][i].setVisible(false);
+			continue alldatafor;
+		    }
+		}
+		
+		if( !document.getElementById('id_colorpoints').checked){
+		    markers_querydata[k][i].icon.url = url;
+		} else {
+		    var iconnum = (((rawPosData[k][i][2] - selectedTimeRange[0]) / timeframe)* 99) | 0;
+		    markers_querydata[k][i].icon.url = '/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png';
+		}
+		    markers_querydata[k][i].setVisible(true);
+		}		
+	    else {
+		markers_querydata[k][i].setVisible(false); //Hides marker
+	    }
+	}
+    }
+}
+    
+function selectFlotPoint(marker){
+    // TODO: Remove dependency on qraat_pos[1]. Find dep another way
+    // (or only save dep)
+    var dep = marker.qraat_pos[1]
+    for(var i=0; i<deps.length; i++)
+	if(dep==deps[i]){
+	    seriesDepInd = i;
+	    break;
+	}
+    $("#plot-div").data("plot").unhighlight();
+    $("#plot-div").data("plot").highlight(seriesDepInd, marker.flot_point);
+}
+
+function addInfoWindow(marker, data, map){
+    /*Add given data info to a given marker*/
+    var content =   '<b>Deployment ID: </b>' + data[1] +
+    '<br><b>Data ID: </b>' + data[0] +
+    '<br><b>Lat, Lon: </b> ' +
+    data[8][0].toFixed(6) + ', ' +
+    data[8][1].toFixed(6) +
+    '<br><b>Easting, Northing, Zone: </b> ' +
+    data[3] + ', ' +
+    data[4] + ', ' +
+    data[5] +
+    data[9] +
+    '<br><b>Date & Time: </b>' + data[10] +
+    '<br><b>Position Likelihood: </b>' + data[6].toFixed(2) +
+    '<br><b>Animal Activity: </b>' + data[7].toFixed(2);
+    
+    var infoWindow = new google.maps.InfoWindow({content: content});
+    
+    // click Listener for markers
+    google.maps.event.addListener(marker, 'click',
+    function (event)
+    {
+        infoWindow.open(map, this);
+    } // end event function
+    ); // end click Listener
+    
+}
+
+function hideFormFields() {
+    if ({{view_type|safe}} == "deployment") {
+        document.getElementById('id_deployment').style.display = 'none';
+        document.querySelector("label[for='id_deployment_0']").style.display = "none";
+    }
+}
+
+window.onload = function() {
+    //hideFormFields();
+};
+
+function getActPointsDepsInd() {
+    var arr = [];
+    $("[id^=id_points_]").each(function(i) {
+        if(document.getElementById('id_deployment_'+i).checked && this.checked) {
+            arr.push(i);
+        }
+    });
+    return arr;
+}
+
+function getActLinesDepsInd() {
+    var arr = [];
+    $("[id^=id_lines_]").each(function(i) {
+        if(document.getElementById('id_deployment_'+i).checked && this.checked) {
+            arr.push(i);
+        }
+    });
+    return arr;
+}
+
+function getActHeatmapDepsInd() {
+    var arr = [];
+    $("[id^=id_heatmap_]").each(function(i) {
+        if(document.getElementById('id_deployment_'+i).checked && this.checked) {
+            arr.push(i);
+        }
+    });
+    return arr;
+}
+
+function getDepsInd(deployments) {
+    // Finds index of deployment in rawPosData
+    var inds = [];
+    for(var j = 0; j<deployments.length; j++) {
+	var i;
+	if((i = deps.indexOf(deployments[j])) != -1) {
+	    inds.push(i);
+	}
+    }
+    return inds;
+}
+
+function getPosIndex(timestamp,depInd,searchDirection) {
+    // A binary search through rawPosData[0] for index of position that has this timestamp
+    // searchDirection is 'gte' or 'lte' which will will return the index that is gte or lte 
+    var min = 0;
+    var max = rawPosData[depInd].length;
+    var mid = ((max + min)/2) | 0;; // or'ing with 0 truncates. It's like floor
+    var maxindex = rawPosData[depInd].length-1;
+    while(max > min) {
+	mid = ((max + min)/2) | 0;
+	if(rawPosData[depInd][mid][2] > timestamp) {
+	    max = mid;
+	}
+	else {
+	    min = mid + 1;
+	}
+    }
+    if(maxindex == -1)
+	return -1;
+    if(max == min && rawPosData[depInd][mid][2] == timestamp) 
+	return mid;
+    else if(mid != 0 && rawPosData[depInd][mid-1][2] == timestamp)
+	return mid -1; // TODO: This else if is just a bandage. Fix this whole thing lmao
+    else {
+	if(searchDirection == 'gte') {
+	    if(rawPosData[depInd][mid][2] > timestamp)
+		return mid;
+	    else if(mid != maxindex)
+		return mid + 1;
+	    else 
+		return -1;
+	}
+	else if(searchDirection == 'lte') {
+	    if(rawPosData[depInd][mid][2] < timestamp)
+		return mid;
+	    else
+		return mid - 1;
+	}
+	else
+	    return -1;
+    }
+}
+
+function updateNumPoints() {
+    var lengths = [];
+    $.each(currPosDataIndex, function(i,indices) {
+        if(indices && indices[1] != 0)
+            lengths.push(indices[1]-indices[0]+1);
+        else
+            lengths.push(0);
+    });
+    $("#num_points").html("<b>No. of points: </b>"+lengths.join(" | "));
+}
+function updateData() {
+    setGraphFilters();
+    var ajaxRequests = [];
+
+    // timezoneJS Dates that are timezone aware
+    var reqTimeFrom = (new timezoneJS.Date(document.getElementById("id_datetime_from").value, TIMEZONE).getTime())/1000; 
+    var reqTimeTo = (new timezoneJS.Date(document.getElementById("id_datetime_to").value, TIMEZONE).getTime())/1000;
+    selectedTimeRange = [reqTimeFrom, reqTimeTo];
+    currTimeRange = [reqTimeFrom, reqTimeTo];
+    var dataLatestTimes = findLatestDataTimes(activeDeps);
+    var dataEarliestLatestTime = dataLatestTimes[0];
+
+    for(var i=0; i<dataLatestTimes.length; i++) {
+         var time = dataLatestTimes[i];
+         if(dataEarliestLatestTime == null) dataEarliestLatestTime = time;
+         else if(time != null && time < dataEarliestLatestTime) dataEarliestLatestTime = time;
+    }
+
+    // If the user wants data from before what we have, or non continguous, or new dataType (raw or tracks)
+    if($("#id_data_type option:selected").text() != dataType || reqTimeTo < userRequestedMaxTimeRange[0] || reqTimeFrom > userRequestedMaxTimeRange[1] || dataEarliestLatestTime == null) {  
+	dataType = $("#id_data_type option:selected").text(); 
+	console.log("Case 1: new array");
+        // All new array
+	ajaxRequests.push(
+	$.ajax({
+	    url: "get_data/",
+	    data: serializeForm($("#form"),activeDeps),
+	    dataType: 'json',
+	    success: function(data){
+	    	var depInds = getDepsInd(activeDeps);
+		var newData = [];
+	    	for(var j = 0; j<depInds.length; j++) {
+		    var depI = depInds[j];
+		    rawPosData[depI] = $.parseJSON(data)[j];
+		    newData.push(rawPosData[depI]);
+		    if(latlongData != null) {
+			latlongData[depI].clear();
+			for(var i = 0; i<rawPosData[depI].length; i++) {
+			    latlongData[depI].push(new google.maps.LatLng(rawPosData[depI][i][8][0], rawPosData[depI][i][8][1]));
+			}
+		    }
+		    currPosDataIndex[depI] = [0, rawPosData[depI].length-1];
+		    console.log("currposdataindex", currPosDataIndex); 
+		    // Remove markers
+		    for(var i = 0; i<markers_querydata[depI].length; i++) {
+			markers_querydata[depI][i].setMap(null);
+		    }
+		    markers_querydata[depI] = [];
+
+		    findBounds(newData);
+		    updateHelper(depI);
+		}
+	    }
+	}));
+    }
+    // Otherwise, check if they want data past what we have.
+    // If not, find new indices.
+    else if(reqTimeFrom < userRequestedMaxTimeRange[0] || reqTimeTo > dataEarliestLatestTime) {	
+	function timeToString(time) {
+	    var theDate = new timezoneJS.Date(time*1000, TIMEZONE);
+	    // .getHours() returns the local hour for the specified timezone
+	    // TODO: You may be able to use .toLocaleString() which allows formating and returns the timezone time. Currently it returns undefined, which may be because we only have LA timezone data.
+	    // + 1 for month because it returns from 0-11!!!
+	    var dT = {
+	        year: theDate.getFullYear(),
+		month: ("0" + (theDate.getMonth()+1)).slice(-2), 
+		day:  ("0" + (theDate.getDate())).slice(-2),
+		hour:  ("0" + (theDate.getHours())).slice(-2),
+		minute: ("0" + (theDate.getMinutes())).slice(-2),
+		second: ("0" + (theDate.getSeconds())).slice(-2), 
+		// + 1 second so we dont get the last point we already have from this query
+	    };
+	    return dT.year+"/"+dT.month+"/"+dT.day+" "+dT.hour+":"+dT.minute+":"+dT.second;
+	}
+
+	if(reqTimeFrom < userRequestedMaxTimeRange[0]) {
+	    console.log("Case 2.a: concatenating so stuff goes in front. (concatenating creates a whole new array");
+	    var depInds = getDepsInd(activeDeps);
+	    for(var j = 0; j<depInds.length; j++){
+            var depI = depInds[j];
+            var oldDateString = $("#id_datetime_to").val();
+            if(rawPosData[depI].length > 0) {
+                var dataEarliestTime = rawPosData[depI][0][2];
+                var dateEarliestString = timeToString(dataEarliestTime - 1); // -1 to not repeat a point
+                $("#id_datetime_to").val(dateEarliestString);
+            }
+            var tempform = serializeForm($("#form"), [deps[depI]]);
+            $("#id_datetime_to").val(oldDateString);
+            ajaxRequests.push(
+            $.ajax({
+                url: "get_data/",
+                data:  tempform,
+                dataType: 'json',
+                success: function(data) {
+                    data = $.parseJSON(data)[0];
+                    if(data.length == 0)
+                        return;
+                    var depII = getDepsInd([data[0][1]]);
+                    depII = depII[0];
+                    var end = getPosIndex(reqTimeTo,depII, 'lte');
+                    rawPosData[depII] = data.concat(rawPosData[depII]); // Q: How slow is this for large arrays
+                    // Push new points to front
+                    if(latlongData != null) {
+                        for(var i = 0; i < data.length; i++) {
+                            latlongData[depII].insertAt(i, new google.maps.LatLng(rawPosData[depII][i][8][0], rawPosData[depII][i][8][1]));
+                        }
+                        // If we have to remove points from the end
+                        if(end < currPosDataIndex[depII][1]) {
+                            var currend = currPosDataIndex[depII][1];
+                            for(var i = end; i < currend; i++) {
+                           latlongData[depII].pop();
+                            }
+                        }
+                    }
+                    var emptyArr = new Array(data.length);
+                    markers_querydata[depII] = emptyArr.concat(markers_querydata[depII]);
+
+                    currPosDataIndex[depII] = [0, end + data.length];
+                    console.log("end and data.length",end, data.length);
+                    console.log("currposdataindex", currPosDataIndex); 
+
+                    findBounds([data]);
+                    updateHelper(depII, true);
+                },
+            }));
+	    }
+	}
+	if(reqTimeTo > dataEarliestLatestTime) {
+	    console.log("Case 2.b: appending to end");
+	    // Append data to end. Query for data starting from latest data timestamp
+	    // Weird way of doing it to reuse existing functions. Change the form date
+	    // so you don't query for data you already have, get/query for data based 
+	    // on the changed form, change it back so user doesnt have to see
+	    // this behind the scenes stuff.
+	    var depInds = getDepsInd(activeDeps);
+	    for(var j = 0; j<depInds.length; j++){
+            var depI = depInds[j];
+            var oldDateString = $("#id_datetime_from").val();
+            if(dataLatestTimes[j] == null) {
+                var dateLatestString = timeToString(dataEarliestLatestTime + 1);	    
+            }
+            else {
+                var dateLatestString = timeToString(dataLatestTimes[j] + 1);	    
+            }
+            $("#id_datetime_from").val(dateLatestString);
+            var tempform = serializeForm($("#form"), [deps[depI]]);
+            $("#id_datetime_from").val(oldDateString);
+            console.log('case 2.b, depI is: ', depI);
+            ajaxRequests.push(
+            $.ajax({
+                url: "get_data/", 		    
+                data: tempform, 
+                dataType: 'json',
+                success: function(data) {
+                console.log('case 2.b ajax, depI is: ', depI);
+                data = $.parseJSON(data)[0];
+                if(data.length == 0)
+                    return;
+                var depII = getDepsInd([data[0][1]]);
+                    depII = depII[0];
+                var start = getPosIndex(reqTimeFrom, depII, 'gte');
+                console.log("start: ", start);
+                for(var i = 0; i < data.length; i++) {
+                    rawPosData[depII].push(data[i]);
+                }
+                // Update latlongData
+                if(latlongData != null) {
+                    if(start > currPosDataIndex[depII][0]) {
+                    var currstart = currPosDataIndex[depII][0];
+                    for(var i = start; i < currstart; i++) {
+                        latlongData[depII].removeAt(0);
+                    }
+                    }
+                    for(var i = 0; i < data.length; i++) {
+                    latlongData[depII].push(new google.maps.LatLng(data[i][8][0], data[i][8][0]));
+                    }	
+                }
+                currPosDataIndex[depII] = [start, rawPosData[0].length-1];
+                console.log("currposdataindex", currPosDataIndex); 
+
+                findBounds([data]);
+                updateHelper(depII);
+                }
+            }));
+	    }
+	}
+    }	
+    else {
+	console.log("case 3: all old data");
+	var depInds = getDepsInd(activeDeps);
+	for(var j = 0; j<depInds.length; j++){
+	    var depI = depInds[j];
+	    // New timeframe is within what we've already fetched, and there's no new data
+	    var start = getPosIndex(reqTimeFrom, depI, 'gte');
+	    var end = getPosIndex(reqTimeTo, depI, 'lte');
+	
+	    // Update latlongData
+	    if(latlongData != null) {
+		if(start > currPosDataIndex[depI][0]) {
+		    var currstart = currPosDataIndex[depI][0];
+		    for(var i = start; i < currstart; i++) {
+			latlongData[depI].removeAt(0);
+		    }
+		}
+		if(end < currPosDataIndex[depI][1]) {
+		   var currend = currPosDataIndex[depI][1];
+		   for(var i = end; i < currend; i++) {
+		       latlongData[depI].pop();
+		   }
+		}
+	    }
+	    currPosDataIndex[depI] = [start,end];
+	    updateHelper(depI);
+	}
+	resetTimeSlider();
+    }
+    
+
+    function findBounds(newData) {
+	// Find new bounds of the likelihood/activity/etc.
+	// TODO: This assumes graphFilters is already at max/min values;
+	for(var i = 0; i<newData.length; i++) {
+	    for(var j = 0; j < graphTypeIndex.length; j++) {
+		if(newData[i].length != 0) {
+		    var val = newData[i][0][graphTypeIndex[j]];
+		    if(val < graphFilters[j][0]) {
+			graphFilters[j][0] = val;
+		    }else if(val > graphFilters[j][1]) {
+			graphFilters[j][1] = val;
+		    }
+		}
+	    }
+	}
+    }
+
+    function findEarliestDataTimes(deployments) {
+	var earliest = [];
+	for(var j = 0; j<deployments.length; j++) {
+	    var dep = deployments[j];
+	    for(var i=0; i < rawPosData.length; i++) {
+		if(rawPosData[i][0][1] == dep) {
+		    earliest.push(rawPosData[i][0][2]);
+		    break;
+		}
+	    }
+	}
+	return earliest;
+    }
+    
+    function findLatestDataTimes(deployments) {
+	var latest = [];
+	console.log('in findLatestDataTimes ', deployments);
+	for(var j = 0; j<deployments.length; j++) {
+	    var dep = deployments[j];
+	    console.log(dep);
+        var found = false;
+	    for(var i=0; i < rawPosData.length; i++) {
+            if(rawPosData[i].length != 0 && rawPosData[i][0][1] == dep) {
+                latest.push(rawPosData[i][rawPosData[i].length-1][2]);
+                found = true;
+                break;
+            }
+	    }
+        if(!found) {
+            latest.push(null);
+        }
+	}
+	console.log('findlatestdatatimes ',latest);
+	return latest;
+    }
+
+    function serializeForm($form, deployments) {
+        // Given a form, replaces "deployment=68&depoyment=69" with "deployment=xx+yy"
+        // where x and y are from the deployments array parameter
+        var str = $form.serialize();
+        var start = str.indexOf('deployment');
+        var next = start;
+        if(start != 1) {
+            while((next = str.indexOf('deployment', next+1)) != -1);
+            end = str.indexOf('&', next);
+            str = str.substring(0,start) + str.substring(end+1, str.length);
+            str += "&deployment=" + deployments.join('+');
+        }
+        return str
+    }
+
+    function updateHelper(depI, prepend) {
+        oldLatLngIndex[depI] = currPosDataIndex[depI].slice();
+        if(prepend == null) { prepend = false; }
+        loadMarkers(map, prepend);
+    }
+
+    if(userRequestedMaxTimeRange != []) {
+        userRequestedMaxTimeRange = [Math.min(reqTimeFrom,userRequestedMaxTimeRange[0]), Math.max(reqTimeTo,userRequestedMaxTimeRange[1])];
+    }
+    else {
+        userRequestedMaxTimeRange = [reqTimeFrom, reqTimeTo];
+    }
+    
+    return ajaxRequests;
+}
+
+function updateDataWrapper() {
+    document.getElementById('updateMap').disabled = true;
+    //document.getElementById('updateMap').style.backgroundColor = '#CCC';
+    document.getElementById('page-overlay').style.visibility = 'visible';
+
+    var dataRequests = updateData();
+
+    // This waits until all requests (all deployments) for new data is done
+    $.when.apply(null,dataRequests).done(function() {
+        // TODO: Make sure response is success 
+        $("#plot-div").data("plot").clearSelection();
+        updateFlot(markers_querydata, [selectedTimeRange[0]*1000, selectedTimeRange[1]*1000]);
+        resetTimeSlider();
+
+        $("#id_likelihood_low").val(graphFilters[0][0]);
+        $("#id_likelihood_high").val(graphFilters[0][1]);
+        $("#id_activity_low").val(graphFilters[1][0]);
+        $("#id_activity_high").val(graphFilters[1][1]);
+        if($("#id_graph_data option:selected").text() == "Likelihood") {
+            $("#filter-slider").slider("values",[$("#id_likelihood_low").val(), $("#id_likelihood_high").val()]);
+        }
+        else if ($("#id_graph_data option:selected").text() == "Activity") {
+            $("#filter-slider").slider("values",[$("#id_activity_low").val(), $("#id_activity_high").val()]);
+        }
+        //$("#filter-slider").slider("values",[0,1]);
+        //colorMarkers(); // Extraneous when creating a whole new markers_querydata, but w/e. Changing the filter-slider calls colorMarkers
+        document.getElementById('updateMap').disabled = false;
+        //document.getElementById('updateMap').style.backgroundColor = '#DDD';
+        document.getElementById('page-overlay').style.visibility = 'hidden';
+        updateNumPoints();
+        //return true; // To make it submit when you press enter?
+    }).fail(function() {
+        alert('An error occured in getting the data, please refresh the page.');
+        document.getElementById('updateMap').disabled = false;
+        //document.getElementById('updateMap').style.backgroundColor = '#DDD';
+        document.getElementById('page-overlay').style.visibility = 'hidden';
+    });
+}
+//TODO: Remove this after finishing updating-with-ajax
+function submitForm() {
+    document.getElementById('form').action = "";
+    document.getElementById('form').submit();
+}
+function submitDownloadForm() {
+    // This happens to append "/download" to the base URL; then the
+    // GET form data is appended to the base URL + "/download".
+    document.getElementById('form').action = "download";
+    document.getElementById('form').submit();
+}
+
+function submitDownloadFormKML() {
+    // TODO: Figure out why this doesn't automatically append /
+    document.getElementById('form').action = "downloadKML/"+$('#KMLtype').val()+"/";
+    document.getElementById('form').submit();
+}
+
+// function setCenter is not working. FIXME
+// It is intended to recenter the map on a button click.
+function setCenter() {
+    map.panTo(new google.maps.LatLng(38.487828027, -122.149419006));
+    //return false;
+}
+
+function loadMarkers(map, prepend) {
+    // If we are adding data to the beginning of rawPosData[0], we must add to the front of markers_querydata 
+    if(prepend == null){ prepend = false; } 
+
+    // Display markers for the data points
+    // Adds new markers for all points in the current range if there's nothing in that position already
+    //var infoWindows_querydata = new Array(); // TODO: Remove this
+    var display_type = {{display_type}};
+    
+    // Display marker points if html pref is set to display them
+    //Uncommenting to show on public
+    var singleColorURLS = ['/static/icons/basedotblue.png','/static/icons/basedotred.png', '/static/icons/basedotgreen.png', '/static/icons/basedotpurple.png']
+    for(var j = 0; j < deps.length; j++) {
+	console.log("loading markers for a dep??");
+	if(markers_querydata[j] == null)
+	    markers_querydata[j] = [];
+    if(rawPosData[j].length==0) {continue;}
+	/*
+	if ( ((display_type != null) && (display_type==1) &&
+	(currPosDataIndex[1]-currPosDataIndex[0]> 0))
+	||
+	({{view_type|safe}} == "deployment") && (display_type!=2)) {
+	*/
+	var timeframe = selectedTimeRange[1] - selectedTimeRange[0];
+	for (var i=currPosDataIndex[j][0]; i <= currPosDataIndex[j][1]; i++) {  
+	    if(markers_querydata[j][i] != null) { 
+		// If this marker already exists
+		if(prepend) {
+		    // If we see an already existant mark, then we've finished adding new markers
+		    break;
+		}
+		else
+		    continue;
+	    } 
+
+	    /*if ( ({{view_type|safe}} == "deployment") ||
+	    ( (deps.length > 0) && (rawPosData[j][i][1] == deps[0]) ) ) {
+	    */
+		if(! $('#id_colorpoints')[0].checked) {
+		    if (j%4==0) {
+			var url = ('/static/icons/basedotblue.png');
+		    }
+		    else if (j%4==1) {
+			var url = ('/static/icons/basedotred.png');
+		    }
+		    else if (j%4==2) {
+			var url = ('/static/icons/basedotgreen.png');
+		    }
+		    else {
+			var url = ('/static/icons/basedotpurple.png');
+		    }
+		} else {
+		    var iconnum = (((rawPosData[j][i][2] - selectedTimeRange[0]) / timeframe)* 99) | 0;
+		    var url = '/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png';
+		}
+		   
+		//marker.setIcon('/static/ramp255_0_0_0_255_0/dot' + iconnum + '.png');
+		// The size,origin,anchor make it so that the dot is centered.
+		// So instead of the center bottom of the marker/dot pointing at the
+		// intended location, the center of the dot is right on the spot.
+		// You can notice that the dots wouldn't be centered otherwise when
+		// using the heatmap
+		var image = {
+		    url: url,
+		    size: new google.maps.Size(10,10),
+		    origin: new google.maps.Point(0,0),
+		    anchor: new google.maps.Point(5,5)
+		};
+		marker = new google.maps.Marker({
+		    position: new google.maps.LatLng(
+		    rawPosData[j][i][8][0], rawPosData[j][i][8][1]),
+		    map: map,
+		    icon: image,
+		    //icon: 'http://www.geocodezip.com/mapIcons/small_blue_dot.png',
+		    infoWindowIndex: i
+		});
+		//marker.setIcon('/static/icons/blue_dot_hard_round.png');//marker.setIcon('http://www.geocodezip.com/mapIcons/small_blue_dot.png')
+	    //}
+	    
+	    var content = '<b>DeploymentID: </b>' + rawPosData[j][0][1] +
+	    '<br>' + rawPosData[j][i][8][0].toFixed(5)
+	    + ', ' + rawPosData[j][i][8][1].toFixed(5)+
+	    '<br><b>PosID:</b> ' + rawPosData[j][i][0] +
+	    '<br><b>Time:</b> ' + rawPosData[j][i][10] +
+	    '<br><b>Activity:</b> ' + rawPosData[j][i][7] +
+	    '<br><b>Likelihood:</b> ' + rawPosData[j][i][6];
+	    
+	    var infoWindow = new google.maps.InfoWindow({ content: content,
+		//Uncomment the following lines for infoWindow options
+		//size: new google.maps.Size(150, 50),
+		disableAutoPan: true
+	    });
+	    
+	    marker.qraat_pos = rawPosData[j][i];
+	    google.maps.event.addListener(marker, 'click',
+	    function(){
+		// WHEN MAP IS CLICKED, display another marker there to highlight point
+		addSelectedPos(this, map);
+	    }); // end event function and marker event listener
+	    
+	    // on mousing over markers for data points, open them to show lat/lng
+	    google.maps.event.addListener(marker, 'mouseover', function() {
+		$("<ul>" +
+		"<li><strong>Deployment ID: </strong>" + this.qraat_pos[1]  + "</li>" +
+		"<li><strong>Data ID: </strong>" + this.qraat_pos[0]  + "</li>" +
+		"<li><strong>Lat, Lon: </strong>" + this.qraat_pos[8]    + "</li>" +
+		"<li><strong>Easting, Northing, Zone: </strong>" + this.qraat_pos[3] + ", " +
+		this.qraat_pos[4] + ", " + this.qraat_pos[5]+this.qraat_pos[9] + "</li>"  +
+		"<li><strong>Date & Time: </strong>" + this.qraat_pos[10]  + "</li>" +
+		"<li><strong>Position Likelihood: </strong>" + this.qraat_pos[6].toFixed(2)  + "</li>" +
+		"<li><strong>Animal Activity: </strong>" + this.qraat_pos[7].toFixed(2)  + "</li>" +
+		"</ul>").appendTo(".mouse-over-info");
+		
+	    }); // end mouseover event function
+	    
+	    google.maps.event.addListener(marker, 'mouseout', function() {
+		$(".mouse-over-info").empty();
+	    }); // end mouseout event function
+	    
+	    /*
+	    // close infowindows on mousing out of marker TODO: Remove this
+	    google.maps.event.addListener(marker, 'mouseout', function() {
+		infoWindows_querydata[this.infoWindowIndex].close();
+	    }); // end mouseout event function
+	    */
+	    if(prepend){
+		//infoWindows_querydata.unshift(infoWindow); // TODO: Remove this unshift ugh
+		markers_querydata[j][i] = marker;
+	    }
+	    else{
+		//infoWindows_querydata.push(infoWindow);
+		markers_querydata[j].push(marker);
+	    }
+	} //end for loop for query data
+    }
+}
+function changeSelectionHelper(oldAndNewIndices) {
+    // To update latlongData when the time selected changes
+    /*
+    console.log("starting changeSelectionHelper, arg",oldAndNewIndices, ++cscount);
+    // The arguments could've been timestamp or index. It was kind of an arbitrary choice
+    if(oldAndNewIndices[0] != null && oldAndNewIndices[1] != null) {
+	var oldSelectedIndex = oldAndNewIndices[0],
+	    newSelectedIndex = oldAndNewIndices[1];
+    }
+    else {
+	console.log("ERROR: shouldn't be here ");
+    }
+   // console.log(currTimeRange[1], currTimeRange[0] + (currTimeDelta * $(this).slider("values",1) / 100));
+    //console.log("new and old ", newSelectedIndex, oldSelectedIndex);
+
+    if($("#id_lines")[0].checked || $("#id_heatmap")[0].checked){
+	oldLatLngIndex = newSelectedIndex.slice(0);
+	// Take care of the front of the selection
+	var temp = oldSelectedIndex[0] - newSelectedIndex[0];
+	console.log('temp',temp);
+	if(temp < 0) {
+	    for(var i = 0; i>temp; i--) {
+		latlongData.removeAt(0);
+	    }
+	} else {
+	    for(var i = 0; i<temp; i++) {
+		latlongData.insertAt(i,new google.maps.LatLng(rawPosData[0][newSelectedIndex[0]+i][8][0],rawPosData[0][newSelectedIndex[0]+i][8][1]));
+	    }
+	}
+	
+	// Back of the selection
+	temp = newSelectedIndex[1] - oldSelectedIndex[1]; // The order of subtraction is delibrately chosen
+	console.log('temp',temp);
+	if(temp < 0) {
+	    for(var i = 0; i>temp; i--) {
+		latlongData.pop();
+	    }
+	} else {
+	    for(var i = 1; i<=temp; i++) {
+		latlongData.push(new google.maps.LatLng(rawPosData[0][oldSelectedIndex[1]+i][8][0], rawPosData[0][oldSelectedIndex[1]+i][8][1]));
+	    }
+	}
+    }
+    console.log("ending changeSelectionHelper", cscount);
+    */
+    setLatLongData();
+}
+
+function setLatLongData(depInd) {
+    if(polylines || heatmaps) {
+	// Change latlongData
+	if(latlongData[depInd])
+	    latlongData[depInd].clear();
+	else
+	    latlongData = [];
+	var selectedIndex = [getPosIndex(selectedTimeRange[0], depInd, 'gte'), getPosIndex(selectedTimeRange[1], depInd, 'lte')];
+	outsideloop: for(var i = selectedIndex[0]; i<selectedIndex[1]; i++) {
+	    for(var j = 0; j < graphTypeIndex.length; j++) {
+		var val = rawPosData[depInd][i][graphTypeIndex[j]];
+		if(val < graphFilters[j][0] || val > graphFilters[j][1]) {
+		    continue outsideloop;
+		}
+	    }
+	    latlongData[depInd].push(new google.maps.LatLng(rawPosData[depInd][i][8][0], rawPosData[depInd][i][8][1]));
+	}
+	//if(polyline) polyline.setPath(latlongData);
+	//if(heatmap) heatmap.setData(latlongData);
+    }
+}
+function resetTimeSlider() {
+    $('#time-slider').slider("values", [0,1]);
+}
+function setupSlider() {
+    $("#time-slider").slider({
+	range: true,
+	min: 0,
+	max: 1,
+	values: [0,1],
+	step: 0.01,
+	change: function(event, ui) {
+	    //console.log("changed",ui);
+	// TODO: remove
+	},
+	slide: function(event, ui) {
+	    console.log("changed or sliding idk whatever", ui);
+	    var currTimeDelta = currTimeRange[1] - currTimeRange[0];
+	    
+	    /*
+	    var oldSelectedIndex = [
+		getPosIndex(currTimeRange[0] + (currTimeDelta * $(this).slider('values',0)), 'gte'),
+		getPosIndex(currTimeRange[0] + (currTimeDelta * $(this).slider('values',1)), 'lte'),
+	    ];
+	    */
+	    var newSelectedTime = [
+		currTimeRange[0] + (currTimeDelta * ui.values[0]),
+		currTimeRange[0] + (currTimeDelta * ui.values[1]),
+	    ];
+	    /*
+	    var newSelectedIndex = [
+		getPosIndex(newSelectedTime[0], 'gte'),
+		getPosIndex(newSelectedTime[1], 'lte'),
+	    ];
+	    */
+	    //console.log("old new", oldSelectedIndex, newSelectedIndex);
+	    var xaxis = $("#plot-div").data("plot").getAxes().xaxis;
+	    //if(selectedTimeRange[0] != rawPosData[0][newSelectedIndex[0]][8] || selectedTimeRange[1] != rawPosData[0][newSelectedIndex[1]][8]) {
+	    if(selectedTimeRange[0] * 1000 != xaxis.min || selectedTimeRange[1] * 1000 != xaxis.max) {
+		selectedTimeRange = newSelectedTime;
+	    //	changeSelectionHelper([oldSelectedIndex, newSelectedIndex]);
+		for(var i=0; i<deps.length; i++) {
+		    if(activeDeps.indexOf(deps[i]) != -1) 
+			setLatLongData(i);
+		}
+	    }
+
+	    // Change the flot plot selection. (And also thus also change the marker coloring) (TODO: Remove colormarkers call from plotselected?)
+	    $("#plot-div").data("plot").setSelection({
+		//xaxis: {from: rawPosData[0][newSelectedIndex[0]][2] * 1000, to: rawPosData[0][newSelectedIndex[1]][2] * 1000},
+		xaxis: {from: newSelectedTime[0] * 1000, to: newSelectedTime[1] * 1000},
+	    });
+	    //console.log("setSelection to", {from: rawPosData[0][newSelectedIndex[0]][2] * 1000, to: rawPosData[0][newSelectedIndex[1]][2] * 1000});
+       },
+    });
+
+
+    $("#filter-slider").slider({
+	orientation: "vertical",
+	range: true,
+	min: 0,
+	max: 1,
+	values: [0,1],
+	step: 0.01,
+	change: function(event, ui) {
+	    // Return if plot hasn't been created yet
+	    if(!$("#plot-div").data("plot")) return; 
+
+	    if($("#id_graph_data option:selected").text() == "Likelihood") {
+	    	var fi = 0;
+		$("#id_likelihood_low").val(ui.values[0]);
+		$("#id_likelihood_high").val(ui.values[1]);
+	    }
+	    else if ($("#id_graph_data option:selected").text() == "Activity") {
+	   	var fi = 1; 
+		$("#id_activity_low").val(ui.values[0]);
+		$("#id_activity_high").val(ui.values[1]);
+	    }
+	    // TODO: Finding the delta is pointless if we bound the yaxis to [0,1] in the plot options
+	    var yaxis = $("#plot-div").data("plot").getAxes().yaxis;	    
+	    var delta = yaxis.max - yaxis.min;
+	    
+	    graphFilters[fi] = [yaxis.min + delta*ui.values[0], yaxis.min + delta*ui.values[1]];
+
+	    if(polylines || heatmaps) {
+		for(var i=0; i<deps.length; i++) {
+		    if(activeDeps.indexOf(deps[i]) != -1) 
+			setLatLongData(i);
+		}
+	    }
+	    
+	    //$("#plot-div").data("plot").setData(getGraphData(markers_querydata, fi));
+	    //$("#plot-div").data("plot").draw();
+	    updateFlot(markers_querydata);
+	    colorMarkers();
+	},
+    });
+}
+
+function setGraphFilters() {
+    graphFilters= [
+	[parseFloat($("#id_likelihood_low").val()),
+	parseFloat($("#id_likelihood_high").val())],
+	[parseFloat($("#id_activity_low").val()),
+	parseFloat($("#id_activity_high").val())],	
+    ];
+}
+
+function toggleSites() {
+    if(map != null) {
+	for(var i = 0; i < markers_sites.length; i++) {
+	    markers_sites[i].setVisible(!markers_sites[i].getVisible());
+	}
+    }
+}
+
+function loadHeatmap() {
+    if(heatmaps == null) heatmaps = [];
+    if(latlongData == null) {
+	latlongData = [];
+	for(var k = 0; k<deps.length; k++) {
+	    if(activeDeps.indexOf(deps[k]) != -1) {
+		latlongData[k] = new google.maps.MVCArray();
+		var ind = oldLatLngIndex.length == 0 ? currPosDataIndex[k] : oldLatLngIndex[k]; 
+		for(var i = ind[0]; i <= ind[1]; i++) {
+		    latlongData[k].push(new google.maps.LatLng(rawPosData[k][i][8][0], rawPosData[k][i][8][1]));
+		}
+	    }
+	}
+    }
+
+    // TODO: what happens if you hide a deployment after already creating it's latlng data
+    var heatmapDeps = getActHeatmapDepsInd();
+    for(var i = 0; i<latlongData.length; i++) {
+	if(latlongData[i] == null)
+	    continue;
+	var heatmap = new google.maps.visualization.HeatmapLayer({
+	    data: latlongData[i],
+	    options: {
+	    	radius: 15,
+		opacity: 0.7,
+	    },
+            map: heatmapDeps.indexOf(i) == -1 ? null : map,
+	});
+	heatmap.set('data', latlongData[i]);
+	heatmaps[i] = heatmap;
+    }
+}
+
+function loadPolyline() {
+    if(polylines == null) polylines = [];
+    // Populate data for the Polyline
+    if(latlongData == null) {
+	latlongData = [];
+	for(var k = 0; k<deps.length; k++) {
+	    if(activeDeps.indexOf(deps[k]) != -1) {
+		latlongData[k] = new google.maps.MVCArray();
+		var ind = oldLatLngIndex.length == 0 ? currPosDataIndex[k] : oldLatLngIndex[k]; 
+		for(var i = ind[0]; i <= ind[1]; i++) {
+		    latlongData[k].push(new google.maps.LatLng(rawPosData[k][i][8][0], rawPosData[k][i][8][1]));
+		}
+	    }
+	}
+    }
+
+    var lineDeps = getActLinesDepsInd();
+    for(var i = 0; i<latlongData.length; i++) {
+	if(latlongData[i] == null)
+	    continue;
+	var polyline = new google.maps.Polyline({
+	    path: latlongData[i],
+	    geodesic: true,
+	    strokeColor: colors[i%4],
+	    strokeOpacity: 1.0,
+	    strokeWeight: 2,
+	    map: map,
+            visible: lineDeps.indexOf(i) == -1 ? false : true,
+	});
+	polylines[i] = polyline;
+    }
+    
+    /*
+    google.maps.event.addListener(flightPath, 'mouseover', function(event) {
+	
+	//Attempt to get the index of the closest point to the mouse location
+	var vertex;
+	var i;
+	for (i=0; i < rawPosData[0].length; i ++) {
+	    if ((event.latLng.lat().toFixed(3) == rawPosData[0][i][8][0].toFixed(3)) && (event.latLng.lng().toFixed(3) == rawPosData[0][i][8][1].toFixed(3))) { vertex = i; }
+	}
+	
+	if (vertex != null) {
+	    document.getElementById('selected_point_latlon').innerHTML =
+	    rawPosData[0][vertex][8][0].toFixed(6) + ', ' +
+	    rawPosData[0][vertex][8][1].toFixed(6);
+	    // lat, lng of actual point in db
+	    document.getElementById('selected_point_eastingnorthing').innerHTML =
+	    rawPosData[0][vertex][3] + ', ' +   // easting
+	    rawPosData[0][vertex][4] + ', ' +   // northing
+	    rawPosData[0][vertex][5] + ' ' +    // zone number
+	    rawPosData[0][vertex][9];          // zone letter
+	    document.getElementById('selected_point_date').innerHTML =
+	    rawPosData[0][vertex][10];          // date string of timestamp
+	    document.getElementById('selected_point_activity').innerHTML =
+	    rawPosData[0][vertex][7].toFixed(6);  // activity
+	    document.getElementById('selected_point_likelihood').innerHTML =
+	    rawPosData[0][vertex][6].toFixed(6); // likelihood
+	    document.getElementById('selected_point_positionID').innerHTML =
+	    rawPosData[0][vertex][0];
+	    document.getElementById('selected_point_deployment').innerHTML =
+	    rawPosData[0][vertex][1];
+	} // end if vertex
+	
+    }); // end event mouseover eventListener
+    
+    
+    google.maps.event.addListener(flightPath, 'mouseout', function() {
+	document.getElementById('selected_point_latlon').innerHTML = ""
+	document.getElementById('selected_point_eastingnorthing').innerHTML = ""
+	document.getElementById('selected_point_date').innerHTML = ""
+	document.getElementById('selected_point_activity').innerHTML = ""
+	document.getElementById('selected_point_likelihood').innerHTML = ""
+	document.getElementById('selected_point_positionID').innerHTML = ""
+	document.getElementById('selected_point_deployment').innerHTML = ""
+	
+    }); // end mouseout event function
+    
+    google.maps.event.addListener(flightPath, 'click', function(event) {
+	//Attempt to get the index of the closest point to the mouse location
+	var vertex;
+	var i;
+	for (i=0; i < rawPosData[0].length-1; i ++) {
+	    if ((event.latLng.lat().toFixed(2) == rawPosData[0][i][8][0].toFixed(2)) && (event.latLng.lng().toFixed(2) == rawPosData[0][i][8][1].toFixed(2))) { vertex = i; }
+	}
+	
+	if (vertex != null) {
+	    marker.setMap(null);
+	    
+	    //if (marker){
+	    //  marker.setMap(null);
+	    
+	    // There is a bug; when a point is clicked in flot,
+	    //the marker stays there when a point in google maps is clicked too.
+	    //The Lines click in maps doesn't get passed to flot either
+	    //because the html form input for lat_clicked and lng_clicked
+	    //are not submitted to calculate index for selected_data
+	    //Also, the map doesn't reload so the marker stays there.
+	    //need to figure out how to set markers declared elsewhere to "null"
+	    
+	    //selectedMarkers.setMap(null);
+	    // }
+	    
+	    marker = new google.maps.Marker({
+		position: new google.maps.LatLng
+		(
+		rawPosData[0][vertex][8][0],
+		rawPosData[0][vertex][8][1]
+		),
+		map: map,
+		zIndex: google.maps.Marker.MAX_ZINDEX + 1
+		// zIndex sets marker on top of all other markers
+		
+		// Note: When no icon, uses default large/red marker
+		// icon: 'http://maps.google.com/mapfiles/ms/micons/red-dot.png'
+	    }); // end setting marker data
+	    
+	    
+	    // Set on click infoWindow content for highlighted data marker
+	    var content = '<b>Deployment ID: </b>' + rawPosData[0][vertex][1] +
+	    '<br><b>Data ID: </b>' + rawPosData[0][vertex][0] +
+	    '<br><b>Lat, Lon: </b> ' +
+	    rawPosData[0][vertex][8][0].toFixed(6) + ', ' +
+	    rawPosData[0][vertex][8][1].toFixed(6) +
+	    '<br><b>Easting, Northing, Zone: </b> ' +
+	    rawPosData[0][vertex][3] + ', ' +
+	    rawPosData[0][vertex][4] + ', ' +
+	    rawPosData[0][vertex][5] +
+	    rawPosData[0][vertex][10] +
+	    '<br><b>Date/Time: </b>'  + rawPosData[0][vertex][9] +
+	    '<br><b>Activity: </b>' +  rawPosData[0][vertex][7] +
+	    '<br><b>Likelihood: </b>' + rawPosData[0][vertex][6];
+	    
+	    var infoWindow = new google.maps.InfoWindow({content: content});
+	    
+	    
+	    // click Listener for markers
+	    google.maps.event.addListener(marker, 'click',
+	    function (event)
+	    {
+		infoWindow.open(map, this);
+	    } // end event function
+	    ); // end click Listener
+	    
+	    
+	    //Populate the html sidebar with related data
+	    
+	    document.getElementById('selected_point_latlon').innerHTML =
+	    rawPosData[0][vertex][8][0].toFixed(6) + ', ' + // lat of actual pt in db
+	    rawPosData[0][vertex][8][1].toFixed(6);          // lng of point in db
+	    document.getElementById('selected_point_eastingnorthing').innerHTML =
+	    rawPosData[0][vertex][3] + ', ' +   // easting
+	    rawPosData[0][vertex][4] + ', ' +   // northing
+	    rawPosData[0][vertex][5] + ' ' +    // zone number
+	    rawPosData[0][vertex][9];          // zone letter
+	    document.getElementById('selected_point_date').innerHTML =
+	    rawPosData[0][vertex][10];          // date string of timestamp
+	    document.getElementById('selected_point_activity').innerHTML =
+	    rawPosData[0][vertex][7].toFixed(6);  // activity
+	    document.getElementById('selected_point_likelihood').innerHTML =
+	    rawPosData[0][vertex][6].toFixed(6); // likelihood
+	    document.getElementById('selected_point_positionID').innerHTML =
+	    rawPosData[0][vertex][0];
+	    document.getElementById('selected_point_deployment').innerHTML =
+	    rawPosData[0][vertex][1];
+	} // end if vertex
+	
+    }); // end event mouseover eventListener
+    */
+    // Polyline for Deployment 2
+}
+
+// Could /maybe/ optimize this by presorting markers (or index of markers) into bins based on lat & lng. This way, we don't have to sort through all the current markers, only at most 4 bins (if you have simple rectangular bins.)
+// But that would necessitate something like a merge-find set for the indices
+function selectMap(bounds) {
+    // Remember, rawPosData[0] and markers_querydata are sorted by time
+    selMapTimes = [];
+    var depInds = getDepsInd(activeDeps);
+
+    for(var k=0; k<depInds.length; k++) {
+        var depI = depInds[k],
+            inds = [getPosIndex(selectedTimeRange[0], depI ,'gte'), getPosIndex(selectedTimeRange[1], depI, 'lte')],
+            selectedInds = [[inds[0],inds[0]]],
+            j=0;
+
+        // If nothing was index not found
+        if(inds[0]==-1 && inds[1]==-1) {
+            selectedInds = [];
+        }
+        for(var i = inds[0]+1; i <= inds[1]; i++) {
+            if(bounds.contains(markers_querydata[depI][i].getPosition())) {
+            if(i > selectedInds[j][1] || i < selectedInds[j][0]) {
+                // Check if selected marker is concurrent in time
+                if(i - selectedInds[j][1] == 1) {
+                selectedInds[j][1] = i;
+                // Check if this creates concurrent
+                }
+                else {
+                selectedInds.push([i,i]);
+                j++;
+                }
+            }
+            }
+        }
+
+        // Change indices to timestamps
+        selMapTimes.push([]);
+        console.log("selinds", selectedInds);
+        for(var i = 0; i < selectedInds.length; i++) {
+            selMapTimes[k].push([rawPosData[depI][selectedInds[i][0]][2],
+            rawPosData[depI][selectedInds[i][1]][2]]);
+        }
+    }
+
+    $("#plot-div").data("plot").triggerRedrawOverlay();
+}
+
+function initialize(){
+    dataType = ({{data_type}} == 1) ? 'Raw positions' : 'Track';
+    // Stops Firefox from using cached values of the form inputs if you press refresh. Maybe.
+    //if({{colorpoints_checked}} == null || {{colorpoints_checked}} == true)
+    if({{colorpoints_checked}} == null) {
+	if(deps.length == 1) 
+	    document.getElementById('id_colorpoints').checked = true;
+	else
+	    document.getElementById('id_colorpoints').checked = false;
+    } else 
+	document.getElementById('id_colorpoints').checked = {{colorpoints_checked}};
+    
+    $('input').attr('autocomplete', 'off'); 
+
+    /*
+    $.each($("#id_deployments inputs"), function(i, box) {
+ 	box[0].checked="checked";
+    });
+    */
+    /*
+    $("input[name='deployment']").on('click', function(e){
+	activeDeps = [];
+	$("input[name='deployment']").each(function(i, dep) {
+	    if($(this)[0].checked) {
+		activeDeps.push(parseFloat($(dep).prop('value')));
+
+	    }
+	});
+	updateFlot(markers_querydata);
+	colorMarkers();
+	e.stopPropagation(); // To stop it from collapsing "it's" contents
+    });
+    */
+    $("input[name='deployment']").prop('checked', true);
+    $.each(deps, function(i, dep) {
+        $("#id_deployment_" + i).prev().css("background-color", colors[i%4]);
+        $("#id_deployment_" + i).on('click', function(e) {
+            //var dep = deps[i]; //parseFloat($(this).prop('value'));
+            if($(this)[0].checked) {
+                    $("#id_deployment_options_"+i+" :input").each(function() {
+                        this.disabled=false;
+                    });
+            activeDeps.push(dep);
+            // Maintain order of deployments
+            var temp = [];
+            for(var j=0; j<deps.length; j++) {
+                if(activeDeps.indexOf(deps[j]) != -1)
+                temp.push(deps[j]);
+            }
+            activeDeps = temp;
+            // TODO: There wll be cases where nothing has changed in between hiding/showing the heatmap/lines
+            setLatLongData(i);
+            if(heatmaps && heatmaps[i]) heatmaps[i].setMap(null);
+            if(polylines && polylines[i]) polylines[i].setVisible(true);
+
+            } 
+            else {
+                    $("#id_deployment_options_"+i+" :input").each(function() {
+                        this.disabled=true;
+                    });
+                activeDeps.splice(activeDeps.indexOf(dep),1);
+            if(heatmaps && heatmaps[i]) heatmaps[i].setMap(map);
+            if(polylines && polylines[i]) polylines[i].setVisible(false);
+            }
+            updateFlot(markers_querydata);
+            colorMarkers();
+            e.stopPropagation(); // To stop it from collapsing its contents
+        });
+    });
+    $(".sidebar-header").on('click', function(){
+        if($(this).attr('clicked')=="true") {
+            $(this).attr('clicked', "false");    
+        }
+        else {
+            $(this).attr('clicked', "true");
+        }
+        $(this).next().collapse('toggle');
+    });
+
+    // Initialize timezoneJS which we use for the flot time axis
+    // Copied it from est_status.html. TODO: Should this be changed
+    // Note: We only have data in timezone.json for LA
+    var _tz = timezoneJS.timezone;
+    _tz.loadingScheme = _tz.loadingSchemes.MANUAL_LOAD;
+    _tz.loadZoneJSONData('/static/js/timezone.json', true);
+    
+    setGraphFilters();
+    //document.getElementById("id_sites").onclick = toggleSites;
+    $("#id_data_type").on('change', updateDataWrapper); // Raw vs tracks
+
+    // Bind filter form inputs to filter slider
+    $("#id_likelihood_low").on('change', function() {
+	setGraphFilters();
+	if($("#id_graph_data option:selected").text() == "Likelihood")
+	    if($("#filter-slider").slider("values",0) != $(this).val())
+		$("#filter-slider").slider("values",0,$(this).val());
+    });
+    $("#id_likelihood_high").on('change', function() {
+	setGraphFilters();
+	if($("#id_graph_data option:selected").text() == "Likelihood")
+	    if($("#filter-slider").slider("values",1) != $(this).val())
+		$("#filter-slider").slider("values",1,$(this).val());
+    });
+    $("#id_activity_low").on('change', function() {
+	setGraphFilters();
+	if($("#id_graph_data option:selected").text() == "Activity")
+	    if($("#filter-slider").slider("values",0) != $(this).val())
+		$("#filter-slider").slider("values",0,$(this).val());
+    });
+    $("#id_activity_high").on('change', function() {
+	setGraphFilters();
+	if($("#id_graph_data option:selected").text() == "Activity")
+	    if($("#filter-slider").slider("values",1) != $(this).val())
+		$("#filter-slider").slider("values",1,$(this).val());
+    });
+
+
+    $("#id_graph_data").on('change', function(){
+	//updateFlot(markers_querydata);
+	var yaxis = $("#plot-div").data("plot").getAxes().yaxis;
+	var delta = yaxis.max - yaxis.min;
+	$("#filter-slider").slider("values",[(graphFilters[$(this).val()-1][0] - yaxis.min)/delta, (graphFilters[$(this).val()-1][1] - yaxis.min)/delta]);
+    });
+    $("#id_colorpoints").on('change', function() {colorMarkers(); $("#plot-div").data("plot").draw();});
+    $("#id_sites").on('click', toggleSites);
+    $("#id_points").on('click', function() {
+        var checked = this.checked;
+        setMarkerVisibility(checked);
+        $("[id^=id_points_]").prop('checked', checked);
+    });
+    $("[id^=id_points_]").prop('checked', true);
+    $("[id^=id_points_]").each(function(i) {
+        $(this).on('click', function() {
+            colorMarkers();
+            updateFlot(markers_querydata);
+        });
+    });
+    $("#id_lines").on('click', function() {
+	if(this.checked) {
+	    if(oldLatLngIndex.length == 0)
+		oldLatLngIndex = currPosDataIndex.slice();
+
+	    if(polylines == null) {
+		loadPolyline();
+	    }
+
+	    //changeSelectionHelper([oldLatLngIndex, [getPosIndex(selectedTimeRange[0], 'gte'), getPosIndex(selectedTimeRange[1], 'lte')]]);
+	    for(var i=0; i<deps.length; i++) {
+	    	if(activeDeps.indexOf(deps[i]) != -1)
+		    setLatLongData(i);
+	    }
+	    
+	    $.each(polylines, function(i,p){if(p) p.setVisible(true); });
+	}
+	else if(polylines != null)
+	    $.each(polylines, function(i,p){if(p) p.setVisible(false); });
+        var checked = this.checked;
+        $("[id^=id_lines_]").prop('checked', checked);
+    });
+    $("[id^=id_lines_]").each(function(i) {
+        // TODO: This loads all deployments on first select
+        $(this).on('click', function() {
+            if(this.checked) {
+                if(oldLatLngIndex.length == 0)
+                    oldLatLngIndex = currPosDataIndex.slice();
+
+                if(polylines == null) {
+                    loadPolyline();
+                }
+
+                if(activeDeps.indexOf(deps[i]) != -1) {
+                    setLatLongData(i);
+                }
+                
+                polylines[i].setVisible(true);
+            }
+            else if(polylines != null)
+                polylines[i].setVisible(false);
+        });
+    });
+    $("#id_heatmap").on('click', function(){
+	if($(this)[0].checked) {
+	    if(oldLatLngIndex.length == 0)
+		oldLatLngIndex = currPosDataIndex.slice();
+
+	    if(heatmaps == null) {
+		loadHeatmap();
+	    }
+
+	    //changeSelectionHelper([oldLatLngIndex, [getPosIndex(selectedTimeRange[0], 'gte'), getPosIndex(selectedTimeRange[1], 'lte')]]);
+	    for(var i=0; i<deps.length; i++) {
+	    	if(activeDeps.indexOf(deps[i]) != -1)
+		    setLatLongData(i);
+	    }
+	    setMarkerVisibility(false);
+	    document.getElementById('id_points').checked = false;
+	    $.each(heatmaps, function(i, h) {if(h) h.setMap(map)});
+	}
+	else if(heatmaps != null)
+	    $.each(heatmaps, function(i, h) {if(h) h.setMap(null)});
+        var checked = this.checked;
+        $("[id^=id_heatmap_]").prop('checked',checked);
+    });
+    $("[id^=id_heatmap_]").each(function(i) {
+        // TODO: This loads all deployments on first select
+        $(this).on('click', function() {
+            if(this.checked) {
+                if(oldLatLngIndex.length == 0)
+                    oldLatLngIndex = currPosDataIndex.slice();
+
+                if(polylines == null) {
+                    loadHeatmap();
+                }
+
+                if(activeDeps.indexOf(deps[i]) != -1) {
+                    setLatLongData(i);
+                }
+                
+                heatmaps[i].setMap(map);
+            }
+            else if(polylines != null)
+                heatmaps[i].setMap(null);
+        });
+    });
+
+    // Hard code the initial center latitude and longitude of the map
+    self.lat = 38.487828027;
+    self.lng = -122.149419006;
+    var myLatLng = new google.maps.LatLng(self.lat, self.lng);
+    
+    
+    // The following section saves the center and zoom for map reloads
+    // otherwise, map would reset back to intial default center
+    var reload_zoom;
+    var mapOptions;
+    
+    // If: Map has been loaded before and bounds have changed
+    // (this is when previous center and zoom are saved)...
+    // Then: Set options to the the previous/saved center and zoom.
+    var mapOptions = {
+	center: myLatLng,
+	zoom: 14, // Scale of 1 to 20
+	mapTypeId: google.maps.MapTypeId.SATELLITE,
+	
+	panControl:true,
+	zoomControl:true,
+	mapTypeControl:true,
+	scaleControl:true,
+	streetViewControl:true,
+	overviewMapControl:true,
+	rotateControl:true
+    };
+    if ((localStorage.mapLat != null) &&
+        (localStorage.mapLng !=null) &&
+	(localStorage.mapZoom !=null)) {
+	mapOptions['center'] = new google.maps.LatLng(
+		localStorage.mapLat, 
+		localStorage.mapLng);
+	mapOptions['zoom'] = parseInt(localStorage.mapZoom);
+    } // end if map has been loaded before
+    
+    // Creates the map object, using the mapOptions set above
+    map = new google.maps.Map(document.getElementById("map-canvas"),
+    mapOptions);
+    
+    // Create time and filter slider
+    setupSlider();
+    
+    // Listen and store center & zoom changes, to be used in map options
+    
+    google.maps.event.addListener(map, "center_changed", function(){
+        mapCenter = map.getCenter();
+        localStorage.mapLat = mapCenter.lat();
+        localStorage.mapLng = mapCenter.lng();
+        localStorage.mapZoom = map.getZoom();
+    });
+    
+    google.maps.event.addListener(map, "zoom_changed", function (){
+        mapCenter = map.getCenter();
+        localStorage.mapLat = mapCenter.lat();
+        localStorage.mapLng = mapCenter.lng();
+        localStorage.mapZoom = map.getZoom();
+    });
+    
+    /* TODO: Remove
+    google.maps.event.addListener(map, "click", function(event) {
+        document.getElementById('clicked_lat_lng').value =
+        event.latLng.lat().toFixed(6) + ', ' + event.latLng.lng().toFixed(6);
+    });
+    */
+   
+    // Selecting a rectangle on the map with shift click+drag 
+    var shiftPressed = false,
+	mouseDown = false,
+	mouseDownCoord,
+	cancelSelDown = false,
+	mouseMoved = false;
+
+    $(window).keydown(function (e) {
+	    console.log("keydown...");
+	if(e.which === 16) {
+	    console.log("shift...");
+	    shiftPressed = true;
+	}
+    }).keyup(function (e) {
+	if(e.which === 16) {
+	    shiftPressed = false;
+	    if(boundingRect) {
+		//boundingRect.setMap(null);
+		//boundingRect = null;
+		//selectMap(boundingRect.getBounds());
+	    }
+	}
+    });
+    google.maps.event.addListener(map, 'mousedown', function(event) {
+	if(shiftPressed) {
+	    console.log("starto");
+	    mouseDown = true;
+	    mouseDownCoord = event.latLng;
+	    map.setOptions({draggable: false});
+	    console.log("endo");
+	}
+	else if(boundingRect) {
+	    mouseMoved = false;
+	    cancelSelDown = true;
+	}
+    });
+    google.maps.event.addListener(map, 'mouseup', function(event) {
+	if(cancelSelDown && !mouseMoved){
+	    boundingRect.setMap(null);
+	    boundingRect = null;
+	    selMapTimes = [];
+	    cancelSelDown = false;
+	    $("#plot-div").data("plot").triggerRedrawOverlay();
+	}
+	else if(mouseDown) {
+	    mouseDown = false;
+	    if(boundingRect) {
+		selectMap(boundingRect.getBounds());	
+	    }
+	    map.setOptions({draggable: true});
+	}	
+    });
+
+    // When google maps loads/refreshes, click 'button' to highlight
+    // Mousemove Listener to display lat, lng of mouse location
+    
+    google.maps.event.addListener(map,'mousemove',function(event){
+	if(cancelSelDown)
+	    mouseMoved = true;
+	if(mouseDown && shiftPressed) {
+	    var bounds = new google.maps.LatLngBounds();
+	    bounds.extend(mouseDownCoord);
+	    bounds.extend(event.latLng);
+	    if(boundingRect != null) {
+	    	boundingRect.setBounds(bounds);
+	    }
+	    else {
+	    	boundingRect = new google.maps.Rectangle({
+		    map: map,
+		    bounds: bounds,
+		    fillOpactiy: 0.15,
+		    strokeWeight: 0.9,
+		    clickable: false,
+		});
+	    }
+	}
+        // Note:  Use '.value' for <input>, then data appears in a box
+        //        Use '.innerHTML' for <span>
+        document.getElementById('latlong').value =
+        event.latLng.lat().toFixed(6) + ', ' +
+        event.latLng.lng().toFixed(6);
+    }); //end onemousemove event listener
+    
+    
+    
+    // Idle Listener. Displays bounds, center, and zoom
+    
+    google.maps.event.addListener(map, 'idle', function(){
+        
+        // bounds
+        document.getElementById('bounds').innerHTML =
+        'NE: '+this.getBounds().getNorthEast().lat().toFixed(6)+ ', ' +
+        this.getBounds().getNorthEast().lng().toFixed(6)+
+        ' | SW: '+this.getBounds().getSouthWest().lat().toFixed(6)+', '+
+        this.getBounds().getSouthWest().lng().toFixed(6);
+        
+        // center
+        document.getElementById('current_center').innerHTML =
+        this.getCenter().lat().toFixed(6)+', ' +
+        this.getCenter().lng().toFixed(6);
+        
+        // zoom
+        document.getElementById('current_zoom').innerHTML =
+        this.getZoom(); 
+    }); // end idle Listener
+    
+    
+    
+    // If site markers are chosen to be shown...
+    // Then populate locations array with site data. Later used for markers
+    var sites_checked = {{sites_checked}};
+    var points_checked = {{points_checked}};
+    var lines_checked = {{lines_checked}};
+    var site_list = {{siteslist|safe}};
+    var locations = [];
+    
+    
+    // Show site markers if site is checked in preferences
+    if ((sites_checked ==1)) { // || ({{view_type|safe}} == "deployment")) { // TODO: What is that second condition??? for??
+        for (var i = 0; i < site_list.length; i++) {
+            locations.push([
+            site_list[i][3],  // [0]: site location lat
+            site_list[i][4],  // [1]: site location lng
+            site_list[i][0],  // [2]: site ID
+            site_list[i][1],  // [3]: site name
+            site_list[i][2],  // [4]: site location string
+            site_list[i][9]   // [5]: site elevation
+            ]);
+        } // end if site checked
+    } // end looping through list of sites
+    
+    else {  // if sites are not checked, just push an empty list
+        locations.push([]);
+    }
+    
+    // SET SITE MARKERS:
+    var marker, i;
+    markers_sites = [];
+    var infoWindows_sites = [];
+    
+    // Display markers for site locations
+    for (i = 0; i < locations.length; i++) {
+        
+        marker = new google.maps.Marker({
+            position: new google.maps.LatLng(locations[i][0], locations[i][1]),
+            map: map,
+            icon: 'http://maps.google.com/mapfiles/ms/micons/green-dot.png',
+            infoWindowIndex: i
+        });   // end the setting of marker data to be pushed to array
+        
+        // Set infoWindow content
+        if (locations.length>0) {
+            var content = '<b>Site ID:</b> ' + locations[i][2] +
+            ' or "' + locations[i][3]+'"' +
+            '<br><b>Location:</b> ' + locations[i][4] + ', ' +
+            '(' + locations[i][0] + ', ' + locations[i][1] +
+            ')<b><br>Elevation:</b> ' + locations[i][5];
+        }
+        var infoWindow = new google.maps.InfoWindow({content: content});
+        
+        // click Listener for markers
+        var clickedInfoWindowIndex;
+        google.maps.event.addListener(marker, 'click',
+        function (event)
+        {
+            // Note: The following pans to point:
+            // map.panTo(event.latLng);
+            
+            // If a site infoWindow is already open, close it.
+            if (clickedInfoWindowIndex != null) {
+                infoWindows_sites[clickedInfoWindowIndex].close();
+            }
+            
+            // Open infoWindow for clicked site location
+            infoWindows_sites[this.infoWindowIndex].open(map, this);
+            clickedInfoWindowIndex = this.infoWindowIndex;
+        } // end event function
+        ); // end click Listener
+        
+        // push to the marker and infoWindow arrays for the site locations
+        markers_sites.push(marker);
+        infoWindows_sites.push(infoWindow);
+        
+    } //end for loop for site locations
+    
+    rawPosData = {{pos_data|safe}};
+    console.log("rawposdata", rawPosData);
+    for(var i = 0; i<deps.length; i++) currPosDataIndex[i] = [0, rawPosData[i].length-1]; // = [0, rawPosData[i].length-1 > 0 ? rawPosData[i].length-1 : 0];
+    updateNumPoints();
+    selectedTimeRange = [{{datetime_from}}, {{datetime_to}}];
+    currTimeRange = [{{datetime_from}}, {{datetime_to}}];
+    userRequestedMaxTimeRange = [{{datetime_from}}, {{datetime_to}}];
+
+	
+    var display_type = {{display_type}};
+
+    if (display_type == null || display_type == 1){
+	loadMarkers(map);
+	loadFlot(markers_querydata, map, curr_dep);
+    }
+
+    // DISPLAY MARKER / "HIGHLIGHT" SELECTED POINT (clicked in maps or in flot)
+    
+    //FIXME: Took reloadflot from here
+    // WHEN HTML PREF IS SET TO 'Lines':
+    
+    else if (display_type == 2) {
+       loadPolyline();
+       loadFlot(); 
+    } // end if (html pref is set to show data as lines)
+
+    // Update filter slider appropriately
+    if($("#id_graph_data option:selected").text() == "Likelihood") {
+	console.log("sdfsdf",$("#id_likelihood_low").val(),$("#id_likelihood_high").val());
+	$("#filter-slider").slider("values",[$("#id_likelihood_low").val(),$("#id_likelihood_high").val()]);
+    }
+    else if ($("#id_graph_data option:selected").text() == "Activity") {
+	$("#filter-slider").slider("values",[$("#id_activity_low").val(),$("#id_activity_high").val()]);
+    }
+    
+} //end function initialize
+
+// Load google maps on browser window load
+google.maps.event.addDomListener(window, 'load', initialize);
+    
+</script>
+{% endblock %}
+{% block sidebar %}
+
+<div id = "text">
+{% if project %}
+<a href={%url 'project:show-project' project.ID %}#deployments><h4><center>{{project.name}}</center></h4></a>
+{% endif %}
+
+<div class = "sidebar-form">
+<div id ="prefs">
+<form id="form" action ="" name="settings" method="get">
+    <div class="sidebar-header">
+        Data<span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr>
+    </div>
+    <div class="collapse in" id="data-section">
+	{{form.datetime_from.label_tag}} <!-- id_datetime_from -->
+        <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="YYYY/MM/DD HH:MM:SS (24hr)"> {{form.datetime_from}}<br> </div>
+	{{form.datetime_to.label_tag}}
+        <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="YYYY/MM/DD HH:MM:SS (24hr)"> {{form.datetime_to}}<br> </div>
+        {{form.data_type.label_tag}} {{form.data_type}}<br>
+	<table>
+	    <tr>
+		<th></th>
+		<th>Min</th>
+		<th>Max</th>
+	    </tr>
+	    <tr>
+		<th>Likelihood</th>
+		<td>{{form.likelihood_low}}</td>
+		<td>{{form.likelihood_high}}</td>
+	    </tr>
+	    <tr>
+		<th>Activity</th>
+		<td>{{form.activity_low}}</td>
+		<td>{{form.activity_high}}</td>
+	    </tr>
+	</table>
+        {{form.graph_data.label_tag}}{{form.graph_data}}<br>
+    </div>
+    <div class="sidebar-header">
+        Display<span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr>
+    </div>
+    <div class="collapse in">
+        {{form.sites.label_tag}} {{form.sites}}<br>
+        {{form.points.label_tag}} {{form.points}}<br>
+        {{form.colorpoints.label_tag}} {{form.colorpoints}}<br>
+        {{form.lines.label_tag}} {{form.lines}}<br>
+        {{form.heatmap.label_tag}} {{form.heatmap}}<br>
+    </div>
+    <div class="sidebar-header">
+        Deployments<span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr>
+    </div>
+    <div class="collapse in">
+    {% for dep in form.deployment %}
+        <div class="sidebar-header">
+            <label for="id_deployment_{{forloop.counter0}}" style="font-weight: normal">{{dep.choice_label}}</label>
+            <span class="circle"></span>
+            {{dep.tag}} <span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr style="border-color: #CCCCCC">
+        </div>
+        <div id="id_deployment_options_{{forloop.counter0}}" class="collapse in">
+            <label for="id_points_{{forloop.counter0}}">Points</label>
+            <input type="checkbox" id="id_points_{{forloop.counter0}}" value="{{forloop.counter0}}"></input>
+            <label for="id_lines_{{forloop.counter0}}">Lines</label>
+            <input type="checkbox" id="id_lines_{{forloop.counter0}}" value="{{forloop.counter0}}"></input>
+            <label for="id_heatmap_{{forloop.counter0}}">Heatmap</label>
+            <input type="checkbox" id="id_heatmap_{{forloop.counter0}}" value="{{forloop.counter0}}"></input>
+        </div>
+    {% endfor %}
+    </div>
+</form>
+<!-- <font size="1">date range: 2013-08-13  13:57:16 to 2014-06-16 14:28:12</font> -->
+</div><!-- end prefs -->
+
+<div class="section_title">
+  <center><button id="updateMap" onclick="updateDataWrapper()">Update Map</button><button onclick="submitDownloadForm()" data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="Data for all deployments for the timerange specified above">Download CSV</button></center>
+<h6></h6>
+  <b>&nbsp;&nbsp;Download KML File</b>
+<h6></h6>
+<select id="KMLtype">
+           				<option value="trackOnly">Track Only</option>
+           				<option value="pointOnly">Point only</option>
+						<option value="histogramOnly">Histogram Only</option>
+           				<option value="track+point"  selected="selected">Track + Point</option>
+						<option value="track+histogram">Track + Histogram</option>
+           				<option value="point+histogram">Point + Histogram</option>
+						<option value="allData">All</option>
+        			</select>
+<button onclick="submitDownloadFormKML()">Download KML</button>
+</div> <!-- end section_title -->
+</div> <!-- end sidebar-form -->
+
+<br>
+
+<div id="mouseover">
+<font size="2">
+<!-- View Type: {{view_type}} <br>-->
+{% if positions %}
+<div id="num_points">
+<b>No. of points</b>: 
+</div>
+
+{% if deps|length > 1 %}  <b>Line Colors: Blue</b>: {{deps.0}} | <b>Red:</b> {{deps.1}}
+{% if deps|length > 2 %} | <b>Green:</b> {{deps.2}}{% endif %}
+{% if deps|length > 3 %} | <b>Yellow:</b> {{deps.3}}{% endif %}
+<br>
+{% endif %}
+
+{% endif %} <!-- endif for positions -->
+
+<b>Mouseover Lat, Lon: </b> <input type="text" class="current_info" id="latlong"></span>
+<!--<br><b>Clicked Lat, Lon: </b>--><input type="hidden" class="current_info" id="clicked_lat_lng"></span>
+<br><b>Map Bounds: <font size="1"></b><span id="bounds"></span></font>
+<br><b>Map Center: </b><span id="current_center"></span>
+<br><b>Map Zoom: </b><span id="current_zoom"></span>
+<!--<br><b>Clicked Lat, Long: </b> <input type="text" id="latlongclicked" style="width:300px; border:1px inset black;"></span> -->
+<br></font>
+</div> <!-- end mouseover -->
+</div> <!-- end text -->
+
+<br>
+
+<div class="mouse-over-info"></div>
+
+{% endblock %} <!-- end sidebar block -->
+
+{% block content %}
+
+<div class="ui-content">
+    <div class='page-overlay' id='page-overlay'><img class='spinner centered' src='/static/map/css/ajax-loader.gif'></div>    
+    <div class="row-3" id="map-canvas"></div> <!-- end row-3, map-canvas -->
+    <div style="display:flex; height:20px">
+        <div style="flex-basis:13px;">&nbsp;</div>
+        <div id="time-slider" style="flex-basis:fill;  height:13px; width:100%; visibility:hidden; padding-bottom:3px"></div>
+    </div>
+    <div class="row-4" style="display:flex">
+        <div id="filter-slider" style="flex-basis:13px; height:100%; margin-bottom:8; visibility:hidden"></div>
+        <div style="flex-basis: fill; width:100%; height:100%" id="plot-div"></div>
+    </div>
+</div> <!-- end ui-content -->
+	<center>
+	<!-- uncomment next line for small overview graph -->
+  <!--   <div id="overview" class="demo-placeholder" style="float: right; width: 100px; height: 125px;"></div> -->
+	</center>
+{% endblock %} <!-- end content block -->
