@@ -6,7 +6,7 @@ import math
 
 def bandwidthFilter(band3, band10, band3Bound, band10Bound):
   """
-     classfy pulse if both band3 and band10 and under the threshold, noise vice versa
+     Classfy the record with bandwidth filter.
   """
   if ((band3 < band3Bound)&(band10 < band10Bound)):
     return 1
@@ -17,7 +17,7 @@ def bandwidthFilter(band3, band10, band3Bound, band10Bound):
 def likelihoodLabelingEvaluation(deploymentID, start_time, end_time,
                                  sites, validation):
   """
-     Find the TP, TN, FP, and FN for the deployment and time for likelihood labeling.
+     Calculate TP, TN, FP, and FN for likelihood labeling.
   """
   
   band3Bound = 450
@@ -45,8 +45,11 @@ def likelihoodLabelingEvaluation(deploymentID, start_time, end_time,
                    AND setNum = %s;
                 """%(start_time, end_time, deploymentID, i, validation))
     for row in cur.fetchall():
+        
+      #Classify data
       isPulse = bandwidthFilter(row[1], row[2], band3Bound, band10Bound)
 
+      #Determine whether the classification results are correct or not
       if (row[0] == 1):
         if (isPulse == 1):
           truePositive += 1
@@ -68,7 +71,7 @@ def likelihoodLabelingEvaluation(deploymentID, start_time, end_time,
 def manualLabelingEvaluation(deploymentID, start_time, end_time,
                                sites, validation):
   """
-     Find the TP, TN, FP, and FN for the deployment and time for manual labeling.
+     Calculate TP, TN, FP, and FN for manual labeling.
   """
   
   band3Bound = 450
@@ -96,8 +99,11 @@ def manualLabelingEvaluation(deploymentID, start_time, end_time,
                    AND setNum = %s;
                 """%(start_time, end_time, deploymentID, i, validation))
     for row in cur.fetchall():
+    
+      #Classify data
       isPulse = bandwidthFilter(row[1], row[2], band3Bound, band10Bound)
-
+      
+      #Determine whether the classification results are correct or not
       if (row[0] == 1):
         if (isPulse == 1):
           truePositive += 1
@@ -119,11 +125,10 @@ def manualLabelingEvaluation(deploymentID, start_time, end_time,
   
 def evaluation(depID, validation):
   """
-      Go through each combinations of site and evaluate bandwidth
-      filter with each of manual labeling and likelihood labeling.
-      The evaluation result is stored in the classifier_performance
-      table. It also prints the result.
+      Gather results from evaluation functions, stores them
+      to the database, and print the results.
   """
+  
   db_con = MySQLdb.connect(user="root", db="qraat")
   start_time = {57:1382252400,
                 60:1383012615,
@@ -138,13 +143,15 @@ def evaluation(depID, validation):
            61:[1,2,3,4,5,6,8],
            62:[1,2,3,4,5,6,8]}
   
+  #Evaluate both manual labeling and likelihood labeling
   evalMan = manualLabelingEvaluation(depID, start_time[depID],
                                      end_time[depID], sites[depID],
                                      validation)
   evalLik = likelihoodLabelingEvaluation(depID, start_time[depID],
                                          end_time[depID], sites[depID],
                                          validation)
-  
+
+  #Additional evaluation for deployment 61 and 62
   if ((depID == 61) | (depID == 62)):
     start_time = 1391276584
     end_time = 1391285374
@@ -159,7 +166,7 @@ def evaluation(depID, validation):
       evalMan[i] += tmpEvalMan[i]
       evalLik[i] += tmpEvalLik[i]
 
-  
+  #Export data into database
   cur = db_con.cursor()
   cur.execute("""INSERT INTO classifier_performance
                  (deploymentID, validation, TP, TN,
@@ -175,7 +182,7 @@ def evaluation(depID, validation):
                """%(depID, validation, evalLik[0], evalLik[1],
                     evalLik[2], evalLik[3], sum(evalLik)))
 
-  
+  #Print results
   print depID, validation
   print 'Manual:'
   print 'False Positive Rate: %s'%(float(evalMan[2])/(evalMan[2] + evalMan[1]))
@@ -189,14 +196,14 @@ def evaluation(depID, validation):
 
 def main():
   """
-     This program should evulate all deployment
-     and site combinations for bandwidth filter.
-     It will do 10 times on different traning
-     and validation sets. It will also do it on
-     both manual and likelihood labelings.
+     This program should evaluate all combinations
+     of deployment and site with bandwidth filter.
+     It will evulate 10 times on each different 
+     tranining set and validation set. It will also 
+     evaluate on both manual labeling and likelihood labeling.
   """
   
-#go through each combination of validation and deployment
+#Loop through each validation and deployment
   initTime = time.time()
   deploymentIDArray = [57, 60, 61, 62]
   for i in range(10):

@@ -7,6 +7,9 @@ from sklearn.svm import SVC
 
 def getDataSet(start_time, end_time, deploymentID,
                siteID, validations, manOrLik):
+  """
+     Query the data set.
+  """
   x = []
   y = []
   idArray = []
@@ -57,6 +60,8 @@ def SVM(deploymentID, site, start_time, end_time,
   bestErrorRate = 1
   CArray = [2**i for i in range(-5,16,3)]
   gammaArray = [2**i for i in range(-15,4,3)]
+  
+  #Grid seach for each combination of possibly C and gamma
   for i in CArray:
     for j in gammaArray:
 
@@ -74,7 +79,7 @@ def SVM(deploymentID, site, start_time, end_time,
                                                  site, training, manOrLik)
       validationX, validationY, idArray = getDataSet(start_time, end_time, deploymentID,
                                                      site, validations, manOrLik)
-      ##bootstrap the data if its too big
+      #bootstrap the data if its too big
       if (len(trainingX) > numberOfSamplePoints):
         np.random.seed()
         tmpX = []
@@ -88,7 +93,8 @@ def SVM(deploymentID, site, start_time, end_time,
       trainingX = np.array(trainingX)
       trainingY = np.array(trainingY)
       trainingYSet = set(trainingY)
-      ##only train data with SVM if it has 2 classes
+      
+      #only train data with SVM if it has 2 classes
       if (len(trainingYSet) == 2):
         clf = SVC()
         clf.fit(trainingX, trainingY) 
@@ -96,7 +102,8 @@ def SVM(deploymentID, site, start_time, end_time,
             decision_function_shape=None, degree=3, gamma=j, kernel='rbf',
             max_iter=-1, probability=False, random_state=None, shrinking=True,
             tol=0.001, verbose=False)
-
+            
+        #calculate error with the trained model
         error = 0
         for l in range(len(validationY)):
           isPulse = clf.predict([validationX[l]])
@@ -108,6 +115,8 @@ def SVM(deploymentID, site, start_time, end_time,
         for l in range(len(validationY)):
           if (predictClass != validationY[l]):
             error += 1
+
+      #keep the pair with the lowest error rate
       currentErrorRate = float(error)/len(validationY)
       if (currentErrorRate < bestErrorRate):
         bestErrorRate = currentErrorRate
@@ -181,6 +190,14 @@ def SVM(deploymentID, site, start_time, end_time,
     
 
 def main():
+  """
+     This program will train SVM. It will use grid search to find the 
+     best parameters for SVM using 1000 bootstrip points and a 20% held-out
+     to calculate the error. With the best pair of parameters, it will then 
+     train the svm using 1000 bootstriped points from the entire set. It will
+     then store all the trained values into the database.
+  """
+  
   initTime = time.time()
   
   deploymentIDArray = [57, 60, 61, 62]
@@ -197,6 +214,7 @@ def main():
            61:[1,2,3,4,5,6,8],
            62:[1,2,3,4,5,6,8]}
   
+  #Loop through each combination of validation, deployment, and sites.
   for i in range(10):
     for j in deploymentIDArray:
       for k in sites[j]:

@@ -5,6 +5,10 @@ from scipy.stats import norm
 
 
 def errorRateCalculation(validationSet, tree):
+  """
+     Calculate the error rate of a set of data with a decision tree.
+  """
+  
   wrongDecision = 0
   for i in range(len(validationSet)):
     isPulse = -1
@@ -25,6 +29,11 @@ def errorRateCalculation(validationSet, tree):
 
 def treePruning(deploymentID, siteID, start_time, end_time,
                 validation, manOrLik):
+  """
+     Prune the tree with the pruning data.
+  """
+  
+  #Load the pruning data
   validationSet = []
   db_con = MySQLdb.connect(user = "root", db = "qraat")
   cur = db_con.cursor()
@@ -43,6 +52,7 @@ def treePruning(deploymentID, siteID, start_time, end_time,
   for row in cur.fetchall():
     validationSet.append(list(row))
   
+  #Load the tree and its leaves
   tree = {}
   leaves = {}
   cur.execute("""SELECT branchID, data_type, data_value
@@ -59,6 +69,8 @@ def treePruning(deploymentID, siteID, start_time, end_time,
       leaves[row[0]] = row[2]
 
   errorRate = errorRateCalculation(validationSet, tree)
+  
+  #Loop through each leaves for purning.
   while (len(leaves) != 0):
     tmpTree = {}
     for i in tree:
@@ -91,6 +103,7 @@ def treePruning(deploymentID, siteID, start_time, end_time,
       tree = {'':[9, leaves['']]}
       break
 
+  #Remove the tree in the database
   cur.execute("""DELETE FROM decision_tree%s
                  WHERE start_time = %s
                  AND deploymentID = %s
@@ -98,6 +111,8 @@ def treePruning(deploymentID, siteID, start_time, end_time,
                  AND validation = %s;
               """%(manOrLik, start_time, deploymentID,
                    siteID, validation))
+
+  #Store the pruned tree into database
   for i in tree:
     cur.execute("""INSERT INTO decision_tree%s
                  (deploymentID, siteID, start_time, validation,
@@ -108,14 +123,17 @@ def treePruning(deploymentID, siteID, start_time, end_time,
 
 
 def bestSplit(trainingSet, dataTypeIndex):
-  """Given a set of data and data type. It calculates
-     the best value for split and the entropy. The branch
-     if splited by <= of the value. If the total number of
+  """
+     Given a set of data and a data type. It calculates
+     the best value for split and its entropy. The branch
+     if splited by <= of that value. If the total number of
      records > 100, check only 100 values equally distrubted
      between max and min, else check all values.
   """
   bestEntropy = 1
   bestValue = -1
+  
+  #Checking all possible values.
   if (len(trainingSet) <= 100):
     for i in range(len(trainingSet)):
       leftPulse = 0
@@ -163,7 +181,8 @@ def bestSplit(trainingSet, dataTypeIndex):
         minValue = trainingSet[i][dataTypeIndex]
       if (trainingSet[i][dataTypeIndex] > maxValue):
         maxValue = trainingSet[i][dataTypeIndex]
-    
+  
+    #Check only 100 intervals between min and max.
     valueInterval = (maxValue - minValue)/100.0
     for i in range(100):
       leftPulse = 0
@@ -209,11 +228,13 @@ def bestSplit(trainingSet, dataTypeIndex):
 def decisionTree(deploymentID, site, start_time, end_time,
                  validation, manOrLik, trainingSet, branchID):
   
-  """Given a set of data, It calculates the entropy at each
+  """
+     Given a set of data, It calculates the entropy at each
      possible splits. Keep the data type and value for the
      best split. Determine if it needs to continue on each
      of left and right branches. Terminates if the region
-     gets less than 5 records, or all records has the same class.
+     gets less than 5 records, all records has the same class,
+     or all records has the same variables.
   """
   minRecords = 5
   dataTypes = ['band3', 'band10', 'frequency',
@@ -223,13 +244,15 @@ def decisionTree(deploymentID, site, start_time, end_time,
   bestValue = -1
   bestDataTypeIndex = -1
   
+  #Loop through each data type and check if there are better splits
   for i in range(len(dataTypes)):
     currentEntropy, currentValue = bestSplit(trainingSet, i)
     if (currentEntropy < bestEntropy):
       bestEntropy = currentEntropy
       bestValue = currentValue
       bestDataTypeIndex = i
-      
+
+  #Create a branch for this split
   db_con = MySQLdb.connect(user = "root", db = "qraat")
   cur = db_con.cursor()
   cur.execute("""INSERT INTO decision_tree%s
@@ -239,7 +262,9 @@ def decisionTree(deploymentID, site, start_time, end_time,
               """%(manOrLik, deploymentID, site, start_time,
                    validation, branchID, bestDataTypeIndex,
                    bestValue))
-      
+
+  #Split data into left and right while keep track if
+  #each left and right child meet the termination condition.
   leftTrainingSet =[]
   rightTrainingSet = []
   leftPulseCount = 0
@@ -268,6 +293,7 @@ def decisionTree(deploymentID, site, start_time, end_time,
       else:
         rightFeatures = trainingSet[i]
 
+  #If the termination condition is met, create a leaf node.
   if ((len(leftTrainingSet) <= minRecords)|
       (len(leftTrainingSet) == leftPulseCount)|
       (leftPulseCount == 0)|
@@ -283,6 +309,7 @@ def decisionTree(deploymentID, site, start_time, end_time,
     decisionTree(deploymentID, site, start_time, end_time,
                  validation, manOrLik, leftTrainingSet, branchID + '1')
 
+  #If the termination condition is met, create a leaf node.
   if ((len(rightTrainingSet) <= minRecords)|
       (len(rightTrainingSet) == rightPulseCount)|
       (rightPulseCount == 0)|
@@ -301,6 +328,11 @@ def decisionTree(deploymentID, site, start_time, end_time,
     
 def getTrainingSet(start_time, end_time, deploymentID,
                    siteID, validation, manOrLik):
+  """
+     Query training set to build the decision tree. The pruning data
+     is excluded in this training set.
+  """
+  
   trainingSet = []
   db_con = MySQLdb.connect(user = "root", db = "qraat")
   cur = db_con.cursor()
@@ -323,6 +355,11 @@ def getTrainingSet(start_time, end_time, deploymentID,
 
 
 def main():
+  """
+     This program will train decisions for each combination of
+     deployment, site, and validations. It will store each tree
+     in the database.
+  """
   initTime = time.time()
   
   deploymentIDArray = [57, 60, 61, 62]
@@ -339,6 +376,7 @@ def main():
            61:[1,2,3,4,5,6,8],
            62:[1,2,3,4,5,6,8]}
   
+  #Loop through each validation, deployment, and site
   for i in range(10):
     for j in deploymentIDArray:
       for k in sites[j]:
@@ -356,6 +394,7 @@ def main():
         treePruning(j, k, start_time[j], end_time[j],
                     i, '2')
 
+      #Additional trainings for deployment 61 and 62
       if ((j == 61)|(j == 62)):
         for k in [1,3,4,5,6,8]:
           trainingSet = getTrainingSet(1391276584, 1391285374, j,

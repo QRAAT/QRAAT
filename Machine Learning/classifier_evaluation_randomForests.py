@@ -4,6 +4,10 @@ import time
 import math
 
 def decisionTreePrediction(estData, tree):
+  """
+      Classify data with a desicion tree.
+  """
+  
   dataTypes = ['band3', 'band10', 'frequency',
                'ec', 'tnp', 'edsp', 'fdsp',
                'edsnr', 'fdsnr']
@@ -22,6 +26,10 @@ def decisionTreePrediction(estData, tree):
   return isPulse
 
 def forestsPrediction(estData, forests):
+  """
+      Doing a majority vote of the results of the decision trees.
+  """
+  
   isPulseCount = 0
   for i in forests:
     isPulse = decisionTreePrediction(estData, forests[i])
@@ -36,7 +44,7 @@ def forestsPrediction(estData, forests):
 def evaluation(deploymentID, start_time,
                end_time, sites, validation, manOrLik):
   """
-     Find the TP, TN, FP, and FN for the deployment and time.
+     Find TP, TN, FP, and FN.
   """
   
   falsePositive_dep = 0
@@ -53,6 +61,7 @@ def evaluation(deploymentID, start_time,
     
     cur = db_con.cursor()
     
+    #Load forests
     forests = {}
     cur.execute("""SELECT branchID, data_type, data_value, tree_number
                    FROM random_forests%s
@@ -67,6 +76,7 @@ def evaluation(deploymentID, start_time,
         forests[row[3]] = {row[0]:[row[1], row[2]]}
       else:
         forests[row[3]][row[0]] = [row[1], row[2]]
+  
     cur.execute("""SELECT isPulse, band3, band10, frequency,
                    ec, tnp, edsp, fdsp, edsnr, fdsnr
                    FROM est INNER JOIN est_class%s
@@ -85,8 +95,11 @@ def evaluation(deploymentID, start_time,
                  'frequency':row[3], 'ec':row[4], 'tnp':row[5],
                  'edsp':row[6], 'fdsp':row[7],
                  'edsnr':row[8], 'fdsnr':row[9]}
+      
+      #Classify data
       isPulse = forestsPrediction(estData, forests)
 
+      #Determine whether the classification results are correct or not
       if (row[0] == 1):
         if (isPulse == 1):
           truePositive += 1
@@ -107,6 +120,11 @@ def evaluation(deploymentID, start_time,
 
   
 def insertResults(depID, validation):
+  """
+     Gather results from evaluation functions, stores them
+     to the database, and print the results.
+  """
+            
   db_con = MySQLdb.connect(user="root", db="qraat")
   start_time = {57:1382252400,
                 60:1383012615,
@@ -121,11 +139,13 @@ def insertResults(depID, validation):
            61:[1,2,3,4,5,6,8],
            62:[1,2,3,4,5,6,8]}
   
+  #Evaluate both manual labeling and likelihood labeling
   evalMan = evaluation(depID, start_time[depID], end_time[depID],
                        sites[depID], validation, '')
   evalLik = evaluation(depID, start_time[depID], end_time[depID],
                        sites[depID], validation, '2')
-  
+
+  #Additional evaluation for deployment 61 and 62
   if ((depID == 61) | (depID == 62)):
     start_time = 1391276584
     end_time = 1391285374
@@ -138,7 +158,7 @@ def insertResults(depID, validation):
       evalMan[i] += tmpEvalMan[i]
       evalLik[i] += tmpEvalLik[i]
 
-  
+  #Export data into database
   cur = db_con.cursor()
   cur.execute("""INSERT INTO classifier_performance
                  (deploymentID, validation, TP, TN,
@@ -154,7 +174,7 @@ def insertResults(depID, validation):
                """%(depID, validation, evalLik[0], evalLik[1],
                     evalLik[2], evalLik[3], sum(evalLik)))
 
-  
+  #Print results
   print depID, validation
   print 'Manual:'
   print 'False Positive Rate: %s'%(float(evalMan[2])/(evalMan[2] + evalMan[1]))
@@ -167,12 +187,14 @@ def insertResults(depID, validation):
 
 def main():
   """
-     This program should evulate all deployment
-     and site combinations for bandwidth filter.
-     It will do 10 times on different traning
-     and validation sets. It will also do it on
-     both manual and likelihood labelings.
+     This program should evaluate all combinations
+     of deployment and site with random forests.
+     It will evulate 10 times on each different
+     tranining set and validation set. It will also
+     evaluate on both manual labeling and likelihood labeling.
   """
+
+  #Loop through each validation and deployment
   initTime = time.time()
   deploymentIDArray = [57, 60, 61, 62]
   for i in range(10):

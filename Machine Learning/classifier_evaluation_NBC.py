@@ -5,6 +5,10 @@ import time
 import math
 
 def normalDist(x, mean, var):
+  """
+     Calculate the log probability of normal distrubtion.
+  """
+            
   if (var != 0):
     return -(x - mean)**2/(2*var) - 0.5*np.log(2*np.pi*var)
   else:
@@ -12,8 +16,13 @@ def normalDist(x, mean, var):
 
 def naiveBayes(deploymentID, siteID, startTime,
                validation, estData, manOrLik):
+  """
+     Classify data with modified bayes classifier.
+  """
+            
   db_con = MySQLdb.connect(user = "root", db = "qraat")
 
+  #Get mean and variance for each variable for each class.
   cur = db_con.cursor()
   cur.execute("""SELECT *
                  FROM est_mean_and_var%s
@@ -26,6 +35,8 @@ def naiveBayes(deploymentID, siteID, startTime,
   for row in cur.fetchall():
     if (row[24] == 1):
       if (row[5] != 0):
+          
+        #Calculate the likelihood of this observation being a pulse
         goodLikelihood = np.log(row[5]) \
                          + normalDist(estData['band3'], row[6], row[7]) \
                          + normalDist(estData['band10'], row[8], row[9]) \
@@ -40,6 +51,8 @@ def naiveBayes(deploymentID, siteID, startTime,
         goodLikelihood = -float('inf')
     else:
       if (row[5] != 0):
+          
+        #Calculate the likelihoood of this observation being a noise
         badLikelihood = np.log(row[5]) \
                         + normalDist(estData['band3'], row[6], row[7]) \
                         + normalDist(estData['band10'], row[8], row[9]) \
@@ -52,7 +65,8 @@ def naiveBayes(deploymentID, siteID, startTime,
                         + normalDist(estData['fdsnr'], row[22], row[23])
       else:
         badLikelihood = -float('inf')
-    
+
+  #Return the class with higher likelihood.
   if (goodLikelihood < badLikelihood):
     return 0
   else:
@@ -61,7 +75,7 @@ def naiveBayes(deploymentID, siteID, startTime,
 def evaluation(deploymentID, start_time,
                end_time, sites, validation, manOrLik):
   """
-     Find the TP, TN, FP, and FN for the deployment and time.
+     Find TP, TN, FP, and FN.
   """
   
   estScoreBound = 5
@@ -96,9 +110,12 @@ def evaluation(deploymentID, start_time,
                  'frequency':row[3], 'ec':row[4], 'tnp':row[5],
                  'edsp':row[6], 'fdsp':row[7],
                  'edsnr':row[8], 'fdsnr':row[9]}
+      
+      #Classify data
       isPulse = naiveBayes(deploymentID, i, start_time,
                            validation, estData, manOrLik)
 
+      #Determine whether the classification results are correct or not
       if (row[0] == 1):
         if (isPulse == 1):
           truePositive += 1
@@ -119,6 +136,11 @@ def evaluation(deploymentID, start_time,
 
   
 def insertResults(depID, validation):
+  """
+     Gather results from evaluation functions, stores them
+     to the database, and print the results.
+  """
+  
   db_con = MySQLdb.connect(user="root", db="qraat")
   start_time = {57:1382252400,
                 60:1383012615,
@@ -133,11 +155,13 @@ def insertResults(depID, validation):
            61:[1,2,3,4,5,6,8],
            62:[1,2,3,4,5,6,8]}
   
+  #Evaluate both manual labeling and likelihood labeling
   evalMan = evaluation(depID, start_time[depID], end_time[depID],
                        sites[depID], validation, '')
   evalLik = evaluation(depID, start_time[depID], end_time[depID],
                        sites[depID], validation, '2')
-  
+
+  #Additional evaluation for deployment 61 and 62
   if ((depID == 61) | (depID == 62)):
     start_time = 1391276584
     end_time = 1391285374
@@ -150,7 +174,7 @@ def insertResults(depID, validation):
       evalMan[i] += tmpEvalMan[i]
       evalLik[i] += tmpEvalLik[i]
 
-  
+  #Export data into database
   cur = db_con.cursor()
   cur.execute("""INSERT INTO classifier_performance
                  (deploymentID, validation, TP, TN,
@@ -166,7 +190,7 @@ def insertResults(depID, validation):
                """%(depID, validation, evalLik[0], evalLik[1],
                     evalLik[2], evalLik[3], sum(evalLik)))
 
-  
+  #Print results
   print depID, validation
   print 'Manual:'
   print 'False Positive Rate: %s'%(float(evalMan[2])/(evalMan[2] + evalMan[1]))
@@ -179,12 +203,14 @@ def insertResults(depID, validation):
 
 def main():
   """
-     This program should evulate all deployment
-     and site combinations for bandwidth filter.
-     It will do 10 times on different traning
-     and validation sets. It will also do it on
-     both manual and likelihood labelings.
+     This program should evaluate all combinations
+     of deployment and site with naive bayes classifier.
+     It will evulate 10 times on each different
+     tranining set and validation set. It will also
+     evaluate on both manual labeling and likelihood labeling.
   """
+  
+  #Loop through each validation and deployment
   initTime = time.time()
   deploymentIDArray = [57, 60, 61, 62]
   for i in range(10):

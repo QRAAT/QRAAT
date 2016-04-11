@@ -5,10 +5,18 @@ from scipy.stats import norm
 
 def probabilityOfDiscreteData(deploymentID, siteID, start_time, end_time,
                               validation, manOrLik):
+  """
+     This program will query the data from band3, band10, and frequency.
+     It then calculate the probability of each unique values and normalize
+     the probabilities. It then store the results in probability_of_discrete_data
+     table.
+  """
+  
   band3 = {}
   band10 = {}
   frequency = {}
   
+  #query the count of each unique values
   db_con = MySQLdb.connect(user = "root", db = "qraat")
   cur = db_con.cursor()
   cur.execute("""SELECT distinct band3, count(band3) AS countOf
@@ -56,6 +64,7 @@ def probabilityOfDiscreteData(deploymentID, siteID, start_time, end_time,
   for row in cur.fetchall():
     frequency[row[0]] = row[1]
 
+  #query the mean and variance for normalize the probabilities.
   cur.execute("""SELECT band3_mean, band3_var, band10_mean, band10_var,
                  frequency_mean, frequency_var
                  FROM est_mean_and_var%s
@@ -71,10 +80,13 @@ def probabilityOfDiscreteData(deploymentID, siteID, start_time, end_time,
     band10Dist = norm(loc = row[2], scale = np.sqrt(row[3]))
     frequencyDist = norm(loc = row[4], scale = np.sqrt(row[5]))
   
+  #calculate the normalization scales
   band3Scale = band3Dist.cdf(max(band3)) - band3Dist.cdf(min(band3))
   band10Scale = band10Dist.cdf(max(band10)) - band10Dist.cdf(min(band10))
   frequencyScale = frequencyDist.cdf(max(frequency)) - frequencyDist.cdf(min(frequency))
   totalRecords = sum(band3.values())
+
+  #store the unique values with normalizated probabilities into the database.
   for i in band3:
     cur2 = db_con.cursor()
     cur2.execute("""INSERT INTO probability_of_discrete_data%s
@@ -103,7 +115,8 @@ def probabilityOfDiscreteData(deploymentID, siteID, start_time, end_time,
 def meanAndVar(deploymentID, sites, start_time, end_time,
                validation, manOrLik):
   db_con = MySQLdb.connect(user = "root", db = "qraat")
-
+  
+  #loop through each site
   for i in sites:
     totalRecords = 0
     goodRecords = 0
@@ -116,6 +129,8 @@ def meanAndVar(deploymentID, sites, start_time, end_time,
                       'frequency':[], 'ec':[], 'tnp':[],
                       'edsp':[], 'fdsp':[],
                       'edsnr':[], 'fdsnr':[]}
+    
+    #query data
     cur = db_con.cursor()
     cur.execute("""SELECT band3, band10, frequency,
                    ec, tnp, edsp, fdsp, edsnr, fdsnr,
@@ -155,6 +170,7 @@ def meanAndVar(deploymentID, sites, start_time, end_time,
         badTrainingSet['edsnr'].append(row[7])
         badTrainingSet['fdsnr'].append(row[8])
 
+    #store the mean and the variance for each variable.
     if (goodRecords != 0):
       cur2 = db_con.cursor()
       cur2.execute("""INSERT INTO est_mean_and_var%s
@@ -242,12 +258,19 @@ def meanAndVar(deploymentID, sites, start_time, end_time,
                       VALUES (%s, %s, %s, %s, 0, 0, 0, 0, 0, 0,
                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
                    """%(manOrLik, deploymentID, i, start_time, validation))
-
+                       
+  #calculate the normalized mixed distribution.
   for i in sites:
     probabilityOfDiscreteData(deploymentID, i, start_time, end_time,
                               validation, manOrLik)
 
 def main():
+  """
+     This program will calculate the mean and the variance for pulse and
+     noise for each of the combination of deployment, site, variable, and labeling.
+     It will also calculate the normalized mixed probability for band3, band10, and
+     frequency.
+  """
   initTime = time.time()
   
   deploymentIDArray = [57, 60, 61, 62]
@@ -264,6 +287,7 @@ def main():
            61:[1,2,3,4,5,6,8],
            62:[1,2,3,4,5,6,8]}
   
+  #loop through each combinatoin of site and deployment.
   for i in range(10):
     for j in deploymentIDArray:
       meanAndVar(j, sites[j], start_time[j], end_time[j],

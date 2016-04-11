@@ -13,6 +13,8 @@ def bestSplit(trainingSet, dataTypeIndex):
   """
   bestEntropy = 1
   bestValue = -1
+  
+  #Checking all possible values.
   if (len(trainingSet) <= 100):
     for i in range(len(trainingSet)):
       leftPulse = 0
@@ -60,7 +62,8 @@ def bestSplit(trainingSet, dataTypeIndex):
         minValue = trainingSet[i][dataTypeIndex]
       if (trainingSet[i][dataTypeIndex] > maxValue):
         maxValue = trainingSet[i][dataTypeIndex]
-    
+
+    #Check only 100 intervals between min and max
     valueInterval = (maxValue - minValue)/100.0
     for i in range(100):
       leftPulse = 0
@@ -111,7 +114,7 @@ def decisionTree(deploymentID, site, start_time, end_time,
      possible splits. Keep the data type and value for the
      best split. Determine if it needs to continue on each
      of left and right branches. Terminates if the region
-     gets less than 5 records, or all records has the same class.
+     gets less than 1 records, or all records has the same class.
   """
   minRecords = 1
   dataTypes = ['band3', 'band10', 'frequency',
@@ -121,13 +124,15 @@ def decisionTree(deploymentID, site, start_time, end_time,
   bestValue = -1
   bestDataTypeIndex = -1
   
+  #Sample 3 random variables to check for best split
   for i in random.sample(range(len(dataTypes)),3):
     currentEntropy, currentValue = bestSplit(trainingSet, i)
     if (currentEntropy < bestEntropy):
       bestEntropy = currentEntropy
       bestValue = currentValue
       bestDataTypeIndex = i
-      
+
+  #Create a branch for this split
   db_con = MySQLdb.connect(user = "root", db = "qraat")
   cur = db_con.cursor()
   cur.execute("""INSERT INTO random_forests%s
@@ -137,7 +142,10 @@ def decisionTree(deploymentID, site, start_time, end_time,
               """%(manOrLik, deploymentID, site, start_time,
                    validation, treeNum, branchID,
                    bestDataTypeIndex, bestValue))
-      
+
+
+  #Split data into left and right while keep track if
+  #each left and rigth child meet the termination condition.
   leftTrainingSet =[]
   rightTrainingSet = []
   leftPulseCount = 0
@@ -166,6 +174,7 @@ def decisionTree(deploymentID, site, start_time, end_time,
       else:
         rightFeatures = trainingSet[i]
 
+  #If the termination condition is met, create a leaf node.
   if ((len(leftTrainingSet) <= minRecords)|
       (len(leftTrainingSet) == leftPulseCount)|
       (leftPulseCount == 0)|
@@ -202,6 +211,9 @@ def decisionTree(deploymentID, site, start_time, end_time,
  
 def getTrainingSet(start_time, end_time, deploymentID,
                    siteID, validation, manOrLik):
+  """
+     Query training set to build the decision tree.
+  """
   trainingSet = []
   db_con = MySQLdb.connect(user = "root", db = "qraat")
   cur = db_con.cursor()
@@ -224,6 +236,9 @@ def getTrainingSet(start_time, end_time, deploymentID,
 
 def randomForests(deploymentID, site, start_time, end_time,
                   validation, manOrLik):
+  """
+     Create 9 trees with boostriped data.
+  """
   numberOfTree = 9
   trainingSet = getTrainingSet(start_time, end_time, deploymentID,
                                site, validation, manOrLik)
@@ -237,6 +252,11 @@ def randomForests(deploymentID, site, start_time, end_time,
   
 
 def main():
+  """
+     This program will train 9 bagged decision trees for each combination 
+     of deployment, site, and validations. It will store each of the 9 trees
+     into the database.
+  """
   initTime = time.time()
   
   deploymentIDArray = [57, 60, 61, 62]
@@ -253,6 +273,7 @@ def main():
            61:[1,2,3,4,5,6,8],
            62:[1,2,3,4,5,6,8]}
   
+  #Loop through each validation, deployment, and site
   for i in range(10):
     for j in deploymentIDArray:
       for k in sites[j]:

@@ -4,15 +4,16 @@ import numpy as np
 import time
 import math
 
+
 def estScoreFilter(estScore, estScoreBound):
   """
-     classify est as pulse if est score less than the threshold,
-     noise vise versa.
+     Classify with est score filter.
   """
   if (estScore > estScoreBound):
     return 0
   else:
     return 1
+
 
 def likelihoodLabelingEvaluation(deploymentID, start_time, end_time,
                                  sites, validation):
@@ -46,8 +47,11 @@ def likelihoodLabelingEvaluation(deploymentID, start_time, end_time,
                    AND setNum = %s;
                 """%(start_time, end_time, deploymentID, i, validation))
     for row in cur.fetchall():
+        
+      #Classify data
       isPulse = estScoreFilter(row[1], estScoreBound)
 
+      #Determine whether the classification results are correct or not
       if (row[0] == 1):
         if (isPulse == 1):
           truePositive += 1
@@ -58,7 +62,7 @@ def likelihoodLabelingEvaluation(deploymentID, start_time, end_time,
           falsePositive += 1
         else:
           trueNegative += 1
-          
+  
     falsePositive_dep += falsePositive
     falseNegative_dep += falseNegative
     truePositive_dep += truePositive
@@ -66,8 +70,9 @@ def likelihoodLabelingEvaluation(deploymentID, start_time, end_time,
   return [truePositive_dep, trueNegative_dep,
           falsePositive_dep, falseNegative_dep]
 
+
 def manualLabelingEvaluation(deploymentID, start_time, end_time,
-                               sites, validation):
+                             sites, validation):
   """
      Find TP, TN, FP, and FN for manual labeling.
   """
@@ -98,8 +103,11 @@ def manualLabelingEvaluation(deploymentID, start_time, end_time,
                    AND setNum = %s;
                 """%(start_time, end_time, deploymentID, i, validation))
     for row in cur.fetchall():
+     
+      #Classify data
       isPulse = estScoreFilter(row[1], estScoreBound)
 
+      #Determine whether the classification results are correct or not
       if (row[0] == 1):
         if (isPulse == 1):
           truePositive += 1
@@ -110,7 +118,7 @@ def manualLabelingEvaluation(deploymentID, start_time, end_time,
           falsePositive += 1
         else:
           trueNegative += 1
-          
+  
     falsePositive_dep += falsePositive
     falseNegative_dep += falseNegative
     truePositive_dep += truePositive
@@ -120,6 +128,10 @@ def manualLabelingEvaluation(deploymentID, start_time, end_time,
 
   
 def evaluation(depID, validation):
+  """
+     Gather results from evaluation functions, stores them
+     to the database, and print the results.
+  """
   db_con = MySQLdb.connect(user="root", db="qraat")
   start_time = {57:1382252400,
                 60:1383012615,
@@ -134,28 +146,30 @@ def evaluation(depID, validation):
            61:[1,2,3,4,5,6,8],
            62:[1,2,3,4,5,6,8]}
   
+  #Evaluate both manual labeling and likelihood labeling
   evalMan = manualLabelingEvaluation(depID, start_time[depID],
-                                                  end_time[depID], sites[depID],
-                                                  validation)
+                                     end_time[depID], sites[depID],
+                                     validation)
   evalLik = likelihoodLabelingEvaluation(depID, start_time[depID],
-                                                      end_time[depID], sites[depID],
-                                                      validation)
-  
+                                         end_time[depID], sites[depID],
+                                         validation)
+
+  #Additional evaluation for deployment 61 and 62
   if ((depID == 61) | (depID == 62)):
     start_time = 1391276584
     end_time = 1391285374
     sites = [1,3,4,5,6,8]
     tmpEvalMan = manualLabelingEvaluation(depID, start_time,
-                                                                end_time, sites,
-                                                                validation)
+                                          end_time, sites,
+                                          validation)
     tmpEvalLik = likelihoodLabelingEvaluation(depID, start_time,
-                                                                    end_time, sites,
-                                                                    validation)
+                                              end_time, sites,
+                                              validation)
     for i in range(4):
       evalMan[i] += tmpEvalMan[i]
       evalLik[i] += tmpEvalLik[i]
 
-  
+  #Export data into database
   cur = db_con.cursor()
   cur.execute("""INSERT INTO classifier_performance
                  (deploymentID, validation, TP, TN,
@@ -171,7 +185,7 @@ def evaluation(depID, validation):
                """%(depID, validation, evalLik[0], evalLik[1],
                     evalLik[2], evalLik[3], sum(evalLik)))
 
-  
+  #Print results
   print depID, validation
   print 'Manual:'
   print 'False Positive Rate: %s'%(float(evalMan[2])/(evalMan[2] + evalMan[1]))
@@ -182,15 +196,17 @@ def evaluation(depID, validation):
   print 'False Nagative Rate: %s'%(float(evalLik[3])/(evalLik[3] + evalLik[0]))
   print 'Overall Error Rate: %s'%(float(evalLik[2] + evalLik[3])/(sum(evalLik)))
 
+
 def main():
   """
-     This program should evulate all deployment
-     and site combinations for est score filter.
-     It will do 10 times on different traning
-     and validation sets. It will also do it on
-     both manual and likelihood labelings.
+      This program should evaluate all combinations
+      of deployment and site with est score filter.
+      It will evulate 10 times on each different
+      tranining set and validation set. It will also
+      evaluate on both manual labeling and likelihood labeling.
   """
   
+  #Loop through each validation and deployment
   initTime = time.time()
   deploymentIDArray = [57, 60, 61, 62]
   for i in range(10):
@@ -198,6 +214,7 @@ def main():
       evaluation(j, i)
 
   print time.time() - initTime
-  
+
+
 if __name__ == '__main__':
   main()

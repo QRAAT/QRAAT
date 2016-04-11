@@ -4,11 +4,16 @@ import time
 
   
 def results(manOrLik):
+  """
+     Print the results in tabular form.
+  """
+  
   deployments = [57, 60, 61, 62]
   methods = ['bandwidth filter', 'estScore Filter', 'NBC',
              'modified BC', 'decisionTree', 'randomForests', 'SVM']
   depDict = {}
   
+  #Query all results
   db_con = MySQLdb.connect(user="root", db="qraat")
   for i in deployments:
     resultDict = {}
@@ -29,6 +34,7 @@ def results(manOrLik):
         resultDict[row[5]][2].append(float(row[2] + row[3]) / row[4])
     depDict[i] = resultDict
 
+  #Print results into tabular form.
   for i in deployments:
     print '\nDeployment %s'%i
     print '%-18s%-9s%-9s%-9s%-9s%-9s%-9s'%('method', 'FP mean', 'FP SD',
@@ -45,6 +51,10 @@ def results(manOrLik):
   
   
 def main():
+  """
+     This program will print the results into a tabular form.
+  """
+  
   initTime = time.time()
   
   print 'Manual Labeling'

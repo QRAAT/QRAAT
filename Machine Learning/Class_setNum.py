@@ -3,10 +3,10 @@ import numpy as np
 
 def setNumLikelihood(deploymentID, start_time, end_time, site):
   """
-     set the validation number to each of the likelihood labeling.
+     Set the validation number to each of the est in likelihood labeling.
   """
 
-#create counter array to keep track how much each block needs
+  #Create a counter array to keep track how much observations each block needs
   db_con = MySQLdb.connect(user="root", db="qraat")
   cur = db_con.cursor()
   cur.execute("""SELECT COUNT(*) FROM est
@@ -22,7 +22,7 @@ def setNumLikelihood(deploymentID, start_time, end_time, site):
   for i in range(total%10):
     counter[i] += 1
 
-#randomly assign validations to each est and insert it to the labeling
+  #Randomly assign validations to each est and insert it to the labeling
   cur2 = db_con.cursor()
   cur2.execute("""SELECT estID FROM est
                   INNER JOIN est_class2
@@ -52,10 +52,10 @@ def setNumLikelihood(deploymentID, start_time, end_time, site):
 
 def setNumManual(deploymentID, start_time, end_time, site):
   """
-      set the validation number to each of the manual labeling.
+     Set the validation number to each of the est in  manual labeling.
   """
     
-#create counter array to keep track how much each block needs
+  #Create a counter array to keep track how much observations each block needs
   db_con = MySQLdb.connect(user="root", db="qraat")
   cur = db_con.cursor()
   cur.execute("""SELECT COUNT(*) FROM est
@@ -71,7 +71,7 @@ def setNumManual(deploymentID, start_time, end_time, site):
   for i in range(total%10):
     counter[i] += 1
 
-#randomly assign validations to each est and insert it to the labeling
+  #Randomly assigned validations to each est and insert it to the labeling
   cur2 = db_con.cursor()
   cur2.execute("""SELECT estID FROM est
                   INNER JOIN est_class
@@ -101,14 +101,13 @@ def setNumManual(deploymentID, start_time, end_time, site):
 
 def main():
   """
-      This program will set the validation number to each est.
-      The number of the est's in each validation set is set to
-      be nearly equally sized blocks by keeping track of how 
-      many est's can still be in a single validation. The data 
-      is stored in est_class table.
+     This program will set the validation number to each est.
+     The number of the est's in each validation set is set to
+     be nearly equally sized blocks by keeping track of how
+     many est's can still be in a single validation. The data
+     is stored in est_class table.
   """
-    
-#going through each combination of deployment and site
+  
   deploymentID = [57, 60, 61, 62]
   start_time = {57:1382252400,
                 60:1383012615,
@@ -122,11 +121,15 @@ def main():
            60:[1,2,3,4,5,6,8],
            61:[1,2,3,4,5,6,8],
            62:[1,2,3,4,5,6,8]}
+  
+  #Loop through each combination of deployment and site
   for i in deploymentID:
     for j in sites[i]:
       setNumManual(i, start_time[i], end_time[i], j)
       setNumLikelihood(i, start_time[i], end_time[i], j)
       print "deployment: %s, site: %s is done"%(i,j)
+    
+    #additional trackings for deployment 61 and 62
     if ((i == 61)|(i == 62)):
       for j in [1,3,4,5,6,8]:
         setNumManual(i, 1391276584, 1391285374, j)
