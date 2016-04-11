@@ -1,0 +1,208 @@
+<tx_list>
+  <number_USRP_channels> 4 </number_USRP_channels>
+  <FPGA_frequency> -10700000 </FPGA_frequency>
+  <USRP_sampling_rate> 64000000 </USRP_sampling_rate>
+  <FPGA_decimation> 250 </FPGA_decimation>
+  <USB_sampling_rate> 256000 </USB_sampling_rate>
+  <tunings>
+    <tuning ID = "1">
+      <center_frequency> 163900000 </center_frequency>
+      <pll_frequency> 233900000 </pll_frequency>
+      <channelizer>
+        <num_bands> 32 </num_bands>
+        <bandwidth> 8000 </bandwidth>
+        <cutoff_frequency> 3200 </cutoff_frequency>
+        <transistion_band> 800 </transistion_band>
+
+        <band number="29">
+          <band_center_frequency> 163876000 </band_center_frequency>
+          <transmitter ID="64">
+            <tx_frequency> 163874000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 240 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+        <band number="12">
+          <band_center_frequency> 163996000 </band_center_frequency>
+          <transmitter ID="68">
+            <tx_frequency> 163997000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 240 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+        <band number="25">
+          <band_center_frequency> 163844000 </band_center_frequency>
+          <transmitter ID="63">
+            <tx_frequency> 163847000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 240 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+      </channelizer>
+   </tuning>
+
+    <tuning ID="2">
+      <center_frequency> 164000000 </center_frequency>
+      <pll_frequency> 234000000 </pll_frequency>
+      <channelizer>
+        <num_bands> 32 </num_bands>
+        <bandwidth> 8000 </bandwidth>
+        <cutoff_frequency> 3200 </cutoff_frequency>
+        <transistion_band> 800 </transistion_band>
+
+        <band number="4">
+          <band_center_frequency> 164032000 </band_center_frequency>
+          <transmitter ID="97">
+            <tx_frequency> 164032000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 120 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+        <band number="7">
+          <band_center_frequency> 164056000 </band_center_frequency>
+          <transmitter ID="100">
+            <tx_frequency> 164056000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 120 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+        <band number="10">
+          <band_center_frequency> 164080000 </band_center_frequency>
+          <transmitter ID="102">
+            <tx_frequency> 164080000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 120 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+        <band number="11">
+          <band_center_frequency> 164088000 </band_center_frequency>
+          <transmitter ID="103">
+            <tx_frequency> 164088000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 120 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+        <band number="0">
+          <band_center_frequency> 164000000 </band_center_frequency>
+          <transmitter ID="68">
+            <tx_frequency> 163997000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 240 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+      </channelizer>
+   </tuning>
+
+    <tuning ID="3">
+      <center_frequency> 164200000 </center_frequency>
+      <pll_frequency> 234200000 </pll_frequency>
+      <channelizer>
+        <num_bands> 32 </num_bands>
+        <bandwidth> 8000 </bandwidth>
+        <cutoff_frequency> 3200 </cutoff_frequency>
+        <transistion_band> 800 </transistion_band>
+
+        <band number="17">
+          <band_center_frequency> 164080000 </band_center_frequency>
+          <transmitter ID="102">
+            <tx_frequency> 164080000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 120 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+        <band number="18">
+          <band_center_frequency> 164088000 </band_center_frequency>
+          <transmitter ID="103">
+            <tx_frequency> 164088000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 120 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+        <band number="25">
+          <band_center_frequency> 164144000 </band_center_frequency>
+          <transmitter ID="107">
+            <tx_frequency> 164144000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 120 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+        <band number="24">
+          <band_center_frequency> 164136000 </band_center_frequency>
+          <transmitter ID="106">
+            <tx_frequency> 164136000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 120 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+        <band number="23">
+          <band_center_frequency> 164128000 </band_center_frequency>
+          <transmitter ID="105">
+            <tx_frequency> 164128000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 120 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+        <band number="27">
+          <band_center_frequency> 164160000 </band_center_frequency>
+          <transmitter ID="109">
+            <tx_frequency> 164160000 </tx_frequency>
+            <type> pulse </type>
+            <filter_length> 120 </filter_length>
+            <rise> 1.5 </rise>
+            <alpha> 10 </alpha>
+          </transmitter>
+        </band>
+
+      </channelizer>
+    </tuning>
+  </tunings>
+
+  <timing>
+    <period tuning_ID="1"> 6 </period>
+    <period tuning_ID="2"> 6 </period>
+    <period tuning_ID="3"> 6 </period>
+    <loop times="2">
+      <period tuning_ID="1"> 10 </period>
+      <period tuning_ID="2"> 10 </period>
+    </loop>
+    <period tuning_ID="2"> 2 </period>
+  </timing>
+</tx_list>
