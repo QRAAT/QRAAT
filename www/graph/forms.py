@@ -4,6 +4,7 @@ from django.forms import widgets
 from django.utils.safestring import mark_safe
 from project.models import Site, Deployment
 from datetime import datetime, timedelta
+import utils
 
 
 def get_processing_options():
@@ -193,12 +194,12 @@ class DashboardForm(forms.Form):
         
     datetime_start = forms.DateTimeField(
         required = True, 
-        label="Start Date & Time",
+        label="Start Date & Time (PST)",
         #[YYYY-MM-DD HH:MM:SS]
         widget = forms.TextInput(attrs={
           'class': 'filter',
           'size': '17'}),
-        initial = (datetime.now() - timedelta(hours=30)).strftime("%Y-%m-%d %H:%M:%S") # current datetime - 6 hours
+        initial = (utils.get_local_now() - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S") # Displays current time in PST, minus 10 minutes
         )
 
     interval = forms.IntegerField(
