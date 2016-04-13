@@ -30,6 +30,7 @@ from datetime import datetime
 #from graph_views import * # graph_home, telemetry_graphs, etc. and helper functions
 
 def index(request):
+    print "in views.index"
     """This view renders the system's first page.
     This page has a nav bar and users projects
 
@@ -171,6 +172,7 @@ def show_location(request, project_id, location_id):
 
 @login_required(login_url='/account/login')
 def projects(request):
+    print "in views.projects"
     """This view renders a page with projects.
     For a user projects are displayed as public projects,
     projects the user owns, projects the user can collaborate,

@@ -194,11 +194,16 @@ def get_context(request, deps=[], req_deps=[]):
         datetime_to = request.GET['datetime_to']
     else:
         args = Q()
+        #for dep in req_deps_IDs:
+        #    args = args | Q(deploymentID=str(dep))
+        ## try max of max of each deployments, might be faster than . can always be optimized either way
+        #datetime_to = Position.objects.filter(args).aggregate(Max('timestamp'))['timestamp__max']
+        max_datetime = 0
         for dep in req_deps_IDs:
-            args = args | Q(deploymentID=str(dep))
-        # try max of max of each deployments, might be faster than . can always be optimized either way
-        datetime_to = Position.objects.filter(args).aggregate(Max('timestamp'))['timestamp__max']
+            d = Position.objects.filter(deploymentID=dep).aggregate(Max('timestamp'))['timestamp__max']
+            max_datetime = max(max_datetime, d)
         print "found datetime"
+        datetime_to = max_datetime
         if datetime_to != None:
             datetime_to = utils.strftime(utils.timestamp_todate(datetime_to))
     if 'lines' in request.GET:
@@ -462,6 +467,7 @@ def index(request):
 
 
 def view_all_dep(request, project_id):
+    ''' Only view deps that have a time start before the current time'''
     try:
         project = Project.objects.get(ID=project_id)
     except ObjectDoesNotExist:
@@ -470,9 +476,11 @@ def view_all_dep(request, project_id):
     if not deployments:
         raise Http404("No Deployments")
 
+    curr_time = time.time()
     dep_ids = []
     for dep in deployments:
-        dep_ids.append(dep.ID)
+        if dep.time_start is not None and dep.time_start < curr_time:
+            dep_ids.append(dep.ID)
     return view_by_dep(request, project_id, '+'.join(map(str, dep_ids)))
 
 def view_by_dep(request, project_id, dep_id):

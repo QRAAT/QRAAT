@@ -756,8 +756,13 @@ function updateNumPoints() {
         else
             lengths.push(0);
     });
+    $(".deployment-label").each(function (i) {
+        console.log(i);
+        $(this).find("inline").html(lengths[i]);
+    });
     $("#num_points").html("<b>No. of points: </b>"+lengths.join(" | "));
 }
+
 function updateData() {
     setGraphFilters();
     var ajaxRequests = [];
@@ -2263,10 +2268,10 @@ google.maps.event.addDomListener(window, 'load', initialize);
     <div class="sidebar-header">
         Deployments<span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr>
     </div>
-    <div class="collapse in">
+    <div class="collapse in" id="deployment-div">
     {% for dep in form.deployment %}
         <div class="sidebar-header">
-            <label for="id_deployment_{{forloop.counter0}}" style="font-weight: normal">{{dep.choice_label}}</label>
+            <label for="id_deployment_{{forloop.counter0}}" class="deployment-label" style="font-weight: normal">{{dep.choice_label}} <inline class="num-points"></inline></label>
             <span class="circle"></span>
             {{dep.tag}} <span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr style="border-color: #CCCCCC">
         </div>
