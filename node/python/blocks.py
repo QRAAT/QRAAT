@@ -27,7 +27,7 @@ from gnuradio import gr, uhd
 from gnuradio import filter as gr_filter
 from gnuradio import analog as gr_analog
 from gnuradio import blocks as gr_blocks
-import qraat.rmg as rmg
+import rmg_swig
 import xml.dom.minidom
 
 import sys, time, os
@@ -217,7 +217,7 @@ class pulse_transmitter(transmitter):
     else:
       self.save_length = save_length
     self.directory += '/det_files'
-    self.block = rmg.blocks.pulse_sink_c(self.number_of_channels)
+    self.block = rmg_swig.pulse_sink_c(self.number_of_channels)
     self.block.enable(self.filter_length, 
                       self.save_length, 
                       self.band_center_frequency,
