@@ -44,7 +44,7 @@ class detector_array:
   :type log_file: string
   """ 
 
-  def __init__(self,filename = "tx.xml",directory = "./det_files", serial_port = '/dev/ttyS0', no_usrp = None, log_file = None):
+  def __init__(self,filename = "tx.xml",directory = "./detector_output/", serial_port = '/dev/ttyS0', no_usrp = None, log_file = None):
 
     self.log_file = log_file
     self.log("Initializing RMG at {0}\n".format(time.strftime('%Y-%m-%d %H:%M:%S')))

@@ -249,7 +249,7 @@ class pulse_transmitter(transmitter):
     tx_type = get_one_value(tx_node, 'type').strip()
     if not tx_type == 'pulse':
       raise TypeError("Not a pulse transmitter")
-    det_directory = directory.rstrip('/') + '/det_files'
+    det_directory = directory.rstrip('/')
     filter_length = int(get_one_value(tx_node, 'filter_length'))
     rise = float(get_one_value(tx_node, 'rise'))
     alpha = float(get_one_value(tx_node, 'alpha'))
@@ -522,7 +522,7 @@ class record_backend(gr.hier_block2):#TODO update this
     :type be_param: qraat.rmg.params.backend
     """ 
     
-    def __init__(self, channels, be_param, directory = "./det_files"):
+    def __init__(self, channels, be_param, directory = "./record_output/"):
 
         gr.hier_block2.__init__(self, "record_backend",
                                 gr.io_signature(4, 4, gr.sizeof_gr_complex), # Input signature
