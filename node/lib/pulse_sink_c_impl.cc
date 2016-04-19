@@ -93,6 +93,7 @@ namespace gr {
 
       d_directory = directory;
       d_txID = tx_name;
+      d_ctr_freq = center_freq;
 
       state = FILL_ACCUMULATOR;
 
@@ -241,7 +242,7 @@ namespace gr {
                 state = DETECT;
                         //initial estimate of the noise floor for detector
                 pkdet->set_noise_floor(boost::accumulators::rolling_sum(*acc),d_acc_length);
-                printf("%s Seed: %e\n", d_directory.c_str(), boost::accumulators::rolling_sum(*acc));
+                printf("%s %.3fMHz Seed: %e\n", d_txID.c_str(), d_ctr_freq/1.0e6, boost::accumulators::rolling_sum(*acc));
               }
 
             break;

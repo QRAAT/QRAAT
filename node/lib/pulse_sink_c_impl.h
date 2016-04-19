@@ -88,6 +88,9 @@ namespace gr {
       //! Mutex to stop processing when changing variables
       boost::mutex d_mutex;
 
+      //! Center frequency of band
+      float d_ctr_freq;
+
       void write_data();
 
       detect_state_t update_peak_detect(const float sample_pwr, const float noise_floor);

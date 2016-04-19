@@ -157,6 +157,7 @@ class transmitter(backend_block):
       raise ValueError("Number of channels must be non-negative, not {}".format(number_of_channels))
     backend_block.__init__(self, 'transmitter_sink', number_of_channels)
     self.identification = str(identification)
+    self.number_of_channels = number_of_channels
     if ((band_center_frequency + bandwidth/2.0) > tx_frequency) and ((band_center_frequency - bandwidth/2.0) < tx_frequency):
       self.band_center_frequency = band_center_frequency
       self.tx_frequency = tx_frequency
@@ -164,9 +165,11 @@ class transmitter(backend_block):
     else:
       raise ValueError("tx_frequency: {0:.6f} MHz not in band (band_center_frequency: {1:.6f} MHz +/- bandwidth/2: {2:.6f} MHz)".format(tx_frequency/1000000.0, band_center_frequency/1000000.0, bandwidth/2000000.0)) 
     self.directory = str(directory).rstrip('/')#directory string doesn't have trailing /
+
+  def connect_null_sink(self):
     interleaver = gr_blocks.interleave(gr.sizeof_gr_complex)
     sink = gr_blocks.null_sink(gr.sizeof_gr_complex)#, directory + identification + '.tdat')
-    for k in range(number_of_channels):
+    for k in range(self.number_of_channels):
       self.connect((self, k), (interleaver, k))
     self.connect(interleaver, sink)
 
@@ -181,12 +184,13 @@ class transmitter(backend_block):
 
   @classmethod
   def from_xml(cls, tx_node, number_of_channels=4, directory='./', bandwidth = 1, band_center_frequency = 0):
-    identification = tx_node.getAttribute('ID')#as string
-    tx_frequency = float(get_one_value(tx_node, 'tx_frequency'))
     try:
       tx_type = get_one_value(tx_node, 'type').strip()
     except NoTagError:
+      identification = tx_node.getAttribute('ID')#as string
+      tx_frequency = float(get_one_value(tx_node, 'tx_frequency'))
       myself = cls(identification, number_of_channels, band_center_frequency, tx_frequency, bandwidth, directory)
+      myself.connect_null_sink()
     else:
       if tx_type == "pulse":
         myself = pulse_transmitter.from_xml(tx_node, number_of_channels, directory, bandwidth, band_center_frequency)
@@ -230,7 +234,7 @@ class pulse_transmitter(transmitter):
       self.connect((self, j), (self.block, j))
 
   def __str__(self):
-    s = "Pulse Transmitter Block (null_sink)\n"
+    s = "Pulse Transmitter Block\n"
     s += "\tID: {}\n".format(self.identification)
     s += "\tBand Center Frequency: {}\n".format(self.band_center_frequency)
     s += "\tBandwidth: {}\n".format(self.bandwidth)
@@ -316,8 +320,8 @@ class channelizer(backend_block):
     s += "\tNumber of Filter Taps: {}\n".format(len(self.low_pass_filter))
     s += "{} Occupied Bands\n".format(len(set(self.channel_map)))
     for j in range(len(self.child_list)):
-      s += "Band {} - \n".format(self.channel_list[j])
-      s += self.child_list[j]
+      s += "Band {} - \n".format(self.channel_map[j])
+      s += str(self.child_list[j])
     return s
 
   @classmethod
@@ -341,11 +345,11 @@ class channelizer(backend_block):
         band_center_frequency = float(get_one_value(node,'band_center_frequency'))
         for n in node.childNodes:
           if n.nodeType == n.ELEMENT_NODE and n.tagName == 'transmitter':
-            tx = transmitter.from_xml(node, number_of_channels, directory, bandwidth, band_center_frequency)
+            tx = transmitter.from_xml(n, number_of_channels, directory, bandwidth, band_center_frequency)
             child_list.append(tx)
             channel_map.append(band_number)
           if n.nodeType == n.ELEMENT_NODE and n.tagName == 'channelizer':
-            child_channelizer = channelizer.from_xml(node, number_of_channels, directory)
+            child_channelizer = channelizer.from_xml(n, number_of_channels, directory)
             child_list.append(child_channelizer)
             channel_map.append(band_number)
     myself.connect_list(child_list, channel_map)
@@ -390,7 +394,7 @@ class tuning(backend_block):
     s += "\nCenter_frequency: {}\n".format(self.center_freq)
     s += "\nFirst LO frequency: {}\n".format(self.pll_freq)
     for child in self.child_list:
-      s += self.child_list
+      s += str(child)
     return s
 
   @classmethod
@@ -507,7 +511,7 @@ class software_backend():#TODO add errors and error handling maybe?  Enable or s
       s += "Using Low 1st LO\n"
     s += "{} Backend Tunings\n\n".format(len(self.tunings))
     for t in self.tunings:
-      s += t
+      s += str(self.tunings[t])
       s +="\n"
     return s
 
