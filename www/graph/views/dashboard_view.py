@@ -76,11 +76,11 @@ def get_context_for_all(request):
         table_sites = ['telemetry', 'detcount', 'estcount', 'timecheck']
 
     #print 'aqui: ' + str(table_sites)
-    table_deployments = request.GET.getlist('info_deployments','all')
+    table_deployments = request.GET.getlist('info_deployments',['all'])
     if len(table_deployments) > 0 and table_deployments[0].lower() == 'all':
         table_deployments = ['est', 'bearing', 'position', 'track_pos']
     
-    table_system = request.GET.getlist('info_system','all')
+    table_system = request.GET.getlist('info_system',['all'])
     if len(table_system) > 0 and table_system[0].lower() == 'all':
         table_system = ['processing_statistics', 'processing_cursor']
     
@@ -103,7 +103,7 @@ def get_interval_and_start_time(request):
     interval = request.GET.get('interval', None)
 
     if not interval:
-        interval = 10*60 #defaul interval is 10 minutes
+        interval = 10*60 #default interval is 10 minutes
     else:
         interval = int(interval)*60 #converting minutes (more suitable) to seconds
     

@@ -1,9 +1,9 @@
+from datetime import datetime, timedelta
 from django import forms
 from django.db import connection
 from django.forms import widgets
 from django.utils.safestring import mark_safe
 from project.models import Site, Deployment
-from datetime import datetime, timedelta
 import utils
 
 
@@ -194,12 +194,12 @@ class DashboardForm(forms.Form):
         
     datetime_start = forms.DateTimeField(
         required = True, 
-        label="Start Date & Time (PST)",
+        label="Start Date & Time (Pacific)",
         #[YYYY-MM-DD HH:MM:SS]
         widget = forms.TextInput(attrs={
           'class': 'filter',
           'size': '17'}),
-        initial = (utils.get_local_now() - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S") # Displays current time in PST, minus 10 minutes
+        initial = (utils.get_local_now() - timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M:%S") # Displays current time in PST, minus 20 minutes
         )
 
     interval = forms.IntegerField(
@@ -211,11 +211,6 @@ class DashboardForm(forms.Form):
         initial = 10
         )
 
-    move_interval = forms.ChoiceField(
-        widget = SubmitButtons,
-        choices = [('back', 'Back'), ('forward', 'Forward')]
-        )
-    
     info_sites = forms.MultipleChoiceField(
         widget = forms.CheckboxSelectMultiple(),
         required = True,

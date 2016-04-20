@@ -1,58 +1,94 @@
 {% extends "map/base.html" %}
 
 {% block script %}
-  <link rel="stylesheet" type="text/css" href="/static/map/css/style.css"/>
+<link rel="stylesheet" type="text/css" href="/static/map/css/style.css"/>
+<script src="/static/js/date.js"></script>
 
-  <script type="text/javascript">
-    function submitForm() {
-      document.getElementById('form').action = "";
-      document.getElementById('form').submit();
+<script class="init" language="javascript" type="text/javascript">
+
+$(document).ready(function() {
+    var deployment_ids = {{deployment_ids}};
+    
+    var table = document.getElementById('deploy_site_table');
+    var sizes = [];
+    var external_width = table.rows[0].cells[0].offsetWidth;
+
+    //go through all rows and get the height for them
+    for(var i = 0; i < table.rows.length; i++){
+      sizes[i] = table.rows[i].cells[1].offsetHeight;
+      for(var j = 0; j < deployment_ids.length; j++){
+        if(table.rows[i].id == ('row_'+deployment_ids[j])){
+          var info_deploy_table_height = document.getElementById('info_deploy_table_'+deployment_ids[j]).offsetHeight;
+          if(info_deploy_table_height >= sizes[i]){ //FIX? subtract some value of sizes[i] or not?
+            sizes[i] = info_deploy_table_height + 100; //FIX? just to fix the height size
+          }
+        }
+      }
     }
-  </script>
-
-  <script class="init" language="javascript" type="text/javascript">
-
-    $(document).ready(function() {
-        var deployment_ids = {{deployment_ids}};
-        
-        var table = document.getElementById('deploy_site_table');
-        var sizes = [];
-        var external_width = table.rows[0].cells[0].offsetWidth;
-
-        //go through all rows and get the height for them
-        for(var i = 0; i < table.rows.length; i++){
-          sizes[i] = table.rows[i].cells[1].offsetHeight;
-          for(var j = 0; j < deployment_ids.length; j++){
-            if(table.rows[i].id == ('row_'+deployment_ids[j])){
-              var info_deploy_table_height = document.getElementById('info_deploy_table_'+deployment_ids[j]).offsetHeight;
-              if(info_deploy_table_height >= sizes[i]){ //FIX? subtract some value of sizes[i] or not?
-                sizes[i] = info_deploy_table_height + 100; //FIX? just to fix the height size
-              }
-            }
+    
+    //go through all table cells and set the new heights for each cell
+    for(var i = 0; i < table.rows.length; i++){
+      for(var j = 0; j < deployment_ids.length; j++){
+        if(table.rows[i].id == ('row_'+deployment_ids[j])){
+          var cells = document.getElementsByClassName('cell_'+deployment_ids[j]);
+          for(var k = 0; k < cells.length; k++){
+            cells[k].style.height = sizes[i] + 'px';
           }
         }
-        
-        //go through all table cells and set the new heights for each cell
-        for(var i = 0; i < table.rows.length; i++){
-          for(var j = 0; j < deployment_ids.length; j++){
-            if(table.rows[i].id == ('row_'+deployment_ids[j])){
-              var cells = document.getElementsByClassName('cell_'+deployment_ids[j]);
-              for(var k = 0; k < cells.length; k++){
-                cells[k].style.height = sizes[i] + 'px';
-              }
-            }
-          }
-        }
-        
-        //set width and height for each element in the fixed column
-        var headers = document.getElementsByClassName('headcol');
-        for(var i=0; i < headers.length; i++){
-          headers[i].style.width = external_width + 'px';
-          headers[i].style.height = sizes[i] + 'px';
-        }
-    });
+      }
+    }
+    
+    //set width and height for each element in the fixed column
+    var headers = document.getElementsByClassName('headcol');
+    for(var i=0; i < headers.length; i++){
+      headers[i].style.width = external_width + 'px';
+      headers[i].style.height = sizes[i] + 'px';
+    }
 
-  </script>
+    // Load timezone.js stuff. TODO: Should this be changed
+    // Note: We only have data in timezone.json for LA
+    var _tz = timezoneJS.timezone;
+    _tz.loadingScheme = _tz.loadingSchemes.MANUAL_LOAD;
+    _tz.loadZoneJSONData('/static/js/timezone.json', true);
+
+    $("#id_interval").next("br").after("<label>Move Interval:</label><br><button id='back_interval' type='button' style='margin-bottom:10px'>Back</button> <button id='forward_interval' type='button' style='margin-bottom:10px'>Forward</button><br>")
+
+    $("#back_interval").click(function(e) {
+        changeDate(-10 * 60);
+        document.getElementById("form").submit();
+    });            
+
+    $("#forward_interval").click(function(e) {
+        changeDate(10 * 60);
+        document.getElementById("form").submit();
+    });            
+});
+    
+// timeDelta in seconds
+function changeDate(timeDelta) {
+    var datetime = new timezoneJS.Date($("#id_datetime_start").val(), TIMEZONE).getTime() / 1000;
+    $("#id_datetime_start").val(timeToString(datetime + timeDelta ));
+}
+// TODO: copied from map/index.html
+// time in seconds
+function timeToString(time) {
+    var theDate = new timezoneJS.Date(time*1000, TIMEZONE);
+    // .getHours() returns the local hour for the specified timezone
+    // TODO: You may be able to use .toLocaleString() which allows formating and returns the timezone time. Currently it returns undefined, which may be because we only have LA timezone data.
+    // + 1 for month because it returns from 0-11!!!
+    var dT = {
+        year: theDate.getFullYear(),
+    month: ("0" + (theDate.getMonth()+1)).slice(-2), 
+    day:  ("0" + (theDate.getDate())).slice(-2),
+    hour:  ("0" + (theDate.getHours())).slice(-2),
+    minute: ("0" + (theDate.getMinutes())).slice(-2),
+    second: ("0" + (theDate.getSeconds())).slice(-2), 
+    // + 1 second so we dont get the last point we already have from this query
+    };
+    return dT.year+"-"+dT.month+"-"+dT.day+" "+dT.hour+":"+dT.minute+":"+dT.second;
+}
+
+</script>
 
 {% endblock %}
 
@@ -73,7 +109,7 @@
       </div><!-- end prefs -->
 
     <div class="section_title">
-      <center><button onclick="submitForm()">Update Graphs</button></center>
+      <center><button type="submit" form="form">Update Graphs</button></center>
     </div> <!-- end section_title -->
 
 
@@ -84,6 +120,7 @@
 
 {% block content %}
 
+{{ data_sites }}
   {% if data_sites %}
     <div class="table-responsive">
       <table class="table table-bordered" width="100%" height="100%">
@@ -130,7 +167,8 @@
     </div>
   {% endif %}
 
-  {% if data_deployments %}
+  {{ data_deployments }}
+  {% if data_deployments != None %}
 
     <div class="table-responsive scroll_x">
       <table id="deploy_site_table" class="table table-bordered scroll_x" width="100%" cellspacing="0">
