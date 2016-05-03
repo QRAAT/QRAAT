@@ -900,6 +900,6 @@ def generic_graph(
         print e
         content["data"] = json.dumps(None)
     else:
-        content["data"] = json.dumps(rest_api.json_parse(data), cls=DateTimeEncoder)
+        content["data"] = json.dumps(rest_api.json_parse(data), cls=utils.DateTimeEncoder)
 
     return render(request, template, content)

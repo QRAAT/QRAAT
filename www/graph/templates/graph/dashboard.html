@@ -63,7 +63,7 @@ $(document).ready(function() {
         document.getElementById("form").submit();
     });            
 });
-    
+
 // timeDelta in seconds
 function changeDate(timeDelta) {
     var datetime = new timezoneJS.Date($("#id_datetime_start").val(), TIMEZONE).getTime() / 1000;
@@ -120,7 +120,6 @@ function timeToString(time) {
 
 {% block content %}
 
-{{ data_sites }}
   {% if data_sites %}
     <div class="table-responsive">
       <table class="table table-bordered" width="100%" height="100%">
@@ -167,7 +166,6 @@ function timeToString(time) {
     </div>
   {% endif %}
 
-  {{ data_deployments }}
   {% if data_deployments != None %}
 
     <div class="table-responsive scroll_x">

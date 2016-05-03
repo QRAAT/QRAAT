@@ -177,6 +177,7 @@ def get_data_for_tables_deployment(tables, start_timestamp, interval, colors):
                 cursor.execute(query)
                 query_results[variable] = dictfetchall(cursor)
             
+            print query_results[variable]
             data[table] = create_data_map_for_est(query_results, interval, colors)
             
         elif table == "bearing":
@@ -272,6 +273,7 @@ def create_data_map_for_processing_statistics(query_results):
 def organize_data_before_send_to_html(data):
     new_data = LastUpdatedOrderedDict()
     for table in data:
+        print table
         if table == 'est' or table == 'bearing':
             for depID, data_by_site in data[table].items():
                 if not depID in new_data:
@@ -294,6 +296,9 @@ def organize_data_before_send_to_html(data):
                     new_data[depID] = {}
                 new_data[depID]['track_pos'] = copy.deepcopy(data_by_variable)
 
+    print "here1"
+    print data
+    print new_data
     return new_data
 
 def create_data_map_by_deployment(query_results, table, colors):

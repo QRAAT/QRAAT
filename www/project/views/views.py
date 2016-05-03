@@ -880,14 +880,17 @@ def show_project(request, project_id):
 
     nav_options = get_nav_options(request)
     user = request.user
-
     try:
         project = Project.objects.get(ID=project_id)
+        have_started_deployments = len(project.get_deployments().filter(time_start__lte = time.time())) != 0
+        print have_started_deployments
+
         if project.is_public:
             return render(
                 request, 'project/display-project.html',
                 {'project': project,
-                 'nav_options': nav_options})
+                 'nav_options': nav_options,
+                 'have_started_deps': have_started_deployments})
 
         else:
             if project.is_owner(user)\
@@ -898,7 +901,8 @@ def show_project(request, project_id):
                         request,
                         'project/display-project.html',
                         {'project': project,
-                         'nav_options': nav_options})
+                         'nav_options': nav_options,
+                         'have_started_deps': have_started_deployments})
 
             else:
                 return not_allowed_page(request)

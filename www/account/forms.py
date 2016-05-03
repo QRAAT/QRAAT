@@ -4,21 +4,6 @@ from django.contrib.auth.forms import UserCreationForm
 
 # Register your models here.
 
-class UserCreateForm(UserCreationForm):
-    email = forms.EmailField(required=True)
-
-    class Meta:
-        model = User
-        fields = ("username", "email", "password1", "password2")
-
-    def save(self, commit=True):
-        print "UserCreateForm"
-        user = super(UserCreateForm, self).save(commit=False)
-        user.email = self.cleaned_data["email"]
-        if commit:
-            user.save()
-        return user
-
 class UserForm(forms.ModelForm):
 
     # A form for creating new users. Includes all the required
@@ -60,7 +45,6 @@ class UserForm(forms.ModelForm):
     
 
     def save(self, commit=True):
-        print "wow saveing"
         user = super(UserForm, self).save(commit=False)
         user.set_password(self.cleaned_data["password1"])
         user.username = self.email

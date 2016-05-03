@@ -289,9 +289,9 @@ function loadFlot(pos_markers, map, dep_id){
 	    min: currTimeRange[0] * 1000,
 	    max: currTimeRange[1] * 1000,
             mode: "time",
-            timezone: "America/Los_Angeles", // TODO: Timezone is hardcoded
+            timezone: TIMEZONE, 
             timeformat: "%m/%d %H:%M",
-            axisLabel: "Time (Los Angeles)",
+            axisLabel: "Time " + TIMEZONE.slice(TIMEZONE.indexOf("/")+1).replace("_", " "),
             axisLabelUseCanvas: true,
             axisLabelFontSizePixels: 12,
             axisLabelFontFamily: "Lucida Grande,Verdana,Arial,sans-serif",

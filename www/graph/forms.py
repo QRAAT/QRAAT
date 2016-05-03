@@ -188,9 +188,9 @@ class ProcessingGraphForm(TimeSeriesGraphForm):
 class DashboardForm(forms.Form):
     def __init__(self, data = None):
         super(forms.Form, self).__init__(data)
-        self.fields['info_sites'].choices = [('all', 'All'), ('telemetry', 'telemetry'), ('detcount', 'detcount'), ('estcount', 'estcount'), ('timecheck', 'timecheck')]
-        self.fields['info_deployments'].choices = [('all', 'All'), ('est', 'est'), ('bearing', 'bearing'), ('position', 'position'), ('track_pos', 'track_pos')]
-        self.fields['info_system'].choices = [('all', 'All'), ('processing_statistics', 'processing_stats'), ('processing_cursor', 'processing_cursor')]
+        self.fields['info_sites'].choices = [('telemetry', 'telemetry'), ('detcount', 'detcount'), ('estcount', 'estcount'), ('timecheck', 'timecheck')]
+        self.fields['info_deployments'].choices = [('est', 'est'), ('bearing', 'bearing'), ('position', 'position'), ('track_pos', 'track_pos')]
+        self.fields['info_system'].choices = [('processing_statistics', 'processing_stats'), ('processing_cursor', 'processing_cursor')]
         
     datetime_start = forms.DateTimeField(
         required = True, 
@@ -215,20 +215,20 @@ class DashboardForm(forms.Form):
         widget = forms.CheckboxSelectMultiple(),
         required = True,
         label = 'Info|Site',
-        initial = ['all']
+        initial = ['telemetry', 'detcount', 'estcount', 'timecheck']
         )
 
     info_deployments = forms.MultipleChoiceField(
         widget = forms.CheckboxSelectMultiple(),
         required = True,
         label = 'Info|Deployment',
-        initial = ['all']
+        initial = ['est', 'bearing', 'position', 'track_pos']
         )
 
     info_system = forms.MultipleChoiceField(
         widget = forms.CheckboxSelectMultiple(),
         required = True,
         label = 'Info|System',
-        initial = ['all']
+        initial = ['processing_statistics', 'processing_cursor']
         )
 

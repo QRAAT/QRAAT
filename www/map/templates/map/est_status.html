@@ -111,7 +111,7 @@
             options.series.points = {show: true};
             options.xaxis.mode = "time";
             options.xaxis.timeformat = "%m/%d/%y %H:%M:%S";
-            options.xaxis.timezone = "America/Los_Angeles";
+            options.xaxis.timezone = TIMEZONE;
             
 
             $.plot($("#placeholder"), [plotData.data] , options);

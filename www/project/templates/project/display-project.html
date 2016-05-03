@@ -35,7 +35,7 @@
             <input type="button" class="btn btn-primary btn-lg" value="Edit Project" name="" {% if not project|is_owner:user and not project|is_collaborator:user %} style="visibility:hidden" {% endif %}/>
         </a>
         <a href="{% url 'map:view_all_dep' project.ID %}">
-            <input type="button" class="btn btn-primary btn-lg" style="float:right" value="View All Deployments" name="" />
+            <input type="button" class="btn btn-primary btn-lg" {% if not have_started_deps %}disabled{% endif %} style="float:right" value="View All Deployments" name="" />
         </a>
     </h3>
 </div>
