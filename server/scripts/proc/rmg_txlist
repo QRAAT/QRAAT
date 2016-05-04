@@ -8,13 +8,66 @@ import qraat, qraat.srv
 import argparse
 import sys, os
 
-default_type = 'pulse'
+#Hardcoded receiver values
+#TODO make these environment variables?
+PA_MIN = 162000000 #: Lower bound frequency (Hz) for the pre amps output. 
+PA_MAX = 167000000 #: Upper bound frequency (Hz) for the pre amp output.
+
+IF1_CF = 70000000 #: Center frequency of the first saw filter (intermediate freqency). 
+IF1_BW = 500000   #: Bandwidth of the first saw filter. 
+IF2_CF = 10700000 #: Center freqency of the second ceramic filter (intermediate frequency). 
+IF2_BW = 250000   #: Bandwidth of the the second ceramic filter. 
+
+#: Frequency of oscillator between the saw and ceramic filters.  
+LO2 = 80700000  
+  
+#: Step size (Hz) for the phase-locked loop (PLL), controlled by the 
+#: PIC interface of the RMG receiver. (Default is 100 Khz; you don't 
+#: want to change this, since the circuitry is optimized for this step.)
+PV_STEP = 100000
+
+PV_MIN = 218500000 #: Lower bound frequency (Hz) for the PLL. 
+PV_MAX = 248000000 #: Upper bound frequency (Hz) for the PLL. 
+
+#: Account for minor frequency error for the RMG receiver. It may be 
+#: possible that the output frequency of the PLL is off the center
+#: frequency by a few Khz. ``pv_tune + pv_offset = actual_pv_tune``.
+#: **NOTE**: this should be callibrated per RMG receiver. 
+PV_OFFSET = 0 
+
+USRP_MAX_DECIMATION = 256
+USRP_SAMPLING_RATE = 64000000
+
+#: The USRP has a numerically controlled oscillator (NCO)
+#: which mixes the frequency of the in-phase and quadrature 
+#: signals. If ``high_lo == True``, then mix by 10.7 Mhz; 
+#: otherwise, mix by -10.7 Mhz. The intermediate frequency 
+#: domain is defined by the hardware filters on the quad 
+#: board. When mixed by the PLL, the frequency domain of the 
+#: preamp signal should fall in this range. If ``high_lo`` is
+#: ``False``, then the sign of IF domain is switched.
+high_lo = False if PA_MAX > IF1_CF + PV_MIN + PV_OFFSET else True
+
+rf_bandwidth = IF2_BW if IF2_BW < IF1_BW else IF1_BW 
+
+#: Decimation factor for the USRP. This parameter controls the rate 
+#: at which the uhd source block produces samples. Default is 250. 
+#: usrp_sampling_rate (64 Ms/sec) / decim (250) = 256 Ks/sec.
+DECIM=250#TODO make this variable on a tuning basis?
+if DECIM > USRP_MAX_DECIMATION:
+  DECIM = USRP_MAX_DECIMATION
+
+usb_rate = USRP_SAMPLING_RATE / DECIM
+
+#TODO check baseband bw is greater than RF bandwidth to avoid aliasing
+
+num_bands_list = [32,]
 
 
 parser = argparse.ArgumentParser(description="Produce tx.csv file from database")
 parser.add_argument("-f", "--file", help="Path to tx.csv file")
-parser.add_argument("-r", "--rise_trigger", type=float, help="Detector rise trigger", default=1.5)
-parser.add_argument("-t", "--time_constant", type=float, help="Detector time constant", default=10)
+parser.add_argument("-r", "--rise_trigger", type=float, help="Detector rise trigger", default=os.environ.get('RMG_PULSE_RISE', 1.5))
+parser.add_argument("-t", "--time_constant", type=float, help="Detector time constant", default=os.environ.get('RMG_PULSE_TIME_CONSTANT', 10))
 parser.add_argument("-i", "--deploymentID", type=int, help="DeploymentID to include in list") 
 
 args = parser.parse_args()
@@ -31,29 +84,27 @@ cur = db_con.cursor()
 
 # Transmitters in active deployments
 if args.deploymentID is None:
-  num_returned = cur.execute('''SELECT deployment.ID, txID, frequency 
+  num_returned = cur.execute('''SELECT deployment.ID, txID, frequency, demod_type 
                                   FROM deployment
                                   JOIN tx ON tx.ID = txID
                                   JOIN tx_make ON tx_make.ID = tx.tx_makeID
-                                 WHERE is_active = True
-                                   AND demod_type = %s ''', default_type)
+                                 WHERE is_active = True''')
   if (num_returned == 0):
     print "No deployments are active"
     sys.exit(1)
 else:
-  num_returned = cur.execute('''SELECT deployment.ID, txID, frequency 
+  num_returned = cur.execute('''SELECT deployment.ID, txID, frequency, demod_type 
                                   FROM deployment
                                   JOIN tx ON tx.ID = txID
                                   JOIN tx_make ON tx_make.ID = tx.tx_makeID
-                                 WHERE deployment.ID = %s
-                                   AND demod_type = %s ''', (args.deploymentID, default_type))
+                                 WHERE deployment.ID = %s''', (args.deploymentID, ))
   if (num_returned == 0):
     print "deploymentID {} not found".format(args.deploymentID)
     sys.exit(1)
 
 tx_dict = {}
-for (dep_id, tx_id, frequency) in cur.fetchall():
-  tx_dict[tx_id] = { 'frequency' : frequency, 'dep_id' : dep_id }
+for (dep_id, tx_id, frequency, demod) in cur.fetchall():
+  tx_dict[tx_id] = { 'frequency' : frequency, 'dep_id' : dep_id, 'type' : demod }
 
 # Transmitter parameters
 cur.execute('''SELECT txID, name, value 
@@ -64,18 +115,122 @@ cur.execute('''SELECT txID, name, value
 for (tx_id, name, value) in cur.fetchall():
   tx_dict[tx_id][name] = value
 
-header = ['ID', 'frequency', 'type', 'pulse_width', 'rise_trigger', 'time_constant']
+#make list of transmitter frequencies
+num_freqs = len(tx_dict)
+list_of_tx_freqs = []#list of frequencys
+for tx_id in tx_dict:
+  list_of_tx_freqs.append(int(tx_dict[tx_id]['frequency']*1000000))#convert to Hz
 
-data = []
+dict_of_tunings_per_freq = dict()#dictionary of sets of tunings for a given frequency
+set_of_needed_tunings = set()#list of tunings to get all the transmitters
 
-for (tx_id, params) in tx_dict.iteritems():
-  data.append((params['dep_id'], 
-               float(params['frequency']), 
-               default_type, 
-               float(params['pulse_width']), 
-               args.rise_trigger, 
-               args.time_constant))
+#Calculate all tunings which will receive at least one transmitter
+for freq in list_of_tx_freqs:
+  if not HIGH_LO:
+    #Using Low LO, high_lo = False 
+    max_tune = freq - IF_MIN - PV_OFFSET
+    min_tune = freq - IF_MAX - PV_OFFSET
+    if max_tune > PV_MAX:
+        max_tune = PV_MAX
+    if min_tune < PV_MIN:
+        min_tune = PV_MIN
+  else:
+    #Using High LO, high_lo = True
+    max_tune = freq + IF_MAX - PV_OFFSET
+    min_tune = freq + IF_MIN - PV_OFFSET
+    if max_tune > PV_MAX:
+        max_tune = PV_MAX
+    if min_tune < PV_MIN:
+        min_tune = PV_MIN
+  min_steps = int(math.ceil(min_tune/PV_STEP))
+  max_steps = (int(math.floor(max_tune/PV_STEP)))
+  tuning_range = range(min_steps, max_steps +1)
+  for num_bands in num_bands_list:#TODO only works with hardcoded 32 bands
+  #check that tx isn't on filter edge or RF edge
+    band_bw = usb_rate / float(num_bands)
+    tr_cp = list(tuning_range)#so I can remove bad values and still iterate over the whole thing
+    for t in tr_cp:
+      base_freq = ((t*PV_STEP - freq) % band_bw)
+      if (base_freq > band_bw*7/16) and (base_freq < band_bw*9/16):
+        tuning_range.remove(t) for this num_bands
+      elif (t*PV_STEP - rf_bandwidth/2.0 > freq) or (t*PV_STEP + rf_bandwidth/2.0 < freq):
+        tuning_range.remove(t) for this num_bands
+      else:
+        pass
+        #tuning_and_num_bands work
 
-txlist = qraat.csv.csv()
-txlist.initialize_from_data(header, data)
-txlist.write(args.file)
+  dict_of_tunings_per_freq[freq] = set(tuning_range)
+  if len(tuning_range) == 1:#only one tuning will work for this transmitter
+      set_of_needed_tunings.add(tuning_range[0])
+  elif len(tuning_range) == 0:
+      raise ValueError("No viable tuning found for {0} Hz".format(freq))
+
+
+#build "dict_of_freqs_per_tuning" which maps the list of transmitters to tuning frequency
+dict_of_freqs_per_tuning = dict()
+for temp_tune in set_of_all_tunings:
+  dict_of_freqs_per_tuning[temp_tune] = set()
+  for freq in list_of_tx_freqs:
+    if temp_tune in dict_of_tunings_per_freq[freq]:
+      dict_of_freqs_per_tuning[temp_tune].add(freq)
+
+#generate set of frequencies not covered by "needed tunings" (because only one tuning worked for frequency at this point)
+set_of_missing_freqs = set(list_of_tx_freqs)
+for tuning in set_of_needed_tunings:
+  set_of_missing_freqs.difference_update(dict_of_freqs_per_tuning[tuning])
+
+#Use "greedy" algorithm to add tunings to "needed tunings"
+while len(set_of_missing_freqs) > 0:
+  set_of_available_tunings = set()
+  for freq in set_of_missing_freqs:
+    set_of_available_tunings.update(dict_of_tunings_per_freq[freq])
+  max_value = 0
+  max_key = None
+  for tuning in set_of_available_tunings:
+    l = len(dict_of_freqs_per_tuning[tuning])
+    if l > max_value:
+      max_value = l
+      max_key = tuning
+  set_of_needed_tunings.add(max_key)
+  set_of_missing_freqs.difference_update(dict_of_freqs_per_tuning[max_key])
+
+#--->
+#builds optimized tuning parameters
+for t in set_of_needed_tunings:#for each tuning required
+    lo1 = t*self.pv_step
+    #calculate tuning center frequency
+    if self.high_lo:
+        center_freq = lo1 + self.pv_offset - (self.lo2 - self.if2_cf)
+    else:
+        center_freq = lo1 + self.pv_offset + (self.lo2 - self.if2_cf)
+
+    #initialize tuning
+    self.add_tuning(center_freq, lo1)
+    print "{0:.1f} MHz - RMG Center Frequency".format(center_freq/1000000.0)
+
+    for tx_freq in dict_of_freqs_per_tuning[t]:#for each transmitter tunable
+        tx_index = list_of_tx_freqs.index(tx_freq)
+
+        #get transmitter data
+        tx_data = self.transmitters[tx_index]
+        if 'name' in tx_data.headers:
+          print "\t{0} {1:.3f} MHz".format(tx_data.name, tx_data.frequency)
+        else:
+          print "\t{0} {1:.3f} MHz".format(tx_data.ID, tx_data.frequency)
+        self.tunings[-1].add_tx(tx_data)
+
+#header = ['ID', 'frequency', 'type', 'pulse_width', 'rise_trigger', 'time_constant']
+
+#data = []
+
+#for (tx_id, params) in tx_dict.iteritems():
+#  data.append((params['dep_id'], 
+#               float(params['frequency']), 
+#               params['type'], 
+#               float(params['pulse_width']), 
+#               args.rise_trigger, 
+#               args.time_constant))
+
+#txlist = qraat.csv.csv()
+#txlist.initialize_from_data(header, data)
+#txlist.write(args.file)

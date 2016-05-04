@@ -382,7 +382,9 @@ class backend:
     def backend_calc(self):
         """ Calculate the smallest set of tunings to record all transmitters. 
 
-          Instance of the set cover problem (NP-hard). **TODO:** what's the solution(?) 
+          Instance of the set cover problem (NP-hard). Using greedy solution, i.e.
+          choose tuning which covers the most transmitters until all transmitters 
+          are covered. 
         """
 
         #make list of transmitter frequencies

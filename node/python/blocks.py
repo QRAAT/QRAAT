@@ -28,54 +28,8 @@ from gnuradio import filter as gr_filter
 from gnuradio import analog as gr_analog
 from gnuradio import blocks as gr_blocks
 import rmg_swig
-import xml.dom.minidom
 
 import sys, time, os
-
-  ##XML helper functions##
-
-class NoTagError(KeyError):
-
-  def __init__(self, tagname):
-    self.tagname = tagname
-
-  def __str__(self):
-    return "Tag Name: {} not found".format(self.tagname)
-
-class MultipleTagError(KeyError):
-
-  def __init__(self, tagname, number):
-    self.tagname = tagname
-    self.number = number
-
-  def __str__(self):
-    return "{} {} found".format(self.number,self.tagname)
-
-#throws NoTagError if not in direct descendent
-def get_one_element(dom,tagname):
-  element_list = dom.getElementsByTagName(tagname)
-  if len(element_list) == 0:
-    raise NoTagError(tagname)
-  elif len(element_list) > 1:
-    copy_list = list(element_list)
-    for e in copy_list:
-      if not e in dom.childNodes:
-        element_list.remove(e)
-    if len(element_list) > 1:
-      raise MultipleTagError(tagname, len(element_list))
-    elif len(element_list) == 0:
-      raise NoTagError(tagname)
-  return element_list[0]
-
-def get_one_value(dom,tagname):
-  element = get_one_element(dom,tagname)
-  children = element.childNodes
-  val = ''
-  if len(children) > 0:
-    for j in children:
-      if j.nodeType == j.TEXT_NODE:
-        val += j.nodeValue
-  return val
 
 
   ##BLOCKS##
