@@ -1,9 +1,10 @@
+from datetime import datetime, timedelta
 from django import forms
 from django.db import connection
 from django.forms import widgets
 from django.utils.safestring import mark_safe
 from project.models import Site, Deployment
-from datetime import datetime, timedelta
+import utils
 
 
 def get_processing_options():
@@ -87,7 +88,7 @@ class TimeSeriesGraphForm(forms.Form):
               widget = forms.TextInput(attrs={
                 'class': 'filter',
                 'size': '17'}),
-              initial = (datetime.now() - timedelta(hours=30)).strftime("%Y-%m-%d %H:%M:%S") # current datetime - 6 hours
+              initial = (utils.get_local_now() - timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M:%S") # Displays current time in PST, minus 20 minutes
               )
   
     datetime_end = forms.DateTimeField(
@@ -96,7 +97,7 @@ class TimeSeriesGraphForm(forms.Form):
               widget = forms.TextInput(attrs={
                 'class': 'filter',
                 'size': '17'}),
-              initial = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # current datetime
+              initial = utils.get_local_now().strftime("%Y-%m-%d %H:%M:%S") # current datetime
               )
 
     start_timestamp = forms.FloatField(
@@ -187,18 +188,18 @@ class ProcessingGraphForm(TimeSeriesGraphForm):
 class DashboardForm(forms.Form):
     def __init__(self, data = None):
         super(forms.Form, self).__init__(data)
-        self.fields['info_sites'].choices = [('all', 'All'), ('telemetry', 'telemetry'), ('detcount', 'detcount'), ('estcount', 'estcount'), ('timecheck', 'timecheck')]
-        self.fields['info_deployments'].choices = [('all', 'All'), ('est', 'est'), ('bearing', 'bearing'), ('position', 'position'), ('track_pos', 'track_pos')]
-        self.fields['info_system'].choices = [('all', 'All'), ('processing_statistics', 'processing_stats'), ('processing_cursor', 'processing_cursor')]
+        self.fields['info_sites'].choices = [('telemetry', 'telemetry'), ('detcount', 'detcount'), ('estcount', 'estcount'), ('timecheck', 'timecheck')]
+        self.fields['info_deployments'].choices = [('est', 'est'), ('bearing', 'bearing'), ('position', 'position'), ('track_pos', 'track_pos')]
+        self.fields['info_system'].choices = [('processing_statistics', 'processing_stats'), ('processing_cursor', 'processing_cursor')]
         
     datetime_start = forms.DateTimeField(
         required = True, 
-        label="Start Date & Time",
+        label="Start Date & Time (Pacific)",
         #[YYYY-MM-DD HH:MM:SS]
         widget = forms.TextInput(attrs={
           'class': 'filter',
           'size': '17'}),
-        initial = (datetime.now() - timedelta(hours=30)).strftime("%Y-%m-%d %H:%M:%S") # current datetime - 6 hours
+        initial = (utils.get_local_now() - timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M:%S") # Displays current time in PST, minus 20 minutes
         )
 
     interval = forms.IntegerField(
@@ -210,29 +211,24 @@ class DashboardForm(forms.Form):
         initial = 10
         )
 
-    move_interval = forms.ChoiceField(
-        widget = SubmitButtons,
-        choices = [('back', 'Back'), ('forward', 'Forward')]
-        )
-    
     info_sites = forms.MultipleChoiceField(
         widget = forms.CheckboxSelectMultiple(),
         required = True,
         label = 'Info|Site',
-        initial = ['all']
+        initial = ['telemetry', 'detcount', 'estcount', 'timecheck']
         )
 
     info_deployments = forms.MultipleChoiceField(
         widget = forms.CheckboxSelectMultiple(),
         required = True,
         label = 'Info|Deployment',
-        initial = ['all']
+        initial = ['est', 'bearing', 'position', 'track_pos']
         )
 
     info_system = forms.MultipleChoiceField(
         widget = forms.CheckboxSelectMultiple(),
         required = True,
         label = 'Info|System',
-        initial = ['all']
+        initial = ['processing_statistics', 'processing_cursor']
         )
 

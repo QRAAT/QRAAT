@@ -157,7 +157,7 @@ elif [[ $foo != 'skip' ]]; then
 	echo "(Errors saying a user cannot be dropped just means it didn't exist before)"
 	mysql -u root --password=$ROOT_PSWD -f < $WWW_DIR/etc/db_create.sql
 	mysql -u root --password=$ROOT_PSWD qraat < $WWW_DIR/../server/etc/db_schema.sql
-	mysql -u root --password=$ROOT_PSWD < $WWW_DIR/etc/db_user_grants.sql
+	#mysql -u root --password=$ROOT_PSWD < $WWW_DIR/etc/db_user_grants.sql
 fi
 # ------------------------------------------------------------
 # Build QRAAT
@@ -274,6 +274,12 @@ echo
 echo "When asked to create a superuser, say yes to create an admin account for your site. If you want to create one later, use 'manage.py createsuperuser'"
 stdbuf -o0 python $WWW_DIR/manage.py syncdb
 
+if [ "$COMPLETE_INSTALL" = true ]; then
+    # This script grants permissions to tables, including tables that are made by Django. 
+    # So we call it here after they're made?
+	mysql -u root --password=$ROOT_PSWD < $WWW_DIR/etc/db_user_grants.sql
+fi
+
 # Restart Apache
 sudo service apache2 restart
     
@@ -293,7 +299,7 @@ echo
 
 printf "\nIt's suggested that you source rmg_env in your bash profile if you haven't already\n"
 
-printf "\nNOTE: Please change the timezone in gaat/timezoneinfo to the timezone where your data will come from. You can refer to https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for your timezone\n"
+printf "\nNOTE: Please change the timezone in gaat/timezoneinfo and gaat/settings.py to the timezone where your data will come from. You can refer to https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for your timezone\n"
 
 printf "\nYou can look at https://github.com/QRAAT/QRAAT-doc/blob/master/database/dev/dev_setup_instructions for more instructions\n"
 

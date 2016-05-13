@@ -6,12 +6,33 @@
 
 <script>
 var current_form = "{{ current_form }}";
+var unused_tx_num = "{{ unused_tx_num }}";
+var unused_target_num = "{{ unused_target_num }}";
+var readonly = {% if readonlyformset %} true {% else %} false {% endif %};
 
 $(document).ready(function(){
+    // If readonly, disable fields. (This is is safe because of how the views work. There shouldn't be a case where the user can edit the form to change our database when we can't. Post forms require CSRF token which isn't in the readonlyformset, and the way the view is made, GET requests don't change the database)
+    if(readonly) {
+        $("table").find(":input").prop("disabled",true);
+    }
+
     // Hide some controls not related to the current form
     if(current_form != "tx") {
         $("#serial_no_filler_div").hide();
         $("#copy_manufacturer_div").hide();
+    }
+
+    // Changing the title to reflect which form you're on
+    if(current_form != "") {
+        if(current_form=="tx" || current_form=="transmitter") {
+            $(".page-header").html("<h4 style='color: grey'><inline id='title_tx' style='color: black'>Transmitter </inline> ➝ <inline id='title_target'>Target</inline> ➝ <inline id='title_deployment'>Deployment</inline></h4>");
+        }
+        else if (current_form=="target") {
+            $(".page-header").html("<h4 style='color: grey'><inline id='title_tx'>Transmitter </inline> ➝ <inline id='title_target' style='color: black'>Target</inline> ➝ <inline id='title_deployment'>Deployment</inline></h4>");
+        }
+        else if(current_form=="deployment") {
+            $(".page-header").html("<h4 style='color: grey'><inline id='title_tx'>Transmitter </inline> ➝ <inline id='title_target'>Target</inline> ➝ <inline id='title_deployment' style='color: black'>Deployment</inline></h4>");
+        }
     }
 	// These are for remembering what the ids of the newly created tx and targets are so they can be auto selected 
 	$("#form").append("<input type='text' id='txIDs' name='txIDs' value='{{ txIDs }}' style='display: none'> <input type='text'id='targetIDs' name='targetIDs' value='{{ targetIDs }}' style='display: none'>");
@@ -21,12 +42,28 @@ $(document).ready(function(){
         var txIDs = $("#txIDs").val().split(" ");
         var targetIDs = $("#targetIDs").val().split(" ");
         for(var i = 0; i < txIDs.length; i++) {
+            if(txIDs[i]=="") break;
            $("#id_form-"+i+"-txID").val(txIDs[i]); 
         }
         for(var i = 0; i < targetIDs.length; i++) {
+            if(targetIDs[i]=="") break;
            $("#id_form-"+i+"-targetID").val(targetIDs[i]); 
         }
 	}
+
+    $("#existing_next_form_btn").click(function() {
+        if(get("existing_tx")) {
+            $("#existing_hidden_form").append("<input type=hidden name='number' value='" + Math.max(unused_target_num, unused_tx_num) + "'>");
+            $("#existing_hidden_form").append("<input type=hidden name='existing_tx' value='true'>");
+        }
+        else if(get("existing_tx_target")=="tx") {
+            $("#existing_hidden_form").append("<input type=hidden name='existing_tx_target' value='target'>");
+        }
+        else if(get("existing_tx_target")=="target") {
+            $("#existing_hidden_form").append("<input type=hidden name='number' value='" + Math.max(unused_target_num, unused_tx_num) + "'>");
+            $("#existing_hidden_form").append("<input type=hidden name='existing_tx_target' value='target'>");
+        }
+    })
 
 	$("#name_filler").click(function() {
 
@@ -92,6 +129,12 @@ $(document).ready(function(){
         }
     });
 })
+
+function get(name){
+   if(name=(new RegExp('[?&]'+encodeURIComponent(name)+'=([^&]*)')).exec(location.search))
+      return decodeURIComponent(name[1]);
+}
+
 function submitNumber() {
 	return false;
 }
@@ -185,15 +228,52 @@ function submitTxMake() {
 {% block content %}
 {{ block.super }}
 
-{% if not formset %}
+{% if not formset and not readonlyformset %}
 <p>This series of forms will take you through creating transmitters, targets, and deployments.</p>
 <p>How many are you starting with?</p>
 <form method="get" onsubmit="submitNumber()">
 	<input id="number" name="number" step="1" type="number" min="1" value="5" style="width:7em">
     <!--<inline data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="For altering transmitters that already exist in the database"> <input id="using_old_tx" name="using_old_tx" type="checkbox"> Using existing transmitters<br> </inline>-->
     <div class="input-group submit-btn">
-        <button class="btn btn-sm btn-primary" type="submit" style="margin-top: 5px">Submit</button>
+        <button class="btn btn-sm btn-primary" type="submit" style="margin-top: 5px">Start</button>
     </div>
+</form>
+<br/>
+<p style="margin-bottom: 0px">You have {{ unused_tx_num }} transmitter{% if unused_tx_num != 1 %}s{% endif %} that have never been associated with a deployment. {% if unused_tx_num > 0 %}Would you like to start with those transmitters?{% endif %}</p>
+<form id="existing_tx_form"> 
+    <input type="hidden" id="existing_tx" name="existing_tx">
+</form>
+<button class="btn btn-sm btn-primary" type="button" style="{% if unused_tx_num == 0 %}display: none; {% endif %}margin-top: 5px" onclick="$('#existing_tx').val('true'); $('#existing_tx_form').submit()">Start with existing transmitters</button>
+
+<br/>
+
+<p style="margin-bottom:0px">You have {{ unused_tx_num }} transmitter{% if unused_tx_num != 1 %}s{% endif %} and {{ unused_target_num }} target{% if unused_target_num != 1 %}s{% endif %} that have never been associated with a deployment. {% if unused_tx_num > 0 and unused_target_num > 0 %}Would you like to start with those transmitters and targets?{% endif %}</p>
+<form id="existing_tx_target_form">
+    <input type="hidden" id="existing_tx_target" name="existing_tx_target">
+</form>
+<button class="btn btn-sm btn-primary" type="button" style="{% if unused_tx_num == 0 or unused_target_num == 0 %} display: none; {%endif %}margin-top: 5px" onclick="$('#existing_tx_target').val('tx'); $('#existing_tx_target_form').submit()">Start with existing transmitters and targets</button>
+
+{% elif readonlyformset %}
+<table>
+{% for form in readonlyformset.forms %}
+  {% if forloop.first %}
+  <thead><tr>
+    {% for field in form.visible_fields %}
+        <th name="{{ field.label|capfirst }}">{{ field.label|capfirst }}</th>
+    {% endfor %}
+  </tr></thead>
+  {% endif %}
+  <tr>
+      {% for field in form.visible_fields %}
+      <td>
+        {{field}}
+      </td>
+      {% endfor %}
+  </tr>
+{% endfor %}
+</table>
+<form id="existing_hidden_form">
+<button id="existing_next_form_btn" class="btn btn-sm btn-primary" type="submit">Continue</button>
 </form>
 {% else %}
 

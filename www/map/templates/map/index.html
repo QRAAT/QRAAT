@@ -15,13 +15,12 @@
     <script src="/static/flot/jquery.flot.threshold.min.js"></script>
     <script src="/static/flot/jquery.flot.resize.min.js"></script>
     <!--    <script src="/static/flot/jquery.flot.axislabels.js"></script>  TODO: minify this  This script is ass. One of the callbacks, which is called by draw, calls draw again. Thus doubling the time it takes, which is important considering draw takes ~200ms See for axis view-source:http://www.flotcharts.org/javascript/flot.demo.js-->
-    <script src="/static/map/js/date.js"></script>
+    <script src="/static/js/date.js"></script>
     <script src="/static/flot/jquery.flot.time.min.js"></script>
     <!-- <script src="/static/map/js/jquery-ui.min.js"></script> -->
     <!-- TODO: Ask about google hosting or not -->
     <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
-    <script src"/static/maps/test1.js"></script>
 
    
 <script>
@@ -287,12 +286,12 @@ function loadFlot(pos_markers, map, dep_id){
         points: { show: true, fill: false, symbol: drawFlotPoint},
         grid: { hoverable: true, clickable: true },
         xaxis: {
-	    min: selectedTimeRange[0] * 1000,
-	    max: selectedTimeRange[1] * 1000,
+	    min: currTimeRange[0] * 1000,
+	    max: currTimeRange[1] * 1000,
             mode: "time",
-            timezone: "America/Los_Angeles", // TODO: Timezone is hardcoded
+            timezone: TIMEZONE, 
             timeformat: "%m/%d %H:%M",
-            axisLabel: "Time (Los Angeles)",
+            axisLabel: "Time " + TIMEZONE.slice(TIMEZONE.indexOf("/")+1).replace("_", " "),
             axisLabelUseCanvas: true,
             axisLabelFontSizePixels: 12,
             axisLabelFontFamily: "Lucida Grande,Verdana,Arial,sans-serif",
@@ -756,8 +755,13 @@ function updateNumPoints() {
         else
             lengths.push(0);
     });
+    $(".deployment-label").each(function (i) {
+        console.log(i);
+        $(this).find("inline").html("("+lengths[i]+")");
+    });
     $("#num_points").html("<b>No. of points: </b>"+lengths.join(" | "));
 }
+
 function updateData() {
     setGraphFilters();
     var ajaxRequests = [];
@@ -1397,13 +1401,13 @@ function setupSlider() {
 
 	    if($("#id_graph_data option:selected").text() == "Likelihood") {
 	    	var fi = 0;
-		$("#id_likelihood_low").val(ui.values[0]);
-		$("#id_likelihood_high").val(ui.values[1]);
+            $("#id_likelihood_low").val(ui.values[0]);
+            $("#id_likelihood_high").val(ui.values[1]);
 	    }
 	    else if ($("#id_graph_data option:selected").text() == "Activity") {
-	   	var fi = 1; 
-		$("#id_activity_low").val(ui.values[0]);
-		$("#id_activity_high").val(ui.values[1]);
+            var fi = 1; 
+            $("#id_activity_low").val(ui.values[0]);
+            $("#id_activity_high").val(ui.values[1]);
 	    }
 	    // TODO: Finding the delta is pointless if we bound the yaxis to [0,1] in the plot options
 	    var yaxis = $("#plot-div").data("plot").getAxes().yaxis;	    
@@ -1785,36 +1789,37 @@ function initialize(){
 
     // Bind filter form inputs to filter slider
     $("#id_likelihood_low").on('change', function() {
-	setGraphFilters();
-	if($("#id_graph_data option:selected").text() == "Likelihood")
-	    if($("#filter-slider").slider("values",0) != $(this).val())
-		$("#filter-slider").slider("values",0,$(this).val());
+        setGraphFilters();
+        if($("#id_graph_data option:selected").text() == "Likelihood")
+            if($("#filter-slider").slider("values",0) != $(this).val())
+                $("#filter-slider").slider("values",0,$(this).val());
     });
     $("#id_likelihood_high").on('change', function() {
-	setGraphFilters();
-	if($("#id_graph_data option:selected").text() == "Likelihood")
-	    if($("#filter-slider").slider("values",1) != $(this).val())
-		$("#filter-slider").slider("values",1,$(this).val());
+        setGraphFilters();
+        if($("#id_graph_data option:selected").text() == "Likelihood")
+            if($("#filter-slider").slider("values",1) != $(this).val())
+                $("#filter-slider").slider("values",1,$(this).val());
     });
     $("#id_activity_low").on('change', function() {
-	setGraphFilters();
-	if($("#id_graph_data option:selected").text() == "Activity")
-	    if($("#filter-slider").slider("values",0) != $(this).val())
-		$("#filter-slider").slider("values",0,$(this).val());
+        setGraphFilters();
+        if($("#id_graph_data option:selected").text() == "Activity")
+            if($("#filter-slider").slider("values",0) != $(this).val())
+                $("#filter-slider").slider("values",0,$(this).val());
     });
     $("#id_activity_high").on('change', function() {
-	setGraphFilters();
-	if($("#id_graph_data option:selected").text() == "Activity")
-	    if($("#filter-slider").slider("values",1) != $(this).val())
-		$("#filter-slider").slider("values",1,$(this).val());
+        setGraphFilters();
+        if($("#id_graph_data option:selected").text() == "Activity")
+            if($("#filter-slider").slider("values",1) != $(this).val())
+                $("#filter-slider").slider("values",1,$(this).val());
     });
 
 
     $("#id_graph_data").on('change', function(){
-	//updateFlot(markers_querydata);
-	var yaxis = $("#plot-div").data("plot").getAxes().yaxis;
-	var delta = yaxis.max - yaxis.min;
-	$("#filter-slider").slider("values",[(graphFilters[$(this).val()-1][0] - yaxis.min)/delta, (graphFilters[$(this).val()-1][1] - yaxis.min)/delta]);
+        var dataLabel = $("#id_graph_data option:selected").text();
+        $("#plotLabel").html(dataLabel + " Graph");
+        var yaxis = $("#plot-div").data("plot").getAxes().yaxis;
+        var delta = yaxis.max - yaxis.min;
+        $("#filter-slider").slider("values",[(graphFilters[$(this).val()-1][0] - yaxis.min)/delta, (graphFilters[$(this).val()-1][1] - yaxis.min)/delta]);
     });
     $("#id_colorpoints").on('change', function() {colorMarkers(); $("#plot-div").data("plot").draw();});
     $("#id_sites").on('click', toggleSites);
@@ -2262,10 +2267,10 @@ google.maps.event.addDomListener(window, 'load', initialize);
     <div class="sidebar-header">
         Deployments<span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr>
     </div>
-    <div class="collapse in">
+    <div class="collapse in" id="deployment-div">
     {% for dep in form.deployment %}
         <div class="sidebar-header">
-            <label for="id_deployment_{{forloop.counter0}}" style="font-weight: normal">{{dep.choice_label}}</label>
+            <label for="id_deployment_{{forloop.counter0}}" class="deployment-label" style="font-weight: normal">{{dep.choice_label}} <inline class="num-points"></inline></label>
             <span class="circle"></span>
             {{dep.tag}} <span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr style="border-color: #CCCCCC">
         </div>
@@ -2311,10 +2316,10 @@ google.maps.event.addDomListener(window, 'load', initialize);
 <b>No. of points</b>: 
 </div>
 
-{% if deps|length > 1 %}  <b>Line Colors: Blue</b>: {{deps.0}} | <b>Red:</b> {{deps.1}}
+<!-- {% if deps|length > 1 %}  <b>Line Colors: Blue</b>: {{deps.0}} | <b>Red:</b> {{deps.1}}
 {% if deps|length > 2 %} | <b>Green:</b> {{deps.2}}{% endif %}
 {% if deps|length > 3 %} | <b>Yellow:</b> {{deps.3}}{% endif %}
-<br>
+<br> -->
 {% endif %}
 
 {% endif %} <!-- endif for positions -->
@@ -2348,6 +2353,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
         <div id="filter-slider" style="flex-basis:13px; height:100%; margin-bottom:8; visibility:hidden"></div>
         <div style="flex-basis: fill; width:100%; height:100%" id="plot-div"></div>
     </div>
+    <p id="plotLabel" style="text-align: center; color: grey"><b>Likelihood Graph</b></p>
 </div> <!-- end ui-content -->
 	<center>
 	<!-- uncomment next line for small overview graph -->

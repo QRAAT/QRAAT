@@ -18,8 +18,12 @@ GRAPH_CHOICES = [('1', 'Likelihood'), ('2', 'Activity'), ('3', 'Covariance')]
 # Choices for transmitter dropdown menu. Sorted by "Active", then number
 def get_choices(deps=[]):
   choices_list = []
+  # Use the deployment name if available. If not, use the target name and tx frequency
   for dep in deps:
-    choices_list.append((dep.ID, "{} {}".format(dep.targetID.name, dep.txID.frequency)))
+    if dep.name != "":
+      choices_list.append((dep.ID, dep.name))
+    else:
+      choices_list.append((dep.ID, "{} {}".format(dep.targetID.name, dep.txID.frequency)))
   return choices_list
 
 def get_deps(req_deps=[]):

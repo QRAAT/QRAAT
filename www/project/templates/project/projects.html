@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
     <h2>Projects
-    <div class="btn-group" style="margin-left:15%">
+    <div class="btn-group" style="float:right">
         <a href={% url 'project:create-project' %}><input type="button" class="btn btn-lg btn-primary" value="Create project" name="create-project" /></a>
     </div>
     </h2>
@@ -13,14 +13,16 @@
     <div class="panel-heading">
         <h4>My projects</h4>
     </div>
-    {% for project in user_projects %}
-    <div class="list-group">
-        <h4 class="list-group item-heading">
-            <a href={% url 'project:show-project' project.ID %}>{{project.name}}</a>
-        </h4>
-        <p class="list-group item-text">{{project.description}}</p>
+    <div class="panel-body">
+        {% for project in user_projects %}
+        <div class="list-group">
+            <h4 class="list-group item-heading">
+                <a href={% url 'project:show-project' project.ID %}>{{project.name}}</a>
+            </h4>
+            <p class="list-group item-text">{{project.description}}</p>
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
 </div>
 {% endif %}
 {% if collaborate_with %}
@@ -28,12 +30,14 @@
     <div class="panel-heading">
         <h4>Projects I'm collaborating on</h4>
     </div>
-    {% for project in collaborate_with %}
-    <div class="list-group">
-        <h4 class="list-group item-heading"><a href={% url 'project:show-project' project.ID %}>{{project.name}}</a></h4>
-        <p class="list-group item-text">{{project.description}}</p>
+    <div class="panel-body">
+        {% for project in collaborate_with %}
+        <div class="list-group">
+            <h4 class="list-group item-heading"><a href={% url 'project:show-project' project.ID %}>{{project.name}}</a></h4>
+            <p class="list-group item-text">{{project.description}}</p>
+        </div>
+        {%endfor%}
     </div>
-    {%endfor%}
 </div>
 {% endif %}
 {% if can_visualize %}
@@ -41,12 +45,14 @@
     <div class="panel-heading">
         <h4>Projects I can visualize</h4>
     </div>
-    {% for project in can_visualize %}
-    <div class="list-group">
-        <h4 class="list-group item-heading"><a href={% url 'project:show-project' project.ID %}>{{project.name}}</a></h4>
-        <p class="list-group item-text">{{project.description}}</p>
+    <div class="panel-body">
+        {% for project in can_visualize %}
+        <div class="list-group">
+            <h4 class="list-group item-heading"><a href={% url 'project:show-project' project.ID %}>{{project.name}}</a></h4>
+            <p class="list-group item-text">{{project.description}}</p>
+        </div>
+        {%endfor%}
     </div>
-    {%endfor%}
 </div>
 {% endif %}
 
@@ -55,12 +61,14 @@
     <div class="panel-heading">
         <h4>Public projects</h4>
     </div>
-    {% for project in public_projects %}
-    <div class="list-group">
-        <h4 class="list-group item-heading"><a href={% url 'project:show-project' project.ID %}>{{project.name}}</a></h4>
-        <p class="list-group item-text">{{project.description}}</p>
+    <div class="panel-body">
+        {% for project in public_projects %}
+        <div class="list-group">
+            <h4 class="list-group item-heading"><a href={% url 'project:show-project' project.ID %}>{{project.name}}</a></h4>
+            <p class="list-group item-text">{{project.description}}</p>
+        </div>
+        {%endfor%}
     </div>
-    {%endfor%}
 </div>
 {% endif %}
 {% if not public_projects and not user_projects and not colaborate_with and not can_visualize %}

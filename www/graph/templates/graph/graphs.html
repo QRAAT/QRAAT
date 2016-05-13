@@ -40,8 +40,9 @@ function loadFlot(data, site_id, graph_variable){
         xaxis: {
             mode: "time",
             timeformat: "%H:%M <br> %m-%d",
-            min: ({{start_timestamp}}) * 1000 - 7*60*60*1000, // hard coded timestamp conversion
-            max: ({{end_timestamp}}) * 1000 - 7*60*60*1000 // hard coded timestamp conversion
+            timezone: TIMEZONE,
+            min: ({{start_timestamp}}) * 1000,
+            max: ({{end_timestamp}}) * 1000,
             },
         yaxis: {
             min: plot_min_y,
@@ -87,7 +88,7 @@ function getGraphData(data, site_id, graph_variable){
     for (var i=0; i < data.length; i++) {
         if ((data[i]).siteID == site_id) {
             var data_point = (data[i])[graph_variable] // fix this? slow?
-            var flot_point = [((data[i]).timestamp)*1000-7*60*60*1000, data_point]; // used to get UTC to PDT - fix this - talk with Marcel
+            var flot_point = [((data[i]).timestamp)*1000, data_point];
             graph_data.push(flot_point);
         }       
     }

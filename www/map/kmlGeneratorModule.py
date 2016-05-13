@@ -5,6 +5,7 @@ from time import strftime
 import math
 import pytz
 from datetime import datetime, timedelta
+import utils
 
 def createStyle2(kmlDoc):
   styleElement = kmlDoc.createElement('Style')
@@ -86,16 +87,11 @@ def createPoints(kmlDoc, epochTime, latitude, longitude):
   styleUrlElement.appendChild(kmlDoc.createTextNode(styleUrl))
   placemarkElement.appendChild(styleUrlElement)
 
-##  print time
-##  print type(time)
-##  print type(int(time))
 ##  time = int(time)
 ##  t=time.gmtime(epochTime)
 ##  timeString="%s-%s-%s %s:%s:%s"%(strftime("%Y", t),strftime("%m", t),strftime("%d", t),strftime("%H", t),strftime("%M", t),strftime("%S", t))
 
-  ## Time zone will need to be set or queried!!!
-  DATA_TIMEZONE = pytz.timezone('America/Los_Angeles')
-  timeString = str(DATA_TIMEZONE.normalize(pytz.utc.localize(datetime.utcfromtimestamp(int(epochTime)), is_dst=True).astimezone(DATA_TIMEZONE))) 
+  timeString = str(utils.timestamp_todate(int(epochTime)))
   nameElement = kmlDoc.createElement('name')
   nameElement.appendChild(kmlDoc.createTextNode(timeString[0:19]))
   placemarkElement.appendChild(nameElement)
@@ -325,13 +321,12 @@ def createKML(deploymentIDs, radius, numberOfIntervals, trackPath, trackLocation
 
   ##Convert time into Google Earth readable form.
   ## Time zone will need to be set or queried!!!
-  DATA_TIMEZONE = pytz.timezone('America/Los_Angeles')
   convertedTime=[]
   for JStime in meanTimeArray:
 #      tm=time.gmtime(float(JStime))
 #      timeString="%s-%s-%sT%s:%s:%sZ"%(strftime("%Y", t),strftime("%m", t),strftime("%d", t),strftime("%H", t),strftime("%M", t),strftime("%S", t))
 #      timeString = strftime("%Y-%m-%dT%H:%M:%SZ",tm)
-      timeString = DATA_TIMEZONE.normalize(pytz.utc.localize(datetime.utcfromtimestamp(int(JStime)), is_dst=True).astimezone(DATA_TIMEZONE))
+      timeString = utils.timestamp_todate(int(JStime))
       timeString = str(timeString)[0:10]+'T'+str(timeString)[11:25]
       convertedTime.append(timeString)
 

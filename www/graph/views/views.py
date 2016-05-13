@@ -141,17 +141,17 @@ def set_time_parameters(start_timestamp, end_timestamp, datetime_from, datetime_
     # datetime format trumps UNIX timestamp format if both are given
     # datetimes
     if datetime_from and datetime_to:
-        start_timestamp = timegm(time.strptime(datetime_from, '%Y-%m-%d %H:%M:%S')) + 7*60*60 # used to get PDT to UTC - fix this - talk with Marcel
-        end_timestamp = timegm(time.strptime(datetime_to, '%Y-%m-%d %H:%M:%S')) + 7*60*60 # used to get PDT to UTC - fix this - talk with Marcel
+        start_timestamp = utils.datelocal_totimestamp(utils.strptime(datetime_from, '%Y-%m-%d %H:%M:%S'))
+        end_timestamp = utils.datelocal_totimestamp(utils.strptime(datetime_to, '%Y-%m-%d %H:%M:%S'))
 
     elif datetime_from and interval:
         update_form_time['datetime_start'] = datetime_from
-        start_timestamp = timegm(time.strptime(datetime_from, '%Y-%m-%d %H:%M:%S')) + 7*60*60 # used to get PDT to UTC - fix this - talk with Marcel
+        start_timestamp = utils.datelocal_totimestamp(utils.strptime(datetime_from, '%Y-%m-%d %H:%M:%S'))
         end_timestamp = start_timestamp + interval
 
     elif datetime_to and interval:
         update_form_time['datetime_end'] = datetime_to
-        end_timestamp = timegm(time.strptime(datetime_to, '%Y-%m-%d %H:%M:%S')) + 7*60*60 # used to get PDT to UTC - fix this - talk with Marcel
+        end_timestamp = utils.datelocal_totimestamp(utils.strptime(datetime_to, '%Y-%m-%d %H:%M:%S'))
         start_timestamp = end_timestamp - interval
 
     # UNIX timestamps
