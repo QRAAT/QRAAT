@@ -762,10 +762,45 @@ def view_by_target(request, target_id):
                         % target_id)
 
 
-def view_by_tx(request, tx_id):
+def view_by_tx(request, project_id, tx_id):
     ''' Compile a list of deployments associated with `tx_id`. '''
+    print "----------------"
+    print type(tx_id)
 
-    return HttpResponse('Not implemented yet. (txID=%s)' % tx_id)
+    try:
+        project = Project.objects.get(ID=project_id)
+    except ObjectDoesNotExist:
+        raise Http404
+
+    if not project.is_public:
+        if request.user.is_authenticated():
+            user = request.user
+            if project.is_owner(user) \
+                or user.has_perm('project.can_view') \
+                and (project.is_collaborator(user)
+                     or project.is_viewer(user)):
+                try:
+                    # Check if this tx exists
+                    tx = Tx.objects.get(ID=tx_id)
+                except ObjectDoesNotExist:
+                    raise Http404
+            else:
+                raise PermissionDenied  # 403
+        else:
+
+            return redirect('/account/login/?next=%s'
+                            % request.get_full_path())
+    else:
+        pass # Public project
+
+    deps = project.get_deployments().filter(txID=tx_id)
+    # Have to make a string of ID's seperated by '+' to use view_by_dep method'
+    dep_ids = [] 
+    for d in deps:
+        dep_ids.append(d.ID)
+
+    dep_ids = "+".join(str(x) for x in dep_ids)
+    return view_by_dep(request, project_id, dep_ids)
 
 # TODO: Fix timezone/datetime things with the new functions in utils if we extend these graphs
 @login_required(login_url='account/login')

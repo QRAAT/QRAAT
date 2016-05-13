@@ -1,8 +1,16 @@
+html {
+    position: relative;
+    min-height: 100%;
+}
+
+.container {
+    height: 100%;
+}
+
 .sidebar{
     margin-top: 3%;
     float:left;
     width: 17%;
-    height: 100%;
     background-color: #F1F5F8;
     border-radius: 10px;
     -moz-border-radius: 10px;
@@ -19,6 +27,12 @@
 .content{
     float: right;
     width: 80%;
+    min-height:100%;
+    height:auto !important;
+    height:100%;
+    /* margin-bottom: 1%; */
+    /*margin: 0 auto -25px; /* for the footer */ 
+    /*padding-bottom: 25px; */
 }
 
 .manage-button{
@@ -96,4 +110,21 @@
     background: none;
     display: block;
     padding-left: 2%;
+}
+
+#footer_container {
+    clear: both;
+    z-index:1;
+    width: inherit;
+    position: absolute;
+    bottom: 0px;
+}
+
+#footer {
+    color: #BBB;
+    margin-bottom: 5px;
+}
+
+.footer_buffer {
+    height: 25px;
 }

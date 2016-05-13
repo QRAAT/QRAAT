@@ -88,7 +88,7 @@ class TimeSeriesGraphForm(forms.Form):
               widget = forms.TextInput(attrs={
                 'class': 'filter',
                 'size': '17'}),
-              initial = (datetime.now() - timedelta(hours=30)).strftime("%Y-%m-%d %H:%M:%S") # current datetime - 6 hours
+              initial = (utils.get_local_now() - timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M:%S") # Displays current time in PST, minus 20 minutes
               )
   
     datetime_end = forms.DateTimeField(
@@ -97,7 +97,7 @@ class TimeSeriesGraphForm(forms.Form):
               widget = forms.TextInput(attrs={
                 'class': 'filter',
                 'size': '17'}),
-              initial = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # current datetime
+              initial = utils.get_local_now().strftime("%Y-%m-%d %H:%M:%S") # current datetime
               )
 
     start_timestamp = forms.FloatField(
