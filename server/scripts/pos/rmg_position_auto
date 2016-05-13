@@ -25,16 +25,18 @@ EASTING_MIN = float(os.environ["RMG_POS_EASTING_MIN"])
 EASTING_MAX = float(os.environ["RMG_POS_EASTING_MAX"])
 NORTHING_MIN = float(os.environ["RMG_POS_NORTHING_MIN"])
 NORTHING_MAX = float(os.environ["RMG_POS_NORTHING_MAX"])
-STEPSIZE = float(os.environ["RMG_POS_STEPSIZE"]
+STEPSIZE = float(os.environ["RMG_POS_STEPSIZE"])
 
 #TODO fix this
 # Compute covariances? 
 if os.environ["RMG_POS_ENABLE_COV"].lower() == 'true':
   print "position_auto: running with covariance estimator"
-  position.ENABLE_BOOTSTRAP3 = True
+  #position.ENABLE_BOOTSTRAP3 = True
+  enable_cov = True
 else: 
   print "position_auto: no covariance"
   #position.ENABLE_BOOTSTRAP = False
+  enable_cov = False
 
 if os.environ["RMG_POS_NORMALIZE_SPECTRUM"].lower() == 'true':
   position.NORMALIZE_SPECTRUM = True
@@ -115,8 +117,8 @@ for deployment in deployment_list:
     print "Processing {0} - {1}".format(time_range[0],time_range[1])
     sig = signal.Signal(db_con, deployment_id, time_range[0], time_range[1], EST_SCORE_THRESHOLD)
     temp_max_id = max(temp_max_id, sig.max_id)
-    pos = position.WindowedPositionEstimator(sig, sites, center, sv, time_delta, time_window, STEPSIZE, EASTING_MIN, EASTING_MAX, NORTHING_MIN, NORTHING_MAX)
-    if position.ENABLE_BOOTSTRAP or position.ENABLE_BOOTSTRAP2 or position.ENABLE_BOOTSTRAP3:
+    pos = position.WindowedPositionEstimator(sig, sites, sv, time_delta, time_window, STEPSIZE, EASTING_MIN, EASTING_MAX, NORTHING_MIN, NORTHING_MAX)
+    if enable_cov:
       cov = position.WindowedCovarianceEstimator(pos, sites)
       position.InsertPositionsCovariances(db_con, deployment_id, cal_id, zone, pos, cov)
     else:

@@ -48,9 +48,10 @@ NORMALIZE_SPECTRUM = False
 
 ### High level function calls. ################################################
 
-def PositionEstimator(signal, sites, sv, method=signal.Signal.Bartlet,
+def PositionEstimator(signal, sites, sv,
                         stepsize = STEPSIZE, emin = EASTING_MIN, emax=EASTING_MAX,
-                        nmin = NORTHING_MIN, nmax = NORTHING_MAX):
+                        nmin = NORTHING_MIN, nmax = NORTHING_MAX,
+                        method=signal.Signal.Bartlet):
   ''' Estimate the source of a signal. 
   
     Inputs: 
@@ -82,9 +83,9 @@ def PositionEstimator(signal, sites, sv, method=signal.Signal.Bartlet,
 
 
 def WindowedPositionEstimator(signal, sites, sv, t_step, t_win, 
-                               method=signal.Signal.Bartlet, 
                                stepsize = STEPSIZE, emin = EASTING_MIN, emax=EASTING_MAX,
                                nmin = NORTHING_MIN, nmax = NORTHING_MAX,
+                               method=signal.Signal.Bartlet, 
                                prepare_for_cov=False):
   ''' Estimate the source of a signal for windows of data over ``signal``. 
   
@@ -147,7 +148,8 @@ def InsertPositions(db_con, dep_id, cal_id, zone, pos, cov=None):
   
   ''' 
   max_id = 0
-  for (P, C) in zip(pos, cov):
+  for j in range(len(pos)):
+    P = pos[j]
     # Insert bearings
     bearing_ids = []
     for (site_id, B) in P.bearings.iteritems():
@@ -157,6 +159,7 @@ def InsertPositions(db_con, dep_id, cal_id, zone, pos, cov=None):
     # Insert position
     pos_id = P.insert_db(db_con, dep_id, bearing_ids, zone)
     if pos_id and not (cov is None):
+      C = cov[j]
       max_id = max(pos_id, max_id)
       
       # Insert covariance
