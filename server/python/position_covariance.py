@@ -1,7 +1,43 @@
 
+#TODO import statements
+
+# Paramters for bootstrap covariance estimation. 
+BOOT_MAX_RESAMPLES = 200
+BOOT_CONF_LEVELS = [0.68, 0.80, 0.90, 0.95, 0.997]
 
 
-def WindowedCovarianceEstimator(pos, sites, max_resamples=BOOT_MAX_RESAMPLES):  
+### class PositionEstimator. ##################################################
+
+class PositionError (Exception): 
+  value = 0; msg = ''
+  def __str__(self): return '%s (%d)' % (self.msg, self.value)
+
+class SingularError (PositionError):
+  value = 2
+  msg = 'covariance matrix is singular.'
+
+class PosDefError (PositionError): 
+  value = 3
+  msg = 'covariance matrix is positive definite.'
+
+class BootstrapError (PositionError): 
+  value = 4
+  msg = 'not enough samples to perform boostrap.'
+
+
+#TODO impliment the correct calls to agragate spectrum
+if False:
+  if ENABLE_BOOTSTRAP3 or ENABLE_ASYMPTOTIC: 
+    all_splines = {}
+  else: all_splines = None
+
+  if ENABLE_BOOTSTRAP or ENABLE_BOOTSTRAP2:
+    sub_splines = {}
+  else: sub_splines = None
+
+
+
+def CovarianceEstimator(pos, sites, max_resamples=BOOT_MAX_RESAMPLES):  
   ''' Compute covariance of each position in `pos`. 
 
     Inputs:
@@ -17,15 +53,8 @@ def WindowedCovarianceEstimator(pos, sites, max_resamples=BOOT_MAX_RESAMPLES):
   ''' 
   cov = []
   for P in pos:
-    if ENABLE_BOOTSTRAP:
-      C = BootstrapCovariance(P, sites, max_resamples)
-      cov.append(C)
-    if ENABLE_BOOTSTRAP2:
-      C = BootstrapCovariance2(P, sites, max_resamples)
-      cov.append(C)
-    if ENABLE_BOOTSTRAP3:
-      C = BootstrapCovariance3(P, sites, max_resamples)
-      cov.append(C)
+    C = BootstrapCovariance3(P, sites, max_resamples)
+    cov.append(C)
   return cov
 
 def ReadCovariances(db_con, dep_id, t_start, t_end):
@@ -631,7 +660,7 @@ def bootstrap_case_resample(pos, sites, max_resamples, objective_function):
         for site, est_index in site_spline_tuples:
           spline_dict[site].append(pos.all_splines[site][est_index])
       (p, _) = compute_position(sites, spline_dict, pos.p, objective_function,
-              s=POS_EST_S, m=POS_EST_M-1, n=POS_EST_N, delta=POS_EST_DELTA)
+              s=POS_EST_S, m=POS_EST_M-1, n=POS_EST_N, delta=POS_EST_DELTA)#FIXME
       bootstrap_resampled_positions.append(p)
 
     

@@ -302,13 +302,13 @@ class Signal:
   def MLE(self, per_site_data, sv):
     ''' Compute bearing spectrum of signals with respect to the MLE. '''    
     assert isinstance(per_site_data, _per_site_data)
-    return (per_site_data.mle(sv), np.argmax)
+    return per_site_data.mle(sv)
 
   @classmethod
   def Bartlet(self, per_site_data, sv):
     ''' Compute bearing spectrum of signals with respect to Bartlet's estimator. ''' 
     assert isinstance(per_site_data, _per_site_data)
-    return (per_site_data.bartlet(sv), np.argmax)
+    return per_site_data.bartlet(sv)
 
   
 def _mle(V, G, edsp, noise_cov, ct, j): 

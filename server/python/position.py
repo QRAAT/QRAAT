@@ -3,22 +3,14 @@
 # High level calls, database interaction: 
 #  - PositionEstimator
 #  - WindowedPositionEstimator
-#  - WindowedCovarianceEstimator
 #  - InsertPositions
-#  - InsertPositionsCovariances
 #  - ReadPositions
 #  - ReadBearings
 #  - ReadAllBearings
-#  - ReadCovariances
-#  - ReadConfidenceRegions
 #
 # Objects defined here: 
 #  - class Position
 #  - class Bearing
-#  - class Covariance
-#  - class BootstrapCovariance (Covariance)
-#  - class BootstrapCovariance2 (BootstrapCovariance)
-#  - class Ellipse
 #
 # Copyright (C) 2015 Chris Patton, Todd Borrowman, Sean Riddle
 # 
@@ -37,67 +29,28 @@
 
 from . import util, signal
 
-import sys, time
 import numpy as np
-import matplotlib.pyplot as pp
 from scipy.interpolate import InterpolatedUnivariateSpline as spline1d
-import scipy, scipy.stats
-import numdifftools as nd
 import utm
-import itertools, random
-
-import Queue, threading
+import itertools
 
 # Paramters for position estimation. 
-POS_EST_M = 3
-POS_EST_N = -1
-POS_EST_DELTA = 5
-POS_EST_S = 10
-
-# Enable bootstrap covariance estimation (compute Position.sub_splines). 
-# The subsplines are computed in `aggregate_window()`. Disabling this 
-# will improve performance of position estimation when the covariance is 
-# not needed. 
-ENABLE_BOOTSTRAP = False
-ENABLE_BOOTSTRAP2 = False
-ENABLE_BOOTSTRAP3 = False
-
-# Enable asymptotic covariance (compute Position.all_splines). 
-ENABLE_ASYMPTOTIC = False
+EASTING_MIN = 573000
+EASTING_MAX = 576000
+NORTHING_MIN = 4259000
+NORTHING_MAX = 4263000
+STEPSIZE = 5
 
 # Normalize bearing spectrum. 
 NORMALIZE_SPECTRUM = False
-
-# Paramters for bootstrap covariance estimation. 
-BOOT_MAX_RESAMPLES = 200
-BOOT_CONF_LEVELS = [0.68, 0.80, 0.90, 0.95, 0.997]
-
-
-
-### class PositionEstimator. ##################################################
-
-class PositionError (Exception): 
-  value = 0; msg = ''
-  def __str__(self): return '%s (%d)' % (self.msg, self.value)
-
-class SingularError (PositionError):
-  value = 2
-  msg = 'covariance matrix is singular.'
-
-class PosDefError (PositionError): 
-  value = 3
-  msg = 'covariance matrix is positive definite.'
-
-class BootstrapError (PositionError): 
-  value = 4
-  msg = 'not enough samples to perform boostrap.'
 
 
 
 ### High level function calls. ################################################
 
-def PositionEstimator(signal, sites, center, sv, method=signal.Signal.Bartlet,
-                        s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA):
+def PositionEstimator(signal, sites, sv, method=signal.Signal.Bartlet,
+                        stepsize = STEPSIZE, emin = EASTING_MIN, emax=EASTING_MAX,
+                        nmin = NORTHING_MIN, nmax = NORTHING_MAX):
   ''' Estimate the source of a signal. 
   
     Inputs: 
@@ -108,41 +61,49 @@ def PositionEstimator(signal, sites, center, sv, method=signal.Signal.Bartlet,
                easting/northing as a complex number. The imaginary component 
                is easting and the real part is northing.
 
-      center -- initial guess of position, represented in UTM as a complex 
-                number. 
-
       sv -- instance of `class signal.SteeringVectors`, calibration data. 
 
       method -- Specify method for computing bearing likelihood distribution.
 
-      s, m, n, delta -- Parameters for position estimation algorithm. 
+      stepsize, emin, emax, nmin, nmax -- Parameters for position estimation algorithm. 
 
     Returns an instance of `class position.Position`. 
   ''' 
   if len(signal) > 0: 
     bearing_spectrum = {} # Compute bearing likelihood distributions.  
     for site_id in signal.get_site_ids().intersection(sv.get_site_ids()): 
-      (bearing_spectrum[site_id], objective_function) = method(signal[site_id], sv)
+      bearing_spectrum[site_id] = method(signal[site_id], sv)
 
-    return Position(bearing_spectrum, signal, objective_function, sites, center,
-                                signal.t_start, signal.t_end, s, m, n, delta)
+    return Position(bearing_spectrum, signal, sites, signal.t_start, signal.t_end,
+                    stepsize, emin, emax, nmin, nmax)
 
   else:
     return None
 
-#TAB Start Here
-def WindowedPositionEstimator(signal, sites, center, sv, t_step, t_win, method=signal.Signal.Bartlet, 
-                               s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA):
+
+def WindowedPositionEstimator(signal, sites, sv, t_step, t_win, 
+                               method=signal.Signal.Bartlet, 
+                               stepsize = STEPSIZE, emin = EASTING_MIN, emax=EASTING_MAX,
+                               nmin = NORTHING_MIN, nmax = NORTHING_MAX,
+                               prepare_for_cov=False):
   ''' Estimate the source of a signal for windows of data over ``signal``. 
   
     Inputs: 
     
-      signal, sites, center, sv
+      signal -- instance of `class signal.Signal`, signal data. 
+      
+      sites -- a map from siteIDs to site positions represented as UTM 
+               easting/northing as a complex number. The imaginary component 
+               is easting and the real part is northing.
+
+      sv -- instance of `class signal.SteeringVectors`, calibration data. 
+
+      method -- Specify method for computing bearing likelihood distribution.
       
       t_step, t_win -- time step and window respectively. A position 
                        is computed for each timestep. 
 
-      s, m, n, delta
+      stepsize, emin, emax, nmin, nmax -- Parameters for position estimation algorithm. 
 
     Returns a list of `class position.Position` instances. 
   ''' 
@@ -150,102 +111,19 @@ def WindowedPositionEstimator(signal, sites, center, sv, t_step, t_win, method=s
 
   if len(signal) > 0: 
     bearing_spectrum = {} # Compute bearing likelihood distributions. 
-    objective_function = None 
 
     for site_id in signal.get_site_ids().intersection(sv.get_site_ids()): 
-      (bearing_spectrum[site_id], objective_function) = method(signal[site_id], sv)
+      bearing_spectrum[site_id] = method(signal[site_id], sv)
     
     for (t_start, t_end) in util.compute_time_windows(
                         signal.t_start, signal.t_end, t_step, t_win):
     
-      pos.append(Position(bearing_spectrum, signal, objective_function, 
-                  sites, center, t_start, t_end, s, m, n, delta))#TAB A
+      pos.append(Position(bearing_spectrum, signal, 
+                  sites, t_start, t_end, stepsize, emin, emax, nmin, nmax,
+                  prepare_for_cov))
     
   return pos
 
-
-#Multithreaded estimation
-class EstimatorPool:
-
-  class Worker (threading.Thread):
-
-    def __init__(self, jobs):
-      threading.Thread.__init__(self)
-      self.jobs = jobs
-      self.daemon = True
-      self.start()
-
-    def run(self):
-      while True:
-        func, args = self.jobs.get()
-        try: func(*args)
-        except Exception, e: print e
-        self.jobs.task_done()
-
-  def __init__(self, num_jobs, sites, center, sv,
-               method=signal.Signal.Bartlet,
-               s=POS_EST_S, m=POS_EST_M, n=POS_EST_N, delta=POS_EST_DELTA,
-               max_resamples=BOOT_MAX_RESAMPLES):
-    ''' Pool of worker threads for multihtreaded position and covariance estimation. 
-
-      Input: jobs -- number of workers to spawn. 
-    '''
-    # Parameters
-    self.sites = sites
-    self.center = center
-    self.sv = sv
-    self.method = method
-    self.pos_params = (s, m, n, delta)
-    self.cov_params = (max_resamples,)
-  
-    # Worker threads
-    self.jobs = Queue.Queue(num_jobs)
-    for _ in range(num_jobs):
-      self.Worker(self.jobs)
-    
-    # Output queue
-    self.output = Queue.PriorityQueue()
-
-  def enqueue(self, sig, t_step, t_win): 
-    ''' Enqueue a chunk of sig data. 
-
-      The bearing spectra for the sigs are computed, then a bunch of jobs
-      are added to the queue. A job consists of a reference the bearing spectrum 
-      data, the sig data, and a window of data to use for the position and 
-      covariance estimation. 
-    '''
-    if len(sig) > 0: 
-      bearing_spectrum = {} # Compute bearing likelihood distributions. 
-      for site_id in sig.get_site_ids().intersection(self.sv.get_site_ids()): 
-        (bearing_spectrum[site_id], objective_function) = self.method(sig[site_id], self.sv)
-      
-      for (t_start, t_end) in util.compute_time_windows(
-                          sig.t_start, sig.t_end, t_step, t_win):
-      
-        self.jobs.put((self.job, (bearing_spectrum, sig, t_start, t_end, objective_function)))
-
-  def dequeue(self):
-    ''' Dequeue a position and covariance estimate in chronological order. 
-    
-      Returns a tuple (P, C) where P is an instance of `position.Position`
-      and C is an instance of `position.BootstrapCovariance`. 
-    ''' 
-    return self.output.get()
-
-  def empty(self):
-    return self.output.empty()
-
-  def job(self, bearing_spectrum, sig, t_start, t_end, objective_function):
-    ''' Estimate position and covariance and put objects in output queue. ''' 
-    P = Position(bearing_spectrum, sig, objective_function, 
-                  self.sites, self.center, t_start, t_end, *self.pos_params)
-    C = BootstrapCovariance(P, self.sites, *self.cov_params)
-    self.output.put((P, C))
-
-  def join(self):
-    self.jobs.join()
-
-   
 
 def InsertPositions(db_con, dep_id, cal_id, zone, pos, cov=None):
   ''' Insert positions, bearings, and covariances into database. 
@@ -386,7 +264,7 @@ def ReadPositions(db_con, dep_id, t_start, t_end):
 
 class Position:
   
-  def __init__(self, *args):#TAB A
+  def __init__(self, *args):
     ''' Representation of position estimtes. 
     
       The default constructor sets all attributes to `None`. If arguments are provided, 
@@ -402,9 +280,7 @@ class Position:
     self.bearings = None
     
     self.splines = None
-    self.sub_splines = None
     self.all_splines = None
-    self.objective_function = None
     
     self.pos_id = None
     self.zone = None
@@ -412,9 +288,9 @@ class Position:
     self.longitude = None
   
     if len(args) == 11: 
-      self.calc(*args)#TAB B
+      self.calc(*args)
 
-  def calc(self, bearing_spectrum, signal, objective_function, sites, center, t_start, t_end, s, m, n, delta):#TAB B
+  def calc(self, bearing_spectrum, signal, sites, t_start, t_end, stepsize, emin, emax, nmin, nmax, prepare_for_cov):
     ''' Compute a position from signal data.
 
       In addition, compute the bearing data. If there is only data from one site, then 
@@ -432,22 +308,19 @@ class Position:
         
         signal -- an instance of `class signal.Signal` encapsulating the raw signal data. 
          
-        objective_function -- objective function for bearing spectrum (either `np.argmin` or `np.argmax`). 
-
         sites -- mapping from siteIDs to receiver locations. 
-
-        center -- initial guess for position estimation. 
 
         t_start, t_end -- slice of `signal` data to use for estimate. 
 
-        s, m, n, delta -- paramters of position estimation algorithm. 
+        stepsize, emin, emax, nmin, nmax -- Parameters for position estimation algorithm. 
     ''' 
     # Aggregate site data. 
-    (splines, sub_splines, all_splines, bearings, num_est) = aggregate_window(
-                                  bearing_spectrum, signal, objective_function, t_start, t_end)#TAB C
+    (splines, all_splines, bearings, num_est) = aggregate_window(
+                                  bearing_spectrum, signal, t_start, t_end,
+                                  prepare_for_cov)
    
     if len(splines) > 1: # Need at least two site bearings. 
-      p_hat, likelihood = compute_position(sites, splines, center, objective_function, s, m, n, delta) #TAB G
+      p_hat, likelihood = compute_position(sites, splines, stepsize, emin, emax, nmin, nmax)
     else: p_hat, likelihood = None, None
     
     # Return a position object. 
@@ -471,9 +344,8 @@ class Position:
     self.num_sites = num_sites
 
     self.splines = splines         # siteID -> aggregated bearing likelihood spline
-    self.sub_splines = sub_splines # siteID -> spline of sub samples for bootstrapping
     self.all_splines = all_splines # siteID -> spline for each pulse
-    self.objective_function = objective_function                 # objective function used in pos. est.
+
  
   def insert_db(self, db_con, dep_id, bearing_ids, zone):
     ''' Insert position and bearings into the database. 
@@ -512,6 +384,8 @@ class Position:
       the position was computed from signal data. 
     '''
     assert self.splines != None 
+    import time
+    import matplotlib.pyplot as pp
 
     if self.num_sites == 0:
       print 'yes'
@@ -578,7 +452,7 @@ def __lt__(self):
 
 class Bearing:
   
-  def __init__(self, *args): #TAB F
+  def __init__(self, *args):
     ''' Representation of bearing estimates. 
 
       This class also encapsulates the "activity" of the transmitter, as 
@@ -594,10 +468,10 @@ class Bearing:
     self.activity = None
     self.num_est = None
 
-    if len(args) == 5:
+    if len(args) == 3:
       self.calc(*args)
 
-  def calc(self, edsp, bearing_spectrum, num_est, objective_function, est_ids):
+  def calc(self, edsp, bearing_spectrum, est_ids):
     ''' Compute bearing from `bearing_spectrum` and activity from `edsp`.
 
       Inputs: 
@@ -608,21 +482,16 @@ class Bearing:
         edsp -- a list of real numbers indicating the signal power 
                 of each signal. 
 
-        num_est -- number of signals 
-
-        objective_function -- objective function for bearing likelihood (either `np.argmin`
-               or `np.argmax`).
-
         est_ids -- estIDs (serial identifiers in database) of the signals. 
     '''
     self.est_ids = est_ids
-    self.num_est = num_est
-    self.bearing = objective_function(bearing_spectrum)
+    self.num_est = len(est_ids)
+    self.bearing = np.argmax(bearing_spectrum)
 
     # Normalized likelihood. 
     self.likelihood = bearing_spectrum[self.bearing]
     if not NORMALIZE_SPECTRUM: #TAB HUH? See other NORMALIZE
-      self.likelihood /= num_est
+      self.likelihood /= self.num_est
     
     # Activity.
     self.activity = (np.sum((edsp - np.mean(edsp))**2)**0.5)/np.sum(edsp)
@@ -651,8 +520,8 @@ class Bearing:
 
 
 ### Low level calls. ##########################################################
-#TAB C
-def aggregate_window(bearing_spectrum_per_site_dict, signal_per_site_dict, objective_function, t_start, t_end):
+def aggregate_window(bearing_spectrum_per_site_dict, signal_per_site_dict, t_start, t_end,
+                     calc_all_splines=False):
   ''' Aggregate site data, compute splines for pos. estimation. 
   
     Site data includes the most likely bearing to each site, 
@@ -663,15 +532,10 @@ def aggregate_window(bearing_spectrum_per_site_dict, signal_per_site_dict, objec
   num_est = 0
   splines = {}  
   bearings = {}
-  sub_splines = {}
 
-  if ENABLE_BOOTSTRAP3 or ENABLE_ASYMPTOTIC: 
+  if calc_all_splines: 
     all_splines = {}
   else: all_splines = None
-
-  if ENABLE_BOOTSTRAP or ENABLE_BOOTSTRAP2:
-    sub_splines = {}
-  else: sub_splines = None
 
   for (siteID, bearing_spectrum) in bearing_spectrum_per_site_dict.iteritems():
     mask = (t_start <= signal_per_site_dict[siteID].t) & (signal_per_site_dict[siteID].t < t_end)
@@ -680,38 +544,23 @@ def aggregate_window(bearing_spectrum_per_site_dict, signal_per_site_dict, objec
     if edsp.shape[0] > 0:
       likelihoods = bearing_spectrum[mask]
       # Aggregated bearing spectrum spline per site.
-      p = aggregate_spectrum(likelihoods)#TAB D
-      splines[siteID] = compute_bearing_spline(p) #TAB E
-      
-      # Sub sample splines.
-      if ENABLE_BOOTSTRAP or ENABLE_BOOTSTRAP2:
-        sub_splines[siteID] = []
-        if len(likelihoods) == 1: 
-          sub_splines[siteID].append(compute_bearing_spline(likelihoods[0]))
-        elif len(likelihoods) == 2:
-          sub_splines[siteID].append(compute_bearing_spline(likelihoods[0]))
-          sub_splines[siteID].append(compute_bearing_spline(likelihoods[1]))
-        else:
-          #HUH? TAB 2015-07-27
-          #For N records build all N-1 sized spectra? 
-          for index in itertools.combinations(range(len(likelihoods)), len(likelihoods)-1):
-            p = aggregate_spectrum(likelihoods[np.array(index)])
-            sub_splines[siteID].append(compute_bearing_spline(p)) 
+      spectrum = aggregate_spectrum(likelihoods)
+      splines[siteID] = compute_bearing_spline(spectrum)
       
       # All splines.
-      if ENABLE_BOOTSTRAP3 or ENABLE_ASYMPTOTIC: 
+      if calc_all_splines: 
         all_splines[siteID] = []
         for i in range(len(likelihoods)):
           all_splines[siteID].append(compute_bearing_spline(likelihoods[i]))
 
-      # Aggregated data per site. #TAB F
-      bearings[siteID] = Bearing(edsp, p, len(edsp), objective_function, est_ids)
+      # Aggregated data per site.
+      bearings[siteID] = Bearing(edsp, spectrum, est_ids)
 
       num_est += edsp.shape[0]
   
-  return (splines, sub_splines, all_splines, bearings, num_est)
+  return (splines, all_splines, bearings, num_est)
 
-#TAB D
+
 def aggregate_spectrum(p):
   ''' Sum a set of bearing likelihoods. '''
   if NORMALIZE_SPECTRUM:
@@ -719,7 +568,6 @@ def aggregate_spectrum(p):
   else: 
     return np.sum(p, 0)
 
-#TAB E
 def compute_bearing_spline(l): 
   ''' Interpolate a spline on a bearing likelihood distribuiton. 
     
@@ -732,13 +580,15 @@ def compute_bearing_spline(l):
   return spline1d(bearing_domain, likelihood_range)
 
 
-def compute_likelihood_grid(sites, splines, center, scale, half_span):
+def compute_likelihood_grid(sites, splines, stepsize, emin, emax, nmin, nmax):
   ''' Compute a grid of candidate points and their likelihoods. '''
   # Generate a grid of positions with center at the center. 
-  positions = np.zeros((half_span*2+1, half_span*2+1),np.complex)
-  for e in range(-half_span,half_span+1):
-    for n in range(-half_span,half_span+1):
-      positions[e + half_span, n + half_span] = center + np.complex(n * scale, e * scale)
+  e_range = np.arange(emin,emax+stepsize,stepsize)
+  n_range = np.arange(nmin,nmax+stepsize,stepsize)
+  positions = np.zeros((len(e_range), len(n_range)),np.complex)
+  for j,e in enumerate(e_range):
+    for k,n in enumerate(n_range):
+      positions[j, k] = np.complex(n, e)
   # Compute the likelihood of each position as the sum of the likelihoods 
   # of bearing to each site. 
   likelihoods = np.zeros(positions.shape, dtype=float)
@@ -762,54 +612,42 @@ def compute_likelihood(sites, splines, p):
     likelihood += splines[siteID](bearing)
   return likelihood
 
-#TAB G
-def compute_position(sites, splines, center, objective_function, s, m, n, delta):
-  ''' Maximize (resp. minimize) over position space. 
+def compute_position(sites, splines, stepsize, emin, emax, nmin, nmax):
+  ''' Maximize over position space. 
 
-    Grid search algorithm for position estimation (optimizing over the 
-    search space). If the most likely position is at the edge of the grid,
-    then rerun at the same scale with the most likely position as the 
-    new center. This is done up to 3 times.  
+    Grid search algorithm for position estimation.  First pass is stepsize grid
+    within boundry.  Second pass is 1 meter grid bounding the likelihoods > 90% max
+    of first pass.
 
     Inputs: 
       
-      sites, center - UTM positions of receiver sites and center, the initial 
-                      guess of the transmitter's position. 
+      sites - UTM positions of receiver sites. 
       
       splines -- a set of splines corresponding to the bearing likelihood
                  distributions for each site.
 
-      objective_function -- np.argmin or np.argmax
+      stepsize -- initial stepsize for grid search
 
-      s -- Half span of search grid. (The dimensions of the grid are 2*s+1 
-           by 2*s+1.) 
-
-      m -- Initial scale. The grid points are initially spaced delta**m 
-           meters apart. 
-
-      n -- Final scale. The grid points are spaced delta**n meters apart 
-           in the final iteration. 
-
-      delta -- Scaling factor.  
+      emin, emax, nmin, nmax -- initial grid boundary for search
     
       Returns UTM position estimate as a complex number and the likelihood
       of the position
   '''
-  assert m >= n
-  p_hat = center
-  span = s * 2 + 1
-  for i in reversed(range(n, m+1)):
-    scale = delta ** i
-    a = b = ct = 0
-    while ct < 3 and (a == 0 or a == span-1 or b == 0 or b == span-1): 
-      (positions, likelihoods) = compute_likelihood_grid(
-                             sites, splines, p_hat, scale, s)
-      index = objective_function(likelihoods)
-      p_hat = positions.flat[index]
-      likelihood = likelihoods.flat[index]
-      a = index / span; b = index % span
-      ct += 1
-  return p_hat, likelihood
+  
+  (positions, likelihoods) = compute_likelihood_grid(
+                             sites, splines, stepsize, emin, emax, nmin, nmax)
+  max_llh = np.max(likelihoods)
+  select_positions = positions[likelihoods > 0.9*max_llh]
+  emin = np.min(select_positions.imag)
+  emax = np.max(select_positions.imag)
+  nmin = np.min(select_positions.real)
+  nmax = np.max(select_positions.real)
+  stepsize = 1
+  (positions, likelihoods) = compute_likelihood_grid(
+                             sites, splines, stepsize, emin, emax, nmin, nmax)
+  max_llh = np.max(likelihoods)
+  p_hat = positions.flat[np.argmax(likelihoods)]
+  return p_hat, max_llh
 
 
 

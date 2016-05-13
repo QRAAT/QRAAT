@@ -207,6 +207,12 @@ export RMG_POS_ENABLE_COV=false
 # Normalize beaaring spectrum
 export RMG_POS_NORMALIZE_SPECTRUM=false
 
+# Boundry for position estimation
+export RMG_POS_EASTING_MIN=573000
+export RMG_POS_EASTING_MAX=576000
+export RMG_POS_NORTHING_MIN=4259000
+export RMG_POS_NORTHING_MAX=4263000
+
 #END#position_auto
 
 #track_auto
