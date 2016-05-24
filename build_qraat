@@ -120,7 +120,7 @@ function node_install {
   sudocheck
   echo
   echo -n ' Installing Node software .'
-  echo `date` > $LOG
+  my_echo `date`
 
   mkdir $RMG_NODE_BUILD &> /dev/null; cd $RMG_NODE_BUILD
   my_echo "--------------------------------"
@@ -226,7 +226,24 @@ function server_install {
   fi
   echo -n '.'
   sudo ldconfig
+  echo ' done.'
+  echo
+}
 
+function db_install {
+  echo
+  echo -n 'Setting up the qraat database .'
+  my_echo `date`
+  my_echo "--------------------------------"
+  my_echo "Setting up the qraat database"
+  echo "Input the password for mysql's root account: "
+  read pswd 
+  mysql -u root --password=$pswd qraat < $RMG_SERVER_SRC/etc/db_schema.sql >>$LOG 2>&1
+  if [ ! $? = 0 ]; then
+    echo
+    echo "error: mysql: exited with error status. Check out log file for details."
+    exit $?
+  fi
   echo ' done.'
   echo 
 }
@@ -235,7 +252,7 @@ function base_install {
   sudocheck
   echo
   echo -n ' Installing Base software .'
-  echo `date` > $LOG
+  my_echo `date`
 
   mkdir $RMG_BASE_BUILD &> /dev/null; cd $RMG_BASE_BUILD
   my_echo "--------------------------------"
@@ -282,7 +299,7 @@ function base_install {
 function dist {
   echo
   echo -n ' Distributing RMG .'
-  echo `date` > $LOG
+  my_echo `date`
 
   mkdir $1 &> /dev/null; cd $1
   my_echo "--------------------------------"
@@ -320,7 +337,7 @@ function uninstall {
   sudocheck
   echo 
   echo -n ' Uninstalling RMG. '
-  echo `date` > $LOG
+  my_echo `date`
 
   cd $1
   my_echo "--------------------------------"
@@ -348,12 +365,15 @@ do
         server)
           BUILD_SECTIONS="base server"
           ;;
+        db)
+          BUILD_SECTIONS="db"
+          ;;
         all)
           BUILD_SECTIONS="base server node"
           ;;
         *)
           echo "Unrecognized section to build"
-          echo "Please specify [base, node, server, all] after install"
+          echo "Please specify [base, node, server, db, all] after install"
           exit
           ;;
       esac
@@ -467,6 +487,7 @@ if [ $INSTALL = true ]; then
       base) base_install ;;
       server) server_install ;;
       node) node_install ;;
+      db) db_install ;;
     esac
   done
 fi

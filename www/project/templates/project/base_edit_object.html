@@ -1,0 +1,26 @@
+{% extends "project/base.html" %}
+{% block css %}
+<link rel='stylesheet' type='text/css' href='/static/project/css/style.css'/>
+{% endblock %}
+{% load class_tag %}
+
+{% block sidebar %} {% include "project/manage_side_bar.html" %} {% endblock %}
+
+{% block content %}
+
+ {% if changed %}
+    <div class="alert alert-success" role="alert">
+        {% block success_msg %} {% endblock %}
+    </div>
+    {% endif %}
+
+    <div class="page-header">
+        <h4>
+            {% block title_msg %}{% endblock %}
+        </h4>
+    </div>
+
+    {% include "project/base_edit_form.html" %}
+
+{% endblock %} 
+

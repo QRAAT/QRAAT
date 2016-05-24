@@ -1,0 +1,306 @@
+#!/bin/bash
+
+WWW_DIR=$( cd $(dirname $0); pwd -P)
+# Where the contents of www/ will be copied to
+# If you change this, you must change qraat-site.conf
+SITE_DIR="/usr/local/share/qraat_site/"
+METADATA_DIR="/etc/qraat_site"
+DJANGO_VERSION=1.8
+
+
+if [[ $# == 0 ]]; then
+    echo "Please use one of the arguments 'complete-install' or 'update'"
+    echo "'complete-install' will check for and install all applications required to run the website, setup some files and folders, and run 'update'. Choose this if this is a fresh install of the site"
+    echo "'update' will copy folders from the www folder to $SITE_DIR and run collect static"
+    echo "You can also have the arguments skip-apache-check or skip-django-check to bypass checking their versions. Use skip-all-check to skip both"
+    exit
+fi
+
+for arg in "$@"; do
+    case $arg in
+	skip-apache-check) SKIP_APACHE_CHECK=true ;;
+	skip-django-check) SKIP_DJANDO_CHECK=true ;;
+	skip-all-check) SKIP_ALL_CHECK=true ;;
+	complete-install) COMPLETE_INSTALL=true ;;
+	update) ;;
+    esac
+done
+
+# Redirect stdout and stderr to log
+LOG="$(basename $0)""_log.txt"
+
+exec > >(tee "$HOME/$LOG") 2>&1
+echo "Starting script $(date)"
+
+if [ "$COMPLETE_INSTALL" = true ]; then
+
+echo "A complete install will take around 25 minutes, with installing numpy taking up a large portion of that time"
+
+# ------------------------------------------------------------
+# Version control
+# ------------------------------------------------------------
+# Check Apache
+if (test "$SKIP_ALL_CHECK" != true && test "$SKIP_APACHE_CHECK" != true) && dpkg -l | grep -qw apache2; then
+    APACHEVS=`dpkg -s apache2 | grep Version`
+    APACHEVS=($APACHEVS)
+    APACHEVS=${APACHEVS[1]}
+    if [[ $APACHEVS != 2.4* ]]; then
+	echo
+	echo "Apache is already installed and is not version 2.4"
+	echo "You can check which version you have with (sudo) apache2ctl -V"
+	echo "Please install version 2.4, the instructions for which can be found here"
+	echo "http://wildlifedamage.unl.edu/manual/install.html"
+	echo "Alternatively, if you have 2.2 change the qraat-site.conf file, replacing"
+	echo "'Require all granted' with"
+	echo "Order allow,deny"
+	echo "Allow from all"
+	echo "Then run this script again with skip-apache-check"
+	exit
+    fi
+fi
+
+# Check Django
+if (test "$SKIP_ALL_CHECK" != true && test "$SKIP_DJANGO_CHECK" != true) && (dpkg -l | grep -qw python-django || ( pip list | grep -qw Django ) > /dev/null 2>&1); then
+    if dpkg -l | grep -qw python-django; then
+	DJANGOVS=`dpkg -s python-django | grep Version`
+    else
+	DJANGOVS=`pip show django | grep Version`
+    fi
+    DJANGOVS=($DJANGOVS)
+    DJANGOVS=${DJANGOVS[1]}
+    if [[ $DJANGOVS != 1.8* ]]; then
+	echo
+	echo "Django is already installed and is not version 1.8"
+	echo "Install version 1.8, or run this script again with skip-django-check"
+	exit
+    fi
+fi
+
+# Check Mysql (only outputs a warning)
+if dpkg -l | grep -qw mysql-server; then
+    MYSQLVS=`dpkg -s mysql-server | grep Version`
+    MYSQLVS=($MYSQLVS)
+    MYSQLVS=${MYSQLVS[1]}
+    if [[ $MYSQLVS != 5.5* ]]; then
+	echo
+	echo "Warning, this setup has only been tested with Mysql 5.5"
+	echo "Enter 'quit' to quit, anything else to continue"
+	read foo
+	if [[ $foo = 'quit' ]]; then
+	    exit
+	fi
+    fi
+fi
+
+# ------------------------------------------------------------
+# Some prompts
+# ------------------------------------------------------------
+# The user that runs collectstatic
+echo
+echo "Enter the name of the user that will run collectstatic"
+read USER
+
+# ------------------------------------------------------------
+# Copying metadata templates
+# ------------------------------------------------------------
+# Create the metadata directory
+if [ ! -d $(dirname $METADATA_DIR) ]; then
+    printf "\nWarning: the parent directory $(dirname $METADATA_DIR) did not exist before\n\n"
+elif [ -e $METADATA_DIR ]; then
+    printf "\nWarning: the folder $METADATA_DIR already exists\n\n"
+fi
+sudo mkdir -p $METADATA_DIR || exit
+
+# Copy files
+sudo cp $WWW_DIR/etc/db_auth $METADATA_DIR
+
+# ------------------------------------------------------------
+# Mysql
+# ------------------------------------------------------------
+# Installs
+dpkg -l | grep -qw mysql-server || sudo apt-get install mysql-server
+dpkg -l | grep -qw python-mysqldb || sudo apt-get install python-mysqldb
+
+# Create the mysql users, and update db_auth
+MYSQL_USERS=(web_reader web_writer django_admin)
+echo
+echo "In the following portion you'll set up users for the mysql database"
+echo "This will overwrite existing accounts with the same name"
+echo "To continue press enter, to skip this step enter 'skip', to quit enter 'quit'"
+read foo
+if [[ $foo = 'quit' ]]; then 
+    exit
+elif [[ $foo != 'skip' ]]; then
+	echo "Enter the password for mysql's root account: "
+	read ROOT_PSWD
+	echo "Just press enter to use the defaults"
+
+	cp $WWW_DIR/etc/db_user_grants.sql.template $WWW_DIR/etc/db_user_grants.sql
+	cp $WWW_DIR/etc/db_create.sql.template $WWW_DIR/etc/db_create.sql
+	for user in "${MYSQL_USERS[@]}"; do
+	    echo "Enter the name of the $user [default = '$user']: "
+	    read NAME
+	    if [ -z $NAME ]; then
+		NAME=$user
+	    fi
+	    DEF_PSWD=`date +%s | sha256sum | base64 | head -c 8`
+	    sleep 1
+	    echo "Enter the password [default = '$DEF_PSWD']: " 
+	    read PSWD
+	    if [ -z $PSWD ]; then
+		PSWD=$DEF_PSWD
+	    fi
+	    sudo sed "s/$user/$NAME/2;/$NAME/s/password/$PSWD/" $METADATA_DIR/db_auth -i
+	    sudo sed "s/$user/$NAME/2" $WWW_DIR/etc/db_user_grants.sql -i
+	    sudo sed "s/$user/$NAME/;/$NAME/s/password/$PSWD/" $WWW_DIR/etc/db_create.sql -i
+	done 
+	echo "(Errors saying a user cannot be dropped just means it didn't exist before)"
+	mysql -u root --password=$ROOT_PSWD -f < $WWW_DIR/etc/db_create.sql
+	mysql -u root --password=$ROOT_PSWD qraat < $WWW_DIR/../server/etc/db_schema.sql
+	#mysql -u root --password=$ROOT_PSWD < $WWW_DIR/etc/db_user_grants.sql
+fi
+# ------------------------------------------------------------
+# Build QRAAT
+# ------------------------------------------------------------
+# Pkgs required for build_qraat
+dpkg -l | grep -qw g++ || sudo apt-get install g++ 
+dpkg -l | grep -qw cmake || sudo apt-get install cmake 
+dpkg -l | grep -qw swig || sudo apt-get install swig 
+dpkg -l | grep -qw python-dev || sudo apt-get install python-dev # Maybe optional if you add -I/usr/include/python2.7 -lpython2.7 flas to gcc command in build_qraat. We need it so python.h exists
+
+MYPWD=$(pwd)
+cd $(dirname $WWW_DIR)
+./build_qraat install base
+cd $MYPWD
+
+# ------------------------------------------------------------
+# Django 
+# ------------------------------------------------------------
+# Install Django and other Python modules
+# Pip is is a package management system for Python. You can install these python modules some other way.
+
+dpkg -l | grep -qw python-pip || sudo apt-get install python-pip
+sudo pip install Django==$DJANGO_VERSION
+sudo pip install pytz
+sudo pip install python-dateutil # May remove in the future if we only use pytz
+sudo pip install utm
+sudo pip install numpy
+
+# Create the SECRET_KEY for Django, and put it in $METADATA_DIR/ui_keys
+# Show a warning if that already exists
+foo="new-key"
+if [ -f $METADATA_DIR/ui_keys ]; then
+    echo
+    echo "$METADATA_DIR/ui_keys already exists. Press enter to skip creating a new SECRET_KEY for Django, or enter 'new-key' for overwrite it, or quit to quit"
+    read foo
+    if [[ $foo = "quit" ]]; then 
+	exit 
+    fi
+fi
+if [[ $foo = "new-key" ]]; then
+    # Random string, replace ',' with '.' so the csv reader works
+    SKEY=`< /dev/urandom tr -dc '!@#$%^&*()-=+_A-Z-a-z-0-9' | head -c 32 | sed 's/,/./g'`
+    echo "name,secret,key
+django_base,yes,$SKEY" | sudo tee $METADATA_DIR/ui_keys #> /dev/null
+fi
+# ------------------------------------------------------------
+# Install and configure Apache and Apache modules
+# ------------------------------------------------------------
+# Intalls Apache (It should install a2ensite/a2enmod if your distribution comes without it)
+sudo apt-get install apache2
+
+# Copy site config file to Apache, then enable it (sym links it)
+sudo cp $WWW_DIR/etc/qraat-site.conf /etc/apache2/sites-available/
+sudo a2ensite qraat-site
+
+# Installs Apache modules: mysql, wsgi
+MODS="libapache2-mod-auth-mysql libapache2-mod-wsgi"
+for mod in $MODS; do
+    dpkg -l | grep -qw $mod || sudo apt-get install $mod 
+done
+
+# Enable modules
+sudo a2enmod auth_mysql wsgi rewrite ssl socache_shmcb
+
+# Disable default site
+sudo a2dissite 000-default
+
+# Append to Apache's environment variables
+echo '. /usr/local/bin/rmg_env' | sudo tee -a /etc/apache2/envvars
+# Give Apache permission to read /var/www/
+sudo chown $USER:www-data /var/www/
+
+# ------------------------------------------------------------
+# SSL certificate for HTTPS
+# ------------------------------------------------------------
+SERVER_KEY_PATH=/etc/ssl
+if [ ! -f "$SERVER_KEY_PATH/certs/server.crt" ]; then
+# Create a self-signed SSL certificate that lasts for a year. 
+# This is not from any certificate authority
+# If you change the paths/names, you will have to change the qraat-sites.conf in the sites-available folder
+dpkg -l | grep -qw openssl || sudo apt-get install openssl
+sudo openssl genrsa -out $SERVER_KEY_PATH/private/server.key 2048
+sudo openssl req -new -key $SERVER_KEY_PATH/private/server.key -out /tmp/server.csr
+sudo openssl x509 -req -days 356 -in /tmp/server.csr -signkey $SERVER_KEY_PATH/private/server.key -out $SERVER_KEY_PATH/certs/server.crt
+fi
+
+fi # End of 'complete-install'
+
+# Start of 'update'
+
+# ------------------------------------------------------------
+# Copies the website files and runs collectstatic
+# ------------------------------------------------------------
+# Installs rsync
+dpkg -l | grep -qw rsync || sudo apt-get install rsync
+
+# Copy only modified files from www to /usr/local/share/qraat_site/, excluding 
+tmpfile=$(mktemp)
+echo "static
+etc
+copywww
+*.pyc
+" > $tmpfile
+
+sudo rsync -av $WWW_DIR/ $SITE_DIR --exclude-from=$tmpfile --delete
+rm $tmpfile
+
+# Run collectstatic to gather static files to where Apache expects them
+# stdbuf -o0 makes stdout not buffer
+source rmg_env
+stdbuf -o0 python $WWW_DIR/manage.py collectstatic
+# syncdb creates the tables in the django db. (It seems like a bug that it doesn't create ones for the apps in qraat)
+echo
+echo "When asked to create a superuser, say yes to create an admin account for your site. If you want to create one later, use 'manage.py createsuperuser'"
+stdbuf -o0 python $WWW_DIR/manage.py syncdb
+
+if [ "$COMPLETE_INSTALL" = true ]; then
+    # This script grants permissions to tables, including tables that are made by Django. 
+    # So we call it here after they're made?
+	mysql -u root --password=$ROOT_PSWD < $WWW_DIR/etc/db_user_grants.sql
+fi
+
+# Restart Apache
+sudo service apache2 restart
+    
+if [ "$COMPLETE_INSTALL" = true ]; then
+    echo
+    echo "Log in as the admin account you created, go to 'Admin Pages' and if you'd like, create another user"
+    echo "To create projects, you have two options:"
+    echo "The recommended option is to go to the 'Projects' and create a project there."
+    echo "The second option is to do it from the admin interface. The steps are:"
+    echo "1) Create a project"
+    echo "2) Create two groups named projectID_viewers and projectID_collaborators, where projectID is the ID of the project you created. Give those groups the corresponding permissions (can change, can hide, can view for collaborators, and can view for viewers)"
+    echo "3) Select the users you want to be viewers/collaborators, and add them to those groups"
+    echo "4) Create auth_project_viewer and auth_project_collaborator, where the projectID is the ID of the project you made, and groupID is the ID of the corresponding group you made."
+fi
+
+echo
+
+printf "\nIt's suggested that you source rmg_env in your bash profile if you haven't already\n"
+
+printf "\nNOTE: Please change the timezone in gaat/timezoneinfo and gaat/settings.py to the timezone where your data will come from. You can refer to https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for your timezone\n"
+
+printf "\nYou can look at https://github.com/QRAAT/QRAAT-doc/blob/master/database/dev/dev_setup_instructions for more instructions\n"
+
+echo "Finished script $(date)"

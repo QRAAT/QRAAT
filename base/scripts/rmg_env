@@ -32,6 +32,10 @@ export RMG_SERVER_DIR="/rmg_server"
 # are sitelist.csv and transmitter spec files.
 export RMG_SERVER_METADATA_DIR="$RMG_SERVER_DIR"
 
+# Location of the metadata for the weg site. Files included are
+# db_auth (for the web site) and ui_keys
+export RMG_WEB_SERVER_METADATA_DIR="/etc/qraat_site"
+
 # Location of archive on the server, used to store processed det and est files
 # This vairable is used to identify the directory that should be backed up
 export RMG_SERVER_ARCHIVE_DIR="$RMG_SERVER_DIR/archive"
@@ -51,10 +55,13 @@ export RMG_SERVER_TXDIR="$RMG_SERVER_METADATA_DIR/site_tx"
 # This file is used by server scripts to access the database.
 export RMG_SERVER_DB_AUTH="$RMG_SERVER_METADATA_DIR/db_auth"
 
+# The location of the db authentification file for the web site
+export RMG_WEB_SERVER_DB_AUTH="$RMG_WEB_SERVER_METADATA_DIR/db_auth"
+
 # Keys related to web-based user interface. The Django 
 # project 'qraatview' expects values for 'google_maps_js_api' 
 # and 'django_base'. 
-export RMG_SERVER_UI_KEYS="$RMG_SERVER_METADATA_DIR/ui_keys"
+export RMG_WEB_SERVER_UI_KEYS="$RMG_WEB_SERVER_METADATA_DIR/ui_keys"
 
 # The location on the server for det files from remote sites.
 export RMG_SERVER_DET_DIR="$RMG_SERVER_DIR/det_files"
@@ -189,16 +196,25 @@ export RMG_POS_TIME_WINDOW=15
 export RMG_POS_TIME_STEP=15
 
 # Calibration data to use in auto position calculation
-export RMG_POS_CAL_ID=10
+export RMG_POS_CAL_ID=11
 
 # EST Score Threshold for filter before position estimation
 export RMG_POS_EST_THRESHOLD=0.0
 
 # Enable covariance estimation 
-export RMG_POS_ENABLE_COV=true
+export RMG_POS_ENABLE_COV=false
 
 # Normalize beaaring spectrum
 export RMG_POS_NORMALIZE_SPECTRUM=false
+
+# Boundry for position estimation
+export RMG_POS_EASTING_MIN=573000
+export RMG_POS_EASTING_MAX=576000
+export RMG_POS_NORTHING_MIN=4259000
+export RMG_POS_NORTHING_MAX=4263000
+
+# Initial stepsize for grid search
+export RMG_POS_STEPSIZE=5
 
 #END#position_auto
 

@@ -1,0 +1,63 @@
+/* Name */
+input {
+    max-width: 10em;
+}
+input[type=number] {
+    /*max-width: 4em;*/
+}
+
+th[name^=Speed] {
+    width: 5em;
+}
+
+ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+table {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+tr {
+    height: 1em;
+}
+
+textarea {
+    display:block;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 10em;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+
+}
+
+.seperate-div {
+    margin-top: 7px;
+    margin-bottom: 7px;
+
+}
+.arrow-down {
+    color: #3A3A3A;
+    float: right;
+    display: inline-block;  
+}
+
+.arrow-up {
+    color: #3A3A3A;
+    float: right;
+    display: none;  
+}
+
+.btn[clicked="true"] .arrow-down{
+    display: none;
+}
+
+.btn[clicked="true"] .arrow-up{
+    display: inline-block;
+}

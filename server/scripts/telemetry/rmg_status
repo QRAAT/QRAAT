@@ -42,26 +42,41 @@ source rmg_env
 
 echo Starting `date`
 echo
+echo Starting rmg_schedule `date`
 echo rmg_schedule
 rmg_schedule $RMG_SERVER_SITELIST $RMG_SERVER_TXLIST
+echo Finished rmg_schedule `date`
 echo
+echo Starting rmg_readstatus `date`
 echo rmg_readstatus
 rmg_readstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
+echo Finished rmg_readstatus `date`
 echo
+echo Starting rmg_timecheck `date`
 echo rmg_timecheck
 rmg_timecheck $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
+echo Finished rmg_timecheck `date`
 echo
+echo Starting rmg_detcount `date`
 echo rmg_detcount
 rmg_detcount $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
+echo Finished rmg_detcount `date`
 echo
+echo Starting rmg_estcount `date`
 echo rmg_estcount
 rmg_estcount $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
+echo Finished rmg_estcount `date`
 echo
+echo Starting rmg_dbstats `date`
 echo rmg_dbstats
 rmg_dbstats $RMG_SERVER_METADATA_DIR/authfile_readest
+echo Finished rmg_dbstats `date`
 echo
+echo Starting rmg_plotstatus `date`
 echo rmg_plotstatus
 rmg_plotstatus $RMG_SERVER_SITELIST $RMG_SERVER_METADATA_DIR/authfile
-echo `date`
+echo Finished rmg_plotstatus `date`
+echo
+echo Finished `date`
 echo
 #END

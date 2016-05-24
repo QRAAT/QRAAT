@@ -331,10 +331,13 @@ sub nudge($$$$)	# nudges the site from its current state towards action. returns
       {
 			  # transfer the tx.csv file every time
 			  if( $Debug ) { print "debug: nudge: updating $txlist for $sitename\n" ; }
-			  if( do_rmg_updatetx($sitename,$txlist) )
-			  {
-				  print "ERROR: cannot update tx list for $sitename\n" ;
-			  }
+
+			  # skipping this per Todd's change with mouse tracking 2015-05-29
+			  #if( do_rmg_updatetx($sitename,$txlist) )
+			  #{
+			#	  print "ERROR: cannot update tx list for $sitename\n" ;
+			  #}
+
 			  # computer up, rmg running: do nothing
 			  if( ($site_status == 5) )
 			  {

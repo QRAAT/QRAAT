@@ -92,17 +92,17 @@ try:
   
   # Delete steering vectors if they already exist. 
   cur.execute('''SELECT COUNT(*)
-                   FROM Steering_Vectors
-                  WHERE siteid = %d 
-                    AND cal_infoid = %d''' % (options.site_id, 
+                   FROM steering_vectors
+                  WHERE siteID = %d 
+                    AND cal_infoID = %d''' % (options.site_id, 
                                               options.cal_id))
   if cur.fetchone()[0] > 0: 
     print >>sys.stderr, ("steering_vector: warning: database already contains data for the "
                          "specified cal run and site. Would you like to replace it? [y,n] "), 
     if raw_input().strip() in ['y', 'Y', 'yes', 'YES']: 
-      cur.execute('''DELETE FROM Steering_Vectors 
-                      WHERE siteid = %d
-                        AND cal_infoid = %d''' % (options.site_id, 
+      cur.execute('''DELETE FROM steering_vectors 
+                      WHERE siteID = %d
+                        AND cal_infoID = %d''' % (options.site_id, 
                                                   options.cal_id))
     else:
       print >>sys.stderr, "steering_vector: exiting."
@@ -110,16 +110,18 @@ try:
   
 
   # get cal data per site from the database. 
-  cur.execute('''SELECT True_Position.bearing, 
+  cur.execute('''SELECT true_position.bearing, 
                         est.edsp, 
                         est.ed1r, est.ed1i, est.ed2r, est.ed2i, est.ed3r, est.ed3i, est.ed4r, est.ed4i, 
                         est.frequency, 
                         est.band10, 
                         est.timestamp 
-                   FROM True_Position, est 
-                  WHERE True_Position.estID = est.ID 
-                    AND est.siteid=%d 
-                    AND True_Position.Cal_InfoID=%d''' % (options.site_id, options.cal_id))
+                   FROM true_position, est, calibration_information
+                  WHERE true_position.estID = est.ID 
+                    AND est.siteid=%s
+                    AND calibration_information.ID=%s
+                    AND calibration_information.deploymentID=est.deploymentID
+                ''',(options.site_id, options.cal_id))
 
   cal_data = np.array(cur.fetchall())
 
@@ -159,8 +161,8 @@ try:
 
 
   # Insert steering vectors into the database. 
-  cur.executemany('''INSERT INTO Steering_Vectors 
-                      (Cal_InfoID, SiteID, Bearing, 
+  cur.executemany('''INSERT INTO steering_vectors 
+                      (cal_infoID, siteID, bearing, 
                        sv1r, sv1i, sv2r, sv2i, 
                        sv3r, sv3i, sv4r, sv4i) 
                      VALUES (%s, %s, %s, 

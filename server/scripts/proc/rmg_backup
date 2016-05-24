@@ -44,8 +44,28 @@ source rmg_env
 echo Checking environment variables are set
 if [ -z "$RMG_BACKUP_DRIVE" ]
 then
-	echo ERROR: environment variable RMG_BACKUP_DRIVE is not set, bailing out
+	echo ERROR: environment variable RMG_BACKUP_DRIVE is not set, use source rmg_env
 	exit 1
+fi
+if [ -z "$RMG_SERVER_DIR" ]
+then
+	echo ERROR: environment variable RMG_SERVER_DIR is not set, use source rmg_env
+	exit 1
+fi
+
+# Setup paths for subdirectories of rmg_server directory on backup drive
+if [ -n "$RMG_BACKUP_DRIVE" ]
+then
+	RMG_BACKUP_DIR=${RMG_BACKUP_DRIVE}/backup${RMG_SERVER_DIR}
+	RMG_BACKUP_DIR_ARCHIVE=${RMG_BACKUP_DIR}/archive
+	RMG_BACKUP_DIR_CODE=${RMG_BACKUP_DIR}/code
+	RMG_BACKUP_DIR_WWW=${RMG_BACKUP_DIR}/www
+fi
+
+# Paths for subdirectories of rmg_server directory on secondary backup drive
+if [ -n "$RMG_BACKUP_DRIVE2" ]
+then
+	RMG_BACKUP_DIR2=${RMG_BACKUP_DRIVE2}/backup${RMG_SERVER_DIR}
 fi
 
 # Check destination directories
@@ -66,32 +86,32 @@ then
 		exit 1
 	fi
 fi
-echo Checking for backup archive directory: $RMG_BACKUP_ARCHIVE_DIR
-if [ ! -e $RMG_BACKUP_ARCHIVE_DIR ]
+echo Checking for backup archive directory: $RMG_BACKUP_DIR_ARCHIVE
+if [ ! -e $RMG_BACKUP_DIR_ARCHIVE ]
 then
-	echo WARNING: creating backup archive directory $RMG_BACKUP_ARCHIVE_DIR
-	mkdir $RMG_BACKUP_ARCHIVE_DIR
-	if [ ! -e $RMG_BACKUP_ARCHIVE_DIR ]
+	echo WARNING: creating backup archive directory $RMG_BACKUP_DIR_ARCHIVE
+	mkdir $RMG_BACKUP_DIR_ARCHIVE
+	if [ ! -e $RMG_BACKUP_DIR_ARCHIVE ]
 	then
-		echo ERROR: cannot create backup archive directory $RMG_BACKUP_ARCHIVE_DIR
+		echo ERROR: cannot create backup archive directory $RMG_BACKUP_DIR_ARCHIVE
 		exit 1
 	fi
 fi
 
-# Backup $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_ARCHIVE_DIR
+# Backup $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_DIR_ARCHIVE
+echo Copying files from $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_DIR_ARCHIVE
 BACKUP_ARCHIVE_FILELIST=/var/log/rmg/rmg_backup_archive_rsynclog
-echo Copying files from $RMG_SERVER_ARCHIVE_DIR to $RMG_BACKUP_ARCHIVE_DIR
 rm -f $BACKUP_ARCHIVE_FILELIST
 echo Logging to $BACKUP_ARCHIVE_FILELIST
 echo $0 starting primary backup `date`
-rsync -av --out-format='%n' $RMG_SERVER_ARCHIVE_DIR/  $RMG_BACKUP_ARCHIVE_DIR >$BACKUP_ARCHIVE_FILELIST
+rsync -av --out-format='%n' $RMG_SERVER_ARCHIVE_DIR/  $RMG_BACKUP_DIR_ARCHIVE >$BACKUP_ARCHIVE_FILELIST
 echo $0 finished primary backup `date`
 if [ $? -ne 0 ]
 then
 	echo Error in rsync, bailing out
 fi
 echo Backup of archive directory completed
-if [[ -e $BACKUP_ARCHIVE_FILELIST ]]
+if [ -e $BACKUP_ARCHIVE_FILELIST ]
 then
 	scancount=`cat $BACKUP_ARCHIVE_FILELIST | grep '/' | wc -l`			# count lines containing a / anywhere
 	copycount=`cat $BACKUP_ARCHIVE_FILELIST | grep '/' | grep -v '/$' | wc -l`	# as above, then exclude lines ending in /
@@ -103,25 +123,72 @@ fi
 # Copy log files
 #TODO
 
-echo Checking for backup database directory: $RMG_BACKUP_DIR/database
-if [ ! -e $RMG_BACKUP_DIR/database ]
+RMG_BACKUP_DIR_DATABASE=$RMG_BACKUP_DIR/database
+echo Checking for backup database directory: $RMG_BACKUP_DIR_DATABASE
+if [ ! -e $RMG_BACKUP_DIR_DATABASE ]
 then
-	echo WARNING: creating backup directory $RMG_BACKUP_DIR/database
-	mkdir $RMG_BACKUP_DIR/database
-	if [ ! -e $RMG_BACKUP_DIR/database ]
+	echo WARNING: creating backup directory $RMG_BACKUP_DIR_DATABASE
+	mkdir $RMG_BACKUP_DIR_DATABASE
+	if [ ! -e $RMG_BACKUP_DIR_DATABASE ]
 	then
-		echo ERROR: cannot create backup directory $RMG_BACKUP_DIR/database
+		echo ERROR: cannot create backup directory $RMG_BACKUP_DIR_DATABASE
 		exit 1
 	fi
 fi
 
-# Extract tables from the qraat database to $RMG_BACKUP_DIR/database
+# Extract tables from the qraat database to $RMG_BACKUP_DIR_DATABASE
 echo Dumping database tables
 echo $0 starting database dump `date`
-rmg_dbarchive $RMG_BACKUP_DIR/database
+rmg_dbarchive $RMG_BACKUP_DIR_DATABASE
 # Make an explicit dump of the archive_log table, so that it contains a record of the other dump files
-rmg_dbarchive archive_log $RMG_BACKUP_DIR/database
+rmg_dbarchive archive_log $RMG_BACKUP_DIR_DATABASE
 echo $0 finished database dump `date`
+
+# Create a backup copy of the code repository
+tar zcf /rmg_server/QRAAT_deployment_code.tar.gz /rmg_server/QRAAT_deployment_code
+if [ -z "$RMG_BACKUP_DIR_CODE" ]
+then
+	echo ERROR: missing environment variable RMG_BACKUP_DIR_CODE
+	echo skipping backup of code
+else
+	if [ ! -e $RMG_BACKUP_DIR_CODE ]
+	then
+		mkdir -p $RMG_BACKUP_DIR_CODE
+		if [ ! -e $RMG_BACKUP_DIR_CODE ]
+		then
+			echo ERROR: cannot create backup directory $RMG_BACKUP_DIR_CODE
+		fi
+	fi
+	if [ -e $RMG_BACKUP_DIR_CODE ]
+	then
+		cp /rmg_server/QRAAT_deployment_code.tar.gz $RMG_BACKUP_DIR_CODE
+	else
+		echo ERROR: missing directory $RMG_BACKUP_DIR_CODE, cannot backup code
+	fi
+fi
+
+# Create a backup copy of the web directory
+tar zcf /rmg_server/www.tar.gz /var/www
+if [ -z "$RMG_BACKUP_DIR_WWW" ]
+then
+	echo ERROR: missing environment variable RMG_BACKUP_DIR_WWW
+	echo skipping backup of www
+else
+	if [ ! -e $RMG_BACKUP_DIR_WWW ]
+	then
+		mkdir -p $RMG_BACKUP_DIR_WWW
+		if [ ! -e $RMG_BACKUP_DIR_WWW ]
+		then
+			echo ERROR: cannot create backup directory $RMG_BACKUP_DIR_WWW
+		fi
+	fi
+	if [ -e $RMG_BACKUP_DIR_WWW ]
+	then
+		cp /rmg_server/www.tar.gz $RMG_BACKUP_DIR_WWW
+	else
+		echo ERROR: missing directory $RMG_BACKUP_DIR_WWW, cannot backup www
+	fi
+fi
 
 # Check for secondary backup
 if [ -z "$RMG_BACKUP_DRIVE2" ]
@@ -155,17 +222,19 @@ else
 	echo $0 finished secondary backup `date`
 	if [ $? -ne 0 ]
 	then
-		echo Error in rsync, bailing out
+		echo Error in rsync
 	fi
 	df -l $RMG_BACKUP_DRIVE $RMG_BACKUP_DRIVE2
 fi
 
-# Sync frontend server
-if [ -z "$RMG_BACKUP_DRIVE2" ]
+# Sync frontend server from backup drive
+# Forcing it to use RMG_BACKUP_DRIVE by disabling RMG_BACKUP_DRIVE2
+#unset RMG_BACKUP_DRIVE2
+#unset does not seem to work, try this
+RMG_BACKUP_DRIVE2=""
+if [ -n "$RMG_BACKUP_DRIVE2" ]
 then
-	echo RMG_BACKUP_DRIVE2 is not set, files not copied to frontend server
-	#TODO Try copying files from RMG_BACKUP_DRIVE instead
-else
+	# use backup drive 2
 	echo Checking for backup drive: $RMG_BACKUP_DRIVE2
 	if [ ! -e $RMG_BACKUP_DRIVE2 ]
 	then
@@ -178,16 +247,56 @@ else
 		echo ERROR: backup directory $RMG_BACKUP_DIR2 not found
 		exit 1
 	fi
-	echo Copying database files from $RMG_BACKUP_DIR2/database/ to $RMG_BACKUP_FRONTEND/database
+	RMG_BACKUP_DIR2_DATABASE=$RMG_BACKUP_DIR2/database
+	RMG_BACKUP_FRONTEND_DATABASE=$RMG_BACKUP_FRONTEND/database
+	echo Copying database files from $RMG_BACKUP_DIR2_DATABASE/ to $RMG_BACKUP_FRONTEND_DATABASE
 	BACKUP_FRONTEND_RSYNCLOG=/var/log/rmg/rmg_backup_frontend_rsynclog
 	echo Logging to $BACKUP_FRONTEND_RSYNCLOG
 	echo $0 starting frontend backup `date`
-	rsync -ravz $RMG_BACKUP_DIR2/database/ $RMG_BACKUP_FRONTEND/database >$BACKUP_FRONTEND_RSYNCLOG
+	#
+	command="rsync -ravz --bwlimit=80 $RMG_BACKUP_DIR2_DATABASE/ $RMG_BACKUP_FRONTEND_DATABASE"
+	echo $command
+	`$command >$BACKUP_FRONTEND_RSYNCLOG`
+	#
 	echo $0 finished frontend backup `date`
 	if [ $? -ne 0 ]
 	then
-		echo Error in rsync, bailing out
+		echo Error in rsync
 	fi
+elif [ -n "$RMG_BACKUP_DRIVE" ]
+then
+	# use backup drive
+	echo ERROR: RMG_BACKUP_DRIVE2 not set, using RMG_BACKUP_DRIVE
+	echo Checking for backup drive: $RMG_BACKUP_DRIVE
+	if [ ! -e $RMG_BACKUP_DRIVE ]
+	then
+		echo ERROR: backup drive $RMG_BACKUP_DRIVE not found
+		exit 1
+	fi
+	echo Checking for backup directory: $RMG_BACKUP_DIR
+	if [ ! -e $RMG_BACKUP_DIR ]
+	then
+		echo ERROR: backup directory $RMG_BACKUP_DIR not found
+		exit 1
+	fi
+	RMG_BACKUP_DIR_DATABASE=$RMG_BACKUP_DIR/database
+	RMG_BACKUP_FRONTEND_DATABASE=$RMG_BACKUP_FRONTEND/database
+	echo Copying database files from $RMG_BACKUP_DIR_DATABASE/ to $RMG_BACKUP_FRONTEND_DATABASE
+	BACKUP_FRONTEND_RSYNCLOG=/var/log/rmg/rmg_backup_frontend_rsynclog
+	echo Logging to $BACKUP_FRONTEND_RSYNCLOG
+	echo $0 starting frontend backup `date`
+	#
+	command="rsync -ravz --bwlimit=80 $RMG_BACKUP_DIR_DATABASE/ $RMG_BACKUP_FRONTEND_DATABASE"
+	echo $command
+	`$command >$BACKUP_FRONTEND_RSYNCLOG`
+	#
+	echo $0 finished frontend backup `date`
+	if [ $? -ne 0 ]
+	then
+		echo Error in rsync
+	fi
+else
+	echo ERROR: no backup drives set, skipping frontend backup
 fi
 
 echo Finished $0 at `date`

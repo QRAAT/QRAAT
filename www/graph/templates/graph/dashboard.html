@@ -1,0 +1,330 @@
+{% extends "map/base.html" %}
+
+{% block script %}
+<link rel="stylesheet" type="text/css" href="/static/map/css/style.css"/>
+<script src="/static/js/date.js"></script>
+
+<script class="init" language="javascript" type="text/javascript">
+
+$(document).ready(function() {
+    var deployment_ids = {{deployment_ids}};
+    
+    var table = document.getElementById('deploy_site_table');
+    var sizes = [];
+    var external_width = table.rows[0].cells[0].offsetWidth;
+
+    //go through all rows and get the height for them
+    for(var i = 0; i < table.rows.length; i++){
+      sizes[i] = table.rows[i].cells[1].offsetHeight;
+      for(var j = 0; j < deployment_ids.length; j++){
+        if(table.rows[i].id == ('row_'+deployment_ids[j])){
+          var info_deploy_table_height = document.getElementById('info_deploy_table_'+deployment_ids[j]).offsetHeight;
+          if(info_deploy_table_height >= sizes[i]){ //FIX? subtract some value of sizes[i] or not?
+            sizes[i] = info_deploy_table_height + 100; //FIX? just to fix the height size
+          }
+        }
+      }
+    }
+    
+    //go through all table cells and set the new heights for each cell
+    for(var i = 0; i < table.rows.length; i++){
+      for(var j = 0; j < deployment_ids.length; j++){
+        if(table.rows[i].id == ('row_'+deployment_ids[j])){
+          var cells = document.getElementsByClassName('cell_'+deployment_ids[j]);
+          for(var k = 0; k < cells.length; k++){
+            cells[k].style.height = sizes[i] + 'px';
+          }
+        }
+      }
+    }
+    
+    //set width and height for each element in the fixed column
+    var headers = document.getElementsByClassName('headcol');
+    for(var i=0; i < headers.length; i++){
+      headers[i].style.width = external_width + 'px';
+      headers[i].style.height = sizes[i] + 'px';
+    }
+
+    // Load timezone.js stuff. TODO: Should this be changed
+    // Note: We only have data in timezone.json for LA
+    var _tz = timezoneJS.timezone;
+    _tz.loadingScheme = _tz.loadingSchemes.MANUAL_LOAD;
+    _tz.loadZoneJSONData('/static/js/timezone.json', true);
+
+    $("#id_interval").next("br").after("<label>Move Interval:</label><br><button id='back_interval' type='button' style='margin-bottom:10px'>Back</button> <button id='forward_interval' type='button' style='margin-bottom:10px'>Forward</button><br>")
+
+    $("#back_interval").click(function(e) {
+        changeDate(-10 * 60);
+        document.getElementById("form").submit();
+    });            
+
+    $("#forward_interval").click(function(e) {
+        changeDate(10 * 60);
+        document.getElementById("form").submit();
+    });            
+});
+
+// timeDelta in seconds
+function changeDate(timeDelta) {
+    var datetime = new timezoneJS.Date($("#id_datetime_start").val(), TIMEZONE).getTime() / 1000;
+    $("#id_datetime_start").val(timeToString(datetime + timeDelta ));
+}
+// TODO: copied from map/index.html
+// time in seconds
+function timeToString(time) {
+    var theDate = new timezoneJS.Date(time*1000, TIMEZONE);
+    // .getHours() returns the local hour for the specified timezone
+    // TODO: You may be able to use .toLocaleString() which allows formating and returns the timezone time. Currently it returns undefined, which may be because we only have LA timezone data.
+    // + 1 for month because it returns from 0-11!!!
+    var dT = {
+        year: theDate.getFullYear(),
+    month: ("0" + (theDate.getMonth()+1)).slice(-2), 
+    day:  ("0" + (theDate.getDate())).slice(-2),
+    hour:  ("0" + (theDate.getHours())).slice(-2),
+    minute: ("0" + (theDate.getMinutes())).slice(-2),
+    second: ("0" + (theDate.getSeconds())).slice(-2), 
+    // + 1 second so we dont get the last point we already have from this query
+    };
+    return dT.year+"-"+dT.month+"-"+dT.day+" "+dT.hour+":"+dT.minute+":"+dT.second;
+}
+
+</script>
+
+{% endblock %}
+
+<title> {% block title %} QRAAT Site {% endblock %} </title>
+
+{% block sidebar%}
+
+  <div id = "text">
+    <div class = "sidebar-form">
+      <div id ="prefs">
+        <form id="form" action="{% url 'graph:dashboard_page' %}" name="settings" method="get">
+          <font size="2">
+            {% for field in form %}
+              <b>{{field.label_tag}}</b> {{field}}<br>
+            {% endfor %}
+          </font>
+        </form> <!-- end form -->
+      </div><!-- end prefs -->
+
+    <div class="section_title">
+      <center><button type="submit" form="form">Update Graphs</button></center>
+    </div> <!-- end section_title -->
+
+
+    </div> <!-- end sidebar-form -->
+  </div> <!-- end text -->
+
+{% endblock %}
+
+{% block content %}
+
+  {% if data_sites %}
+    <div class="table-responsive">
+      <table class="table table-bordered" width="100%" height="100%">
+        <th>Variables</th>
+        {% for site_id, site_name in site_names.items %}
+          <th class="text-center"> {{ site_name }} </th>
+        {% endfor %}
+
+        {% for table_name, data in data_sites.items %}
+          {% for table_n, variables in table_variables.items %}
+            {% if table_name == table_n %}
+              <tr><td>Table: {{table_name}}</td></tr>
+              {% for variable in variables %}
+                <tr>
+                  <th>{{variable}}</th>
+                  {% for site_id, site_name in site_names.items %}
+                    <td class="text-center" >
+                      {% for id, data_by_site in data.items %}
+                        {% if id == site_id %}
+                          {% for var, value in data_by_site.items %}
+                            {% if variable == var %}
+
+                              {% if value and value == 'None' %}
+                                <div style="background-color: red;">{{ value }}</div>
+                              {% elif value and value.1 %}
+                                <div style="background-color: {{value.1}};">{{ value.0 }}</div>
+                              {% else %}
+                                <div style="background-color: white;">{{ value }}</div>
+                              {% endif %}
+
+                            {% endif %}
+                          {% endfor %}
+                        {% endif %}
+                      {% endfor %}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+
+      </table>
+    </div>
+  {% endif %}
+
+  {% if data_deployments != None %}
+
+    <div class="table-responsive scroll_x">
+      <table id="deploy_site_table" class="table table-bordered scroll_x" width="100%" cellspacing="0">
+        <thead>
+          <tr>
+            <td style="margin-left:0px;">
+              <table style="" class="table-bordered">
+                <tr>
+                  <th style="margin-left:-10px; margin-top:-10px;" class="headcol">Deployments</th>
+                </tr>
+              </table>
+              ..............................................................
+            </td>
+
+            {% for site_id, site_name in site_names.items %}
+              <th class="text-center"> {{ site_name }} </th>
+            {% endfor %}
+            <th class="text-center"> Position </th>
+            <th class="text-center"> Track Position </th>
+          </tr>  
+        </thead>
+
+        <tbody>
+          {% for depID, data_by_site in data_deployments.items %}
+            <tr id="row_{{depID}}">
+              <td class="headcol cell_{{depID}}" style="overflow:auto;">
+                <table id="info_deploy_table_{{depID}}"  class="table">
+                  <tr><th>Dep: {{depID}}</th></tr>
+                  {% for dep_id, dep_info in deployments_info.items %}
+                    {% if depID == dep_id %}
+                      {% for key, value in dep_info.items %}
+                        <tr><td class="text-right">{{key}}:</td><td>{{value}}</td></tr>
+                      {% endfor %}
+                    {% endif %}
+                  {% endfor %}
+                </table>
+              </td>
+
+              {% for site_id, site_name in site_names.items %}
+                {% if site_id != 'position' and site_id != 'track_pos' %}
+                  <td class="cell_{{depID}}" class="text-center">
+                    {% for siteID, data_by_variable in data_by_site.items %}
+                      {% if site_id == siteID %}
+
+                        <table class="table">
+                          {% for var, value in data_by_variable.items %}
+                            <tr>
+
+                              {% if value and value == 'None' %}
+                                <td class="text-right">{{var}}:</td>
+                                <td class="text-center"><div style="background-color: red;">{{ value }}</div></td>
+                              {% elif value and value.1 %}
+                                <td class="text-right">{{var}}:</td>
+                                <td class="text-center"><div style="background-color: {{value.1}};">{{ value.0 }}</div></td>
+                              {% else %}
+                                <td class="text-right">{{var}}:</td>
+                                <td class="text-center"><div style="background-color: white;">{{ value }}</div></td>
+                              {% endif %}
+
+                            </tr>
+                          {% endfor %}
+                        </table>
+                        
+                      {% endif %}
+                    {% endfor %}
+                  </td>
+                {% endif %}
+              {% endfor %}
+
+              <td class="cell_{{depID}}" class="text-center">
+                <table class="table">
+                  {% for var, value in data_by_site.position.items %}
+                    <tr>
+
+                      {% if value and value == 'None' %}
+                        <td class="text-right">{{var}}:</td>
+                        <td class="text-center"><div style="background-color: red;">{{ value }}</div></td>
+                      {% elif value and value.1 and var != 'current_position' %}
+                        <td class="text-right">{{var}}:</td>
+                        <td class="text-center"><div style="background-color: {{value.1}};">{{ value.0 }}</div></td>
+                      {% else %}
+                        <td class="text-right">{{var}}:</td>
+                        <td class="text-center"><div style="background-color: white;">{{ value }}</div></td>
+                      {% endif %}
+
+                    </tr>
+                  {% endfor %}
+                </table>
+              </td>
+              <td class="cell_{{depID}}" class="text-center" >
+                <table class="table">
+                  {% for var, value in data_by_site.track_pos.items %}
+                    <tr>
+
+                      {% if value and value == 'None' %}
+                        <td class="text-right">{{var}}:</td>
+                        <td class="text-center"><div style="background-color: red;">{{ value }}</div></td>
+                      {% elif value and value.1 %}
+                        <td class="text-right">{{var}}:</td>
+                        <td class="text-center"><div style="background-color: {{value.1}};">{{ value.0 }}</div></td>
+                      {% else %}
+                        <td class="text-right">{{var}}:</td>
+                        <td class="text-center"><div style="background-color: white;">{{ value }}</div></td>
+                      {% endif %}
+
+                    </tr>
+                  {% endfor %}
+                </table>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+    </div>
+
+  {% endif %}
+
+  {% if data_system %}
+    <div class="table-responsive">
+      <table class="table table-bordered" width="100%" height="100%">
+
+        {% for table_name, data in data_system.items %}
+          
+          {% for table_n, variables in table_variables.items %}
+            {% if table_name == table_n %}
+              <tr><td>Table: {{table_name}}</td></tr>
+              <th>Variables</th>
+              {% for variable in variables %}
+                <th>{{variable}}</th>
+              {% endfor %}    
+            {% endif %}
+          {% endfor %}
+
+          {% for table_n, variables in table_variables.items %}
+            {% if table_name == table_n %}
+              
+              {% for variable, data_by_variable in data.items%}
+                <tr>
+                  <th>{{variable}}</th>
+                  {% for val in variables %}
+                    <td class="text-center">
+                    {% for key, value in data_by_variable.items %}
+                      {% if key == val %}
+                        {{value}}
+                      {% endif %}  
+                    {% endfor %}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+
+      </table>
+    </div>
+
+  {% endif %}
+
+{% endblock %}

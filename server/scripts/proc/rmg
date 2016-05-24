@@ -71,9 +71,6 @@
 #
 # Cycle the power on the RMG module.  
 #
-# TODOs 
-# 
-# - Run task on 'all' sites. 
 #
 #
 
@@ -152,6 +149,15 @@ function get_status() {
     then
       ping_computer="success"
       read site_goal timestamp site_status <<< `ssh -o ConnectTimeout=$ConnectTimeout $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+      if [ -z "$site_goal" ]
+       then
+        site_goal="unknown"
+      fi
+      if [ -z "$timestamp" ]
+       then
+        timestamp=`date -u +%s`
+        site_status="unknown"
+      fi
     else
       ping_computer="failure"
       site_goal="unknown"
@@ -175,6 +181,16 @@ function get_status() {
                 then
                   ping_computer="success"
                   read site_goal timestamp site_status <<< `ssh -o ConnectTimeout=$ConnectTimeout $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+
+                  if [ -z "$site_goal" ]
+                   then
+                    site_goal="unknown"
+                  fi
+                  if [ -z "$timestamp" ]
+                   then
+                    timestamp=`date -u +%s`
+                    site_status="unknown"
+                  fi
                 else
                   if [[ $serv_state == "down" ]]
                     then
@@ -241,16 +257,17 @@ case $TASK in
 
   exporttx) # Export transmitter config file 
             # from DB and exit. 
+    rmg_txlist "$@"
+    exit 0
+  ;;
+
+  calibration)
     if [[ "$1" == "-f" ]] || [[ "$1" == "--file" ]] 
     then
       TX_FILE=$2
       shift
       shift
-    else     
-      TX_FILE=$RMG_SERVER_TXLIST
-      rmg_txlist $RMG_SERVER_DB_AUTH -f $TX_FILE
     fi
-    exit 0
   ;;
 
   calibration)
@@ -342,10 +359,9 @@ do
       echo "  Powerswitch Router Ping Test: $ping_router"
       echo "  Computer Ping Test: $ping_computer"
       echo "  Site Status:    $site_status, `date --date @$timestamp`"
-      if [[ "$ping_computer" == "success" ]]
-        then 
-          [[ "$site_goal" != "$serv_goal" ]] && \
-           echo "warning: goal state mismatch (serv=$serv_goal, node=$site_goal). Suggest update." 1>&2
+      if [[ "$ping_computer" == "success" ]] && [[ "$site_goal" != "$serv_goal" ]] && [[ "$site_goal" != "unknown" ]]
+       then
+        echo "warning: goal state mismatch (serv=$serv_goal, node=$site_goal). Suggest update." 1>&2
       fi
     ;;
 
@@ -542,9 +558,11 @@ do
        then
         if [[ -e $TX_FILE ]]
          then
-          scp $TX_FILE $SITE:$RMG_SITE_CAL_TX_CSV 
           echo "updating cal_txlist on $SITE"
+          scp $TX_FILE $SITE:$RMG_SITE_CAL_TX_CSV 
         fi
+        echo "Turning auto scheduler off for $SITE"
+        rmg auto_off $SITE
         rmg_csv $SITE state calibration < $SITELIST > /tmp/tmp_sitelist.csv && mv -f -b /tmp/tmp_sitelist.csv $SITELIST
         do_update $SITE
        else

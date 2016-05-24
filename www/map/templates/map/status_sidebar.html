@@ -1,0 +1,18 @@
+{% block sidebar %}
+{% if user.is_authenticated %}
+<ol class="nav nav-pills nav-stacked">  
+    <li class="active">
+        <a href={% url 'map:system-status' %}>System status</a>
+    </li>
+    <li>
+        <li class="side-bar-element">
+            <a href={% url 'map:est-status' %}>Est status</a>
+        </li>
+        <li class="side-bar-element">
+            <a href={% url 'map:generic-graph' %}>Generic graph</a>
+        </li>
+    </li>
+</ol>
+
+{% endif %}
+{%endblock%}

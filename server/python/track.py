@@ -242,7 +242,7 @@ class Track:
         windows.append((i, i + a))
       windows[-1] = (windows[-1][0], t-1)
     
-    else: # May be a small amount of data in the first (ever) window. 
+    elif t > 1: # May be a small amount of data in the first (ever) window. 
       windows.append((0, t-1))
 
     for (i, j) in windows: 

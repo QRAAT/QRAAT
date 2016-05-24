@@ -1,0 +1,43 @@
+-- front-end database users
+-- actually, frontend server database user grants only, for users and grants see ../frontend_db_users.sql
+
+-- django admin controls django related tables
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.* TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_group TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_group_permissions TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_permission TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_user_user_permission TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_user TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.auth_user_groups TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.django_admin_log TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.django_content_log TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.django_content_type TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.django_migrations TO django_admin@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, INDEX, CREATE, DROP, ALTER ON qraat.django_session TO django_admin@'localhost';
+
+-- web_reader has read-only access to all tables
+GRANT SELECT ON qraat.* TO web_reader@'localhost';
+
+-- web_writer can write to project metadata tables
+GRANT SELECT, INSERT, UPDATE ON qraat.auth_group TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.auth_group_permissions TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.auth_permission TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.auth_user TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.auth_user_groups TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.django_admin_log TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.django_content_log TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.django_content_type TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.django_migrations TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.django_session TO web_writer@'localhost';
+GRANT SELECT ON qraat.* TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.auth_project_collaborator TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.auth_project_viewer TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.deployment TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.location TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.project TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.target TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.tx TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.tx_make TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.tx_make_parameters TO web_writer@'localhost';
+GRANT SELECT, INSERT, UPDATE ON qraat.tx_parameters TO web_writer@'localhost';
+

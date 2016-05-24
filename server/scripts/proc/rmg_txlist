@@ -5,31 +5,51 @@
 
 
 import qraat, qraat.srv
-import MySQLdb as mdb
 import argparse
+import sys, os
+
+default_type = 'pulse'
 
 
 parser = argparse.ArgumentParser(description="Produce tx.csv file from database")
-parser.add_argument("db_auth_file", help="Path to db_auth file")
-parser.add_argument("-f", "--tx_file", help="Path to tx.csv file", default='./tx.csv')
+parser.add_argument("-f", "--file", help="Path to tx.csv file")
 parser.add_argument("-r", "--rise_trigger", type=float, help="Detector rise trigger", default=1.5)
 parser.add_argument("-t", "--time_constant", type=float, help="Detector time constant", default=10)
+parser.add_argument("-i", "--deploymentID", type=int, help="DeploymentID to include in list") 
 
 args = parser.parse_args()
 
-default_type = 'pulse'
+if args.file is None:
+  try:
+    args.file = os.environ['RMG_SERVER_TXLIST']
+  except KeyError:
+    args.file = './tx.csv'
 
 db_con = qraat.srv.util.get_db('reader')
 
 cur = db_con.cursor()
 
 # Transmitters in active deployments
-cur.execute('''SELECT deployment.ID, txID, frequency 
-                 FROM deployment
-                 JOIN tx ON tx.ID = txID
-                 JOIN tx_make ON tx_make.ID = tx.tx_makeID
-                WHERE is_active = True
-                  AND demod_type = '%s' ''' % default_type)
+if args.deploymentID is None:
+  num_returned = cur.execute('''SELECT deployment.ID, txID, frequency 
+                                  FROM deployment
+                                  JOIN tx ON tx.ID = txID
+                                  JOIN tx_make ON tx_make.ID = tx.tx_makeID
+                                 WHERE is_active = True
+                                   AND demod_type = %s ''', default_type)
+  if (num_returned == 0):
+    print "No deployments are active"
+    sys.exit(1)
+else:
+  num_returned = cur.execute('''SELECT deployment.ID, txID, frequency 
+                                  FROM deployment
+                                  JOIN tx ON tx.ID = txID
+                                  JOIN tx_make ON tx_make.ID = tx.tx_makeID
+                                 WHERE deployment.ID = %s
+                                   AND demod_type = %s ''', (args.deploymentID, default_type))
+  if (num_returned == 0):
+    print "deploymentID {} not found".format(args.deploymentID)
+    sys.exit(1)
 
 tx_dict = {}
 for (dep_id, tx_id, frequency) in cur.fetchall():
@@ -58,4 +78,4 @@ for (tx_id, params) in tx_dict.iteritems():
 
 txlist = qraat.csv.csv()
 txlist.initialize_from_data(header, data)
-txlist.write(args.tx_file)
+txlist.write(args.file)

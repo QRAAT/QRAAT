@@ -1,8 +1,0 @@
-{% extends "qraat_site/manage_project_base.html" %}
-{% load project_filters %}
-
-{%block success_msg %} Target created {% endblock %}
-{% block deleted_msg %} Targets deleted {% endblock %}
-
-{% block managed_obj %} Targets {% endblock %}
-{% block add_url %} {% url 'qraat:add-target' project.ID %} {% endblock %}
