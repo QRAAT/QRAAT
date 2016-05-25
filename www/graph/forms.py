@@ -6,6 +6,16 @@ from django.utils.safestring import mark_safe
 from project.models import Site, Deployment
 import utils
 
+DATE_CHOICES = (
+  ("sdt_i", "Start Datetime-Interval"),
+  ("edt_i", "End Datetime-Interval"),
+  ("sts_i", "Start Timestamp-Interval"),
+  ("ets_i", "End Timestamp-Interval"),
+  ("sdt_ets", "Start Datetime-End Timestamp"),
+  ("sts_edt", "Start Timestamp-End Datetime"),
+  ("sdt_edt", "Start Datetime-End Datetime"),
+  ("sts_ets", "Start Timestamp-End Timestamp"),
+  )
 
 def get_processing_options():
     processing_options = [("estserver", "Server est"), ("server", "Server det"), ("site", "Site det")]
@@ -124,10 +134,10 @@ class TimeSeriesGraphForm(forms.Form):
               'size': '10'}),
               )
 
-    move_interval = forms.ChoiceField(
-              widget = SubmitButtons,
-              choices = [('back', 'Back'), ('forward', 'Forward')]
-              )
+    #move_interval = forms.ChoiceField(
+    #          widget = SubmitButtons,
+    #          choices = [('back', 'Back'), ('forward', 'Forward')]
+    #          )
 
     graph_variables = forms.MultipleChoiceField(
               choices = [],
@@ -150,6 +160,10 @@ class TelemetryGraphForm(TimeSeriesGraphForm):
               label = 'Site Names',
               initial = ['all']
               )
+
+    date_format = forms.ChoiceField(label="Date Format", choices=DATE_CHOICES)
+
+
 
 
 class EstGraphForm(TimeSeriesGraphForm):
