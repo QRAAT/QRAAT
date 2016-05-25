@@ -185,6 +185,8 @@ class EstGraphForm(TimeSeriesGraphForm):
               label = 'Deployment ID',
               )
 
+    date_format = forms.ChoiceField(label="Date Format", choices=DATE_CHOICES)
+
 
 class ProcessingGraphForm(TimeSeriesGraphForm):
     def __init__(self, data = None):
@@ -198,6 +200,8 @@ class ProcessingGraphForm(TimeSeriesGraphForm):
               label = 'Site Names',
               initial = ['all']
               )
+
+    date_format = forms.ChoiceField(label="Date Format", choices=DATE_CHOICES)
 
 class DashboardForm(forms.Form):
     def __init__(self, data = None):

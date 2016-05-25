@@ -109,9 +109,6 @@ def get_graphs_context(request):
         'end_timestamp': end_timestamp, #used in query
         'update_form_time': update_form_time
     }
-    print 'bybye'
-    print context['start_timestamp']
-    print context['end_timestamp']
     
     return context
 
@@ -196,9 +193,6 @@ def set_time_parameters(start_timestamp, end_timestamp, datetime_from, datetime_
         if update_form_time['start_timestamp'] and update_form_time['end_timestamp']:
             update_form_time['start_timestamp'] = start_timestamp
             update_form_time['end_timestamp'] = end_timestamp
-            print 'hihihi'
-            print update_form_time['start_timestamp']
-            print update_form_time['end_timestamp'] 
         else:
             if update_form_time['datetime_start'] and interval:
                 update_form_time['datetime_start'] = datetime.datetime.fromtimestamp(start_timestamp).strftime('%Y-%m-%d %H:%M:%S')
@@ -303,13 +297,8 @@ def telemetry_graphs(request):
         requestGET = request.GET.copy()
        
         context = get_telemetry_graphs_context(request) # gets all the info from URL, runs query, formats data
-        print 'in telemetry_graphs'
-        print context['start_timestamp']
-        print context['end_timestamp']
 
         requestGET = update_all_form_time_and_date(requestGET, context)
-        print requestGET['start_timestamp']
-        print requestGET['end_timestamp']
         
         telemetry_graph_form = TelemetryGraphForm(data = requestGET)
 
@@ -365,12 +354,21 @@ def get_telemetry_graphs_context(request):
 
 
 def est_graphs(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    
     nav_options = get_nav_options(request)
     
     if not request.GET: # no parameters from user yet
         try:
-            est_graph_form = EstGraphForm() # unbound form - uses default initial form values
-            return render(request, "graph/est_graphs_form.html", {'nav_options': nav_options, 'form': est_graph_form})
+            #est_graph_form = EstGraphForm() # unbound form - uses default initial form values
+            #return render(request, "graph/est_graphs_form.html", {'nav_options': nav_options, 'form': est_graph_form})
+            end_timestamp = int(time.time())
+            start_timestamp = end_timestamp - 18000 # 5 hour interval
+            response = redirect("graph:est_graphs")
+            query_str = "?date_format=sts_i&start_timestamp={}&end_timestamp={}&graph_variables=frequency&graph_variables=fdsp&graph_variables=band3&graph_variables=band10&graph_variables=edsp&site_names=all&deployment_id=60".format(start_timestamp, end_timestamp)
+            response['Location'] += query_str
+            return response
         except:
             return HttpResponseBadRequest("Sorry, something went wrong when trying to load the Est Graphs page.")
 
@@ -414,15 +412,23 @@ def get_est_graphs_context(request):
 
 
 def processing_graphs(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied
 
     nav_options = get_nav_options(request)
     
     if not request.GET: # no parameters from user yet
         try:
-                processing_graph_form = ProcessingGraphForm() # unbound form - uses default initial form values
-                return render(request, "graph/processing_graphs_form.html", {'nav_options': nav_options, 'form': processing_graph_form})
+            #processing_graph_form = ProcessingGraphForm() # unbound form - uses default initial form values
+            #return render(request, "graph/processing_graphs_form.html", {'nav_options': nav_options, 'form': processing_graph_form})
+            end_timestamp = int(time.time())
+            start_timestamp = end_timestamp - 18000 # 5 hour interval
+            response = redirect("graph:processing_graphs")
+            query_str = "?date_format=sts_i&start_timestamp={}&end_timestamp={}&graph_variables=estserver&graph_variables=server&graph_variables=site&site_names=all".format(start_timestamp, end_timestamp)
+            response['Location'] += query_str
+            return response
         except:
-                return HttpResponseBadRequest("Sorry, something went wrong when trying to load the Processing Graphs page.")
+            return HttpResponseBadRequest("Sorry, something went wrong when trying to load the Processing Graphs page.")
 
     else: # user has already filled out the form or entered parameters via the URL
         requestGET = request.GET.copy()
