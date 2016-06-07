@@ -10,7 +10,7 @@
 **Scripts:**
 
 - *bearingCalculation.py* - Calculate bearing used for each sites and stores them into a txt file. normalized variable on line 44 determines if we want to normalize each inidviual bearing to have a sum of 1. 
-- *positionCalculation.py* - Load bearing txt files into memory and calculate and sotre positions into *position_non_normalized* table. The likelihood of the position and the number of sites used in the calculation is also being recorded. 
+- *positionCalculation.py* - Load bearing txt files into memory and calculate and sotre positions into *position_non_normalized* table. The likelihood of the position and the number of sites used in the calculation are also being recorded. 
 - *numberOfPositionVsThreshold.py* - Plot the likelihood threshold vs number of positons.
 - *positionPlots.py* -  Plot easting and northing according to the settings. Change DeploymentID, normalized, and likelihood variables on line 108, 110, and 111 to plot with differnet settings. 
 - *qraatSignal* - My modification of the Singal module from QRAAT system to run on my own environment. 
