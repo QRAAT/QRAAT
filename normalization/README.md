@@ -35,3 +35,10 @@ PRIMARY KEY (`ID`)
 ) ENGINE=MyISAM;
 
 ```
+
+
+**Other Files**
+
+- *deployment XXX - site YY.txt* - bearings for not normalize indivual bearings.
+- *non-normalize bearing plots* - plots for non-normalized indivual bearings.
+- *normalize bearing plots* - plots for normalized indivual bearings.
