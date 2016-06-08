@@ -270,15 +270,6 @@ case $TASK in
     fi
   ;;
 
-  calibration)
-    if [[ "$1" == "-f" ]] || [[ "$1" == "--file" ]] 
-    then
-      TX_FILE=$2
-      shift
-      shift
-    fi
-  ;;
-    
   status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing|die|down_now|auto_off|auto_on)
   ;; 
     
