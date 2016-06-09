@@ -1,6 +1,5 @@
-# map/forms.py
-
 from django import forms
+from django.forms import widgets
 from project.models import Site, Deployment, Position
 from django.shortcuts import render, redirect
 
@@ -48,21 +47,26 @@ class Form(forms.Form):
   #    raise forms.ValidationError('Select no more than 3.')
   #  return self.cleaned_data['deployment']
   
+  DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
   datetime_from = forms.DateTimeField(
             required = True, 
             label="Start Date & Time",
             #[YYYY-MM-DD HH:MM:SS]
-            widget = forms.TextInput(attrs={
-              'class': 'filter',
-              'size': '17'}),
+            #widget = forms.TextInput(attrs={
+            #  'class': 'filter',
+            #  'size': '17'}),
+            widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+            input_formats=[DATE_FORMAT, ],
             initial="2014-08-01 12:00:00")
   
   datetime_to = forms.DateTimeField(
             required = True, 
             label="End Date & Time", 
-            widget = forms.TextInput(attrs={
-              'class': 'filter',
-              'size': '17'}),
+            #widget = forms.TextInput(attrs={
+            #  'class': 'filter',
+            #  'size': '17'}),
+            widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+            input_formats=[DATE_FORMAT, ],
             initial="2014-08-01 17:00:00")
  
  

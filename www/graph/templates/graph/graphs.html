@@ -11,6 +11,9 @@
     <script src="/static/flot/jquery.flot.resize.min.js"></script>
     <script src="/static/flot/jquery.flot.axislabels.js"></script>
     <script src="/static/js/date.js"></script>
+    <link rel="stylesheet" type"text/css" href="/static/css/jquery.datetimepicker.css" >
+    <script type="text/javascript" src="/static/js/jquery.datetimepicker.js"></script>
+
 		<script>
 
 var last_format = "";
@@ -279,6 +282,8 @@ function initialize() {
     fill_date_fields(start_timestamp, end_timestamp);
 
     change_date_fields_visiblity();
+
+    $(".datetime").datetimepicker({format: "Y-m-d H:i:s"});
 
     // TODO: copied from dashboard.html, refactor
     $("#id_interval").next("br").after("<label>Move Interval:</label><br><button id='back_interval' type='button' style='margin-bottom:10px'>Back</button> <button id='forward_interval' type='button' style='margin-bottom:10px'>Forward</button><br>")

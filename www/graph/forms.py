@@ -91,23 +91,28 @@ class TimeSeriesGraphForm(forms.Form):
         
         return graph_variables
 
+    DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
     datetime_start = forms.DateTimeField(
               required = True, 
               label="Start Date & Time",
               #[YYYY-MM-DD HH:MM:SS]
-              widget = forms.TextInput(attrs={
-                'class': 'filter',
-                'size': '17'}),
-              initial = (utils.get_local_now() - timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M:%S") # Displays current time in PST, minus 20 minutes
+              #widget = forms.TextInput(attrs={
+              #  'class': 'filter',
+              #  'size': '17'}),
+              widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+              initial = (utils.get_local_now() - timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M:%S"), # Displays current time in PST, minus 20 minutes
+              input_formats=[DATE_FORMAT, ]
               )
   
     datetime_end = forms.DateTimeField(
               required = True, 
               label="End Date & Time", 
-              widget = forms.TextInput(attrs={
-                'class': 'filter',
-                'size': '17'}),
-              initial = utils.get_local_now().strftime("%Y-%m-%d %H:%M:%S") # current datetime
+              #widget = forms.TextInput(attrs={
+              #  'class': 'filter',
+              #  'size': '17'}),
+              widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+              initial = utils.get_local_now().strftime("%Y-%m-%d %H:%M:%S"), # current datetime
+              input_formats=[DATE_FORMAT, ]
               )
 
     start_timestamp = forms.FloatField(

@@ -804,4 +804,15 @@ class Est(models.Model):
 
     deploymentID = models.ForeignKey(Deployment, db_column="deploymentID")
 
+class MovebankExport(models.Model):
+    id = models.BigIntegerField(db_column='ID', primary_key=True)  # Field name made lowercase.
+    deploymentid = models.IntegerField(db_column='deploymentID')  # Field name made lowercase.
+    time_last_export = models.DecimalField(max_digits=16, decimal_places=6)
+    export_interval = models.IntegerField()
+    studyid = models.CharField(db_column='studyID', max_length=20)  # Field name made lowercase.
+    formatid = models.CharField(db_column='formatID', max_length=20)  # Field name made lowercase.
+    enable = models.IntegerField()
 
+    class Meta:
+        managed = False
+        db_table = 'movebank_export'

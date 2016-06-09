@@ -15,4 +15,5 @@ urlpatterns = patterns(
     url(r'^$', 'project.views.index', name="index"),
     url(r'^project/', include('project.urls', namespace="project")),
     url(r'^data', 'project.views.render_data', name="get-data"),
+    url(r'^about/$', 'project.views.about', name='about'),
 )

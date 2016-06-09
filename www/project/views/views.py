@@ -1051,7 +1051,24 @@ def edit_deployment(request, project_id, deployment_id):
         success_url="%s?new_element=True" % reverse(
             "project:edit-deployment", args=(project_id, deployment_id)))
 
+@login_required(login_url="/account/login")
+def movebank_export(request, project_id):
+    user = request.user
+    project = get_project(project_id)
 
+    if can_view(project, user):
+        query = get_query("transmitter")
+        tx = query(transmitter_id)
+        return HttpResponse(
+            "Transmitter: %d Model: %s Manufacturer: %s" % (
+                tx.ID, tx.tx_makeID.model, tx.tx_makeID.manufacturer))
+    else:
+        pass
+
+def about(request):
+    nav_options = get_nav_options(request)
+    return render(request, "about.html",{'nav_options': nav_options},
+    )
 
 def render_data(request):
     """Renders a JSON serialized data
