@@ -198,8 +198,8 @@ class AddDeploymentForm(ProjectElementForm):
 
     DATE_FORMAT = "%m/%d/%Y %H:%M:%S"
 
-    txID = forms.ChoiceField()
-    targetID = forms.ChoiceField()
+    txID = forms.ChoiceField(label="TxID")
+    targetID = forms.ChoiceField(label="TargetID")
     time_start = forms.DateTimeField(
         widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
         initial=datetime.now().strftime(DATE_FORMAT),
@@ -261,9 +261,9 @@ class AddTransmitterForm(ProjectElementForm):
         labels = {"name": ("Transmitter name"),
                   "serial_no": ("Serial number"),
                   "tx_makeID": ("Manufacturer"),
-                  "frequency": ("Frequency (Hz)")}
+                  "frequency": ("Frequency")}
 
-    frequency = forms.FloatField(min_value=0, widget=widgets.NumberInput(attrs={"step":"0.001"}))
+    frequency = forms.FloatField(label="Frequency (MHz)", min_value=0, widget=widgets.NumberInput(attrs={"step":"0.001"}))
 
     def save(self, commit=True):
         """Overriden method to set the right tx_make and

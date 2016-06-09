@@ -1,6 +1,5 @@
-# map/forms.py
-
 from django import forms
+from django.forms import widgets
 from project.models import Site, Deployment, Position
 from django.shortcuts import render, redirect
 
@@ -18,8 +17,12 @@ GRAPH_CHOICES = [('1', 'Likelihood'), ('2', 'Activity'), ('3', 'Covariance')]
 # Choices for transmitter dropdown menu. Sorted by "Active", then number
 def get_choices(deps=[]):
   choices_list = []
+  # Use the deployment name if available. If not, use the target name and tx frequency
   for dep in deps:
-    choices_list.append((dep.ID, "{} {}".format(dep.targetID.name, dep.txID.frequency)))
+    if dep.name != "":
+      choices_list.append((dep.ID, dep.name))
+    else:
+      choices_list.append((dep.ID, "{} {}".format(dep.targetID.name, dep.txID.frequency)))
   return choices_list
 
 def get_deps(req_deps=[]):
@@ -44,21 +47,26 @@ class Form(forms.Form):
   #    raise forms.ValidationError('Select no more than 3.')
   #  return self.cleaned_data['deployment']
   
+  DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
   datetime_from = forms.DateTimeField(
             required = True, 
             label="Start Date & Time",
             #[YYYY-MM-DD HH:MM:SS]
-            widget = forms.TextInput(attrs={
-              'class': 'filter',
-              'size': '17'}),
+            #widget = forms.TextInput(attrs={
+            #  'class': 'filter',
+            #  'size': '17'}),
+            widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+            input_formats=[DATE_FORMAT, ],
             initial="2014-08-01 12:00:00")
   
   datetime_to = forms.DateTimeField(
             required = True, 
             label="End Date & Time", 
-            widget = forms.TextInput(attrs={
-              'class': 'filter',
-              'size': '17'}),
+            #widget = forms.TextInput(attrs={
+            #  'class': 'filter',
+            #  'size': '17'}),
+            widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+            input_formats=[DATE_FORMAT, ],
             initial="2014-08-01 17:00:00")
  
  

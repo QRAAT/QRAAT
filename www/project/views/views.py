@@ -30,6 +30,7 @@ from datetime import datetime
 #from graph_views import * # graph_home, telemetry_graphs, etc. and helper functions
 
 def index(request):
+    print "in views.index"
     """This view renders the system's first page.
     This page has a nav bar and users projects
 
@@ -171,6 +172,7 @@ def show_location(request, project_id, location_id):
 
 @login_required(login_url='/account/login')
 def projects(request):
+    print "in views.projects"
     """This view renders a page with projects.
     For a user projects are displayed as public projects,
     projects the user owns, projects the user can collaborate,
@@ -610,33 +612,117 @@ If it's not, then we call and return render_project_formset with the modelform o
 # The worst function ever
 @login_required(login_url="/account/login")
 def bulk_wizard(request, project_id, number=0):
-    project = get_project(project_id)
-    content = {}
-    content["nav_options"] = get_nav_options(request)
-    content["project"] = project
+    user = request.user
+    try:
+        project = Project.objects.get(ID=project_id)
+        if project.is_owner(user) or project.is_collaborator(user):
+            pass # Just to take the rest of the function out of this block
+        else:
+            return not_allowed_page(request)
+
+    except ObjectDoesNotExist:
+        raise Http404
 
     # GET requests are from non submission page loads. 
     if request.method == 'GET':
-        num = request.GET.get("number")
-        number = num
+        # Check how many never before used tx and targets there are for this project
+        # QuerySets
+        # Tx and Target ID's that've been used
+        usedTxs = []
+        usedTargets = []
+        for d in project.get_deployments():
+            usedTxs.append(d.txID.ID)
+            usedTargets.append(d.targetID.ID)
+        pTx = project.get_transmitters().exclude(pk__in=usedTxs)
+        pTarget = project.get_targets().exclude(pk__in=usedTargets)
+        pTxIDs = [x.pk for x in pTx]
+        pTargetIDs = [x.pk for x in pTarget]
 
-        txIDs = request.GET.get("txIDs")
-        targetIDs = request.GET.get("targetIDs")
-        # If no num 
-        if num is None or num == '':
-            return render_manage_page(
-                request,
-                project,
-                "project/bulk-create.html",
-                content)
-        # Number of forms present
-        else: 
+        num = request.GET.get("number")
+        # Check number of forms present
+        if not num is None: 
             try:
                 num = int(num)
                 if num < 1:
                     return HttpResponseBadRequest("Non positive value")
             except ValueError:
                 return HttpResponseBadRequest("Entered a non-number")
+
+        txIDs = request.GET.get("txIDs")
+        targetIDs = request.GET.get("targetIDs")
+
+        # Check if using existing targets
+        existing_tx = request.GET.get("existing_tx")
+        existing_tx_target = request.GET.get("existing_tx_target")
+        if existing_tx == "true":
+            if not num:
+                return render_bulk_page(
+                    request,
+                    project,
+                    "project/bulk-create.html",
+                    extra_context={"readonlyformset": modelformset_factory(Tx, form=AddTransmitterForm, extra=0)(queryset=pTx),
+                        "unused_tx_num": len(pTxIDs), 
+                        "unused_target_num": len(pTargetIDs),
+                        "current_form": "tx",
+                        "txIDs": " ".join(str(__) for __ in pTxIDs)}
+                )
+            else:
+                return render_wizard_project_formset(
+                    request=request,
+                    project_id=project_id,
+                    post_formset=modelformset_factory(Target, form=AddTargetForm)(),#(data=request.POST),
+                    get_formset=modelformset_factory(Target, form=AddTargetForm, extra=num)(queryset=Target.objects.none()),
+                    template_path="project/bulk-create.html",
+                    success_url="",
+                    redirect_bool=False,
+                    extra_context={"title_msg": "New Target",
+                                    "current_form": "target",}
+                ) 
+
+        elif existing_tx_target == "tx":
+            return render_bulk_page(
+                request,
+                project,
+                "project/bulk-create.html",
+                extra_context={"readonlyformset": modelformset_factory(Tx, form=AddTransmitterForm, extra=0)(queryset=pTx),
+                    "unused_tx_num": len(pTxIDs), 
+                    "unused_target_num": len(pTargetIDs),
+                    "current_form": "tx",
+                }
+            )
+        elif existing_tx_target == "target":
+            if not num:
+                return render_bulk_page(
+                    request,
+                    project,
+                    "project/bulk-create.html",
+                    extra_context={"readonlyformset": modelformset_factory(Target, form=AddTargetForm, extra=0)(queryset=pTarget),
+                        "unused_tx_num": len(pTxIDs), 
+                        "unused_target_num": len(pTargetIDs),
+                        "current_form": "target",
+                        "targetIDs": " ".join(str(__) for __ in pTargetIDs)}
+                    )
+            else:
+                return render_wizard_project_formset(
+                    request=request,
+                    project_id=project_id,
+                    post_formset=modelformset_factory(Deployment, form=AddDeploymentForm)(data=request.POST),
+                    get_formset=modelformset_factory(Deployment, form=AddDeploymentForm, extra=num)(queryset=Deployment.objects.none()),
+                    template_path="project/bulk-create.html",
+                    success_url="",
+                    redirect_bool=False,
+                    extra_context={"current_form": "deployment",
+                        "txIDs": " ".join(str(__) for __ in pTxIDs),
+                        "targetIDs": " ".join(str(__) for __ in pTargetIDs)}
+                ) 
+        # If no num 
+        if num is None or num == '':
+            return render_bulk_page(
+                request,
+                project,
+                "project/bulk-create.html",
+                extra_context={"unused_tx_num": len(pTx), "unused_target_num": len(pTarget)}
+                )
 
 
         # Tx error
@@ -665,6 +751,7 @@ def bulk_wizard(request, project_id, number=0):
                 )
         # Dep error     
         elif request.GET.get("form-0-targetID") != None:
+            print "error dep"
             return render_wizard_project_formset(
                 request=request,
                 project_id=project_id,
@@ -793,14 +880,17 @@ def show_project(request, project_id):
 
     nav_options = get_nav_options(request)
     user = request.user
-
     try:
         project = Project.objects.get(ID=project_id)
+        have_started_deployments = len(project.get_deployments().filter(time_start__lte = time.time())) != 0
+        print have_started_deployments
+
         if project.is_public:
             return render(
                 request, 'project/display-project.html',
                 {'project': project,
-                 'nav_options': nav_options})
+                 'nav_options': nav_options,
+                 'have_started_deps': have_started_deployments})
 
         else:
             if project.is_owner(user)\
@@ -811,7 +901,8 @@ def show_project(request, project_id):
                         request,
                         'project/display-project.html',
                         {'project': project,
-                         'nav_options': nav_options})
+                         'nav_options': nav_options,
+                         'have_started_deps': have_started_deployments})
 
             else:
                 return not_allowed_page(request)
@@ -960,7 +1051,24 @@ def edit_deployment(request, project_id, deployment_id):
         success_url="%s?new_element=True" % reverse(
             "project:edit-deployment", args=(project_id, deployment_id)))
 
+@login_required(login_url="/account/login")
+def movebank_export(request, project_id):
+    user = request.user
+    project = get_project(project_id)
 
+    if can_view(project, user):
+        query = get_query("transmitter")
+        tx = query(transmitter_id)
+        return HttpResponse(
+            "Transmitter: %d Model: %s Manufacturer: %s" % (
+                tx.ID, tx.tx_makeID.model, tx.tx_makeID.manufacturer))
+    else:
+        pass
+
+def about(request):
+    nav_options = get_nav_options(request)
+    return render(request, "about.html",{'nav_options': nav_options},
+    )
 
 def render_data(request):
     """Renders a JSON serialized data
