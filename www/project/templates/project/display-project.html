@@ -209,7 +209,7 @@
                 <span class="table-element table-cell">Description</span>
             </div>
             {% for target in project.get_targets %}
-            <a href={% url 'project:show-target' project.ID target.ID %} class="table-element table-row">
+            <a href={% url 'map:view_by_target' project.ID target.ID %} class="table-element table-row">
                 <span class="table-element table-cell">{{target.name}}</span>
                 <span class="table-element table-cell">{{target.description}}</span>
             </a>

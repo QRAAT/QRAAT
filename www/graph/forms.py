@@ -6,6 +6,16 @@ from django.utils.safestring import mark_safe
 from project.models import Site, Deployment
 import utils
 
+DATE_CHOICES = (
+  ("sdt_i", "Start Datetime-Interval"),
+  ("edt_i", "End Datetime-Interval"),
+  ("sts_i", "Start Timestamp-Interval"),
+  ("ets_i", "End Timestamp-Interval"),
+  ("sdt_ets", "Start Datetime-End Timestamp"),
+  ("sts_edt", "Start Timestamp-End Datetime"),
+  ("sdt_edt", "Start Datetime-End Datetime"),
+  ("sts_ets", "Start Timestamp-End Timestamp"),
+  )
 
 def get_processing_options():
     processing_options = [("estserver", "Server est"), ("server", "Server det"), ("site", "Site det")]
@@ -81,23 +91,28 @@ class TimeSeriesGraphForm(forms.Form):
         
         return graph_variables
 
+    DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
     datetime_start = forms.DateTimeField(
               required = True, 
               label="Start Date & Time",
               #[YYYY-MM-DD HH:MM:SS]
-              widget = forms.TextInput(attrs={
-                'class': 'filter',
-                'size': '17'}),
-              initial = (utils.get_local_now() - timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M:%S") # Displays current time in PST, minus 20 minutes
+              #widget = forms.TextInput(attrs={
+              #  'class': 'filter',
+              #  'size': '17'}),
+              widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+              initial = (utils.get_local_now() - timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M:%S"), # Displays current time in PST, minus 20 minutes
+              input_formats=[DATE_FORMAT, ]
               )
   
     datetime_end = forms.DateTimeField(
               required = True, 
               label="End Date & Time", 
-              widget = forms.TextInput(attrs={
-                'class': 'filter',
-                'size': '17'}),
-              initial = utils.get_local_now().strftime("%Y-%m-%d %H:%M:%S") # current datetime
+              #widget = forms.TextInput(attrs={
+              #  'class': 'filter',
+              #  'size': '17'}),
+              widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+              initial = utils.get_local_now().strftime("%Y-%m-%d %H:%M:%S"), # current datetime
+              input_formats=[DATE_FORMAT, ]
               )
 
     start_timestamp = forms.FloatField(
@@ -124,10 +139,10 @@ class TimeSeriesGraphForm(forms.Form):
               'size': '10'}),
               )
 
-    move_interval = forms.ChoiceField(
-              widget = SubmitButtons,
-              choices = [('back', 'Back'), ('forward', 'Forward')]
-              )
+    #move_interval = forms.ChoiceField(
+    #          widget = SubmitButtons,
+    #          choices = [('back', 'Back'), ('forward', 'Forward')]
+    #          )
 
     graph_variables = forms.MultipleChoiceField(
               choices = [],
@@ -151,6 +166,10 @@ class TelemetryGraphForm(TimeSeriesGraphForm):
               initial = ['all']
               )
 
+    date_format = forms.ChoiceField(label="Date Format", choices=DATE_CHOICES)
+
+
+
 
 class EstGraphForm(TimeSeriesGraphForm):
     def __init__(self, data = None):
@@ -171,6 +190,8 @@ class EstGraphForm(TimeSeriesGraphForm):
               label = 'Deployment ID',
               )
 
+    date_format = forms.ChoiceField(label="Date Format", choices=DATE_CHOICES)
+
 
 class ProcessingGraphForm(TimeSeriesGraphForm):
     def __init__(self, data = None):
@@ -184,6 +205,8 @@ class ProcessingGraphForm(TimeSeriesGraphForm):
               label = 'Site Names',
               initial = ['all']
               )
+
+    date_format = forms.ChoiceField(label="Date Format", choices=DATE_CHOICES)
 
 class DashboardForm(forms.Form):
     def __init__(self, data = None):

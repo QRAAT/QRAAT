@@ -21,6 +21,8 @@
     <!-- TODO: Ask about google hosting or not -->
     <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+    <link rel="stylesheet" type"text/css" href="/static/css/jquery.datetimepicker.css" >
+    <script type="text/javascript" src="/static/js/jquery.datetimepicker.js"></script>
 
    
 <script>
@@ -1783,6 +1785,7 @@ function initialize(){
     _tz.loadingScheme = _tz.loadingSchemes.MANUAL_LOAD;
     _tz.loadZoneJSONData('/static/js/timezone.json', true);
     
+    $(".datetime").datetimepicker({format: "Y/m/d H:i:s"});
     setGraphFilters();
     //document.getElementById("id_sites").onclick = toggleSites;
     $("#id_data_type").on('change', updateDataWrapper); // Raw vs tracks
@@ -2270,9 +2273,11 @@ google.maps.event.addDomListener(window, 'load', initialize);
     <div class="collapse in" id="deployment-div">
     {% for dep in form.deployment %}
         <div class="sidebar-header">
-            <label for="id_deployment_{{forloop.counter0}}" class="deployment-label" style="font-weight: normal">{{dep.choice_label}} <inline class="num-points"></inline></label>
+            <!--<label for="id_deployment_{{forloop.counter0}}" class="deployment-label" style="font-weight: normal">{{dep.choice_label}} <inline class="num-points"></inline></label>-->
+            <label for="id_deployment_{{forloop.counter0}}" class="deployment-label" style="font-weight: normal">{{dep.choice_label}} </label>
+            <span class="num-points"></span>
             <span class="circle"></span>
-            {{dep.tag}} <span class="arrow-down">▼</span><span class="arrow-up">▲</span><hr style="border-color: #CCCCCC">
+            {{dep.tag}} <span class="arrow-down">▼</span><span class="arrow-up">▲</span>
         </div>
         <div id="id_deployment_options_{{forloop.counter0}}" class="collapse in">
             <label for="id_points_{{forloop.counter0}}">Points</label>
@@ -2281,6 +2286,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
             <input type="checkbox" id="id_lines_{{forloop.counter0}}" value="{{forloop.counter0}}"></input>
             <label for="id_heatmap_{{forloop.counter0}}">Heatmap</label>
             <input type="checkbox" id="id_heatmap_{{forloop.counter0}}" value="{{forloop.counter0}}"></input>
+            <hr style="border-color: #CCCCCC">
         </div>
     {% endfor %}
     </div>
