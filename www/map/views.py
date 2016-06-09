@@ -25,7 +25,7 @@ import utm
 import math
 import copy
 from pytz import utc, timezone
-from project.models import Position, Deployment, Site, Project, Tx
+from project.models import Position, Deployment, Site, Project, Tx, Target
 from map.forms import Form
 from decimal import Decimal
 
