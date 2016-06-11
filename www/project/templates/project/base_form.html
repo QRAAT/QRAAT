@@ -212,7 +212,7 @@ function checkFormEmpty() {
   {% if forloop.first %}
   <thead><tr>
     {% for field in form.visible_fields %}
-        <th name="{{ field.label|capfirst }}">{{ field.label|capfirst }}</th>
+        <th name="{{ field.label }}">{{ field.label }}</th>
     {% endfor %}
   </tr></thead>
   {% endif %}

@@ -344,7 +344,7 @@ class Tx(models.Model):
     ID = models.AutoField(
         primary_key=True)  # primary key autoincrement
 
-    name = models.CharField(max_length=50, null=False)  # varchar(50) not null
+    name = models.CharField(max_length=50, null=False, default='')  # varchar(50) not null
 
     serial_no = models.CharField(
         max_length=50, null=False)  # varchar(50) not null
@@ -389,7 +389,7 @@ class Tx(models.Model):
         return objs_related
 
     def __unicode__(self):
-        return u'%s %s' % (self.name, self.serial_no)
+        return u'%s' % (self.frequency)
 
 
 class TxParameters(models.Model):
@@ -524,7 +524,7 @@ class Deployment(models.Model):
 
     ID = models.AutoField(primary_key=True)
 
-    name = models.CharField(max_length=50, null=False)
+    name = models.CharField(max_length=50, null=False, default='')
 
     description = models.TextField(blank=True)
 

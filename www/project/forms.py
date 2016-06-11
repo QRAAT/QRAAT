@@ -194,20 +194,22 @@ class AddDeploymentForm(ProjectElementForm):
 
     class Meta:
         model = Deployment
-        exclude = ["projectID", "is_active", "is_hidden"]
+        exclude = ["projectID", "is_active", "is_hidden", "name"]
+        labels = {"description":("Description/Notes/Comments")}
+        fields = ["txID", "targetID", "time_start", "time_end", "description"]
 
     DATE_FORMAT = "%m/%d/%Y %H:%M:%S"
 
-    txID = forms.ChoiceField(label="TxID")
-    targetID = forms.ChoiceField(label="TargetID")
+    txID = forms.ChoiceField(label="Transmitter Frequency (MHz)")
+    targetID = forms.ChoiceField(label="Target ID/Name/Number")
     time_start = forms.DateTimeField(
         widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
         initial=datetime.now().strftime(DATE_FORMAT),
-        input_formats=[DATE_FORMAT, ])
+        input_formats=[DATE_FORMAT, ], label='Start Time')
     time_end = forms.DateTimeField(
         widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
         initial=datetime.now().strftime(DATE_FORMAT),
-        input_formats=[DATE_FORMAT, ])
+        input_formats=[DATE_FORMAT, ], label='End Time')
 
     def set_project(self, project):
         super(AddDeploymentForm, self).set_project(project)
@@ -257,11 +259,11 @@ class AddTransmitterForm(ProjectElementForm):
 
     class Meta:
         model = Tx
-        exclude = ["projectID", "is_hidden"]
-        labels = {"name": ("Transmitter name"),
-                  "serial_no": ("Serial number"),
-                  "tx_makeID": ("Manufacturer"),
-                  "frequency": ("Frequency")}
+        exclude = ["projectID", "is_hidden", "name"]
+        labels = {"tx_makeID": ("Manufacturer"),
+                  "frequency": ("Frequency"),
+                  "serial_no": ("Serial number")}
+        fields = ["tx_makeID", "frequency", "serial_no"]
 
     frequency = forms.FloatField(label="Frequency (MHz)", min_value=0, widget=widgets.NumberInput(attrs={"step":"0.001"}))
 
