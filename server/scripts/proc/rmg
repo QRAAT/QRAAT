@@ -499,7 +499,7 @@ do
               echo "$SITE copying $DIR"
               mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
               # download to RMG server and delete from site if xfer succeeds
-              rsync -az --timeout=100 --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
+              rsync -az --timeout=30 --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
               if [ $? -ne 0 ]; then
                 echo "rsync error copying $DIR from $SITE"
               fi
