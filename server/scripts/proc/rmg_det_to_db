@@ -95,6 +95,7 @@ for site in dir_sitelist:
           break
         elif sublist:
           sublist.sort()
+          sublist.reverse()
         elif filelist:
 
           #get directories
