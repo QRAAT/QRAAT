@@ -441,7 +441,7 @@ do
           do_update $SITE
           mkdir -p $RMG_SERVER_DET_DIR/$SITE 
           touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
-          rsync -az $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
+          rsync -az --timeout=300 $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
           rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
           ssh -o ConnectTimeout=$ConnectTimeout $SITE "rmg-node down -d 0; sleep 1; rmg-node check"
         else
@@ -497,7 +497,7 @@ do
               echo "$SITE copying $DIR"
               mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
               # download to RMG server and delete from site if xfer succeeds
-              rsync -az --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
+              rsync -az --timeout=30 --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
               if [ $? -ne 0 ]; then
                 echo "rsync error copying $DIR from $SITE"
               fi
