@@ -41,20 +41,30 @@
         PyErr_SetString(PyExc_RuntimeError, "no data read yet"); break;
       case IndexError: 
         PyErr_SetString(PyExc_RuntimeError, "index out of range"); break;
-      default: cout << "unknown";
+      default: std::cout << "unknown";
     }
     return 0;
   } 
 }
 
 
+//%rename(index_operator) operator[](const int i);
+%extend pulse_data {
+  float r_sample(int i) {
+    return (*$self)[i].real();
+  }
+  float i_sample(int i) {
+    return (*$self)[i].imag();
+  }
+};
+
+
 /* Map my_complex to a Python tuple, (real, imag) */
-%typemap(out) my_complex& {
+%typemap(out) my_complex* {
   $result = PyTuple_New(2);
   PyObject *r = PyFloat_FromDouble((double) $1->real()); 
   PyObject *i = PyFloat_FromDouble((double) $1->imag()); 
   PyTuple_SetItem($result, 0, r);
   PyTuple_SetItem($result, 1, i);
 }
-
 

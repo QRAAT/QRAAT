@@ -51,6 +51,8 @@ private:
   //! Data array as a circular buffer
   boost::circular_buffer<my_complex> *data; 
   
+public:
+
   /*! Name of input file. */
   std::string filename;   
   
@@ -81,7 +83,6 @@ private:
   //! Timestamp of pulse (milliseconds) 
   int t_usec;   
   
-public:
   
   /*!
    * Constructor for the Python interface. Throws PulseDataErr.

@@ -200,7 +200,7 @@ class est (qraat.csv.csv):
     new_row.tagname   = det.tag_name
     new_row.timestamp = det.time
     new_row.frequency = det.freq
-    new_row.center    = det.params.ctr_freq
+    new_row.center    = det.ctr_freq
     new_row.fn        = det.fn
 
     # Fourier decomposistion

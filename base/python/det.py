@@ -50,15 +50,16 @@ class det (pulse_data):
     self.n_cov = None          #: Result of :func:`det.noise_cov`. 
     self.tag_name = ""         #: Tag name parsed from input file name. 
     self.fn = fn 
-    self.data = np.zeros((self.params.sample_ct,self.params.channel_ct),np.complex)
-    for j in range(self.params.sample_ct):
-      for k in range(self.params.channel_ct):
-        (r, i) = self.sample((j * self.params.channel_ct) + k)
+    self.data = np.zeros((self.sample_ct,self.channel_ct),np.complex)
+    for j in range(self.sample_ct):
+      for k in range(self.channel_ct):
+        r = self.r_sample((j * self.channel_ct) + k)
+        i = self.i_sample((j * self.channel_ct) + k)
         self.data[j,k] = np.complex(r,i)
     if np.any(np.isnan(self.data)):
       raise IOError("NaN in det data")#bad data samples
-    self.pulse = self.data[self.params.pulse_index:self.params.pulse_index+self.params.pulse_sample_ct,:]
-    self.time = self.params.t_sec + (self.params.t_usec * 1e-6)
+    self.pulse = self.data[self.pulse_index:self.pulse_index+self.pulse_sample_ct,:]
+    self.time = self.t_sec + (self.t_usec * 1e-6)
     m = tag_regex.search(fn)
     if m:
       self.tag_name = m.groups()[0]
@@ -89,12 +90,13 @@ class det (pulse_data):
     det_list = []
     bad_file_list = []
     for fn in files:
+      file_path = os.path.join(base_dir,fn)
       try:
-        det_list.append(cls(base_dir + '/' + fn))
+        det_list.append(cls(file_path))
       except:
         import sys
-        print >>sys.stderr, "Couldn't read det file: {}".format(base_dir + '/' + fn)
-        bad_file_list.append(base_dir + '/' + fn)
+        print >>sys.stderr, "Couldn't read det file: {}".format(file_path)
+        bad_file_list.append(file_path)
     return det_list, bad_file_list
   
 
@@ -106,8 +108,8 @@ class det (pulse_data):
     :returns: result of fft calculation
     """
     if self.f is None:
-      self.f = np.zeros((self.params.pulse_sample_ct,self.params.channel_ct),np.complex)
-      for j in range(self.params.channel_ct):
+      self.f = np.zeros((self.pulse_sample_ct,self.channel_ct),np.complex)
+      for j in range(self.channel_ct):
         self.f[:,j] = np.fft.fft(self.pulse[:,j])
     return self.f
 
@@ -122,7 +124,7 @@ class det (pulse_data):
     if self.f is None: self.fft()
     
     if self.f_sig is None: 
-      bin_width = self.params.sample_rate/self.params.pulse_sample_ct
+      bin_width = self.sample_rate/self.pulse_sample_ct
       f_pwr = np.sum(self.f*self.f.conjugate(),axis = 1)
       freq_index = np.argmax(f_pwr)
 
@@ -137,9 +139,9 @@ class det (pulse_data):
 
       #frequency of peak
       freq = freq_index*bin_width
-      if freq_index >= self.params.pulse_sample_ct/2:
-        freq = freq - self.params.sample_rate
-      self.freq = freq + self.params.ctr_freq
+      if freq_index >= self.pulse_sample_ct/2:
+        freq = freq - self.sample_rate
+      self.freq = freq + self.ctr_freq
 
       #total received power in bin with peak
       self.f_pwr = np.abs(f_pwr[freq_index])*bin_width
@@ -162,7 +164,7 @@ class det (pulse_data):
       self.e_sig = self.eigenvectors[:,(self.eigenvalues == np.amax(self.eigenvalues))]
 
       #total received power
-      self.e_pwr = np.max(self.eigenvalues)/self.params.pulse_sample_ct*self.params.sample_rate
+      self.e_pwr = np.max(self.eigenvalues)/self.pulse_sample_ct*self.sample_rate
 
       #confidence measure, ratio of signal eigenvalue to total power
       self.e_conf = np.max(self.eigenvalues)/np.sum(self.eigenvalues)
@@ -176,11 +178,11 @@ class det (pulse_data):
     """
 
     if self.n_cov is None:
-      if self.params.sample_ct - self.params.pulse_index >= self.params.pulse_sample_ct:
-        noise_start = int(self.params.sample_ct - self.params.pulse_index - self.params.pulse_sample_ct)/2
-        noise = self.data[noise_start:noise_start+self.params.pulse_sample_ct,:]
+      if self.sample_ct - self.pulse_index >= self.pulse_sample_ct:
+        noise_start = int(self.sample_ct - self.pulse_index - self.pulse_sample_ct)/2
+        noise = self.data[noise_start:noise_start+self.pulse_sample_ct,:]
         noise_ct = noise.conjugate().transpose()
-        self.n_cov = np.dot(noise_ct,noise)/self.params.pulse_sample_ct*self.params.sample_rate
+        self.n_cov = np.dot(noise_ct,noise)/self.pulse_sample_ct*self.sample_rate
       else:
         self.n_cov = np.array([[]])
     return self.n_cov
