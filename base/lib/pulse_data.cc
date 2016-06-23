@@ -239,12 +239,11 @@ void pulse_data::set_time(const int sec, const int usec){
   t_usec = usec;
 }
 
+my_complex pulse_data::get_sample(int channel, int index){
+  return data->at(index*channel_ct+channel);
+}
 
   /* Circular buffer methods */ 
-
-my_complex& pulse_data::operator[] (const int i) {
-  return (*data)[i*channel_ct]; 
-}
 
 my_complex* pulse_data::get_data()
 {

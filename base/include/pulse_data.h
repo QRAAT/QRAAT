@@ -140,10 +140,8 @@ public:
 
 
     /* accessors */ 
+  my_complex get_sample(int channel, int index);
 
-
-  //! Return value at given index.
-  my_complex& operator[] (const int i); 
 
   /*!
    * Return pointer to the unwrapped data buffer.

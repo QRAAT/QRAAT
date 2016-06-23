@@ -50,21 +50,30 @@
 
 //%rename(index_operator) operator[](const int i);
 %extend pulse_data {
-  float r_sample(int i) {
-    return (*$self)[i].real();
+  float r_sample(int c, int i) {
+    return $self->get_sample(c,i).real();
   }
-  float i_sample(int i) {
-    return (*$self)[i].imag();
+  float i_sample(int c, int i) {
+    return $self->get_sample(c,i).imag();
   }
 };
 
 
 /* Map my_complex to a Python tuple, (real, imag) */
-%typemap(out) my_complex* {
+%typemap(out) my_complex * {
   $result = PyTuple_New(2);
   PyObject *r = PyFloat_FromDouble((double) $1->real()); 
   PyObject *i = PyFloat_FromDouble((double) $1->imag()); 
   PyTuple_SetItem($result, 0, r);
   PyTuple_SetItem($result, 1, i);
 }
+
+%typemap(out) my_complex {
+  $result = PyTuple_New(2);
+  PyObject *r = PyFloat_FromDouble((double) $1.real()); 
+  PyObject *i = PyFloat_FromDouble((double) $1.imag()); 
+  PyTuple_SetItem($result, 0, r);
+  PyTuple_SetItem($result, 1, i);
+}
+
 

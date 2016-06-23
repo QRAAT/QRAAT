@@ -53,8 +53,8 @@ class det (pulse_data):
     self.data = np.zeros((self.sample_ct,self.channel_ct),np.complex)
     for j in range(self.sample_ct):
       for k in range(self.channel_ct):
-        r = self.r_sample((j * self.channel_ct) + k)
-        i = self.i_sample((j * self.channel_ct) + k)
+        r = self.r_sample(k,j)
+        i = self.i_sample(k,j)
         self.data[j,k] = np.complex(r,i)
     if np.any(np.isnan(self.data)):
       raise IOError("NaN in det data")#bad data samples
@@ -68,11 +68,6 @@ class det (pulse_data):
   def __str__(self):
     """ Return the filename as a string. """
     return self.filename
-
-
-  def print_det(self):
-    """ Print the record's metdata to standard output. """
-    print self.params
 
   
   @classmethod
