@@ -38,8 +38,10 @@ std::ostream& operator<< ( std::ostream &out, const pulse_data &p ) {
 pulse_data::pulse_data( const char *fn ) 
 {
   data = NULL;
-  if( fn && read(fn)==-1 ) 
-    throw FileReadError;
+  if( fn && read(fn)==-1 ){
+    std::cerr << "File read Error\n"; 
+    channel_ct=0;
+  }
 } // constructor for Python interface
 
 

@@ -26,13 +26,14 @@
 #include <sys/time.h>
 #include <boost/circular_buffer.hpp>
 
+
 /* Warning: we expect that the Gnu Radio `gr_complex` type matches this
  * typedef. This is the case as of version 3.7.3, and this is unlikely 
  * to change down the road. */
 typedef std::complex<float> my_complex;
 
 //! Error handling. 
-typedef enum { FileReadError, NoDataError, IndexError } PulseDataError; 
+//typedef enum { FileReadError, NoDataError, IndexError } PulseDataError; 
 
 
 /*!

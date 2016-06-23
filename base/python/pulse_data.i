@@ -30,6 +30,7 @@
 
 %include "../include/pulse_data.h"
 
+/* Doesn't work!!
 %exception {
   try { 
     $function
@@ -46,7 +47,7 @@
     return 0;
   } 
 }
-
+*/
 
 //%rename(index_operator) operator[](const int i);
 %extend pulse_data {
@@ -60,6 +61,7 @@
 
 
 /* Map my_complex to a Python tuple, (real, imag) */
+/* Doesn't work!!
 %typemap(out) my_complex * {
   $result = PyTuple_New(2);
   PyObject *r = PyFloat_FromDouble((double) $1->real()); 
@@ -75,5 +77,5 @@
   PyTuple_SetItem($result, 0, r);
   PyTuple_SetItem($result, 1, i);
 }
-
+*/
 

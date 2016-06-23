@@ -42,6 +42,8 @@ class det (pulse_data):
    
   def __init__(self, fn):
     pulse_data.__init__(self, fn)
+    if self.channel_ct==0:
+      raise IOError("pulse_data failed to read det file")
     self.f = None              #: Result of :func:`det.fft`. 
     self.f_sig = None          #: Result of :func:`det.f_signal`.
     self.e_sig = None          #: Result of :func:`det.eig`. 
