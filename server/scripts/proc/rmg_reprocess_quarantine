@@ -57,7 +57,7 @@ for leaf_dir,sublist,filelist in os.walk(det_dir):
   if filelist:
     search_result = leaf_regex.search(leaf_dir)
     if search_result:
-      print "Found {} {}".format(leaf_dir,directory_counter)
+      print "Found {}".format(leaf_dir)
       date_tuple = search_result.groups(0)
 
       # Process det files, store signals in the database. 
@@ -68,7 +68,7 @@ for leaf_dir,sublist,filelist in os.walk(det_dir):
       cur = db_con.cursor()
       for row in table: 
         try:
-          table.write_db_row(cur, row, site)
+          table.write_db_row(cur, row, date_tuple[0])
           total_det_files+=1
         except Exception as e:
           #could be qraat.ResolveIdError from est class
@@ -77,17 +77,17 @@ for leaf_dir,sublist,filelist in os.walk(det_dir):
           print >>sys.stderr, "det_to_db: error was: {0}".format(e)
 
       # Archive table as est file. 
-      table.write(os.path.join(est_arch, site, *date_tuple))
+      table.write(os.path.join(est_arch, *date_tuple))
     
       # Archive processed det files.
-      arch_fn = os.path.join(det_arch, site, *date_tuple)
+      arch_fn = os.path.join(det_arch, *date_tuple)
       try:
         os.makedirs(arch_fn)
       except OSError, e:            # Catch if directory exists;
         if e.errno != errno.EEXIST: # otherwise, throw exception.  
           raise e
 
-      arch_fn += site + (".{}.{}.{}.{}.{}.tar".format(*date_tuple))
+      arch_fn += ("{}.{}.{}.{}.{}.{}.tar".format(*date_tuple))
       if os.path.isfile(arch_fn): 
         (status, output) = commands.getstatusoutput(
           '/bin/tar -rf {} -C {} .'.format(arch_fn, leaf_dir))
