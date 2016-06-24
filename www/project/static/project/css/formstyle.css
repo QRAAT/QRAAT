@@ -25,12 +25,24 @@ tr {
     height: 1em;
 }
 
+table.formset_table > td {
+    min-width: 10em;
+}
+
+td.initial-width {
+    min-width: initial;
+}
+
+table.formset_table > td > input, select {
+    width: 100%;
+}
+
 textarea {
     display:block;
     margin: 0;
     padding: 0;
     height: 100%;
-    width: 10em;
+    width: 100%; /*10em;*/
     -webkit-box-sizing: border-box;
     -moz-box-sizing: border-box;
     box-sizing: border-box;
