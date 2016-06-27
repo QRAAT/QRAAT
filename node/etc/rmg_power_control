@@ -1,0 +1,3 @@
+rmg ALL=NOPASSWD: /sbin/halt
+rmg ALL=NOPASSWD: /sbin/reboot
+rmg ALL=NOPASSWD: /sbin/poweroff
