@@ -129,13 +129,13 @@ html {
     height: 25px;
 }
 
-.warning-text, input-error {
+.warning-text, .input-error {
     color: rgb(255, 20, 20);
 }
 
-.warning-border select,
-.warning-border input,
-.warning-border textarea {
+.child-warning-border select,
+.child-warning-border input,
+.child-warning-border textarea {
     border-color: rgb(255, 20, 20);
     border-width: 2px;
 }
