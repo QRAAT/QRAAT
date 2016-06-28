@@ -22,7 +22,11 @@ table {
 }
 
 tr {
-    height: 1em;
+    height: 1em; /* Not even sure why this is here */
+}
+
+tr.error-tr {
+    height: initial; /* So that when there are no error messages (user fixed their mistake) the error msg row can collapse */
 }
 
 table.formset_table > td {
@@ -33,7 +37,7 @@ td.initial-width {
     min-width: initial;
 }
 
-table.formset_table > td > input, select {
+table#formset_table select {
     width: 100%;
 }
 
