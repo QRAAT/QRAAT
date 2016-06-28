@@ -128,3 +128,14 @@ html {
 .footer_buffer {
     height: 25px;
 }
+
+.warning-text, .input-error {
+    color: rgb(255, 20, 20);
+}
+
+.child-warning-border select,
+.child-warning-border input,
+.child-warning-border textarea {
+    border-color: rgb(255, 20, 20);
+    border-width: 2px;
+}

@@ -15,8 +15,21 @@ If you create a placeholder target, remember to change the target information wh
 {{ block.super }}
 <script>
 $(document).ready(function() {
-    $("select[name$=targetID]").prepend('<option value selected="selected">---------</option>');
-    $("select[name$=txID]").prepend('<option value selected="selected">---------</option>');
+    var defaultOption = '<option value "selected">---------</option>'
+    var defaultOptionSel = '<option value selected="selected">---------</option>'
+    // If select already has option with "selected" prop, dont select default
+    $("select[name$=targetID]").each(function() {
+        if($(this).find("option").prop("selected"))
+            $(this).prepend(defaultOptionSel);
+        else
+            $(this).prepend(defaultOption);
+    });
+    $("select[name$=txID]").each(function() {
+        if($(this).find("option").prop("selected"))
+            $(this).prepend(defaultOptionSel);
+        else
+            $(this).prepend(defaultOption);
+    });
 
     // Add buttons that copy the
     //$("#formset_table").prepend("<tr id='table-controls'><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>");
