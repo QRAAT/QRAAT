@@ -82,8 +82,8 @@ $(document).ready(function(){
 
     // If select caused error when empty (nothing selected), a change of selection will remove msg
     $("#formset_table select, #formset_table input, #formset_table textarea").change(function() {
-        if($(this).parent("td").hasClass("warning-border")) {
-            $(this).parent("td").removeClass("warning-border");
+        if($(this).parent("td").hasClass("child-warning-border")) {
+            $(this).parent("td").removeClass("child-warning-border");
             var ind = $(this).parent("td").index();
             if ($(this).closest("tr").prev().hasClass("error-tr")) {
                 $(this).closest("tr").prev().children().eq(ind).html("");
@@ -240,7 +240,7 @@ function checkFormEmpty() {
   {% endif %}
   <tr class="{% cycle row1,row2 %} objectrow">
   {% for field in form.visible_fields %}
-  <td {% if field.errors %}class="warning-border"{% endif %}>
+  <td {% if field.errors %}class="child-warning-border"{% endif %}>
     {# Include the hidden fields in the form #}
     {% comment %}
     {% if forloop.first %}

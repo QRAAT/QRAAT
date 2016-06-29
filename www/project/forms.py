@@ -328,11 +328,15 @@ class EditDeploymentForm(ProjectElementForm):
 
     class Meta:
         model = Deployment
-        exclude = ["projectID", "is_hidden", "time_end", "targetID", "txID"]
+        exclude = ["projectID", "is_hidden", "targetID", "txID"]
 
     DATE_FORMAT = "%m/%d/%Y %H:%M:%S"
 
     time_start = forms.DateTimeField(
+        widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+        input_formats=[DATE_FORMAT, ])
+
+    time_end = forms.DateTimeField(
         widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
         input_formats=[DATE_FORMAT, ])
 
@@ -344,6 +348,18 @@ class EditDeploymentForm(ProjectElementForm):
         except:
             raise forms.ValidationError(
                 "We couldn't parse the time_start given.\
+                        Check if the format is correct")
+        else:
+            return timestamp
+
+    def clean_time_end(self):
+        time_end = self.cleaned_data.get("time_start").astimezone(pytz.utc)
+
+        try:
+            timestamp = utils.date_totimestamp(time_end)
+        except:
+            raise forms.ValidationError(
+                "We couldn't parse the time_end given.\
                         Check if the format is correct")
         else:
             return timestamp

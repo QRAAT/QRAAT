@@ -14,7 +14,7 @@ $(document).ready(function(){
     
     $(".datetime").datetimepicker({format: "m/d/Y H:i:s"})
         
-    $("#form-container_table select, #form-container_table input, #form-container_table textarea").change(function() {
+    $("#form-container select, #form-container input, #form-container textarea").change(function() {
         var $parentDiv = $(this).parent("div");
         if($parentDiv.hasClass("warning-border")) {
             $parentDiv.removeClass("warning-border");

@@ -1038,6 +1038,11 @@ def edit_deployment(request, project_id, deployment_id):
     query = get_query("deployment")
     deployment = query(deployment_id)
 
+    if isinstance( deployment.time_end, (int, long) ):
+        time_end = utils.strftime(utils.timestamp_todate(deployment.time_end))
+    else:
+        time_end = "None"
+
     return render_project_form(
         request=request,
         project_id=project_id,
@@ -1046,7 +1051,8 @@ def edit_deployment(request, project_id, deployment_id):
             instance=deployment,
             initial={'time_start':
                      utils.strftime(
-                         utils.timestamp_todate(deployment.time_start))}),
+                         utils.timestamp_todate(deployment.time_start)),
+                     'time_end': time_end}),
         template_path="project/edit-deployment.html",
         success_url="%s?new_element=True" % reverse(
             "project:edit-deployment", args=(project_id, deployment_id)))
