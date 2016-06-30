@@ -50,9 +50,7 @@ if args.plot:
 deploymentID = args.depID
 
 print "Gathering data for deployment {}".format(deploymentID)
-#db_con = util.get_db('reader')
-import MySQLdb
-db_con = MySQLdb.connect(host='127.0.0.1',user='reader',passwd='reader',db='qraat',port=13306)#FIXME
+db_con = util.get_db('reader')
 cursor = db_con.cursor()
 
 est_fields = {'timestamp':1,
