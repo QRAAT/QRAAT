@@ -1,0 +1,353 @@
+#!/usr/bin/env python2
+
+import numpy as np
+import qraat.srv
+import argparse
+import scipy.optimize
+
+#TODO number of channels is hard-coded, azimuthal range is hard-coded
+
+parser = argparse.ArgumentParser()
+parser.description = '''\
+Average signal vectors over bearing.
+This assumes there are est and gps records for
+the given deployment in the database.
+'''
+
+
+parser.add_argument('depID', type=int, help="Serial ID of the deployment in the database")
+
+parser.add_argument('--sites', type=int, nargs='+', help="Sites to cal. Must be in site table", metavar='SITE#')
+
+parser.add_argument('--min-distance', type=float, default=50.0, help="Minimum distance from tower for valid measurement")
+
+parser.add_argument('--use-elevation-model', nargs=2 , help="Use elevation model given by .tif and .tfw files", metavar=('file.tif','file.tfw'))
+
+parser.add_argument('--band3', type=float, default=150.0, help="3dB bandwidth filter threshold", metavar='THRESHOLD')
+
+parser.add_argument('--band10', type=float, default=900.0, help="10dB bandwidth filter threshold", metavar='THRESHOLD')
+
+parser.add_argument('--elevation-angle', type=float, default=45.0, help="Maximum elevation angle deviation for valid measurement")
+
+parser.add_argument('--plot', nargs='?', const='./', help='Save plots to given directory, defaults to ./', metavar='DIRECTORY')
+
+parser.add_argument('--min_contributors', type=int, default=10, help='Minimum number of samples in a wedge to generate cal data for', metavar='N')
+
+parser.add_argument('--wedge', type=float, default=5.0, help='Size of bearing wedge to average over', metavar='N')
+
+parser.add_argument('--out-file', default='cal.csv', help='File to output cal data csv')
+
+args = parser.parse_args()
+
+
+if args.plot:
+  import matplotlib
+  matplotlib.use('Agg')
+  import matplotlib.pyplot as pp
+  import os
+
+#GET DATA
+deploymentID = args.depID
+
+print "Gathering data for deployment {}".format(deploymentID)
+#db_con = util.get_db('reader')
+import MySQLdb
+db_con = MySQLdb.connect(host='127.0.0.1',user='reader',passwd='reader',db='qraat',port=13306)#FIXME
+cursor = db_con.cursor()
+
+est_fields = {'timestamp':1,
+               'siteID':2,
+               'frequency':6,
+               'band3':7,
+               'band10':8,
+               'easting':17,
+               'northing':18,
+               'elevation':19,
+               'distance':20,
+               'bearing':22,
+               'elevation_angle':23}
+cursor.execute("select ID, timestamp, siteID, edsp, edsnr, tnp, frequency, band3, band10, ed1r, ed1i, ed2r, ed2i, ed3r, ed3i, ed4r, ed4i, easting, northing, elevation, 2d_distance, 3d_distance, bearing, elevation_angle from est, true_position where deploymentID=%s and est.ID=true_position.estID",deploymentID)
+est_data = np.array(cursor.fetchall(),dtype=float)
+
+cursor.execute("select ID, latitude, longitude, elevation, easting, northing from site")
+site_data = np.array(cursor.fetchall(), dtype=float)
+
+db_con.close()
+
+if args.sites:
+  site_set = set(args.sites)
+  est_site_set = set(est_data[:,est_fields['siteID']])
+  db_site_set = set(site_data[:,0])
+  missing_est_set = site_set - est_site_set
+  missing_db_set = site_set - db_site_set
+  site_set = site_set.intersection(est_site_set.intersection(db_site_set))
+  if missing_est_set:
+    print "Missing est data for sites: {}".format(missing_est_set)
+  if missing_db_set:
+    print "Missing database data for sites: {}".format(missing_db_set)
+else:
+  site_set = set(est_data[:,est_fields['siteID']]).intersection(set(site_data[:,0]))
+
+print "Using sites {}".format(','.join(str(x) for x in site_set))
+
+#END get data
+
+
+#plot gps
+if args.plot:
+  print "Plotting GPS Data of all ests for given deployment to {}".format(args.plot)
+  pp.plot(est_data[:,est_fields['easting']],est_data[:,est_fields['northing']],'.')
+  for site in site_set:
+    e = site_data[site_data[:,0]==site,4]
+    n = site_data[site_data[:,0]==site,5]
+    pp.plot(e,n,'k*')
+  pp.xlabel('Easting (meters)')
+  pp.ylabel('Northing (meters)')
+  pp.title('GPS Locations of EST Records for Deployment {}'.format(deploymentID))
+  pp.savefig(os.path.join(args.plot,'gps.png'))
+  pp.clf()
+
+#END plot
+
+est_site_mask = np.zeros(est_data.shape[0],dtype=np.bool)
+for site in site_set:
+  est_site_mask += (est_data[:,est_fields['siteID']]==site)
+
+est_data = est_data[est_site_mask,:]
+
+
+
+#elevation model
+if args.use_elevation_model:
+  print "Determining Line-of-Sight"
+  import qraat.srv.elevation
+  import utm
+  if args.use_elevation_model[0][-4:]=='.tif':
+    tif_file = args.use_elevation_model[0]
+    if args.use_elevation_model[1][-4:]=='.tfw':
+      tfw_file = args.use_elevation_model[1]
+    else:
+      print "{} not a .tfw extension".format(args.use_elevation_model[1])
+      raise IOError()
+  elif args.use_elevation_model[1][-4:]=='.tif':
+    tif_file = args.use_elevation_model[1]
+    if args.use_elevation_model[0][-4:]=='.tfw':
+      tfw_file = args.use_elevation_model[0]
+    else:
+      print "{} not a .tfw extension".format(args.use_elevation_model[0])
+      raise IOError()
+  else:
+    print "neither {} is a .tif extension".format(args.use_elevation_model)
+    raise IOError()
+  em = elevation.elevation_model(tif_file, tfw_file)
+  los_dict = {}
+  for data in site_data:
+    if data[0] in site_set:
+      los_dict[data[0]] = elevation.line_of_sight(em, data[1], data[2], data[3])
+  can_see = np.zeros((est_data.shape[0],),dtype=np.bool)
+  for j in range(est_data.shape[0]):
+    lat, lon = utm.to_latlon(est_data[j,est_fields['easting']],est_data[j,est_fields['northing']], 10,'S')#FIXME hardcoded UTM zone
+    can_see[j] = los_dict[est_data[j,est_fields['siteID']]].can_see(lat,lon,est_data[j,est_fields['elevation']]) and (est_data[j,20] > args.min_distance)
+else:
+  can_see = np.ones((est_data.shape[0],),dtype=np.bool)
+
+#END elevation model
+
+#filter data
+print "Filtering Data"
+print "\tBand3 < {}".format(args.band3)
+print "\tBand10 < {}".format(args.band10)
+print "\t|Elevation Angle| < {}".format(args.elevation_angle)
+print "\tDistance < {}".format(args.min_distance)
+signal_dict = {}
+bearing_dict = {}
+for site in site_set:
+  score_mask = (est_data[:,est_fields['siteID']] == site)
+  score_mask *= (est_data[:,est_fields['band3']] < args.band3)
+  score_mask *= (est_data[:,est_fields['band10']] < args.band10)
+  score_mask *= (np.abs(est_data[:,est_fields['elevation_angle']]) < args.elevation_angle)
+  score_mask *= (est_data[:,est_fields['distance']] > args.min_distance)
+  score_mask *= can_see
+  signal = np.zeros((np.sum(score_mask),4),dtype=np.complex)
+  for k in range(4):
+    #Due to an error somewhere, use the conjugate of the data 
+    #to produce a cal which works with position.py
+    signal[:,k] = est_data[score_mask,9+k*2]+np.complex(0,-1)*est_data[score_mask,10+k*2]
+  signal_dict[site] = signal*np.exp(np.complex(0,-1)*np.angle(signal[:,0,np.newaxis]))
+  bearing_dict[site] = est_data[score_mask,est_fields['bearing']]
+
+#END filter
+
+
+
+#plot data
+if args.plot:
+  print "Plotting filtered data to {}".format(args.plot)
+  for site in bearing_dict:
+    pp.plot(bearing_dict[site],np.angle(signal_dict[site]),'.')
+    pp.xlabel('Bearing (degrees)')
+    pp.ylabel('Phase (radians)')
+    pp.title('Signal Phase of Filtered Data for Site {}'.format(int(site)))
+    pp.savefig(os.path.join(args.plot,'data_phase_{}.png'.format(int(site))))
+    pp.clf()
+  for site in bearing_dict:
+    pp.plot(bearing_dict[site],np.abs(signal_dict[site]),'.')
+    pp.xlabel('Bearing (degrees)')
+    pp.ylabel('Amplitude')
+    pp.title('Signal Amplitude of Filtered Data for Site {}'.format(int(site)))
+    pp.savefig(os.path.join(args.plot,'data_amplitude_{}.png'.format(int(site))))
+    pp.clf()
+
+#END plot
+
+#functions
+def measure(test, signals):
+  #assuming test is (1x4) and signals is (Nx4)
+  temp = np.dot(test,signals.transpose().conj())
+  result = np.abs(np.sum(temp*temp.conj()))
+  return 1-result/float(signals.shape[0])
+
+
+def estimate(test,cal):
+  temp = np.dot(test,cal.transpose().conj())
+  temp = np.abs(temp*temp.conj())
+  temp[np.where(np.isnan(temp))] = 0.0
+  result = np.argmax(temp)
+  return result
+
+def r_signal(rotation):
+  signal = np.array([[1.0,0.0,0.0,0.0]],dtype=np.complex)
+  cr1 = np.cos(rotation[3])
+  sr1 = np.sin(rotation[3])
+  cr2 = np.cos(rotation[4])
+  sr2 = np.sin(rotation[4])
+  cr3 = np.cos(rotation[5])
+  sr3 = np.sin(rotation[5])
+  rotation_matrix = np.array(
+                    [[cr1,sr1*cr2, sr1*sr2*cr3,sr1*sr2*sr3],
+                     [-sr1, cr1*cr2,cr1*sr2*cr3, cr1*sr2*sr3],
+                     [0.0,     -sr2,     cr2*cr3,    cr2*sr3],
+                     [0.0,     0.0,         -sr3,         cr3]], dtype=np.complex)
+  rotated_signal = np.dot(signal,rotation_matrix)
+  for j in range(3):
+    rotated_signal[:,j+1] = rotated_signal[:,j+1]*np.exp(np.complex(0,1)*rotation[j])
+  return rotated_signal
+
+def rotation_from_signal(signal):
+  norm_sig = signal*np.exp(np.complex(0,-1)*np.angle(signal[0,0]))
+  norm_sig = norm_sig/(np.linalg.norm(norm_sig))
+  rotation = np.zeros((6,))
+  for j in range(3):
+    rotation[j] = np.angle(norm_sig[0,j+1])
+    norm_sig[0,j+1] = norm_sig[0,j+1]*np.exp(np.complex(0,-1)*rotation[j])
+  rotation[3] = np.arccos(norm_sig[0,0].real)
+  if rotation[3] == 0:
+    rotation[4]=0
+    rotation[5]=0
+  else:
+    rotation[4] = np.arccos(norm_sig[0,1].real/np.sin(rotation[3]))
+    if rotation[4] == 0:
+      rotation[5]=0
+    else:
+      rotation[5] = np.arccos(norm_sig[0,2].real/np.sin(rotation[4])/np.sin(rotation[3]))
+  return rotation
+
+def scoring_function(rotation,signal_wedge):
+  test_signal = r_signal(rotation)
+  return measure(test_signal,signal_wedge)
+
+def cal_for_wedge(signal_wedge):
+  mean_signal = np.mean(signal_wedge,0)
+  mean_signal /= np.linalg.norm(mean_signal)
+  mean_signal = mean_signal[np.newaxis,:]
+  parameter_guess = rotation_from_signal(mean_signal)
+  res = scipy.optimize.minimize(scoring_function, parameter_guess, args=(signal_wedge,))
+  solution = r_signal(res.x)
+  return solution, res
+
+#END functions
+
+#Running wedge cal
+print "Calculating Average Pattern"
+min_contributors = args.min_contributors
+wedge = args.wedge
+cal_dict = {}
+est_dict = {}
+cal_rotations_dict = {}
+wedge_scores_dict = {}
+contributors_dict = {}
+for site in signal_dict:
+  print "\tSite {}".format(site)
+  low_mask = bearing_dict[site] < wedge
+  high_mask = bearing_dict[site] > 360-wedge
+  sig_zero = np.vstack((signal_dict[site],signal_dict[site][low_mask,:],signal_dict[site][high_mask,:]))
+  bearings = np.hstack((bearing_dict[site],bearing_dict[site][low_mask]+360, bearing_dict[site][high_mask]-360))
+  cal = np.zeros((360,4),dtype=np.complex)
+  score = np.zeros((360,))
+  contributors = np.zeros((360,))
+  for j in range(360):
+    mask = np.where((bearings < j+wedge/2.0)*(bearings > j-wedge/2.0))[0]
+    contributors[j] = mask.shape[0]
+    if contributors[j] > min_contributors:
+      cal[j,:], res = cal_for_wedge(sig_zero[mask,:])
+      score[j] = measure(cal[j,:],sig_zero[mask,:])
+    else:
+      cal[j,:] = np.nan*np.ones((4,),dtype=np.complex)
+      score[j] = np.nan
+  cal_dict[site]=cal
+  wedge_scores_dict[site] = score
+  contributors_dict[site] = contributors
+  est_bearing = np.zeros((bearing_dict[site].shape[0],))
+  for j in range(bearing_dict[site].shape[0]):
+    est_bearing[j] = estimate(sig_zero[j,np.newaxis,:],cal)
+    #est_bearing[j] = estimate(sig_zero[j,:],minimize_cal)
+  est_dict[site] = est_bearing
+  cal_rot = np.zeros((cal.shape[0],6))
+  for j in range(cal.shape[0]):
+    cal_rot[j,:] = rotation_from_signal(cal[j,np.newaxis,:])
+  cal_rotations_dict[site]=cal_rot
+
+#END running wedge cal
+
+#plot cal
+if args.plot:
+  print "Plotting Patterns to {}".format(args.plot)
+  for site in cal_dict:
+    pp.plot(np.arange(360),np.angle(cal_dict[site]),'.')
+    pp.xlabel('Bearing (degrees)')
+    pp.ylabel('Phase (radians)')
+    pp.title('Phase of Calibration for Site {}'.format(int(site)))
+    pp.savefig(os.path.join(args.plot,'cal_phase_{}.png'.format(int(site))))
+    pp.clf()
+  for site in cal_dict:
+    pp.plot(np.arange(360),np.abs(cal_dict[site]),'.')
+    pp.xlabel('Bearing (degrees)')
+    pp.ylabel('Amplitude')
+    pp.title('Amplitude of Calibration for Site {}'.format(int(site)))
+    pp.savefig(os.path.join(args.plot,'cal_amplitude_{}.png'.format(int(site))))
+    pp.clf()
+  for site in est_dict:
+    pp.plot(bearing_dict[site], est_dict[site], '.')
+    pp.plot([0,360],[0,360],'k')
+    pp.xlim([0,360])
+    pp.xticks(np.arange(0,360,60))
+    pp.ylim([0,360])
+    pp.yticks(np.arange(0,360,60))
+    pp.xlabel('True Bearing (degrees)')
+    pp.ylabel('Estimated Bearing (degrees)')
+    pp.title('Verification of Calibration for Site {}'.format(int(site)))
+    pp.savefig(os.path.join(args.plot,'verification_{}.png'.format(int(site))))
+    pp.clf()
+#END plot
+
+#write cal data to csv
+if args.out_file:
+  print "Writing calibration patterns to {}".format(args.out_file)
+  with open(args.out_file,'w') as f:
+    f.write('siteID,bearing,cal_1r,cal_1i,cal_2r,cal_2i,cal_3r,cal_3i,cal_4r,cal_4i\n')
+    for site in cal_dict:
+      for bearing in range(360):
+        out_str = ','.join((str(site),str(bearing)))
+        for j in range(4):
+          out_str += ',{},{}'.format(cal_dict[site][bearing,j].real,cal_dict[site][bearing,j].imag)
+        f.write(out_str+'\n')
