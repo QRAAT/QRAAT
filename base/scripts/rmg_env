@@ -190,22 +190,31 @@ export RMG_EST_SCORE_NEIGHBORHOOD=20
 #position_auto
 
 # Averaging window used for auto position calculation
-export RMG_POS_TIME_WINDOW=15
+export RMG_POS_TIME_WINDOW=30
 
 # Time step for auto position calculation
-export RMG_POS_TIME_STEP=15
+export RMG_POS_TIME_STEP=60
 
 # Calibration data to use in auto position calculation
-export RMG_POS_CAL_ID=10
+export RMG_POS_CAL_ID=11
 
 # EST Score Threshold for filter before position estimation
 export RMG_POS_EST_THRESHOLD=0.0
 
 # Enable covariance estimation 
-export RMG_POS_ENABLE_COV=true
+export RMG_POS_ENABLE_COV=false
 
 # Normalize beaaring spectrum
 export RMG_POS_NORMALIZE_SPECTRUM=false
+
+# Boundry for position estimation
+export RMG_POS_EASTING_MIN=573000
+export RMG_POS_EASTING_MAX=576000
+export RMG_POS_NORTHING_MIN=4259000
+export RMG_POS_NORTHING_MAX=4263000
+
+# Initial stepsize for grid search
+export RMG_POS_STEPSIZE=5
 
 #END#position_auto
 

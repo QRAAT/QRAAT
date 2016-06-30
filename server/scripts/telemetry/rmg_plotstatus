@@ -137,7 +137,7 @@ my @Products =
 		columns=> "server",
 		file=> "server_det_count",
 		title=> "server det count",
-		yrange=> [1,1000],
+		yrange=> [1,100000],
 		timezone=> "localtime",
 		gpextra=> "set logscale y",
 		lines=> [ {column=>1,color=>'red'} ],
@@ -149,7 +149,7 @@ my @Products =
 		columns=> "site",
 		file=> "site_det_count",
 		title=> "site det count",
-		yrange=> [1,1000],
+		yrange=> [1,100000],
 		timezone=> "localtime",
 		gpextra=> "set logscale y",
 		lines=> [ {column=>1,color=>'red'} ],
@@ -166,56 +166,6 @@ my @Products =
 		gpextra=> "set logscale y",
 		lines=> [ {column=>1,color=>'red'} ],
 		interval=> 2*$INTERVAL_DAY,
-	}, 
-	# Database fest entries per site
-	{
-		table=> "procount",
-		columns=> "festserver",
-		file=> "server_fest_count",
-		title=> "filtered est entries per 10 minutes",
-		yrange=> [1,1000],
-		timezone=> "localtime",
-		lines=> [ {column=>1,color=>'red'} ],
-		gpextra=> "set logscale y",
-		interval=> 2*$INTERVAL_DAY,
-	}, 
-	# Database fest power vs time
-	{
-		table=> "fest",
-		columns=> "fdsp",
-		file=> "fest_power_time",
-		title=> "filtered est power",
-		yrange=> [0.01,1000],
-		timezone=> "localtime",
-		lines=> [ {column=>1,color=>'red'} ],
-		gpextra=> "set logscale y",
-		interval=> $INTERVAL_DAY,
-	}, 
-	# Database fest freq vs time
-	{
-		table=> "fest",
-		columns=> "frequency",
-		file=> "fest_frequency_time",
-		title=> "filtered est frequency timeline",
-		yrange=> [164000000,164500000],
-		timezone=> "localtime",
-		lines=> [ {column=>1,color=>'black'} ],
-		interval=> $INTERVAL_DAY,
-		size=> [600,1200],					# Here the optional hash element 'size' is used to override the default
-		gpextra=> "set format y \"%s\"; set ytics 10000",
-	}, 
-	# Database fest freq vs time
-	{
-		table=> "fest",
-		columns=> "frequency,fdsp",
-		file=> "fest_frequency_power_time",
-		title=> "filtered est frequency timeline",
-		yrange=> [164000000,164500000],
-		timezone=> "localtime",
-		lines=> [ {column=>1,color=>'black'} ],
-		interval=> $INTERVAL_DAY,
-		size=> [600,1200],					# Here the optional hash element 'size' is used to override the default
-		gpextra=> "set format y \"%s\"; set ytics 10000",
 	}, 
 ) ;
 

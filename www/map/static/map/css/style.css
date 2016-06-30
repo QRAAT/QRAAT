@@ -180,3 +180,7 @@ hr {
     right: 0;
     opacity: 1;
 }
+
+.arrow-up, .arrow-down{
+    color: #545454;
+}

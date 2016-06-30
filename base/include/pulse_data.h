@@ -26,13 +26,14 @@
 #include <sys/time.h>
 #include <boost/circular_buffer.hpp>
 
+
 /* Warning: we expect that the Gnu Radio `gr_complex` type matches this
  * typedef. This is the case as of version 3.7.3, and this is unlikely 
  * to change down the road. */
 typedef std::complex<float> my_complex;
 
 //! Error handling. 
-typedef enum { FileReadError, NoDataError, IndexError } PulseDataError; 
+//typedef enum { FileReadError, NoDataError, IndexError } PulseDataError; 
 
 
 /*!
@@ -51,6 +52,8 @@ private:
   //! Data array as a circular buffer
   boost::circular_buffer<my_complex> *data; 
   
+public:
+
   /*! Name of input file. */
   std::string filename;   
   
@@ -81,7 +84,6 @@ private:
   //! Timestamp of pulse (milliseconds) 
   int t_usec;   
   
-public:
   
   /*!
    * Constructor for the Python interface. Throws PulseDataErr.
@@ -139,10 +141,8 @@ public:
 
 
     /* accessors */ 
+  my_complex get_sample(int channel, int index);
 
-
-  //! Return value at given index.
-  my_complex& operator[] (const int i); 
 
   /*!
    * Return pointer to the unwrapped data buffer.

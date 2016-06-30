@@ -7,12 +7,23 @@
 <script>
 
 $(document).ready(function(){
-        var inputs = $(".input-group").children("input, select, textarea");
-        for(var i=0; i<inputs.length; i++){
-            $(inputs[i]).addClass("form-control");
-        }
+    var inputs = $(".input-group").children("input, select, textarea");
+    for(var i=0; i<inputs.length; i++){
+        $(inputs[i]).addClass("form-control");
+    }
+    
+    $(".datetime").datetimepicker({format: "m/d/Y H:i:s"})
         
-        $(".datetime").datetimepicker({format: "m/d/Y H:i:s"})
+    $("#form-container select, #form-container input, #form-container textarea").change(function() {
+        var $parentDiv = $(this).parent("div");
+        if($parentDiv.hasClass("warning-border")) {
+            $parentDiv.removeClass("warning-border");
+            var ind = $(this).parent("td").index();
+            if ($parentDiv.prev("div").hasClass("input-error")) {
+                $parentDiv.prev("div").html("");
+            }
+        }
+    })
 });
 
 </script>
@@ -41,7 +52,7 @@ $(document).ready(function(){
 				{% endfor %}
 			{% endif %}
 		<!-- Display form fields -->
-			<div class="input-group input-lg">
+        <div class="input-group input-lg{% if field.errors %} child-warning-border{% endif %}">
                 {% if field.field.widget|get_class == "CheckboxInput" %}
                 <input class="form-control" value="{{field.label}}" disabled></input>
                     <span class="input-group-addon">

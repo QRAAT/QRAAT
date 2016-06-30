@@ -15,9 +15,9 @@ from datetime import datetime, timedelta
 from django.db.models.base import ModelState
 import gaat.timezoneinfo
 
-__author__ = "Jeymisson Oliveira"
+__author__ = "Jeymisson Oliveira, Peggy Li"
 __copyright__ = ""
-__credits__ = ["Jeymisson Oliveira"]
+__credits__ = ["Jeymisson Oliveira, Peggy Li"]
 
 __license__ = ""
 __version__ = "1.0"

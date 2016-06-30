@@ -42,6 +42,8 @@ class det (pulse_data):
    
   def __init__(self, fn):
     pulse_data.__init__(self, fn)
+    if self.channel_ct==0:
+      raise IOError("pulse_data failed to read det file")
     self.f = None              #: Result of :func:`det.fft`. 
     self.f_sig = None          #: Result of :func:`det.f_signal`.
     self.e_sig = None          #: Result of :func:`det.eig`. 
@@ -53,7 +55,8 @@ class det (pulse_data):
     self.data = np.zeros((self.sample_ct,self.channel_ct),np.complex)
     for j in range(self.sample_ct):
       for k in range(self.channel_ct):
-        (r, i) = self.sample((j * self.channel_ct) + k)
+        r = self.r_sample(k,j)
+        i = self.i_sample(k,j)
         self.data[j,k] = np.complex(r,i)
     if np.any(np.isnan(self.data)):
       raise IOError("NaN in det data")#bad data samples
@@ -67,11 +70,6 @@ class det (pulse_data):
   def __str__(self):
     """ Return the filename as a string. """
     return self.filename
-
-
-  def print_det(self):
-    """ Print the record's metdata to standard output. """
-    print self.str() #FIXME? TAB
 
   
   @classmethod
@@ -89,12 +87,13 @@ class det (pulse_data):
     det_list = []
     bad_file_list = []
     for fn in files:
+      file_path = os.path.join(base_dir,fn)
       try:
-        det_list.append(cls(base_dir + '/' + fn))
+        det_list.append(cls(file_path))
       except:
         import sys
-        print >>sys.stderr, "Couldn't read det file: {}".format(base_dir + '/' + fn)
-        bad_file_list.append(base_dir + '/' + fn)
+        print >>sys.stderr, "Couldn't read det file: {}".format(file_path)
+        bad_file_list.append(file_path)
     return det_list, bad_file_list
   
 

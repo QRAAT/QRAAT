@@ -5,7 +5,7 @@
 {% block title_msg %}
 New Deployment.
 <font size=3 color="#7F7C7C">
-    There must be an available <a href={%url 'project:add-transmitter' project.ID %}>transmitter</a> and a <a href={%url 'project:add-target' project.ID %}>target</a> to make a deployment.
+    There must be an available <a href={%url 'project:add-transmitter' project.ID %}>transmitter</a> and <a href={%url 'project:add-target' project.ID %}>target</a> to make a deployment.
 <br>
 If you create a placeholder target, remember to change the target information when you actually deploy the transmitter on an animal.
 </font>
@@ -15,13 +15,26 @@ If you create a placeholder target, remember to change the target information wh
 {{ block.super }}
 <script>
 $(document).ready(function() {
-    $("select[name$=targetID]").prepend('<option value selected="selected">---------</option>');
-    $("select[name$=txID]").prepend('<option value selected="selected">---------</option>');
+    var defaultOption = '<option value "selected">---------</option>'
+    var defaultOptionSel = '<option value selected="selected">---------</option>'
+    // If select already has option with "selected" prop, dont select default
+    $("select[name$=targetID]").each(function() {
+        if($(this).find("option").prop("selected"))
+            $(this).prepend(defaultOptionSel);
+        else
+            $(this).prepend(defaultOption);
+    });
+    $("select[name$=txID]").each(function() {
+        if($(this).find("option").prop("selected"))
+            $(this).prepend(defaultOptionSel);
+        else
+            $(this).prepend(defaultOption);
+    });
 
     // Add buttons that copy the
-    $("#formset_table").prepend("<tr id='table-controls'><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>");
-    $($("#table-controls")[0].children[2]).append("<button class='copy-last btn btn-default' type='button'>Copy last</button>")
-    $($("#table-controls")[0].children[3]).append("<button class='copy-last btn btn-default' type='button'>Copy last</button>")
+    //$("#formset_table").prepend("<tr id='table-controls'><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>");
+    //$($("#table-controls")[0].children[2]).append("<button class='copy-last btn btn-default' type='button'>Copy last</button>")
+    //$($("#table-controls")[0].children[3]).append("<button class='copy-last btn btn-default' type='button'>Copy last</button>")
     //$($("#table-controls")[0].children[5]).append("<div class='input-group'><select id='placeholder-select'></select><span class='input-group-btn'><button id='create-placeholders' class=' btn btn-default' type='button'>Create Placeholders</button></span></div></div>")
 
     $("select[name$=targetID]").append("<option value=create>Create Target</option>");

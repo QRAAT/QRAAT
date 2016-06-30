@@ -280,6 +280,10 @@ class csv:
         yield getattr(self, h) 
     self.Row.__iter__ = f
 
+    def g(self, i):
+      return getattr(self, i)
+    self.Row.__getitem__ = g
+
     return lengths
    
 

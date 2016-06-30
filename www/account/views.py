@@ -13,6 +13,7 @@ from account.forms import PasswordChangeForm
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
 import re #regular expressions
+from viewsutils import get_nav_options
 
 # Create your views here.
 
@@ -82,7 +83,8 @@ def show_users(request):
             users = User.objects.all()
             return render(
                 request, 'account/users.html',
-                {'users': users})
+                {'users': users,
+                'nav_options': get_nav_options(request) })
         else:
 					  raise PermissionDenied #403
 

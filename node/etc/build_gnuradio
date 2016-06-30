@@ -13,6 +13,16 @@
 #
 function doexit
 {
+	cat <<"!EOF!"
+
+=======================================================================
+If you have found this script useful and time-saving, consider a 
+donation to help me keep build-gnuradio, simple_ra, SIDsuite,
+meteor_detector, simple_fm_rcv, and multimode maintained and up to date.
+A simple paypal transfer to mleech@ripnet.com is all you need to do.
+======================================================================
+!EOF!
+
 	echo -n "Send success/fail info to sbrac.org?"
 	read ans
 		case $ans in
@@ -30,7 +40,8 @@ function help {
 Usage: build-gnuradio [--help|-h] [-v|--verbose] [-jN] [-ja] 
                       [-l|--logfile logfile ] [-u|--users ulist] [-m] funcs
 
--m             - Use master branch, rather than 3.6.5.1.  Use compatible extras as well
+-m             - Use HEAD of master branch, rather than 3.7.1.  Use compatible extras as well
+-o             - User v3.6.5.1 and compatible extras.
 
 -v|--verbose   - turn on verbose logging to stdout
 
@@ -73,7 +84,7 @@ fi
 
 VERBOSE=No
 JFLAG=""
-LOGDEV=/dev/null
+LOGDEV=`pwd`/build_gnuradio.log
 USERSLIST=None
 JOSHMODE=False
 UTAG=None
@@ -81,7 +92,8 @@ GTAG=None
 export LC_LANG=C
 EXTRAS=""
 MASTER_MODE=0
-PULLED_LIST="gnuradio uhd rtl-sdr gr-osmosdr gr-iqbal hackrf gr-baz"
+OLD_MODE=0
+PULLED_LIST="gnuradio uhd rtl-sdr gr-osmosdr gr-iqbal hackrf gr-baz bladeRF libairspy"
 which python3 >/dev/null 2>&1
 if [ $? -eq 0 ]
 then
@@ -128,8 +140,6 @@ do
 			esac
 			shift
 			shift
-			rm -f $LOGDEV
-			echo $LOGDEV Starts at: `date` >>$LOGDEV 2>&1
 			;;
 			
 		-u|--users)
@@ -138,11 +148,16 @@ do
 			shift
 			;;
 		
-		-m)
+		-m|--master)
 			MASTER_MODE=1
 			shift
 			;;
 
+        -o|--old)
+            OLD_MODE=1
+            shift
+            ;;
+            
 		-h|--help)
 			help
 			exit
@@ -178,11 +193,13 @@ do
 	esac
 done
 
+echo $LOGDEV Starts at: `date` >$LOGDEV 2>&1
+
 CWD=`pwd`
 SUDOASKED=n
 SYSTYPE=unknown
 good_to_go=no
-for files in /etc/fedora-release /etc/linuxmint/info /etc/lsb-release /etc/debian_version /etc/redhat-release
+for file in /etc/fedora-release /etc/linuxmint/info /etc/lsb-release /etc/debian_version /etc/redhat-release
 do
 	if [ -f $file ]
 	then
@@ -223,16 +240,6 @@ echo if it runs into trouble, a certain amount of knowledge on your part about
 echo system configuration and idiosyncrasies will inevitably be necessary.
 echo
 echo
-echo -n Proceed?
-
-read ans
-case $ans in
-	y|Y|YES|yes|Yes)
-		PROCEED=y
-	;;
-	*)
-		exit
-esac
 
 SPACE=`df $HOME| grep -v blocks|grep '%'`
 SPACE=`echo $SPACE | awk '/./ {n=NF-2; printf ("%d\n", $n/1.0e3)}'`
@@ -241,6 +248,7 @@ SPACE=`echo $SPACE | awk '/./ {n=NF-2; printf ("%d\n", $n/1.0e3)}'`
 if [ $SPACE -lt 500 ]
 then
 	echo "You don't appear to have enough free disk space on $HOME"
+  echo "($SPACE MB free)
 	echo to complete this build/install
 	echo exiting
 	doexit DISKSPACE
@@ -317,13 +325,21 @@ function checkcmd {
 	then
 		found=1
 	fi
-	for place in /bin /usr/bin /usr/local/bin /opt/bin /opt/local/bin
+	for place in /bin /usr/bin /usr/local/bin /sbin /usr/sbin /usr/local/sbin /opt/bin /opt/local/bin
 	do
 		if [ -e $place/$1 ]
 		then
 			found=1
 		fi
 	done
+	if [ $found -eq 0 ]
+	then
+		which $1 >/dev/null 2>&1
+		if [ $? -eq 0 ]
+		then
+			found=1
+		fi
+	fi
 	if [ $found -eq 0 ]
 	then
 		my_echo Failed to find just-installed command \'$1\' after pre-requisite installation.
@@ -336,7 +352,8 @@ function checkcmd {
 function checklib {
 	found=0
 	my_echo -n Checking for library $1 ...
-	for dir in /lib /usr/lib /usr/lib64 /lib64 /usr/lib/x86_64-linux-gnu /usr/lib/i386-linux-gnu
+	for dir in /lib /usr/lib /usr/lib64 /lib64 /usr/lib/x86_64-linux-gnu /usr/lib/i386-linux-gnu \
+	    /usr/lib/arm-linux-gnueabihf /usr/lib/arm-linux-gnueabi
 	do
 		for file in $dir/${1}*.so*
 		do
@@ -385,7 +402,8 @@ function prereqs {
 			sudo yum -y erase 'gnuradio*' >>$LOGDEV 2>&1
 			sudo yum -y erase 'libgruel-*' >>$LOGDEV 2>&1
 			sudo yum -y erase 'libgruel*' >>$LOGDEV 2>&1
-			sudo yum -y groupinstall "Engineering and Scientific" "Development Tools" >>$LOGDEV 2>&1
+			sudo yum -y groupinstall "Engineering and Scientific" "Development Tools" \
+					"Software Development Tools" "C Development Tools and Libraries" >>$LOGDEV 2>&1
 			sudo yum -y install fftw-devel cppunit-devel wxPython-devel \
 			  boost-devel alsa-lib-devel numpy gsl-devel python-devel pygsl \
 			  python-cheetah python-lxml PyOpenGL qt-devel qt qt4 qt4-devel \
@@ -395,11 +413,12 @@ function prereqs {
 			  orc-devel python-sphinx SDL-devel swig >>$LOGDEV 2>&1
 		;;
 		
-		*19*)
+		*19*|*20*)
 			sudo yum -y erase 'gnuradio*' >>$LOGDEV 2>&1
 			sudo yum -y erase 'libgruel-*' >>$LOGDEV 2>&1
 			sudo yum -y erase 'libgruel*' >>$LOGDEV 2>&1
-			sudo yum -y groupinstall "Engineering and Scientific" "Development Tools" >>$LOGDEV 2>&1
+			sudo yum -y groupinstall "Engineering and Scientific" "Development Tools" \
+				"Software Development Tools" "C Development Tools and Libraries" >>$LOGDEV 2>&1
 			sudo yum -y install fftw-devel cppunit-devel wxPython-devel \
 			  boost-devel alsa-lib-devel numpy gsl-devel python-devel pygsl \
 			  python-cheetah python-lxml PyOpenGL qt-devel qt qt4 qt4-devel \
@@ -409,7 +428,7 @@ function prereqs {
 			  orc-devel python-sphinx SDL-devel swig >>$LOGDEV 2>&1
 		;;
 		*)
-			my_echo Only Fedora release 12 - 18 are supported by this script
+			my_echo Only Fedora release 12 - 20 are supported by this script
 			doexit WRONGRELEASE
 			;;
 		esac
@@ -451,7 +470,7 @@ function prereqs {
 		sudo apt-get -y purge 'libgnuradio*' >>$LOGDEV 2>&1
 		sudo apt-get -y purge 'python-gnuradio*' >>$LOGDEV 2>&1
 		case `grep RELEASE /etc/linuxmint/info` in
-		*11*|*12*|*13*|*14*)
+		*11*|*12*|*13*|*14*|*15*|*16*|*17*)
 			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
 			automake autoconf libtool python-dev libfftw3-dev
 			libcppunit-dev libboost-all-dev libusb-dev libusb-1.0-0-dev fort77
@@ -473,8 +492,8 @@ function prereqs {
 
 	#
 	# It's a Ubuntu system
-	#
-	elif [ -f /etc/lsb-release ]
+	# 
+	elif [ -f /etc/lsb-release -a ! -f /etc/SuSE-release ]
 	then
 		SYSTYPE=Ubuntu
 		sudo apt-get -y purge 'gnuradio-*' >>$LOGDEV 2>&1
@@ -484,7 +503,7 @@ function prereqs {
 		sudo apt-get -y purge 'libgnuradio*' >>$LOGDEV 2>&1
 		sudo apt-get -y purge 'python-gnuradio*' >>$LOGDEV 2>&1
 		case `grep DISTRIB_RELEASE /etc/lsb-release` in
-		*13.*)
+		*13.*|*14.*)
 			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
 			automake autoconf libtool python-dev libfftw3-dev
 			libcppunit-dev libboost-all-dev libusb-dev libusb-1.0-0-dev fort77
@@ -577,7 +596,7 @@ function prereqs {
 		sudo apt-get -y purge 'libgnuradio*' >>$LOGDEV 2>&1
 		sudo apt-get -y purge 'python-gnuradio*' >>$LOGDEV 2>&1
 		case `cat /etc/debian_version` in
-		*6.0*|*wheezy*|*sid*)
+		*6.0*|*wheezy*|*sid*|*7.1*|*7.0*|*7.2*|*7.3*|*7.4*|*7.5*|*7.6*|*7.7*)
 			PKGLIST="libfontconfig1-dev libxrender-dev libpulse-dev swig g++
 			automake autoconf libtool python-dev libfftw3-dev
 			libcppunit-dev libboost-all-dev libusb-dev libusb-1.0-0-dev fort77
@@ -586,10 +605,11 @@ function prereqs {
 			python-cheetah python-lxml doxygen qt4-dev-tools libusb-1.0-0-dev
 			libqwt5-qt4-dev libqwtplot3d-qt4-dev pyqt4-dev-tools python-qwt5-qt4
 			cmake git-core wget libxi-dev python-docutils gtk2-engines-pixbuf r-base-dev python-tk
-			liborc-0.4-0 liborc-0.4-dev libasound2-dev python-gtk2 libportaudio2 portaudio19-dev"
+			liborc-0.4-0 liborc-0.4-dev libasound2-dev python-gtk2 libportaudio2 portaudio19-dev
+			ca-certificates"
 			;;
 		*)
-			my_echo Only Debian release 6 is supported
+			my_echo Unsupported Debian version `cat /etc/debian_version`
 			doexit WRONGRELEASE
 			;;
 		esac
@@ -644,6 +664,17 @@ function prereqs {
 
 function gitfetch {
 	date=`date +%Y%m%d%H%M%S`
+	V=3.7/maint
+	if [ $MASTER_MODE -eq 1 ]
+	then
+		V=Master/HEAD
+	fi
+	if [ $OLD_MODE -eq 1 ]
+	then
+		V=3.6.5.1
+	fi
+	echo This script will fetch Gnu Radio version $V from the repositories, along with compatible
+	echo  extras.
 
 	my_echo "Fetching various packages (Gnu Radio, UHD, gr-osmosdr, gr-iqbal, etc)"
 	my_echo "  via the Internet"
@@ -664,19 +695,27 @@ function gitfetch {
 	my_echo -n Fetching Gnu Radio via GIT...
 	if [ $JOSHMODE = False ]
 	then
-		#git clone --progress http://gnuradio.org/git/gnuradio.git >>$LOGDEV 2>&1
-                wget http://gnuradio.org/releases/gnuradio/gnuradio-3.6.5.1.tar.gz 
-                tar -zxf gnuradio-3.6.5.1.tar.gz && mv gnuradio-3.6.5.1 gnuradio
+		git clone --progress http://git.gnuradio.org/git/gnuradio.git >>$LOGDEV 2>&1
 		if [ ! -d gnuradio/gnuradio-core -a ! -d gnuradio/gnuradio-runtime ]
 		then
 			my_echo "Could not find gnuradio/gnuradio-{core,runtime} after GIT checkout"
 			my_echo GIT checkout of Gnu Radio failed!
 			doexit FETCH-GR-FAIL
+    else
+      cd gnuardio
+	  	cd ..
 		fi
-		if [ $MASTER_MODE -eq 0 ]
+		if [ $OLD_MODE -eq 1 ]
 		then
 			cd gnuradio
 			git checkout v3.6.5.1  >>$LOGDEV 2>&1
+			cd $CWD
+		elif [ $MASTER_MODE -eq 0 ]
+		then
+			cd gnuradio
+			git checkout maint >>$LOGDEV 2>&1
+      git submodule init  >>$LOGDEV 2>&1
+  		git submodule update >>$LOGDEV 2>&1
 			cd $CWD
 		fi
 		
@@ -685,7 +724,7 @@ function gitfetch {
 			cd gnuradio
 			git checkout $GTAG >/dev/null 2>&1
 			git name-rev HEAD >tmp$$ 2>&1
-			if grep -q "HEAD $GTAG" tmp$$
+			if grep -q "HEAD tags/$GTAG" tmp$$
 			then
 				whee=yes
 				rm -f tmp$$
@@ -697,7 +736,7 @@ function gitfetch {
 			cd ..
 		fi
 	else
-		git clone --progress git://gnuradio.org/jblum.git >>$LOGDEV 2>&1
+		git clone --progress git://git.gnuradio.org/jblum.git >>$LOGDEV 2>&1
 		if [ $GTAG != "None" ]
 		then
 			git checkout $GTAG
@@ -717,7 +756,7 @@ function gitfetch {
 	#
 	rm -rf uhd
 	my_echo -n Fetching UHD via GIT...
-	git clone --progress  http://github.com/EttusResearch/uhd >>$LOGDEV 2>&1
+	git clone --progress  https://github.com/EttusResearch/uhd >>$LOGDEV 2>&1
 
 	if [ ! -d uhd/host ]
 	then
@@ -746,16 +785,19 @@ function gitfetch {
 	#
 	rm -rf rtl-sdr
 	rm -rf gr-osmosdr
-	rm  -rf gr-baz
+	rm -rf gr-baz
 	rm -rf hackrf
-	my_echo Fetching rtl-sdr "(rtl-sdr, gr-osmosdr, gr-iqbal and hackrf)" via GIT
+	rm -rf bladeRF
+	rm -rf airspy
+	my_echo Fetching rtl-sdr "(rtl-sdr, gr-osmosdr, gr-iqbal, hackrf, bladeRF and airspy)" via GIT
 	git clone --progress git://git.osmocom.org/rtl-sdr >>$LOGDEV 2>&1
 	git clone --progress git://git.osmocom.org/gr-osmosdr >>$LOGDEV 2>&1
-	git clone --progress git://git.osmocom.org/gr-iqbal.git
+	git clone --progress git://git.osmocom.org/gr-iqbal.git >>$LOGDEV 2>&1
+	git clone https://github.com/Nuand/bladeRF.git >>$LOGDEV 2>&1
 	if [ -d gr-iqbal ]
 	then
 		cd gr-iqbal
-		if [ $MASTER_MODE -eq 0 ]
+		if [ $OLD_MODE -eq 1 ]
 		then
 			git checkout gr3.6
 		fi
@@ -763,7 +805,8 @@ function gitfetch {
 		git submodule update >>$LOGDEV 2>&1
 		cd ..
 	fi
-	git clone --progress http://github.com/mossmann/hackrf.git >>$LOGDEV 2>&1
+	git clone --progress https://github.com/mossmann/hackrf.git >>$LOGDEV 2>&1
+	(cd $CWD; rm -rf airpsy; mkdir airspy; cd airspy; git clone https://github.com/airspy/host) >>$LOGDEV 2>&1
 	my_echo Done
 }
 
@@ -795,7 +838,7 @@ function uhd_build {
 	fi
 	cd build
 	make clean >/dev/null 2>&1
-	cmake $CMAKE_FLAG1 $CMAKE_FLAG2 ../ >>$LOGDEV 2>&1
+	cmake $CMAKE_FLAG1 $CMAKE_FLAG2 $CMF1 $CMF2 ../ >>$LOGDEV 2>&1
 	make clean >>$LOGDEV 2>&1
 	make $JFLAG >>$LOGDEV 2>&1
 	if [ $? -ne 0  ]
@@ -834,7 +877,7 @@ function rtl_build {
 	
 	my_echo -n Building rtl-sdr...
 	cd rtl-sdr
-	cmake $CMAKE_FLAG1 $CMAKE_FLAG2 . >>$LOGDEV 2>&1
+	cmake $CMAKE_FLAG1 $CMAKE_FLAG2 $CMF1 $CMF2 . >>$LOGDEV 2>&1
 	make clean >>$LOGDEV 2>&1
 	make $JFLAG >>$LOGDEV 2>&1
 
@@ -852,7 +895,7 @@ function rtl_build {
 	then
 		my_echo -n Building hackrf...
 		cd hackrf
-		cmake $CMAKE_FLAG1 $CMAKE_FLAG2 host/ >>$LOGDEV 2>&1
+		cmake $CMAKE_FLAG1 $CMAKE_FLAG2 $CMF1 $CMF2 -DINSTALL_UDEV_RULES=ON host/ >>$LOGDEV 2>&1
 		make clean >>$LOGDEV 2>&1
 		make >>$LOGDEV 2>&1
 		if [ $? -ne 0 ]
@@ -872,18 +915,55 @@ function rtl_build {
 		cd gr-iqbal
 		mkdir -p build
 		cd build
-		cmake .. $CMAKE_FLAG1 $CMAKE_FLAG2 >>$LOGDEV 2>&1
+		cmake .. $CMAKE_FLAG1 $CMAKE_FLAG2 $CMF1 $CMF2 >>$LOGDEV 2>&1
 		make clean >>$LOGDEV 2>&1
 		make >>$LOGDEV 2>&1
 		if [ $? -ne 0 ]
 		then
 			my_echo gr-iqbal build apparently failed
 			my_echo Exiting gr-iqbal build
-			doexit IQBAL-BUILD-FAIL1
+		else
+			sudo make install  >>$LOGDEV 2>&1
+			cd $CWD
+			my_echo Done building gr-iqbal
 		fi
-		sudo make install  >>$LOGDEV 2>&1
+	fi
+	if [ -d bladeRF  ]
+	then
+		my_echo -n Building bladeRF...
+		cd bladeRF
+		cd host
+		cmake . $CMAKE_FLAG1 $CMAKE_FLAG2 $CMF1 $CMF2 >>$LOGDEV 2>&1
+		make clean >>$LOGDEV 2>&1
+		make >>$LOGDEV 2>&1
+		if [ $? -ne 0 ]
+		then
+			my_echo bladeRF build apparently failed
+			my_echo Exiting bladeRF build
+		else
+			sudo make install >>$LOGDEV 2>&1
+			cd $CWD
+			my_echo Done building bladeRF
+		fi
+	fi
+	
+	if [ -d airspy/host ]
+	then
+		cd airspy/host
+		mkdir build
+		cd build
+		cmake .. $CMAKE_FLAG1 $CMAKE_FLAG2 $CMF1 $CMF2 >>$LOGDEV 2>&1
+		make clean >>$LOGDEV 2>&1
+		make >>$LOGDEV 2>&1
+		if [ $? -ne 0 ]
+		then
+			my_echo airspy build apparently failed
+			my_echo Exiting airspy build
+		else
+			sudo make install >>$LOGDEV 2>&1
+			my_echo Done building airspy
+		fi
 		cd $CWD
-		my_echo Done building gr-iqbal
 	fi
 	
 
@@ -896,12 +976,12 @@ function rtl_build {
 		doexit RTL-BUILD-FAIL2
 	fi
 	cd gr-osmosdr
-	if [ $MASTER_MODE -eq 0 ]
+	if [ $OLD_MODE -eq 1 ]
 	then
 		git checkout gr3.6 >/dev/null 2>&1
 	fi
 	my_echo -n Building gr-osmosdr...
-	cmake . >>$LOGDEV $CMAKE_FLAG1 $CMAKE_FLAG2 2>&1
+	cmake . $CMAKE_FLAG1 $CMAKE_FLAG2 $CMF1 $CMF2 >>$LOGDEV  2>&1
 	make clean >>$LOGDEV 2>&1
 	make $JFLAG >>$LOGDEV 2>&1
 	
@@ -1021,7 +1101,7 @@ function gnuradio_build {
 	cd build
 	make clean >/dev/null 2>&1
 	my_echo ...Cmaking
-	cmake -DENABLE_BAD_BOOST=ON $CMAKE_FLAG1 $CMAKE_FLAG2 ../ >>$LOGDEV 2>&1
+	cmake -DENABLE_BAD_BOOST=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo $CMAKE_FLAG1 $CMAKE_FLAG2 $CMF1 $CMF2 ../ >>$LOGDEV 2>&1
 	my_echo ...Building
 	make $JFLAG clean >>$LOGDEV 2>&1
 	make $JFLAG >>$LOGDEV 2>&1
@@ -1055,7 +1135,7 @@ function do_an_extra {
 		then
 			mkdir -p build >>$LOGDEV 2>&1
 			cd build
-			cmake .. >>$LOGDEV 2>&1
+			cmake .. $CMAKE_FLAGS1 $CMAKE_FLAGS2 $CMF1 $CMF2 >>$LOGDEV 2>&1
 			make >>$LOGDEV 2>&1
 			sudo make install >>$LOGDEV 2>&1
 			sudo ldconfig
@@ -1244,7 +1324,7 @@ function all {
 	my_echo Starting all functions at: `date`
 	cd $CWD
 	prereqs
-	touch -d "15 minutes ago" touch$$
+	touch -d "1 day ago" touch$$
 	if [ -d uhd -a -d gnuradio ]
 	then
 		if [ uhd -ot touch$$ -o gnuradio -ot touch$$ ]
@@ -1257,8 +1337,8 @@ function all {
 		gitfetch
 	fi
 	rm -f touch$$
-	EXTRAS=$EXTRAS" http://github.com/balint256/gr-baz.git"
-	EXTRAS=$EXTRAS" http://github.com/guruofquality/grextras.git"
+	EXTRAS=$EXTRAS" https://github.com/balint256/gr-baz.git"
+	EXTRAS=$EXTRAS" https://github.com/guruofquality/grextras.git"
 	for fcn in uhd_build firmware gnuradio_build rtl_build extras mod_groups mod_udev mod_sysctl pythonpath
 	do
 		my_echo Starting function $fcn at: `date`
@@ -1307,36 +1387,45 @@ function sudocheck {
 	if [ $SUDOASKED = n ]
 	then
 		echo SUDO privileges are required 
-		echo -n Do you have SUDO privileges'?'
-		read ans
-		case $ans in
-			y|Y|YES|yes|Yes)
-				echo Continuing with script
-				SUDOASKED=y
-				sudo grep timestamp_timeout /etc/sudoers >tmp$$
-				timeout=`cat tmp$$|awk '/./ {print $4}'`
-				rm -f tmp$$
-				if [ "@@" = "@$timeout@" ]
-				then
-					sudo cp /etc/sudoers tmp$$
-					sudo chown $USER tmp$$
-					sudo chmod 644 tmp$$
-					echo "Defaults  timestamp_timeout = 90" >>tmp$$
-					sudo cp tmp$$ /etc/sudoers
-					sudo chown root /etc/sudoers
-					sudo chmod 440 /etc/sudoers
-				elif [ $timeout -lt 90 ]
-				then
-					echo You need to have a timestamp_timout in /etc/sudoers of 90 or more
-					echo Please ensure that your timestamp_timeout is 90 or more
-					exit
-				fi
-				;;
-			*)
-				echo Exiting.  Please ensure that you have SUDO privileges on this system!
-				exit
-				;;
-		esac
+		SUDOASKED=y
+		sudo grep timestamp_timeout /etc/sudoers >tmp$$
+    if [ "$?" -gt 0 ]
+      echo "You must have SUDO privileges to run this script"
+      exit
+    fi
+		timeout=`cat tmp$$|awk '/./ {print $4}'`
+		rm -f tmp$$
+		if [ "@@" = "@$timeout@" ]
+		  then
+			  echo "No timestamp_timeout set in /etc/sudoers"
+        echo "You will have to enter your sudo password everytime"
+        echo "Do you wish to continue?"
+        read ans
+		    case $ans in
+			    y|Y|YES|yes|Yes)
+				    echo Okay
+				  ;;
+          *)
+            exit
+		    esac
+		elif [ "$timeout" -lt 90 ]
+		  then
+			  echo "You have a timestamp_timout in /etc/sudoers of $timeout"
+			  echo "It is recommended that your timestamp_timeout is 90 or more"
+        echo "If you continue you may be prompted for your sudo password"
+        echo "before the script finishes."
+        echo "Do you wish to continue?"
+        read ans
+		    case $ans in
+			    y|Y|YES|yes|Yes)
+				    echo Okay
+				  ;;
+          *)
+            exit
+		    esac
+
+			exit
+		fi
 	fi
 }
 

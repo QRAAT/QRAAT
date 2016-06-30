@@ -115,5 +115,10 @@ urlpatterns = patterns(
         r'^(?P<project_id>\d+)/edit-project/add-deployment/$',
         'add_deployment',
         name='add-deployment'),
+    url(
+        r'^(?P<project_id>\d+)/movebank/$',
+        'movebank_export',
+        name='movebank_export',
+        )
 )
 

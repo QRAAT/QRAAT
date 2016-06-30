@@ -1,0 +1,161 @@
+#!/usr/bin/env python2
+
+import numpy as np
+import argparse
+
+#TODO number of channels is hard-coded, azimuthal range is hard-coded
+
+parser = argparse.ArgumentParser()
+parser.description = 'Fit model to given calibration.'
+
+parser.add_argument('cal_file', help="Cal csv file")
+
+parser.add_argument('model_file', help="Model csv file")
+
+parser.add_argument('--plot', nargs='?', const='./', help='Save plots to given directory, defaults to ./', metavar='DIRECTORY')
+
+parser.add_argument('--out-file', default='model.csv', help='File to output cal data csv')
+
+args = parser.parse_args()
+
+
+if args.plot:
+  import matplotlib
+  matplotlib.use('Agg')
+  import matplotlib.pyplot as pp
+  import os
+
+def measure(test, signals):
+  #assuming test is (1x4) and signals is (Nx4)
+  temp = np.dot(test.conj(),signals.transpose())
+  result = np.abs(np.sum(temp*temp.conj()))
+  return 1-result/float(signals.shape[0])
+
+def estimate(test,cal):
+  temp = np.dot(test,cal.transpose().conj())
+  temp = np.abs(temp*temp.conj())
+  temp[np.where(np.isnan(temp))] = 0.0
+  result = np.argmax(temp)
+  return result
+
+def compare_sv(model,cal):
+  result = 0.0
+  count = 0
+  for j in range(model.shape[0]):
+    if not (np.any(np.isnan(model[j,:])) or np.any(np.isnan(cal[j,:]))):
+      count +=1
+      result+=measure(model[j,np.newaxis,:],cal[j,np.newaxis,:])
+  return result/float(count)
+
+
+#cal comparing phase to wedge cal phase
+def fit_model_to_wedge_cal_phase(cal_dict, norm_model_pattern):
+  model_cal_dict={}
+  az_rot_dict={}
+  order_dict={}
+  for site in cal_dict:
+    print "\tSite {}".format(int(site))
+    min_score=1.0
+    saved_order = None
+    saved_c = 0
+    saved_rotation=None
+    nan_mask = np.isfinite(cal_dict[site][:,0])
+    if np.sum(nan_mask) > 0:
+      for order in [(0,1,2,3),(0,2,3,1),(0,3,2,1),(0,1,3,2),(0,2,1,3),(0,3,1,2)]:
+        #for conjugates in [(1,1,1,1),(1,1,1,-1),(1,1,-1,1),(1,1,-1,-1),(1,-1,1,1),(1,-1,1,-1),(1,-1,-1,1),(1,-1,-1,-1)]:
+        for j in range(360):
+          canidate_model = np.roll(norm_model_pattern[:,order],j,0)
+          for k in range(1,4):
+            #if conjugates[k] == -1:
+            #  canidate_model[:,k] = canidate_model[:,k].conj()
+            mean_angle = np.mean(np.unwrap(np.angle(canidate_model[nan_mask,k]/cal_dict[site][nan_mask,k])))
+            canidate_model[:,k] = canidate_model[:,k]*np.exp(np.complex(0,-1)*mean_angle)
+          score = compare_sv(cal_dict[site],canidate_model)
+          if score < min_score:
+            min_score=score
+            saved_c = np.array(canidate_model)
+            saved_order = order
+            saved_rotation = j
+            #saved_conjugates = conjugates
+      model_cal_dict[site] = saved_c
+      az_rot_dict[site] = saved_rotation
+      order_dict[site] = saved_order
+    else:
+      print "Site {} doesn't have enough data".format(site)
+  return model_cal_dict, az_rot_dict, order_dict
+
+#END cal
+
+#read in cal
+print "Reading Calibration Data from {}".format(args.cal_file)
+cal_dict ={}
+raw_cal = np.genfromtxt(args.cal_file,dtype=float,skip_header=1, delimiter=',')
+site_set = set(raw_cal[:,0])
+for site in site_set:
+  cal_dict[site]=np.zeros((360,4),dtype=np.complex)
+for row in raw_cal:
+  for j in range(4):
+    cal_dict[row[0]][row[1],j]=row[2*j+2] + np.complex(0,1)*row[2*j+3]
+
+#model from file
+print "Reading Model Data from {}".format(args.model_file)
+model_pattern=np.genfromtxt(args.model_file,delimiter=',',dtype=np.complex)
+
+norm_model_pattern = np.zeros((360,4),dtype=np.complex)
+for j in range(360):
+  norm_model_pattern[j,:] = model_pattern[j,:]*np.exp(np.complex(0,-1)*np.angle(model_pattern[j,0]))
+  norm_model_pattern[j,:] = norm_model_pattern[j,:]/np.sqrt(np.real(np.dot(norm_model_pattern[j,:],norm_model_pattern[j,:].conj())))
+
+#END model from file
+
+
+#cal comparing smooth phase and model to wedge cal phase
+print "Fitting Model"
+model_cal_dict, model_az_rot_dict, model_order_dict = fit_model_to_wedge_cal_phase(cal_dict, norm_model_pattern)
+
+
+if args.plot:
+  print "Plotting fit to {}".format(args.plot)
+  for site in model_cal_dict:
+    pp.plot(np.angle(cal_dict[site]),'.')
+    pp.plot(np.angle(model_cal_dict[site]))
+    pp.title('Model Fit for Site {}'.format(site))
+    pp.savefig(os.path.join(args.plot,'modelfit_{}.png'.format(int(site))))
+    pp.clf()
+  print "Plotting Verification to {}".format(args.plot)
+  for site in cal_dict:
+    est_bearing=np.zeros(cal_dict[site].shape[0])
+    for j in range(cal_dict[site].shape[0]):
+      if np.isfinite(cal_dict[site][j,0]):
+        est_bearing[j] = estimate(cal_dict[site][j,np.newaxis,:],model_cal_dict[site])
+      else:
+        est_bearing[j]=np.nan
+    pp.plot(np.arange(360),est_bearing,'.')
+    pp.plot([0,360],[0,360],'k')
+    pp.xlim([0,360])
+    pp.xticks(np.arange(0,360,60))
+    pp.ylim([0,360])
+    pp.yticks(np.arange(0,360,60))
+    pp.xlabel('Bearing from Averaging (degrees)')
+    pp.ylabel('Estimated Bearing from Model (degrees)')
+    pp.title('Verification of Model Fit for Site {}'.format(int(site)))
+    pp.savefig(os.path.join(args.plot,'verification_fit_{}.png'.format(int(site))))
+    pp.clf()
+
+if args.out_file:
+  print "Writing fit to {}".format(args.out_file)
+  with open(args.out_file,'w') as f:
+    f.write('siteID,bearing,cal_1r,cal_1i,cal_2r,cal_2i,cal_3r,cal_3i,cal_4r,cal_4i\n')
+    for site in model_cal_dict:
+      for bearing in range(360):
+        if not np.isnan(model_cal_dict[site][bearing,0]):
+          out_str = ','.join((str(site),str(bearing)))
+          for j in range(4):
+            out_str += ',{},{}'.format(model_cal_dict[site][bearing,j].real,model_cal_dict[site][bearing,j].imag)
+        f.write(out_str+'\n')
+
+
+
+
+
+

@@ -48,7 +48,11 @@ def dashboard_page(request):
     if not request.GET: # no parameters from user yet
         try:
             dashboard_page = DashboardForm() # unbound form - uses default initial form values
-            return render(request, "graph/dashboard.html", {'nav_options': nav_options, 'form': dashboard_page})
+            context = get_context_for_all(request)
+            context['form'] = dashboard_page
+            context['nav_options'] = nav_options
+            return render(request, "graph/dashboard.html", context)
+            #return render(request, "graph/dashboard.html", {'nav_options': nav_options, 'form': dashboard_page})
         except:
             return HttpResponseBadRequest("Sorry, something went wrong when trying to load the dashboard page.")
 
@@ -67,15 +71,16 @@ def get_context_for_all(request):
     
     context = get_interval_and_start_time(request)
 
-    table_sites = request.GET.getlist('info_sites')
+    table_sites = request.GET.getlist('info_sites',['all'])
     if len(table_sites) > 0 and table_sites[0].lower() == 'all':
         table_sites = ['telemetry', 'detcount', 'estcount', 'timecheck']
+
     #print 'aqui: ' + str(table_sites)
-    table_deployments = request.GET.getlist('info_deployments')
+    table_deployments = request.GET.getlist('info_deployments',['all'])
     if len(table_deployments) > 0 and table_deployments[0].lower() == 'all':
         table_deployments = ['est', 'bearing', 'position', 'track_pos']
     
-    table_system = request.GET.getlist('info_system')
+    table_system = request.GET.getlist('info_system',['all'])
     if len(table_system) > 0 and table_system[0].lower() == 'all':
         table_system = ['processing_statistics', 'processing_cursor']
     
@@ -98,7 +103,7 @@ def get_interval_and_start_time(request):
     interval = request.GET.get('interval', None)
 
     if not interval:
-        interval = 10*60 #defaul interval is 10 minutes
+        interval = 10*60 #default interval is 10 minutes
     else:
         interval = int(interval)*60 #converting minutes (more suitable) to seconds
     
@@ -121,20 +126,19 @@ def get_data_for_tables(tables, start_timestamp, interval, colors):
     data = LastUpdatedOrderedDict()
     cursor = connection.cursor()
 
-    print "in get_data_for_tables, start_timestamp:", start_timestamp, "tables", tables
 
     for table in tables:
         query = ""
         if not table in data:
             data[table] = LastUpdatedOrderedDict()
         if table == 'telemetry':
-            query = "SELECT siteID, ROUND(AVG(intemp),3) AS intemp, ROUND(AVG(extemp),3) AS extemp, ROUND(AVG(voltage),3) AS voltage, ROUND(AVG(ping_power),3) AS avg_ping_power, ROUND(AVG(ping_computer),3) AS avg_ping_computer, (select ping_power from qraat.telemetry as teleIN where teleIN.siteID = teleOUT.siteID and timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " order by timestamp desc limit 1) AS last_ping_power, (select ping_computer from qraat.telemetry as teleIN where teleIN.siteID = teleOUT.siteID and timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " order by timestamp desc limit 1) AS last_ping_computer, (select site_status from qraat.telemetry as teleIN where teleIN.siteID = teleOUT.siteID and timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " order by timestamp desc limit 1) AS site_status FROM qraat.telemetry AS teleOUT WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " GROUP BY siteID"
+            query = "SELECT siteID, ROUND(AVG(intemp),3) AS intemp, ROUND(AVG(extemp),3) AS extemp, ROUND(AVG(voltage),3) AS voltage, ROUND(AVG(ping_power),3) AS avg_ping_power, ROUND(AVG(ping_computer),3) AS avg_ping_computer, (select ping_power from qraat.telemetry as teleIN where teleIN.siteID = teleOUT.siteID and timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " order by timestamp desc limit 1) AS last_ping_power, (select ping_computer from qraat.telemetry as teleIN where teleIN.siteID = teleOUT.siteID and timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " order by timestamp desc limit 1) AS last_ping_computer, (select site_status from qraat.telemetry as teleIN where teleIN.siteID = teleOUT.siteID and timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " order by timestamp desc limit 1) AS site_status FROM qraat.telemetry AS teleOUT WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " GROUP BY siteID"
         elif table == 'detcount':
-            query = "SELECT siteID, ROUND(AVG(server),3) AS server, ROUND(AVG(site),3) AS site FROM qraat.detcount WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " GROUP BY siteID"
+            query = "SELECT siteID, ROUND(AVG(server),3) AS server, ROUND(AVG(site),3) AS site FROM qraat.detcount WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " GROUP BY siteID"
         elif table == 'estcount':
-            query = "SELECT siteID, ROUND(AVG(server),3) AS server FROM qraat.estcount WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " GROUP BY siteID"
+            query = "SELECT siteID, ROUND(AVG(server),3) AS server FROM qraat.estcount WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " GROUP BY siteID"
         elif table == 'timecheck':
-            query = "SELECT siteID, ROUND(AVG(time_offset),3) AS time_offset FROM qraat.timecheck WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " GROUP BY siteID"
+            query = "SELECT siteID, ROUND(AVG(time_offset),3) AS time_offset FROM qraat.timecheck WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " GROUP BY siteID"
         
         try:
             cursor.execute(query)
@@ -160,33 +164,34 @@ def get_data_for_tables_deployment(tables, start_timestamp, interval, colors):
 
         # this query would be used if fields time_start and time_end work properly
         #deploy_query = "deploymentID in (SELECT ID FROM qraat.deployment WHERE time_start IS NOT NULL AND time_end IS NULL AND ((" + str(start_timestamp-interval) + " <= time_start AND " + str(start_timestamp) + " >= time_start) OR (" + str(start_timestamp-interval) + " >= time_start))) AND"
-        deploy_query = "deploymentID IN (SELECT distinct deploymentID FROM qraat.est WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + ")"
+        deploy_query = "deploymentID IN (SELECT distinct deploymentID FROM qraat.est WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + ")"
 
         if table == "est":
-            queries['est_records'] = "SELECT siteID, deploymentID, COUNT(*) AS est_records FROM qraat.est WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " GROUP BY siteID, deploymentID ORDER BY siteID"
-            queries['est_true_positives'] = "SELECT siteID, deploymentID, COUNT(*) AS est_true_positives FROM qraat.est WHERE qraat.est.ID IN (SELECT estID FROM qraat.estscore WHERE score >= " + threshold + ") AND timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " GROUP BY siteID, deploymentID ORDER BY siteID"
-            queries['est_false_positives'] = "SELECT siteID, deploymentID, COUNT(*) AS est_false_positives FROM qraat.est WHERE qraat.est.ID IN (SELECT estID FROM qraat.estscore WHERE score < " + threshold + ") AND timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " GROUP BY siteID, deploymentID ORDER BY siteID"
-            queries['est_perceived_pulse_rate'] = "SELECT siteID, deploymentID, ROUND(AVG(pulse_interval),3) AS est_perceived_pulse_rate FROM qraat.estinterval WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " AND " + deploy_query + " GROUP BY siteID, deploymentID ORDER BY siteID"
-            queries['est_snr'] = "SELECT siteID, deploymentID, ROUND(AVG(edsnr),3) AS est_snr FROM qraat.est WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " GROUP BY siteID, deploymentID ORDER BY siteID"
+            queries['est_records'] = "SELECT siteID, deploymentID, COUNT(*) AS est_records FROM qraat.est WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " GROUP BY siteID, deploymentID ORDER BY siteID"
+            queries['est_true_positives'] = "SELECT siteID, deploymentID, COUNT(*) AS est_true_positives FROM qraat.est WHERE qraat.est.ID IN (SELECT estID FROM qraat.estscore WHERE score >= " + threshold + ") AND timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " GROUP BY siteID, deploymentID ORDER BY siteID"
+            queries['est_false_positives'] = "SELECT siteID, deploymentID, COUNT(*) AS est_false_positives FROM qraat.est WHERE qraat.est.ID IN (SELECT estID FROM qraat.estscore WHERE score < " + threshold + ") AND timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " GROUP BY siteID, deploymentID ORDER BY siteID"
+            queries['est_perceived_pulse_rate'] = "SELECT siteID, deploymentID, ROUND(AVG(pulse_interval),3) AS est_perceived_pulse_rate FROM qraat.estinterval WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " AND " + deploy_query + " GROUP BY siteID, deploymentID ORDER BY siteID"
+            queries['est_snr'] = "SELECT siteID, deploymentID, ROUND(AVG(edsnr),3) AS est_snr FROM qraat.est WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " GROUP BY siteID, deploymentID ORDER BY siteID"
             
             for variable, query in queries.items():
                 cursor.execute(query)
                 query_results[variable] = dictfetchall(cursor)
             
+            print query_results[variable]
             data[table] = create_data_map_for_est(query_results, interval, colors)
             
         elif table == "bearing":
-            query = "SELECT deploymentID, siteID, COUNT(*) AS num_of_bearings, ROUND(AVG(bearing),3) AS current_bearing, ROUND(AVG(likelihood),3) AS bearing_likelihood, ROUND(AVG(activity),3) AS bearing_activity FROM qraat.bearing WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " AND " + deploy_query + " GROUP BY deploymentID, siteID ORDER BY deploymentID"
+            query = "SELECT deploymentID, siteID, COUNT(*) AS num_of_bearings, ROUND(AVG(bearing),3) AS current_bearing, ROUND(AVG(likelihood),3) AS bearing_likelihood, ROUND(AVG(activity),3) AS bearing_activity FROM qraat.bearing WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " AND " + deploy_query + " GROUP BY deploymentID, siteID ORDER BY deploymentID"
             cursor.execute(query)
             query_results = dictfetchall(cursor)
             data[table] = create_data_map_for_bearing(query_results, colors)
         elif table == "position":
-            query = "SELECT deploymentID, COUNT(*) AS num_of_pos, ROUND(AVG(likelihood),3) AS position_likelihood, ROUND(AVG(activity),3) AS position_activity, ROUND(AVG(easting),3) AS easting, ROUND(AVG(northing),3) AS northing FROM qraat.position WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " AND " + deploy_query + " GROUP BY deploymentID ORDER BY deploymentID"
+            query = "SELECT deploymentID, COUNT(*) AS num_of_pos, ROUND(AVG(likelihood),3) AS position_likelihood, ROUND(AVG(activity),3) AS position_activity, ROUND(AVG(easting),3) AS easting, ROUND(AVG(northing),3) AS northing FROM qraat.position WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " AND " + deploy_query + " GROUP BY deploymentID ORDER BY deploymentID"
             cursor.execute(query)
             query_results = dictfetchall(cursor)
             data[table] = create_data_map_by_deployment(query_results, table, colors)
         elif table == "track_pos":
-            query = "SELECT deploymentID, COUNT(*) AS num_of_track_pos FROM qraat.track_pos WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " AND " + deploy_query + " GROUP BY deploymentID ORDER BY deploymentID"
+            query = "SELECT deploymentID, COUNT(*) AS num_of_track_pos FROM qraat.track_pos WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " AND " + deploy_query + " GROUP BY deploymentID ORDER BY deploymentID"
             cursor.execute(query)
             query_results = dictfetchall(cursor)
             data[table] = create_data_map_by_deployment(query_results, table, colors)
@@ -199,7 +204,7 @@ def get_data_for_tables_system(tables, start_timestamp, interval, colors):
 
     for table in tables:
         if table == "processing_statistics":
-            query = "SELECT process, SUM(number_records_input) AS number_records_input, SUM(number_records_output) AS number_records_output, ROUND((SUM(number_records_output)/SUM(duration)),3) AS output_processing_rate FROM qraat.processing_statistics WHERE timestamp >= " + str(start_timestamp-interval) + " AND timestamp <= " + str(start_timestamp) + " GROUP BY process"
+            query = "SELECT process, SUM(number_records_input) AS number_records_input, SUM(number_records_output) AS number_records_output, ROUND((SUM(number_records_output)/SUM(duration)),3) AS output_processing_rate FROM qraat.processing_statistics WHERE timestamp >= " + str(start_timestamp) + " AND timestamp <= " + str(start_timestamp+interval) + " GROUP BY process"
             cursor.execute(query)
             query_results = dictfetchall(cursor)
             data[table] = create_data_map_for_processing_statistics(query_results)
@@ -268,6 +273,7 @@ def create_data_map_for_processing_statistics(query_results):
 def organize_data_before_send_to_html(data):
     new_data = LastUpdatedOrderedDict()
     for table in data:
+        print table
         if table == 'est' or table == 'bearing':
             for depID, data_by_site in data[table].items():
                 if not depID in new_data:
@@ -290,6 +296,9 @@ def organize_data_before_send_to_html(data):
                     new_data[depID] = {}
                 new_data[depID]['track_pos'] = copy.deepcopy(data_by_variable)
 
+    print "here1"
+    print data
+    print new_data
     return new_data
 
 def create_data_map_by_deployment(query_results, table, colors):

@@ -31,12 +31,14 @@
         <small>{{project.description}}</small>
         </br>
         </br>
+        <div>
         <a href="edit-project">
             <input type="button" class="btn btn-primary btn-lg" value="Edit Project" name="" {% if not project|is_owner:user and not project|is_collaborator:user %} style="visibility:hidden" {% endif %}/>
         </a>
-        <a href="{% url 'map:view_all_dep' project.ID %}">
-            <input type="button" class="btn btn-primary btn-lg" style="float:right" value="View All Deployments" name="" />
-        </a>
+        <div data-toggle="tooltip" data-placement="right" data-delay='{"show":"250", "hide":"3000"}' title="Deployments that have started in the past" style="float:right">
+            <a href="{% url 'map:view_all_dep' project.ID %}" class="btn btn-primary btn-lg" {% if not have_started_deps %}disabled{% endif %} value="View All Deployments" name="" /> View All Deployments </a>
+        </div>
+        </div>
     </h3>
 </div>
 
@@ -111,22 +113,20 @@
     <div class="dropdown-list-table" style="display: none;">
         <div class="table-body"> 
             <div class="table-element table-row">
-                <span class="table-element table-cell">Name</span>
-                <span class="table-element table-cell">Description</span>
-                <span class="table-element table-cell">Time start</span>
-                <span class="table-element table-cell">Time end</span>
                 <span class="table-element table-cell">Transmitter</span>
                 <span class="table-element table-cell">Target</span>
+                <span class="table-element table-cell">Time start</span>
+                <span class="table-element table-cell">Time end</span>
+                <span class="table-element table-cell">Description</span>
                 <span class="table-element table-cell">Active</span>
             </div>
             {% for deployment in project.get_deployments %}
             <a href={% url 'map:view_by_dep' project.ID deployment.ID %} class="table-element table-row">
-                <span class="table-element table-cell">{{deployment.name}}</span>
-                <span class="table-element table-cell">{{deployment.description}}</span>
-                <span class="table-element table-cell">{{deployment.get_start}}</span>
-                <span class="table-element table-cell">{{deployment.get_end}}</span>
                 <span class="table-element table-cell">{{deployment.txID}}</span>
                 <span class="table-element table-cell">{{deployment.targetID}}</span>
+                <span class="table-element table-cell">{{deployment.get_start}}</span>
+                <span class="table-element table-cell">{{deployment.get_end}}</span>
+                <span class="table-element table-cell">{{deployment.description}}</span>
                 <span class="table-element table-cell">{% if deployment.is_active %}
                      <span style="color:green;" class="glyphicon glyphicon-ok-sign"></span>
                     {% else %}
@@ -161,19 +161,18 @@
     <div class="dropdown-list-table" style="display: none;">
         <div class="table-body">
             <div class="table-element table-row">
-                <span class="table-element table-cell">Name</span>
+                <span class="table-element table-cell">Frequency</span>
                 <span class="table-element table-cell">Serial number</span>
                 <span class="table-element table-cell">Model</span>
                 <span class="table-element table-cell">Manufacturer</span>
-                <span class="table-element table-cell">Frequency</span>
             </div>
             {% for transmitter in project.get_transmitters %}
-                <a class="table-element table-row" href="transmitter/{{transmitter.ID}}">
-                    <span class="table-element table-cell">{{transmitter.name}}</span>
+                <a href={% url 'map:view_by_tx' project.ID transmitter.ID %} class="table-element table-row">
+                    <!--<a class="table-element table-row" href={{transmitter.ID}}>-->
+                    <span class="table-element table-cell">{{transmitter.frequency}}</span>
                     <span class="table-element table-cell">{{transmitter.serial_no}}</span>
                     <span class="table-element table-cell">{{transmitter.tx_makeID.model}}</span>
                     <span class="table-element table-cell">{{transmitter.tx_makeID.manufacturer}}</span>
-                    <span class="table-element table-cell">{{transmitter.frequency}}</span>
                 </a>
             {% endfor %}
         </div>
@@ -202,11 +201,11 @@
     <div class="dropdown-list-table" style="display: none;">
         <div class="table-body">
             <div class="table-element table-row">
-                <span class="table-element table-cell">Name</span>
+                <span class="table-element table-cell">ID/Name/Number</span>
                 <span class="table-element table-cell">Description</span>
             </div>
             {% for target in project.get_targets %}
-            <a href={% url 'project:show-target' project.ID target.ID %} class="table-element table-row">
+            <a href={% url 'map:view_by_target' project.ID target.ID %} class="table-element table-row">
                 <span class="table-element table-cell">{{target.name}}</span>
                 <span class="table-element table-cell">{{target.description}}</span>
             </a>

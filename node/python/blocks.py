@@ -490,6 +490,8 @@ class record_backend(gr.hier_block2):#TODO update this
         print "Number of Bands: 1"
         print "Band sampling rate: ",self.band_rate
 
+
+
         self.directory = directory
 
         filename = os.path.join(self.directory, "placeholder.tdat")
@@ -507,10 +509,7 @@ class record_backend(gr.hier_block2):#TODO update this
         self.current_bands = None
    
     def enable(self, bands=None):
-        if bands:
-          self.center_frequency = bands[0].cf
-        print "Enabling frequency {} at {}".format(self.frequency, time.strftime("%Y%m%d%H%M%Z"))
-        self.file_sink.open(os.path.join(self.directory, "{0:.0f}kHz_{1}.tdat".format(self.center_frequency/1000.0,time.strftime("%Y%m%d%H%M%Z"))))
+        self.file_sink.open(os.path.join(self.directory, "{1}.tdat".format(time.strftime("%Y%m%d%H%M%Z"))))
 
     def disable(self):
         self.file_sink.close()

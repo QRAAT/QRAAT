@@ -1,0 +1,2 @@
+# ramdisk for RMG det_files
+tmpfs /tmp/ramdisk tmpfs nodev,nosuid,mode=1777,size=512M 0 0

@@ -25,7 +25,7 @@ import utm
 import math
 import copy
 from pytz import utc, timezone
-from project.models import Position, Deployment, Site, Project, Tx
+from project.models import Position, Deployment, Site, Project, Tx, Target
 from map.forms import Form
 from decimal import Decimal
 
@@ -39,7 +39,6 @@ INITIAL_DATA_WINDOW = 60 * 60 * 4
 
 
 def get_context(request, deps=[], req_deps=[]):
-    print "in get_context"
     req_deps_list = req_deps.values_list('ID', flat=True)
     req_deps_IDs = []
     for dep in req_deps_list:
@@ -194,10 +193,15 @@ def get_context(request, deps=[], req_deps=[]):
         datetime_to = request.GET['datetime_to']
     else:
         args = Q()
+        #for dep in req_deps_IDs:
+        #    args = args | Q(deploymentID=str(dep))
+        ## try max of max of each deployments, might be faster than . can always be optimized either way
+        #datetime_to = Position.objects.filter(args).aggregate(Max('timestamp'))['timestamp__max']
+        max_datetime = 0
         for dep in req_deps_IDs:
-            args = args | Q(deploymentID=str(dep))
-        datetime_to = Position.objects.filter(args).aggregate(Max('timestamp'))['timestamp__max']
-        print "found datetime"
+            d = Position.objects.filter(deploymentID=dep).aggregate(Max('timestamp'))['timestamp__max']
+            max_datetime = max(max_datetime, d)
+        datetime_to = max_datetime
         if datetime_to != None:
             datetime_to = utils.strftime(utils.timestamp_todate(datetime_to))
     if 'lines' in request.GET:
@@ -288,7 +292,6 @@ def get_context(request, deps=[], req_deps=[]):
                     ))
         else:
             raise Exception("data_type isn't 1 or 2")
-        print "got query"
 
         index_form.fields['datetime_from'].initial = datetime_from
         index_form.fields['datetime_to'].initial = datetime_to
@@ -461,6 +464,7 @@ def index(request):
 
 
 def view_all_dep(request, project_id):
+    ''' Only view deps that have a time start before the current time'''
     try:
         project = Project.objects.get(ID=project_id)
     except ObjectDoesNotExist:
@@ -469,9 +473,11 @@ def view_all_dep(request, project_id):
     if not deployments:
         raise Http404("No Deployments")
 
+    curr_time = time.time()
     dep_ids = []
     for dep in deployments:
-        dep_ids.append(dep.ID)
+        if dep.time_start is not None and dep.time_start < curr_time:
+            dep_ids.append(dep.ID)
     return view_by_dep(request, project_id, '+'.join(map(str, dep_ids)))
 
 def view_by_dep(request, project_id, dep_id):
@@ -749,17 +755,79 @@ def download_by_dep(request, project_id, dep_id):
     return response
 
 
-def view_by_target(request, target_id):
+def view_by_target(request, project_id, target_id):
     ''' Compile a list of deployments associated with `target_id`. '''
+    try:
+        project = Project.objects.get(ID=project_id)
+    except ObjectDoesNotExist:
+        raise Http404
 
-    return HttpResponse('Not implemented yet. (targetID=%s)'
-                        % target_id)
+    if not project.is_public:
+        if request.user.is_authenticated():
+            user = request.user
+            if project.is_owner(user) \
+                or user.has_perm('project.can_view') \
+                and (project.is_collaborator(user)
+                     or project.is_viewer(user)):
+                try:
+                    # Check if this tx exists
+                    target = Target.objects.get(ID=target_id)
+                except ObjectDoesNotExist:
+                    raise Http404
+            else:
+                raise PermissionDenied  # 403
+        else:
 
+            return redirect('/account/login/?next=%s'
+                            % request.get_full_path())
+    else:
+        pass # Public project
 
-def view_by_tx(request, tx_id):
+    deps = project.get_deployments().filter(targetID=target_id)
+    # Have to make a string of ID's seperated by '+' to use view_by_dep method'
+    dep_ids = [] 
+    for d in deps:
+        dep_ids.append(d.ID)
+
+    dep_ids = "+".join(str(x) for x in dep_ids)
+    return view_by_dep(request, project_id, dep_ids)
+
+def view_by_tx(request, project_id, tx_id):
     ''' Compile a list of deployments associated with `tx_id`. '''
+    try:
+        project = Project.objects.get(ID=project_id)
+    except ObjectDoesNotExist:
+        raise Http404
 
-    return HttpResponse('Not implemented yet. (txID=%s)' % tx_id)
+    if not project.is_public:
+        if request.user.is_authenticated():
+            user = request.user
+            if project.is_owner(user) \
+                or user.has_perm('project.can_view') \
+                and (project.is_collaborator(user)
+                     or project.is_viewer(user)):
+                try:
+                    # Check if this tx exists
+                    tx = Tx.objects.get(ID=tx_id)
+                except ObjectDoesNotExist:
+                    raise Http404
+            else:
+                raise PermissionDenied  # 403
+        else:
+
+            return redirect('/account/login/?next=%s'
+                            % request.get_full_path())
+    else:
+        pass # Public project
+
+    deps = project.get_deployments().filter(txID=tx_id)
+    # Have to make a string of ID's seperated by '+' to use view_by_dep method'
+    dep_ids = [] 
+    for d in deps:
+        dep_ids.append(d.ID)
+
+    dep_ids = "+".join(str(x) for x in dep_ids)
+    return view_by_dep(request, project_id, dep_ids)
 
 # TODO: Fix timezone/datetime things with the new functions in utils if we extend these graphs
 @login_required(login_url='account/login')
@@ -894,6 +962,6 @@ def generic_graph(
         print e
         content["data"] = json.dumps(None)
     else:
-        content["data"] = json.dumps(rest_api.json_parse(data), cls=DateTimeEncoder)
+        content["data"] = json.dumps(rest_api.json_parse(data), cls=utils.DateTimeEncoder)
 
     return render(request, template, content)

@@ -19,10 +19,10 @@ $(document).ready(function(){
 
     $("#change_num_rows").click(function() {
         var curnum = numVisibleRows();
-        var num = $("#num_rows").val();
+        var num = parseInt($("#num_rows").val());
         if(num-curnum > 0) {
-            for(var i=0; i<num-curnum; i++) {
-                addMore('#form tr:last', 'form');
+            for(var i=curnum; i < num; i++) {
+                addMore('#form tr:last', 'form', i+1);
             }
         }
         else {
@@ -34,24 +34,20 @@ $(document).ready(function(){
     });
 
     $(".delete_button").click(function() {
-        $(this).closest("tr").remove();
-        /*
-        $(this).closest("tr").hide();
-        $(this).closest("tr").find(":input").each(function() {
-            console.log($(this));
-            if($(this).hasClass("datetime")) {
-                console.log("clearing datetimme field");
-            }
-            else {
-                $(this).val("");
-            }
-        });
-        */
+        // Delete this row, and the row above it if that row is for dispalying error messages
+        var $closestTr = $(this).closest("tr");
+        $closestTr.find(".datetime").datetimepicker("destroy");
+        if($closestTr.prev("tr").hasClass("error-tr")) {
+            $closestTr.prev("tr").remove();
+        }
+        $closestTr.remove()
+
         $("#num_rows").val($("#form tr.objectrow:visible").length);
 
         // Change total form number (for Django formset management)
-        var num = $("#id_form-TOTAL_FORMS").val();
+        var num = parseInt($("#id_form-TOTAL_FORMS").val());
         $("#id_form-TOTAL_FORMS").val( --num );
+
         // Change the numbers of the remaining rows
         var $row = $("#form tr.objectrow:visible:first");
         for(var currnum = 0; currnum < num; currnum++) {
@@ -83,6 +79,17 @@ $(document).ready(function(){
         }
         
     });
+
+    // If select caused error when empty (nothing selected), a change of selection will remove msg
+    $("#formset_table select, #formset_table input, #formset_table textarea").change(function() {
+        if($(this).parent("td").hasClass("child-warning-border")) {
+            $(this).parent("td").removeClass("child-warning-border");
+            var ind = $(this).parent("td").index();
+            if ($(this).closest("tr").prev().hasClass("error-tr")) {
+                $(this).closest("tr").prev().children().eq(ind).html("");
+            }
+        }
+    })
 });
 
 function numVisibleRows() {
@@ -96,12 +103,13 @@ function numVisibleRows() {
     return num;
 }
 
-function addMore(selector, type) {
+// number is 0 indexed, describes the row number to be inserted.
+function addMore(selector, type, number) {
     var $newElement = $(selector).clone(true);
-    var total = $("#id_" + type + "-TOTAL_FORMS").val();
+    //var total = $("#id_" + type + "-TOTAL_FORMS").val();
     $newElement.find(':input').each(function() {
         if($(this).attr("name")) {
-            var name = $(this).attr("name").replace("-" + (total-1) + "-", "-" + total + "-");
+            var name = $(this).attr("name").replace("-" + (number-2) + "-", "-" + (number-1) + "-");
             var id = "id_" + name;
             $(this).attr({"name": name, "id": id});//.val('').removeAttr('checked');
             if(name.indexOf("description") != -1) {
@@ -115,11 +123,14 @@ function addMore(selector, type) {
        $(newSelects[i]).val($(this).val());
     });
 
-    total++;
     // Update formset manager total
-    $("#id_" + type + "-TOTAL_FORMS").val(total);
+    var total = parseInt($("#id_" + type + "-TOTAL_FORMS").val());
+    $("#id_" + type + "-TOTAL_FORMS").val(total + 1);
     $(selector).css('display','');
     $(selector).after($newElement);
+
+    // Remove old datetimepicker and Iniitialize datetimepicker for new row
+    $newElement.find('.datetime').off(".xdsoft").removeData('xdsoft_datetimepicker').removeData('xdsoft_datetime').datetimepicker({format: "m/d/Y H:i:s"});
 }
 
 // true if form is empty, false if not empty
@@ -212,14 +223,14 @@ function checkFormEmpty() {
   {% if forloop.first %}
   <thead><tr>
     {% for field in form.visible_fields %}
-        <th name="{{ field.label|capfirst }}">{{ field.label|capfirst }}</th>
+        <th name="{{ field.label }}">{{ field.label }}</th>
     {% endfor %}
   </tr></thead>
   {% endif %}
   {% if formset.errors %}
-    <tr>
+    <tr class="error-tr">
     {% for field in form.visible_fields %}
-      <td>
+      <td class="warning-text">
         {% if field.errors %}
           {{ field.errors.as_ul }}
         {% endif %}
@@ -229,7 +240,7 @@ function checkFormEmpty() {
   {% endif %}
   <tr class="{% cycle row1,row2 %} objectrow">
   {% for field in form.visible_fields %}
-    <td>
+  <td {% if field.errors %}class="child-warning-border"{% endif %}>
     {# Include the hidden fields in the form #}
     {% comment %}
     {% if forloop.first %}
@@ -241,10 +252,10 @@ function checkFormEmpty() {
       {{ field }}
     </td>
   {% endfor %}
-    <td>
+    <td class="initial-width">
       <button type="button" class="btn btn-xs delete_button">Delete</button>
     </td>
-    <td>
+    <td class="initial-width">
       <button type="button" class="btn btn-xs copy_button">Copy▾</button>
     </td>
   </tr>

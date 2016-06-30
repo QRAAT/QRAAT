@@ -194,20 +194,22 @@ class AddDeploymentForm(ProjectElementForm):
 
     class Meta:
         model = Deployment
-        exclude = ["projectID", "is_active", "is_hidden"]
+        exclude = ["projectID", "is_active", "is_hidden", "name"]
+        labels = {"description":("Description/Notes/Comments")}
+        fields = ["txID", "targetID", "time_start", "time_end", "description"]
 
     DATE_FORMAT = "%m/%d/%Y %H:%M:%S"
 
-    txID = forms.ChoiceField()
-    targetID = forms.ChoiceField()
+    txID = forms.ChoiceField(label="Transmitter Frequency (MHz)")
+    targetID = forms.ChoiceField(label="Target ID/Name/Number")
     time_start = forms.DateTimeField(
         widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
         initial=datetime.now().strftime(DATE_FORMAT),
-        input_formats=[DATE_FORMAT, ])
+        input_formats=[DATE_FORMAT, ], label='Start Time')
     time_end = forms.DateTimeField(
         widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
         initial=datetime.now().strftime(DATE_FORMAT),
-        input_formats=[DATE_FORMAT, ])
+        input_formats=[DATE_FORMAT, ], label='End Time')
 
     def set_project(self, project):
         super(AddDeploymentForm, self).set_project(project)
@@ -257,13 +259,13 @@ class AddTransmitterForm(ProjectElementForm):
 
     class Meta:
         model = Tx
-        exclude = ["projectID", "is_hidden"]
-        labels = {"name": ("Transmitter name"),
-                  "serial_no": ("Serial number"),
-                  "tx_makeID": ("Manufacturer"),
-                  "frequency": ("Frequency (Hz)")}
+        exclude = ["projectID", "is_hidden", "name"]
+        labels = {"tx_makeID": ("Manufacturer"),
+                  "frequency": ("Frequency"),
+                  "serial_no": ("Serial number")}
+        fields = ["tx_makeID", "frequency", "serial_no"]
 
-    frequency = forms.FloatField(min_value=0, widget=widgets.NumberInput(attrs={"step":"0.001"}))
+    frequency = forms.FloatField(label="Frequency (MHz)", min_value=0, widget=widgets.NumberInput(attrs={"step":"0.001"}))
 
     def save(self, commit=True):
         """Overriden method to set the right tx_make and
@@ -326,11 +328,15 @@ class EditDeploymentForm(ProjectElementForm):
 
     class Meta:
         model = Deployment
-        exclude = ["projectID", "is_hidden", "time_end", "targetID", "txID"]
+        exclude = ["projectID", "is_hidden", "targetID", "txID"]
 
     DATE_FORMAT = "%m/%d/%Y %H:%M:%S"
 
     time_start = forms.DateTimeField(
+        widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
+        input_formats=[DATE_FORMAT, ])
+
+    time_end = forms.DateTimeField(
         widget=widgets.DateTimeInput(attrs={'class': 'datetime'}),
         input_formats=[DATE_FORMAT, ])
 
@@ -342,6 +348,18 @@ class EditDeploymentForm(ProjectElementForm):
         except:
             raise forms.ValidationError(
                 "We couldn't parse the time_start given.\
+                        Check if the format is correct")
+        else:
+            return timestamp
+
+    def clean_time_end(self):
+        time_end = self.cleaned_data.get("time_start").astimezone(pytz.utc)
+
+        try:
+            timestamp = utils.date_totimestamp(time_end)
+        except:
+            raise forms.ValidationError(
+                "We couldn't parse the time_end given.\
                         Check if the format is correct")
         else:
             return timestamp

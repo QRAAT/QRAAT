@@ -112,13 +112,13 @@ class est (qraat.csv.csv):
   """
 
   def __init__(self, det=None, dets=None, fn=None):
-  
+
+    qraat.csv.csv.__init__(self)  
     self.txid_index = self.siteid_index = None
-    self.table = []
 
     # TODO deal with 'datetime' (before 'timestamp')  and 'timezone' (before 'txid') in old est archives. 
     # NOTE deploymentID called txid for legacy reasons. 
-    self.headers = [ 'ID', 'siteid', 'timestamp', 'frequency', 'center', 'fdsp', 
+    headers = [ 'ID', 'siteid', 'timestamp', 'frequency', 'center', 'fdsp', 
                      'fd1r', 'fd1i', 'fd2r', 'fd2i', 'fd3r', 'fd3i', 'fd4r', 'fd4i', 
                      'band3', 'band10', 'edsp', 
                      'ed1r', 'ed1i', 'ed2r', 'ed2i', 'ed3r', 'ed3i', 'ed4r', 'ed4i', 
@@ -130,21 +130,11 @@ class est (qraat.csv.csv):
                      'fdsnr', 'edsnr', 'txid', 
                      'tagname', 'fn' ]
 
-    self.Row = type('Row', (object,), { h : None for h in self.headers })
-    self.Row.headers = self.headers
-
-    def f(self):
-      for h in self.headers:
-         yield getattr(self, h)
-    self.Row.__iter__ = f
-    def g(self, i):
-      return getattr(self, i)
-    self.Row.__getitem__ = g
-
-    self._row_template = "%10s " * len(self.headers)
+    lengths = self._csv__build_header(headers)
+    self._csv__build_row_template(lengths)
 
     if fn: 
-      self.read(fn, build_header=False)
+      self.read(fn, build_header=False)#This only works if the file has the same headers as above
 
     if det:
       self.append(det)
@@ -204,7 +194,7 @@ class est (qraat.csv.csv):
     new_row.tagname   = det.tag_name
     new_row.timestamp = det.time
     new_row.frequency = det.freq
-    new_row.center    = det.params.ctr_freq
+    new_row.center    = det.ctr_freq
     new_row.fn        = det.fn
 
     # Fourier decomposistion

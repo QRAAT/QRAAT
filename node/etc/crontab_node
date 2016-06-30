@@ -1,0 +1,4 @@
+*/5 * * * * /usr/local/bin/rmg-node check
+59 * * * * /usr/local/bin/rmg-node restart
+@reboot echo "`date +\%s`,Reboot">>/home/rmg/status.log && /usr/local/bin/rmg-node check
+01 * * * * /usr/local/bin/rmg_clean_logs

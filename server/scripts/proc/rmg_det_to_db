@@ -36,6 +36,7 @@ try: # Get some environment variables.
   det_dir  = os.environ['RMG_SERVER_DET_DIR']
   det_arch = os.environ['RMG_SERVER_DET_ARCHIVE']
   est_arch = os.environ['RMG_SERVER_EST_ARCHIVE']
+  det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
   DIRECTORY_THROTTLE=int(os.environ['RMG_DIRECTORY_THROTTLE'])
 except KeyError: 
   print >>sys.stderr, "det_to_db: error: undefined environment variables. Try `source rmg_env.`"
@@ -84,10 +85,10 @@ else:
 for site in dir_sitelist:
 
   if site in db_sitelist:
-    site_dir = '{}/{}'.format(det_dir, site)
+    site_dir = os.path.join(det_dir, site)
     
     # Don't process sites currently being fetched or that don't have files in them. 
-    if os.path.isdir(site_dir) and not os.path.isfile('{}/fetching.site'.format(site_dir)):
+    if os.path.isdir(site_dir) and not os.path.isfile(os.path.join(site_dir,'fetching.site')):
               
       directory_counter = 0
       for leaf_dir,sublist,filelist in os.walk(site_dir):
@@ -95,6 +96,7 @@ for site in dir_sitelist:
           break
         elif sublist:
           sublist.sort()
+          sublist.reverse()
         elif filelist:
 
           #get directories
@@ -109,14 +111,12 @@ for site in dir_sitelist:
                     
             if bad_list: #there are non-readable det files
             
-              det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
-              q_dir = ("{}/{}_".format(det_q, site)) +\
-                       ("{}.{}.{}.{}.{}/".format(*date_tuple))
+              q_dir = os.path.join(det_q,"{}_{}.{}.{}.{}.{}".format(site,*date_tuple))
               try:
                 os.makedirs(q_dir)
-              except OSError:
-                if not os.path.isdir(q_dir):
-                  raise
+              except OSError, e:            # Catch if directory exists;
+                if e.errno != errno.EEXIST: # otherwise, throw exception.  
+                  raise e
             
               for f in bad_list:
                 (status, output) = commands.getstatusoutput("mv {0} {1}".format(f,q_dir))
@@ -138,9 +138,7 @@ for site in dir_sitelist:
                 #could be MySQLdb.error that we haven't anticipated
                 print >>sys.stderr, "det_to_db: warning: skipping est row corresponding to '{0}' due to error from qraat.est.est.write_db_row()".format(row.fn)
                 print >>sys.stderr, "det_to_db: error was: {0}".format(e)
-                det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
-                q_dir = ("{}/{}_".format(det_q, site)) +\
-                       ("{}.{}.{}.{}.{}/".format(*date_tuple))
+                q_dir = os.path.join(det_q,"{}_{}.{}.{}.{}.{}".format(site,*date_tuple))
                 try:
                   os.makedirs(q_dir)
                 except OSError, e:            # Catch if directory exists;
@@ -152,12 +150,10 @@ for site in dir_sitelist:
                   print >>sys.stderr, output
                   
             # Archive table as est file. 
-            table.write(("{}/{}/".format(est_arch, site)) +\
-                         ("{}/{}/{}/{}/{}/".format(*date_tuple)))
+            table.write(os.path.join(est_arch, site, *date_tuple))
           
             # Archive processed det files.
-            arch_fn = ("{}/{}/".format(det_arch, site)) +\
-                     ("{}/{}/{}/{}/{}/".format(*date_tuple))
+            arch_fn = os.path.join(det_arch, site, *date_tuple)
             try:
               os.makedirs(arch_fn)
             except OSError, e:            # Catch if directory exists;
@@ -185,7 +181,7 @@ for site in dir_sitelist:
                 total_directories+=1
           else:#there are some type of file in directory and directory doesn't pass regex
             #quarantine weird thing
-            det_q = os.environ['RMG_SERVER_DET_QUARANTINE']
+
             if leaf_dir.startswith(det_dir):
               leaf = leaf_dir[len(det_dir)+1:]#remove det_dir and extra '/'
               if leaf.startswith(site):

@@ -71,9 +71,6 @@
 #
 # Cycle the power on the RMG module.  
 #
-# TODOs 
-# 
-# - Run task on 'all' sites. 
 #
 #
 
@@ -184,6 +181,10 @@ function get_status() {
                 then
                   ping_computer="success"
                   read site_goal timestamp site_status <<< `ssh -o ConnectTimeout=$ConnectTimeout $SITE "rmg_csv --column state <$RMG_SITE_METADATA_DIR/site.csv; rmg_csv --last-row timestamp site_status <$RMG_SITE_METADATA_DIR/status.log"`
+<<<<<<< HEAD
+=======
+
+>>>>>>> master
                   if [ -z "$site_goal" ]
                    then
                     site_goal="unknown"
@@ -264,22 +265,17 @@ case $TASK in
       TX_FILE=$2
       shift
       shift
+<<<<<<< HEAD
     else     
       TX_FILE=$RMG_SERVER_TXLIST
     fi
     rmg_txlist $RMG_SERVER_DB_AUTH -f $TX_FILE
     exit 0
+=======
+    fi
+>>>>>>> master
   ;;
 
-  calibration)
-    if [[ "$1" == "-f" ]] || [[ "$1" == "--file" ]] 
-    then
-      TX_FILE=$2
-      shift
-      shift
-    fi
-  ;;
-    
   status|update|on|off|up|down|start|stop|fetch|cyclerx|do_nothing|die|down_now|auto_off|auto_on)
   ;; 
     
@@ -451,7 +447,7 @@ do
           do_update $SITE
           mkdir -p $RMG_SERVER_DET_DIR/$SITE 
           touch $RMG_SERVER_DET_DIR/$SITE/fetching.site
-          rsync -az $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
+          rsync -az --timeout=300 $SITE:$RMG_SITE_DET_DIR/ $RMG_SERVER_DET_DIR/$SITE/
           rm $RMG_SERVER_DET_DIR/$SITE/fetching.site
           ssh -o ConnectTimeout=$ConnectTimeout $SITE "rmg-node down -d 0; sleep 1; rmg-node check"
         else
@@ -507,7 +503,7 @@ do
               echo "$SITE copying $DIR"
               mkdir -p $RMG_SERVER_DET_DIR/$SITE/$DIR
               # download to RMG server and delete from site if xfer succeeds
-              rsync -az --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
+              rsync -az --timeout=30 --remove-source-files $SITE:$RMG_SITE_DET_DIR/$DIR/* $RMG_SERVER_DET_DIR/$SITE/$DIR
               if [ $? -ne 0 ]; then
                 echo "rsync error copying $DIR from $SITE"
               fi
